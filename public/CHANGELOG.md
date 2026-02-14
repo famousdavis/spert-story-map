@@ -1,5 +1,34 @@
 # Changelog
 
+## Version 0.6.0 (2026-02-14)
+
+### Added
+- **Error Boundary** — Wraps the app router; catches render crashes and shows a reload button instead of white-screening
+- **Save flush on tab close** — `flushPendingSaves()` fires on `beforeunload`, preventing data loss from the 500ms debounce window
+- **Storage quota awareness** — Red banner appears in ProductLayout when localStorage writes fail ("Storage full — export your data")
+
+### Refactored
+- Created `forEachRib` / `reduceRibs` utilities — replaces 12+ manual triple-nested loops across the codebase
+- Rewrote 10 functions in `calculations.js` (458→320 LOC) using `reduceRibs`
+- Extracted `ReleaseColumn` component from `ReleasePlanningView` (429→355 LOC)
+- Decomposed `ProgressTrackingView` (606→395 LOC) — extracted `SprintSummaryCard`, `BurnUpChart`, and `ProgressRow` into `src/components/progress/`
+- Extracted `CollapsibleSection` into reusable `src/components/ui/CollapsibleSection.jsx`
+- Moved `addRelease` and `addSprint` into `useProductMutations` hook — eliminates duplication across 3 views
+- Extracted `readImportFile()` shared utility to deduplicate file import in ProductList and SettingsView
+- Extracted cascade deletion as pure functions in `src/lib/settingsMutations.js` (`deleteReleaseFromProduct`, `deleteSprintFromProduct`, `releaseHasAllocations`)
+- Replaced manual stats loop in StructureView with `reduceRibs`
+
+### Fixed
+- `parseInt` calls missing radix parameter in SettingsView size mapping
+- Sprint cadence input NaN fallback (empty input now defaults to 2 weeks)
+
+### Technical
+- Added `settingsMutations.test.js` (12 tests) for cascade deletion coverage
+- Added `duplicateProduct` edge case tests (4 tests) in `storage.test.js`
+- Added `getReleasePercentComplete` sprint history tests (4 tests) and `getSprintSummary` non-core breakdown tests (2 tests) in `calculations.test.js`
+- Added `ribHelpers.test.js` (6 tests) for `forEachRib` / `reduceRibs`
+- 156 tests total across 8 test files
+
 ## Version 0.5.0 (2026-02-14)
 
 ### Refactored

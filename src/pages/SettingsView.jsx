@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { exportProduct, importProductFromJSON, saveProductImmediate } from '../lib/storage';
-import { calculateNextSprintEndDate } from '../lib/progressMutations';
+import { exportProduct, readImportFile, saveProductImmediate } from '../lib/storage';
+import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
+import { useProductMutations } from '../hooks/useProductMutations';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 export default function SettingsView() {
   const { product, updateProduct } = useOutletContext();
+  const { addRelease, addSprint } = useProductMutations(updateProduct);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   // Release drag-to-reorder state
@@ -27,7 +29,7 @@ export default function SettingsView() {
     updateProduct(prev => ({
       ...prev,
       sizeMapping: prev.sizeMapping.map((m, i) =>
-        i === index ? { ...m, points: parseInt(m.points) || 0 } : m
+        i === index ? { ...m, points: parseInt(m.points, 10) || 0 } : m
       ),
     }));
   };
@@ -47,19 +49,6 @@ export default function SettingsView() {
   };
 
   // Releases
-  const addRelease = () => {
-    updateProduct(prev => ({
-      ...prev,
-      releases: [...prev.releases, {
-        id: crypto.randomUUID(),
-        name: `Release ${prev.releases.length + 1}`,
-        order: prev.releases.length + 1,
-        description: '',
-        targetDate: null,
-      }],
-    }));
-  };
-
   const updateRelease = (id, updates) => {
     updateProduct(prev => ({
       ...prev,
@@ -108,68 +97,14 @@ export default function SettingsView() {
   };
 
   const deleteRelease = (id) => {
-    // Check if any rib items reference this release
-    let hasAllocations = false;
-    for (const t of product.themes) {
-      for (const b of t.backboneItems) {
-        for (const r of b.ribItems) {
-          if (r.releaseAllocations.some(a => a.releaseId === id)) {
-            hasAllocations = true;
-            break;
-          }
-        }
-        if (hasAllocations) break;
-      }
-      if (hasAllocations) break;
-    }
-
-    if (hasAllocations) {
+    if (releaseHasAllocations(product, id)) {
       setDeleteTarget({ type: 'release', id, message: 'This release has rib items allocated to it. Deleting it will remove those allocations. Continue?' });
     } else {
-      doDeleteRelease(id);
+      updateProduct(prev => deleteReleaseFromProduct(prev, id));
     }
-  };
-
-  const doDeleteRelease = (id) => {
-    updateProduct(prev => {
-      // Clean the deleted release's column from releaseCardOrder
-      const { [id]: _, ...restCardOrder } = prev.releaseCardOrder || {};
-      return {
-        ...prev,
-        releases: prev.releases.filter(r => r.id !== id).map((r, i) => ({ ...r, order: i + 1 })),
-        themes: prev.themes.map(t => ({
-          ...t,
-          backboneItems: t.backboneItems.map(b => ({
-            ...b,
-            ribItems: b.ribItems.map(r => ({
-              ...r,
-              releaseAllocations: r.releaseAllocations.filter(a => a.releaseId !== id),
-              progressHistory: r.progressHistory.filter(p => p.releaseId !== id),
-            })),
-          })),
-        })),
-        releaseCardOrder: restCardOrder,
-      };
-    });
   };
 
   // Sprints
-  const addSprint = () => {
-    updateProduct(prev => {
-      const cadenceWeeks = prev.sprintCadenceWeeks || 2;
-      const last = prev.sprints.length > 0 ? prev.sprints[prev.sprints.length - 1] : null;
-      return {
-        ...prev,
-        sprints: [...prev.sprints, {
-          id: crypto.randomUUID(),
-          name: `Sprint ${prev.sprints.length + 1}`,
-          order: prev.sprints.length + 1,
-          endDate: calculateNextSprintEndDate(last?.endDate, cadenceWeeks),
-        }],
-      };
-    });
-  };
-
   const updateSprint = (id, updates) => {
     updateProduct(prev => ({
       ...prev,
@@ -178,48 +113,19 @@ export default function SettingsView() {
   };
 
   const deleteSprint = (id) => {
-    updateProduct(prev => ({
-      ...prev,
-      sprints: prev.sprints.filter(s => s.id !== id).map((s, i) => ({ ...s, order: i + 1 })),
-      themes: prev.themes.map(t => ({
-        ...t,
-        backboneItems: t.backboneItems.map(b => ({
-          ...b,
-          ribItems: b.ribItems.map(r => ({
-            ...r,
-            progressHistory: r.progressHistory.filter(p => p.sprintId !== id),
-          })),
-        })),
-      })),
-    }));
+    updateProduct(prev => deleteSprintFromProduct(prev, id));
   };
 
   // Import/Export
   const handleExport = () => exportProduct(product);
 
   const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const imported = importProductFromJSON(ev.target.result);
-          if (!window.confirm(`Import "${imported.name}"? This will overwrite the current project data.`)) return;
-          // Overwrite current product with imported data, keeping same ID
-          const merged = { ...imported, id: product.id };
-          saveProductImmediate(merged);
-          window.location.reload();
-        } catch (err) {
-          alert('Import failed: ' + err.message);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+    readImportFile((imported) => {
+      if (!window.confirm(`Import "${imported.name}"? This will overwrite the current project data.`)) return;
+      const merged = { ...imported, id: product.id };
+      saveProductImmediate(merged);
+      window.location.reload();
+    });
   };
 
   const handleDownloadTemplate = () => {
@@ -363,7 +269,7 @@ export default function SettingsView() {
           <label className="text-xs font-medium text-gray-500">Sprint cadence</label>
           <select
             value={product.sprintCadenceWeeks || 2}
-            onChange={e => updateProduct(prev => ({ ...prev, sprintCadenceWeeks: parseInt(e.target.value) }))}
+            onChange={e => updateProduct(prev => ({ ...prev, sprintCadenceWeeks: parseInt(e.target.value, 10) || 2 }))}
             className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-700"
           >
             <option value={1}>1 week</option>
@@ -408,7 +314,7 @@ export default function SettingsView() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
-          if (deleteTarget.type === 'release') doDeleteRelease(deleteTarget.id);
+          if (deleteTarget.type === 'release') updateProduct(prev => deleteReleaseFromProduct(prev, deleteTarget.id));
         }}
         title="Confirm Delete"
         message={deleteTarget?.message || ''}

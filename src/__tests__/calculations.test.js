@@ -541,3 +541,145 @@ describe('getRibItemPercentCompleteAsOf', () => {
     expect(getRibItemPercentCompleteAsOf(rib, null, sprints)).toBe(42);
   });
 });
+
+// --- getReleasePercentComplete with sprintId ---
+describe('getReleasePercentComplete with sprint history', () => {
+  const sprints = [
+    { id: 'sp-1', name: 'Sprint 1', order: 1 },
+    { id: 'sp-2', name: 'Sprint 2', order: 2 },
+  ];
+
+  it('uses historical walk-back when sprintId is provided', () => {
+    const rib = makeRib('r1', {
+      size: 'M', // 20 pts
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [
+        { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 40 },
+        { sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: 80 },
+      ],
+    });
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
+      sprints,
+    });
+    // As of sp-1: 40/100 = 40%
+    expect(getReleasePercentComplete(product, 'rel-1', 'sp-1')).toBe(40);
+    // As of sp-2: 80/100 = 80%
+    expect(getReleasePercentComplete(product, 'rel-1', 'sp-2')).toBe(80);
+  });
+
+  it('handles partial allocations across releases', () => {
+    const rib = makeRib('r1', {
+      size: 'L', // 40 pts
+      allocations: [
+        { releaseId: 'rel-1', percentage: 60 },
+        { releaseId: 'rel-2', percentage: 40 },
+      ],
+      history: [
+        { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 60 },
+      ],
+    });
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
+      releases: [
+        { id: 'rel-1', name: 'R1', order: 1 },
+        { id: 'rel-2', name: 'R2', order: 2 },
+      ],
+      sprints,
+    });
+    // rel-1: allocated 24pts (40*0.6), progress 60/60 = 100% of allocation
+    expect(getReleasePercentComplete(product, 'rel-1', 'sp-1')).toBe(100);
+    // rel-2: allocated 16pts (40*0.4), no progress → 0%
+    expect(getReleasePercentComplete(product, 'rel-2', 'sp-1')).toBe(0);
+  });
+
+  it('handles zero-point ribs allocated to release', () => {
+    const rib = makeRib('r1', {
+      // size: null → 0 points
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 50 }],
+    });
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
+      sprints,
+    });
+    expect(getReleasePercentComplete(product, 'rel-1', 'sp-1')).toBe(0); // 0 allocated points
+  });
+
+  it('returns 100% when all ribs at 100% progress', () => {
+    const rib = makeRib('r1', {
+      size: 'S', // 10 pts
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 100 }],
+    });
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
+      sprints,
+    });
+    expect(getReleasePercentComplete(product, 'rel-1', 'sp-1')).toBe(100);
+  });
+});
+
+// --- getSprintSummary non-core breakdown ---
+describe('getSprintSummary core/nonCore breakdown', () => {
+  it('correctly splits core and non-core metrics', () => {
+    const coreRib = makeRib('r1', {
+      size: 'M', // 20 pts
+      category: 'core',
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 50 }],
+    });
+    const nonCoreRib = makeRib('r2', {
+      size: 'S', // 10 pts
+      category: 'non-core',
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 100 }],
+    });
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [coreRib, nonCoreRib])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
+      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1 }],
+    });
+
+    const summary = getSprintSummary(product, 'sp-1');
+    expect(summary.core.totalPoints).toBe(20);
+    expect(summary.core.completedPoints).toBe(10);
+    expect(summary.core.percentComplete).toBe(50);
+
+    expect(summary.nonCore.totalPoints).toBe(10);
+    expect(summary.nonCore.completedPoints).toBe(10);
+    expect(summary.nonCore.percentComplete).toBe(100);
+
+    expect(summary.totalPoints).toBe(30);
+    expect(summary.itemsTotal).toBe(2);
+    expect(summary.itemsUpdated).toBe(2);
+  });
+
+  it('tracks itemsUpdated vs itemsTotal correctly with mixed updates', () => {
+    const updated = makeRib('r1', {
+      size: 'S', category: 'core',
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [{ sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: 30 }],
+    });
+    const notUpdated = makeRib('r2', {
+      size: 'M', category: 'non-core',
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 50 }],
+    });
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [updated, notUpdated])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
+      sprints: [
+        { id: 'sp-1', name: 'Sprint 1', order: 1 },
+        { id: 'sp-2', name: 'Sprint 2', order: 2 },
+      ],
+    });
+
+    const summary = getSprintSummary(product, 'sp-2');
+    expect(summary.itemsTotal).toBe(2);
+    expect(summary.itemsUpdated).toBe(1); // only r1 has sp-2 entry
+  });
+});

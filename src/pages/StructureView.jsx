@@ -5,6 +5,7 @@ import SizePicker from '../components/ui/SizePicker';
 import CategoryBadge from '../components/ui/CategoryBadge';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, getRibItemPercentComplete } from '../lib/calculations';
+import { reduceRibs } from '../lib/ribHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
 
 const GRID_COLS = '24px minmax(120px, 1fr) 48px 44px 80px 56px 56px 56px 36px';
@@ -155,19 +156,12 @@ export default function StructureView() {
     handleRibDragEnd();
   };
 
-  const stats = useMemo(() => {
-    let totalItems = 0, totalPoints = 0, unsized = 0;
-    for (const t of product.themes) {
-      for (const b of t.backboneItems) {
-        for (const r of b.ribItems) {
-          totalItems++;
-          totalPoints += getRibItemPoints(r, product.sizeMapping);
-          if (!r.size) unsized++;
-        }
-      }
-    }
-    return { totalItems, totalPoints, unsized };
-  }, [product]);
+  const stats = useMemo(() => reduceRibs(product, (acc, rib) => {
+    acc.totalItems++;
+    acc.totalPoints += getRibItemPoints(rib, product.sizeMapping);
+    if (!rib.size) acc.unsized++;
+    return acc;
+  }, { totalItems: 0, totalPoints: 0, unsized: 0 }), [product]);
 
   return (
     <div className="max-w-3xl">

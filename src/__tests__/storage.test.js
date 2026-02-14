@@ -120,6 +120,93 @@ describe('duplicateProduct', () => {
     expect(dupRib.size).toBe('M');
     expect(dupRib.category).toBe('core');
   });
+
+  it('handles multiple releases with cross-references', () => {
+    const multi = {
+      ...original,
+      releases: [
+        { id: 'rel-1', name: 'R1', order: 1 },
+        { id: 'rel-2', name: 'R2', order: 2 },
+        { id: 'rel-3', name: 'R3', order: 3 },
+      ],
+      themes: [{
+        id: 't1', name: 'T1', order: 1,
+        backboneItems: [{
+          id: 'b1', name: 'B1', order: 1,
+          ribItems: [{
+            id: 'r1', name: 'Rib', size: 'M', category: 'core', order: 1,
+            releaseAllocations: [
+              { releaseId: 'rel-1', percentage: 40 },
+              { releaseId: 'rel-2', percentage: 60 },
+            ],
+            progressHistory: [
+              { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 20 },
+              { sprintId: 'sp-1', releaseId: 'rel-2', percentComplete: 30 },
+            ],
+          }],
+        }],
+      }],
+      releaseCardOrder: { 'rel-1': ['r1'], 'rel-2': ['r1'] },
+    };
+
+    const dup = duplicateProduct(multi);
+    const dupRib = dup.themes[0].backboneItems[0].ribItems[0];
+    // Each allocation references consistent new release IDs
+    const newRel1 = dup.releases[0].id;
+    const newRel2 = dup.releases[1].id;
+    expect(dupRib.releaseAllocations[0].releaseId).toBe(newRel1);
+    expect(dupRib.releaseAllocations[1].releaseId).toBe(newRel2);
+    // Progress also references the same remapped IDs
+    expect(dupRib.progressHistory[0].releaseId).toBe(newRel1);
+    expect(dupRib.progressHistory[1].releaseId).toBe(newRel2);
+    // Card order keys remapped
+    expect(dup.releaseCardOrder[newRel1]).toBeDefined();
+    expect(dup.releaseCardOrder[newRel2]).toBeDefined();
+  });
+
+  it('handles empty releaseCardOrder', () => {
+    const noOrder = { ...original };
+    delete noOrder.releaseCardOrder;
+    const dup = duplicateProduct(noOrder);
+    expect(dup.releaseCardOrder).toEqual({});
+  });
+
+  it('handles progressHistory entries without releaseId (legacy)', () => {
+    const legacy = {
+      ...original,
+      themes: [{
+        id: 't1', name: 'T1', order: 1,
+        backboneItems: [{
+          id: 'b1', name: 'B1', order: 1,
+          ribItems: [{
+            id: 'r1', name: 'Rib', size: 'M', category: 'core', order: 1,
+            releaseAllocations: [],
+            progressHistory: [
+              { sprintId: 'sp-1', percentComplete: 50 },
+            ],
+          }],
+        }],
+      }],
+    };
+    const dup = duplicateProduct(legacy);
+    const entry = dup.themes[0].backboneItems[0].ribItems[0].progressHistory[0];
+    expect(entry.sprintId).toBe(dup.sprints[0].id);
+    // No releaseId should be added
+    expect(entry.releaseId).toBeUndefined();
+  });
+
+  it('handles product with no themes', () => {
+    const empty = {
+      ...original,
+      themes: [],
+      releaseCardOrder: {},
+    };
+    const dup = duplicateProduct(empty);
+    expect(dup.themes).toEqual([]);
+    expect(dup.releases.length).toBe(1);
+    expect(dup.sprints.length).toBe(1);
+    expect(dup.id).not.toBe(empty.id);
+  });
 });
 
 // --- importProductFromJSON ---

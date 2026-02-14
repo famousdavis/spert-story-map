@@ -1,16 +1,42 @@
 import { STORAGE_KEYS, SCHEMA_VERSION, DEFAULT_SIZE_MAPPING } from './constants';
 
+// Save error callback — subscribe to get notified when localStorage writes fail
+let _onSaveError = null;
+export function onSaveError(callback) { _onSaveError = callback; }
+
+function handleSaveError(e) {
+  console.error('Failed to save to localStorage:', e);
+  if (_onSaveError) _onSaveError(e);
+}
+
 // Debounce helper
 let saveTimers = {};
+let pendingSaves = {};
 function debouncedSave(key, data, delay = 500) {
   if (saveTimers[key]) clearTimeout(saveTimers[key]);
+  pendingSaves[key] = data;
   saveTimers[key] = setTimeout(() => {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (e) {
-      console.error('Failed to save to localStorage:', e);
+      handleSaveError(e);
     }
+    delete pendingSaves[key];
   }, delay);
+}
+
+/** Flush all pending debounced saves immediately. Call on beforeunload. */
+export function flushPendingSaves() {
+  for (const [key, data] of Object.entries(pendingSaves)) {
+    if (saveTimers[key]) clearTimeout(saveTimers[key]);
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      handleSaveError(e);
+    }
+  }
+  saveTimers = {};
+  pendingSaves = {};
 }
 
 function immediatelyLoad(key) {
@@ -120,7 +146,7 @@ export function saveProductImmediate(product) {
     }
     localStorage.setItem(STORAGE_KEYS.PRODUCTS_INDEX, JSON.stringify(index));
   } catch (e) {
-    console.error('Failed to save product:', e);
+    handleSaveError(e);
   }
   return updated;
 }
@@ -247,4 +273,26 @@ export function importProductFromJSON(jsonString) {
     data = migrateToV2(data);
   }
   return data;
+}
+
+/** Open a file picker, read + parse the JSON, and call onParsed(product). */
+export function readImportFile(onParsed) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const product = importProductFromJSON(ev.target.result);
+        onParsed(product);
+      } catch (err) {
+        alert('Failed to import: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }

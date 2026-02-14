@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-  getAllRibItems, getRibItemPoints, getRibItemPercentComplete,
+  getAllRibItems, getRibItemPercentComplete,
   getReleasePercentComplete, getProgressOverTime,
   getRibReleaseProgressForSprint, getRibReleaseProgress, getSprintSummary,
 } from '../lib/calculations';
@@ -9,14 +9,17 @@ import {
   updateProgress as doUpdateProgress,
   removeProgress as doRemoveProgress,
   updateComment as doUpdateComment,
-  calculateNextSprintEndDate,
 } from '../lib/progressMutations';
+import { useProductMutations } from '../hooks/useProductMutations';
 import ProgressBar from '../components/ui/ProgressBar';
-import CommentPanel from '../components/progress/CommentPanel';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import CollapsibleSection from '../components/ui/CollapsibleSection';
+import SprintSummaryCard from '../components/progress/SprintSummaryCard';
+import BurnUpChart from '../components/progress/BurnUpChart';
+import ProgressRow from '../components/progress/ProgressRow';
 
 export default function ProgressTrackingView() {
   const { product, updateProduct } = useOutletContext();
+  const { addSprint } = useProductMutations(updateProduct);
   const [selectedSprint, setSelectedSprint] = useState(
     product.sprints.length > 0 ? product.sprints[product.sprints.length - 1].id : null
   );
@@ -238,23 +241,7 @@ export default function ProgressTrackingView() {
               ))}
             </select>
             <button
-              onClick={() => {
-                const newId = crypto.randomUUID();
-                updateProduct(prev => {
-                  const cadenceWeeks = prev.sprintCadenceWeeks || 2;
-                  const last = prev.sprints.length > 0 ? prev.sprints[prev.sprints.length - 1] : null;
-                  return {
-                    ...prev,
-                    sprints: [...prev.sprints, {
-                      id: newId,
-                      name: `Sprint ${prev.sprints.length + 1}`,
-                      order: prev.sprints.length + 1,
-                      endDate: calculateNextSprintEndDate(last?.endDate, cadenceWeeks),
-                    }],
-                  };
-                });
-                setSelectedSprint(newId);
-              }}
+              onClick={() => addSprint(setSelectedSprint)}
               className="text-gray-400 hover:text-blue-600 text-lg leading-none px-1"
               title="Add sprint"
             >
@@ -330,18 +317,7 @@ export default function ProgressTrackingView() {
       {/* Burn-up chart (collapsible) */}
       {progressData.length > 1 && (
         <CollapsibleSection label="Progress Over Time" open={showChart} onToggle={() => setShowChart(v => !v)}>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={progressData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="sprintName" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="completedPoints" stackId="1" stroke="#3b82f6" fill="#93c5fd" name="Completed" />
-                <Area type="monotone" dataKey="totalPoints" stackId="2" stroke="#e5e7eb" fill="#f3f4f6" name="Total Scope" fillOpacity={0} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <BurnUpChart data={progressData} />
         </CollapsibleSection>
       )}
 
@@ -415,220 +391,5 @@ export default function ProgressTrackingView() {
   );
 }
 
-// --- Sub-components ---
 
-function ProgressRow({
-  rib, idx, sprint, prevSprint, selectedSprint,
-  showTargetCol, totalCols, expandedRows, toggleRow,
-  commentDrafts, setCommentDrafts, progressDrafts, setProgressDrafts,
-  getSprintPct, getCurrentPct, getDelta, getCommentCount, getCommentHistory,
-  updateProgress, removeProgress, updateComment, formatDate, sizeMapping,
-}) {
-  const rowKey = `${rib.id}-${rib._releaseId || idx}`;
-  const isExpanded = expandedRows.has(rowKey);
-  const pts = getRibItemPoints(rib, sizeMapping);
-  const currentPct = getCurrentPct(rib, rib._releaseId);
-  const sprintPct = getSprintPct(rib, rib._releaseId);
-  const delta = getDelta(rib, rib._releaseId);
-  const maxPct = rib._allocPct || 100;
-  const progressBarPct = rib._allocPct
-    ? (rib._allocPct > 0 ? (currentPct / rib._allocPct) * 100 : 0)
-    : currentPct;
-  const commentCount = getCommentCount(rib, rib._releaseId);
 
-  // Get current sprint's comment
-  const currentEntry = rib.progressHistory?.find(
-    p => p.sprintId === selectedSprint && (rib._releaseId ? p.releaseId === rib._releaseId : true)
-  );
-  const savedComment = currentEntry?.comment || '';
-
-  // Initialize comment draft when expanding (replaces old setTimeout-in-render bug)
-  useEffect(() => {
-    if (isExpanded && commentDrafts[rowKey] === undefined && savedComment) {
-      setCommentDrafts(prev => prev[rowKey] === undefined ? { ...prev, [rowKey]: savedComment } : prev);
-    }
-  }, [isExpanded, rowKey, savedComment, commentDrafts, setCommentDrafts]);
-
-  return (
-    <Fragment>
-      <tr className={`hover:bg-gray-50 transition-colors ${isExpanded ? 'bg-blue-50/30' : ''}`}>
-        <td className="px-3 py-2 cursor-pointer select-none" onClick={() => toggleRow(rowKey)}>
-          <div className="flex items-center gap-1.5">
-            <span className={`text-gray-400 text-[10px] transition-transform duration-150 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>&#9654;</span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm text-gray-800 truncate">{rib.name}</span>
-                {commentCount > 0 && (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400 flex-shrink-0" title={`${commentCount} note${commentCount > 1 ? 's' : ''}`}>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    {commentCount}
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-gray-400 truncate">{rib.backboneName}</div>
-            </div>
-          </div>
-        </td>
-        <td className="text-center px-2 py-2">
-          <span className="text-xs text-gray-500">{rib.size || '—'}</span>
-        </td>
-        <td className="text-center px-2 py-2">
-          <span className="text-xs text-gray-500 tabular-nums">
-            {pts ? (rib._allocPct ? Math.round(pts * rib._allocPct / 100) : pts) : '—'}
-          </span>
-        </td>
-        {showTargetCol && (
-          <td className="text-center px-2 py-2">
-            <span className="text-xs text-gray-500 tabular-nums">{rib._allocPct}%</span>
-          </td>
-        )}
-        <td className="text-center px-2 py-2">
-          <span className="text-sm font-medium text-gray-700 tabular-nums">{currentPct}%</span>
-        </td>
-        <td className="text-center px-2 py-2">
-          {rib._editable ? (
-            <input
-              type="number"
-              min={0}
-              max={maxPct}
-              value={progressDrafts[rowKey] ?? sprintPct ?? ''}
-              placeholder="—"
-              onClick={e => e.stopPropagation()}
-              onFocus={() => {
-                if (progressDrafts[rowKey] === undefined) {
-                  setProgressDrafts(prev => ({ ...prev, [rowKey]: sprintPct ?? '' }));
-                }
-              }}
-              onChange={e => {
-                setProgressDrafts(prev => ({ ...prev, [rowKey]: e.target.value }));
-              }}
-              onBlur={() => {
-                const raw = progressDrafts[rowKey];
-                if (raw === undefined) return;
-                if (raw === '' || raw === null) {
-                  removeProgress(rib.id, rib._releaseId);
-                } else {
-                  const val = parseInt(raw, 10);
-                  if (!isNaN(val) && val >= 0 && val <= maxPct) {
-                    updateProgress(rib.id, rib._releaseId, val);
-                  }
-                }
-                setProgressDrafts(prev => { const next = { ...prev }; delete next[rowKey]; return next; });
-              }}
-              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-              className="w-14 border border-gray-200 rounded px-1 py-1 text-sm text-center focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"
-            />
-          ) : (
-            <span className="text-sm text-gray-500 tabular-nums">{sprintPct ?? '—'}%</span>
-          )}
-        </td>
-        {prevSprint && (
-          <td className="text-center px-2 py-2">
-            {delta !== null ? (
-              <span className={`text-xs font-medium tabular-nums ${delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                {delta > 0 ? '+' : ''}{delta}%
-              </span>
-            ) : (
-              <span className="text-xs text-gray-300">—</span>
-            )}
-          </td>
-        )}
-        <td className="px-2 py-2">
-          <ProgressBar percent={progressBarPct} height="h-1.5" />
-        </td>
-      </tr>
-
-      {isExpanded && (
-        <tr>
-          <td colSpan={totalCols} className="px-4 py-3 bg-gray-50/60 border-t border-gray-100">
-            <CommentPanel
-              rib={rib}
-              sprint={sprint}
-              selectedSprint={selectedSprint}
-              rowKey={rowKey}
-              savedComment={savedComment}
-              commentDrafts={commentDrafts}
-              setCommentDrafts={setCommentDrafts}
-              updateComment={updateComment}
-              getCommentHistory={getCommentHistory}
-              formatDate={formatDate}
-              editable={rib._editable}
-            />
-          </td>
-        </tr>
-      )}
-    </Fragment>
-  );
-}
-
-function SprintSummaryCard({ summary, formatDate }) {
-  return (
-    <div className="mb-6 bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
-      <div className="flex items-center gap-8">
-        <div>
-          <div className="text-xs text-gray-400 mb-0.5">Sprint pts</div>
-          <div className={`text-lg font-semibold ${summary.pointsThisSprint > 0 ? 'text-green-600' : 'text-gray-700'}`}>
-            {summary.pointsThisSprint > 0 ? '+' : ''}{summary.pointsThisSprint}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-gray-400 mb-0.5">Completed</div>
-          <div className="text-lg font-semibold text-gray-800">
-            {summary.completedPoints}<span className="text-sm font-normal text-gray-400"> / {summary.totalPoints} pts</span>
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-gray-400 mb-0.5">Remaining</div>
-          <div className="text-lg font-semibold text-gray-800">
-            {summary.remainingPoints}<span className="text-sm font-normal text-gray-400"> pts</span>
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-gray-400 mb-0.5">Items updated</div>
-          <div className="text-lg font-semibold text-gray-800">
-            {summary.itemsUpdated}<span className="text-sm font-normal text-gray-400"> / {summary.itemsTotal}</span>
-          </div>
-        </div>
-        {summary.endDate && (
-          <div>
-            <div className="text-xs text-gray-400 mb-0.5">Ends</div>
-            <div className="text-lg font-semibold text-gray-800">{formatDate(summary.endDate)}</div>
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-6 pt-2 border-t border-gray-100">
-        {[
-          { label: 'Core', data: summary.core },
-          { label: 'Non-core', data: summary.nonCore },
-          { label: 'Total', data: { percentComplete: summary.percentComplete, completedPoints: summary.completedPoints, totalPoints: summary.totalPoints, pointsThisSprint: summary.pointsThisSprint } },
-        ].map(({ label, data }) => (
-          <div key={label} className="flex items-center gap-3">
-            <span className="text-xs text-gray-400 w-16">{label}</span>
-            <span className="text-sm font-semibold text-gray-800 tabular-nums w-12 text-right">{data.percentComplete}%</span>
-            <span className="text-xs text-gray-500 tabular-nums">{data.completedPoints} / {data.totalPoints} pts</span>
-            <span className={`text-xs font-medium tabular-nums ${data.pointsThisSprint > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-              {data.pointsThisSprint > 0 ? '+' : ''}{data.pointsThisSprint}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CollapsibleSection({ label, open, onToggle, children }) {
-  return (
-    <div className="mb-8">
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-2"
-      >
-        <span className={`transition-transform duration-150 ${open ? 'rotate-90' : ''}`}>&#9654;</span>
-        {label}
-      </button>
-      {open && children}
-    </div>
-  );
-}

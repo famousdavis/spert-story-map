@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { loadProductIndex, loadProduct, saveProductImmediate, deleteProduct, exportProduct, importProductFromJSON, createNewProduct, duplicateProduct } from '../lib/storage';
+import { loadProductIndex, loadProduct, saveProductImmediate, deleteProduct, exportProduct, readImportFile, createNewProduct, duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
 import Modal from '../components/ui/Modal';
@@ -66,29 +66,14 @@ export default function ProductList() {
   };
 
   const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const product = importProductFromJSON(ev.target.result);
-          const existing = loadProduct(product.id);
-          if (existing) {
-            if (!window.confirm(`A project with the same ID already exists ("${existing.name}"). Overwrite it?`)) return;
-          }
-          saveProductImmediate(product);
-          refresh();
-        } catch (err) {
-          alert('Failed to import: ' + err.message);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+    readImportFile((product) => {
+      const existing = loadProduct(product.id);
+      if (existing) {
+        if (!window.confirm(`A project with the same ID already exists ("${existing.name}"). Overwrite it?`)) return;
+      }
+      saveProductImmediate(product);
+      refresh();
+    });
   };
 
   return (

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { calculateNextSprintEndDate } from '../lib/progressMutations';
 
 /**
  * Provides reusable CRUD operations for the product's theme/backbone/rib hierarchy.
@@ -90,6 +91,38 @@ export function useProductMutations(updateProduct) {
     }));
   }, [updateBackbone]);
 
+  const addRelease = useCallback(() => {
+    updateProduct(prev => ({
+      ...prev,
+      releases: [...prev.releases, {
+        id: crypto.randomUUID(),
+        name: `Release ${prev.releases.length + 1}`,
+        order: prev.releases.length + 1,
+        description: '',
+        targetDate: null,
+      }],
+    }));
+  }, [updateProduct]);
+
+  const addSprint = useCallback((onCreated) => {
+    const newId = crypto.randomUUID();
+    updateProduct(prev => {
+      const cadenceWeeks = prev.sprintCadenceWeeks || 2;
+      const last = prev.sprints.length > 0 ? prev.sprints[prev.sprints.length - 1] : null;
+      return {
+        ...prev,
+        sprints: [...prev.sprints, {
+          id: newId,
+          name: `Sprint ${prev.sprints.length + 1}`,
+          order: prev.sprints.length + 1,
+          endDate: calculateNextSprintEndDate(last?.endDate, cadenceWeeks),
+        }],
+      };
+    });
+    if (onCreated) onCreated(newId);
+    return newId;
+  }, [updateProduct]);
+
   const moveItem = useCallback((items, id, direction, key = 'id') => {
     const arr = [...items];
     const idx = arr.findIndex(item => item[key] === id);
@@ -107,6 +140,8 @@ export function useProductMutations(updateProduct) {
     addTheme,
     addBackbone,
     addRib,
+    addRelease,
+    addSprint,
     moveItem,
   };
 }

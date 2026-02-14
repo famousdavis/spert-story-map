@@ -1,4 +1,5 @@
 // All computed values - pure functions, no side effects
+import { forEachRib, reduceRibs } from './ribHelpers';
 
 export function getRibItemPoints(ribItem, sizeMapping) {
   if (!ribItem.size) return 0;
@@ -8,59 +9,30 @@ export function getRibItemPoints(ribItem, sizeMapping) {
 
 export function getAllRibItems(product) {
   const items = [];
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        items.push({ ...rib, themeName: theme.name, themeId: theme.id, backboneName: backbone.name, backboneId: backbone.id });
-      }
-    }
-  }
+  forEachRib(product, (rib, { theme, backbone }) => {
+    items.push({ ...rib, themeName: theme.name, themeId: theme.id, backboneName: backbone.name, backboneId: backbone.id });
+  });
   return items;
 }
 
 export function getTotalProjectPoints(product) {
-  let total = 0;
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        total += getRibItemPoints(rib, product.sizeMapping);
-      }
-    }
-  }
-  return total;
+  return reduceRibs(product, (total, rib) => total + getRibItemPoints(rib, product.sizeMapping), 0);
 }
 
 export function getPointsForRelease(product, releaseId) {
-  let total = 0;
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-        if (alloc) {
-          total += getRibItemPoints(rib, product.sizeMapping) * (alloc.percentage / 100);
-        }
-      }
-    }
-  }
-  return total;
+  return reduceRibs(product, (total, rib) => {
+    const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
+    return alloc ? total + getRibItemPoints(rib, product.sizeMapping) * (alloc.percentage / 100) : total;
+  }, 0);
 }
 
 export function getCoreNonCorePoints(product) {
-  let core = 0;
-  let nonCore = 0;
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        const pts = getRibItemPoints(rib, product.sizeMapping);
-        if (rib.category === 'non-core') {
-          nonCore += pts;
-        } else {
-          core += pts;
-        }
-      }
-    }
-  }
-  return { core, nonCore };
+  return reduceRibs(product, (acc, rib) => {
+    const pts = getRibItemPoints(rib, product.sizeMapping);
+    if (rib.category === 'non-core') acc.nonCore += pts;
+    else acc.core += pts;
+    return acc;
+  }, { core: 0, nonCore: 0 });
 }
 
 // --- Per-release progress helpers ---
@@ -113,7 +85,6 @@ export function getRibReleaseProgress(ribItem, releaseId) {
 // Sum per-release entries for the latest sprint to get overall rib %
 export function getRibItemPercentComplete(ribItem) {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
-  // Find the latest entry with an explicit progress value
   const realEntries = ribItem.progressHistory.filter(e => e.percentComplete !== null);
   if (realEntries.length === 0) return 0;
   const lastEntry = realEntries[realEntries.length - 1];
@@ -135,15 +106,12 @@ export function getRibItemPercentCompleteAsOf(ribItem, sprintId, sprints) {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
   if (!sprintId || !sprints) return getRibItemPercentComplete(ribItem);
 
-  // Collect unique releaseIds from progressHistory
   const releaseIds = [...new Set(ribItem.progressHistory.map(p => p.releaseId).filter(Boolean))];
 
   if (releaseIds.length === 0) {
-    // Legacy fallback: no releaseId entries — treat as global
     return _legacyPercentCompleteAsOf(ribItem, sprintId, sprints);
   }
 
-  // Sum per-release walk-backs
   let total = 0;
   for (const releaseId of releaseIds) {
     total += getRibReleaseProgressAsOf(ribItem, releaseId, sprintId, sprints);
@@ -172,76 +140,53 @@ function _legacyPercentCompleteAsOf(ribItem, sprintId, sprints) {
   return best ? best.percentComplete : 0;
 }
 
-// --- Release-level calculations (use per-release progress directly) ---
+// --- Release-level calculations ---
 
 export function getReleasePercentComplete(product, releaseId, sprintId) {
-  let totalAllocatedPoints = 0;
-  let totalCompletedPoints = 0;
+  const { totalAllocatedPoints, totalCompletedPoints } = reduceRibs(product, (acc, rib) => {
+    const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
+    if (!alloc) return acc;
 
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-        if (!alloc) continue;
+    const ribPoints = getRibItemPoints(rib, product.sizeMapping);
+    const allocatedPoints = ribPoints * (alloc.percentage / 100);
+    acc.totalAllocatedPoints += allocatedPoints;
 
-        const ribPoints = getRibItemPoints(rib, product.sizeMapping);
-        const allocatedPoints = ribPoints * (alloc.percentage / 100);
-        totalAllocatedPoints += allocatedPoints;
-
-        // Read release-specific progress directly
-        const releaseProgress = sprintId
-          ? getRibReleaseProgressAsOf(rib, releaseId, sprintId, product.sprints)
-          : getRibReleaseProgress(rib, releaseId);
-        // releaseProgress is 0..alloc.percentage; convert to fraction of allocation
-        const releasePortionComplete = alloc.percentage > 0
-          ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
-          : 0;
-        totalCompletedPoints += allocatedPoints * releasePortionComplete;
-      }
-    }
-  }
+    const releaseProgress = sprintId
+      ? getRibReleaseProgressAsOf(rib, releaseId, sprintId, product.sprints)
+      : getRibReleaseProgress(rib, releaseId);
+    const releasePortionComplete = alloc.percentage > 0
+      ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
+      : 0;
+    acc.totalCompletedPoints += allocatedPoints * releasePortionComplete;
+    return acc;
+  }, { totalAllocatedPoints: 0, totalCompletedPoints: 0 });
 
   return totalAllocatedPoints > 0 ? (totalCompletedPoints / totalAllocatedPoints) * 100 : 0;
 }
 
 export function getProjectPercentComplete(product, sprintId) {
-  let totalPoints = 0;
-  let completedPoints = 0;
-
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        const pts = getRibItemPoints(rib, product.sizeMapping);
-        totalPoints += pts;
-        const pct = sprintId
-          ? getRibItemPercentCompleteAsOf(rib, sprintId, product.sprints)
-          : getRibItemPercentComplete(rib);
-        completedPoints += pts * (pct / 100);
-      }
-    }
-  }
+  const { totalPoints, completedPoints } = reduceRibs(product, (acc, rib) => {
+    const pts = getRibItemPoints(rib, product.sizeMapping);
+    acc.totalPoints += pts;
+    const pct = sprintId
+      ? getRibItemPercentCompleteAsOf(rib, sprintId, product.sprints)
+      : getRibItemPercentComplete(rib);
+    acc.completedPoints += pts * (pct / 100);
+    return acc;
+  }, { totalPoints: 0, completedPoints: 0 });
 
   return totalPoints > 0 ? (completedPoints / totalPoints) * 100 : 0;
 }
 
 export function getCoreNonCorePointsForRelease(product, releaseId) {
-  let core = 0;
-  let nonCore = 0;
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-        if (!alloc) continue;
-        const pts = getRibItemPoints(rib, product.sizeMapping) * (alloc.percentage / 100);
-        if (rib.category === 'non-core') {
-          nonCore += pts;
-        } else {
-          core += pts;
-        }
-      }
-    }
-  }
-  return { core, nonCore };
+  return reduceRibs(product, (acc, rib) => {
+    const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
+    if (!alloc) return acc;
+    const pts = getRibItemPoints(rib, product.sizeMapping) * (alloc.percentage / 100);
+    if (rib.category === 'non-core') acc.nonCore += pts;
+    else acc.core += pts;
+    return acc;
+  }, { core: 0, nonCore: 0 });
 }
 
 export function getAllocationTotal(ribItem) {
@@ -250,22 +195,13 @@ export function getAllocationTotal(ribItem) {
 
 export function getSizingDistribution(product) {
   const dist = {};
-  for (const m of product.sizeMapping) {
-    dist[m.label] = 0;
-  }
+  for (const m of product.sizeMapping) dist[m.label] = 0;
   dist['Unsized'] = 0;
 
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        if (rib.size && dist[rib.size] !== undefined) {
-          dist[rib.size]++;
-        } else {
-          dist['Unsized']++;
-        }
-      }
-    }
-  }
+  forEachRib(product, (rib) => {
+    if (rib.size && dist[rib.size] !== undefined) dist[rib.size]++;
+    else dist['Unsized']++;
+  });
   return dist;
 }
 
@@ -311,20 +247,13 @@ export function getProgressOverTime(product) {
   if (!product.sprints.length) return [];
 
   return product.sprints.map(sprint => {
-    let totalPoints = 0;
-    let completedPoints = 0;
-
-    for (const theme of product.themes) {
-      for (const backbone of theme.backboneItems) {
-        for (const rib of backbone.ribItems) {
-          const pts = getRibItemPoints(rib, product.sizeMapping);
-          totalPoints += pts;
-
-          const pct = getRibItemPercentCompleteAsOf(rib, sprint.id, product.sprints);
-          completedPoints += pts * (pct / 100);
-        }
-      }
-    }
+    const { totalPoints, completedPoints } = reduceRibs(product, (acc, rib) => {
+      const pts = getRibItemPoints(rib, product.sizeMapping);
+      acc.totalPoints += pts;
+      const pct = getRibItemPercentCompleteAsOf(rib, sprint.id, product.sprints);
+      acc.completedPoints += pts * (pct / 100);
+      return acc;
+    }, { totalPoints: 0, completedPoints: 0 });
 
     return {
       sprintName: sprint.name,
@@ -343,56 +272,44 @@ export function getSprintSummary(product, sprintId) {
 
   const prevSprint = sprints.find(s => s.order === sprint.order - 1);
 
-  let totalPoints = 0;
-  let completedPointsAsOf = 0;
-  let completedPointsPrev = 0;
-  let itemsUpdated = 0;
-  let itemsTotal = 0;
+  const acc = reduceRibs(product, (a, rib) => {
+    if (rib.releaseAllocations.length === 0) return a;
+    const pts = getRibItemPoints(rib, product.sizeMapping);
+    a.totalPoints += pts;
+    a.itemsTotal++;
 
-  let coreTotalPts = 0;
-  let coreCompletedPts = 0;
-  let coreCompletedPrev = 0;
-  let nonCoreTotalPts = 0;
-  let nonCoreCompletedPts = 0;
-  let nonCoreCompletedPrev = 0;
+    const pctAsOf = getRibItemPercentCompleteAsOf(rib, sprintId, sprints);
+    const completed = pts * (pctAsOf / 100);
+    a.completedPointsAsOf += completed;
 
-  for (const theme of product.themes) {
-    for (const backbone of theme.backboneItems) {
-      for (const rib of backbone.ribItems) {
-        if (rib.releaseAllocations.length === 0) continue;
-        const pts = getRibItemPoints(rib, product.sizeMapping);
-        totalPoints += pts;
-        itemsTotal++;
-
-        const pctAsOf = getRibItemPercentCompleteAsOf(rib, sprintId, sprints);
-        const completed = pts * (pctAsOf / 100);
-        completedPointsAsOf += completed;
-
-        let prevCompleted = 0;
-        if (prevSprint) {
-          const pctPrev = getRibItemPercentCompleteAsOf(rib, prevSprint.id, sprints);
-          prevCompleted = pts * (pctPrev / 100);
-          completedPointsPrev += prevCompleted;
-        }
-
-        if (rib.category === 'non-core') {
-          nonCoreTotalPts += pts;
-          nonCoreCompletedPts += completed;
-          nonCoreCompletedPrev += prevCompleted;
-        } else {
-          coreTotalPts += pts;
-          coreCompletedPts += completed;
-          coreCompletedPrev += prevCompleted;
-        }
-
-        // Check if this rib has any non-null progress entry for this sprint
-        const hasEntry = rib.progressHistory?.some(
-          p => p.sprintId === sprintId && p.percentComplete !== null
-        );
-        if (hasEntry) itemsUpdated++;
-      }
+    let prevCompleted = 0;
+    if (prevSprint) {
+      const pctPrev = getRibItemPercentCompleteAsOf(rib, prevSprint.id, sprints);
+      prevCompleted = pts * (pctPrev / 100);
+      a.completedPointsPrev += prevCompleted;
     }
-  }
+
+    if (rib.category === 'non-core') {
+      a.nonCoreTotalPts += pts;
+      a.nonCoreCompletedPts += completed;
+      a.nonCoreCompletedPrev += prevCompleted;
+    } else {
+      a.coreTotalPts += pts;
+      a.coreCompletedPts += completed;
+      a.coreCompletedPrev += prevCompleted;
+    }
+
+    const hasEntry = rib.progressHistory?.some(
+      p => p.sprintId === sprintId && p.percentComplete !== null
+    );
+    if (hasEntry) a.itemsUpdated++;
+    return a;
+  }, {
+    totalPoints: 0, completedPointsAsOf: 0, completedPointsPrev: 0,
+    itemsUpdated: 0, itemsTotal: 0,
+    coreTotalPts: 0, coreCompletedPts: 0, coreCompletedPrev: 0,
+    nonCoreTotalPts: 0, nonCoreCompletedPts: 0, nonCoreCompletedPrev: 0,
+  });
 
   const round1 = v => Math.round(v * 10) / 10;
   const pct = (completed, total) => total > 0 ? Math.round((completed / total) * 1000) / 10 : 0;
@@ -400,24 +317,24 @@ export function getSprintSummary(product, sprintId) {
   return {
     sprintName: sprint.name,
     endDate: sprint.endDate,
-    totalPoints,
-    completedPoints: round1(completedPointsAsOf),
-    remainingPoints: round1(totalPoints - completedPointsAsOf),
-    pointsThisSprint: round1(completedPointsAsOf - completedPointsPrev),
-    percentComplete: pct(completedPointsAsOf, totalPoints),
-    itemsUpdated,
-    itemsTotal,
+    totalPoints: acc.totalPoints,
+    completedPoints: round1(acc.completedPointsAsOf),
+    remainingPoints: round1(acc.totalPoints - acc.completedPointsAsOf),
+    pointsThisSprint: round1(acc.completedPointsAsOf - acc.completedPointsPrev),
+    percentComplete: pct(acc.completedPointsAsOf, acc.totalPoints),
+    itemsUpdated: acc.itemsUpdated,
+    itemsTotal: acc.itemsTotal,
     core: {
-      totalPoints: coreTotalPts,
-      completedPoints: round1(coreCompletedPts),
-      pointsThisSprint: round1(coreCompletedPts - coreCompletedPrev),
-      percentComplete: pct(coreCompletedPts, coreTotalPts),
+      totalPoints: acc.coreTotalPts,
+      completedPoints: round1(acc.coreCompletedPts),
+      pointsThisSprint: round1(acc.coreCompletedPts - acc.coreCompletedPrev),
+      percentComplete: pct(acc.coreCompletedPts, acc.coreTotalPts),
     },
     nonCore: {
-      totalPoints: nonCoreTotalPts,
-      completedPoints: round1(nonCoreCompletedPts),
-      pointsThisSprint: round1(nonCoreCompletedPts - nonCoreCompletedPrev),
-      percentComplete: pct(nonCoreCompletedPts, nonCoreTotalPts),
+      totalPoints: acc.nonCoreTotalPts,
+      completedPoints: round1(acc.nonCoreCompletedPts),
+      pointsThisSprint: round1(acc.nonCoreCompletedPts - acc.nonCoreCompletedPrev),
+      percentComplete: pct(acc.nonCoreCompletedPts, acc.nonCoreTotalPts),
     },
   };
 }
@@ -426,28 +343,21 @@ export function getReleaseProgressOverTime(product, releaseId) {
   if (!product.sprints.length) return [];
 
   return product.sprints.map(sprint => {
-    let totalAllocatedPoints = 0;
-    let completedPoints = 0;
+    const { totalAllocatedPoints, completedPoints } = reduceRibs(product, (acc, rib) => {
+      const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
+      if (!alloc) return acc;
 
-    for (const theme of product.themes) {
-      for (const backbone of theme.backboneItems) {
-        for (const rib of backbone.ribItems) {
-          const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-          if (!alloc) continue;
+      const ribPoints = getRibItemPoints(rib, product.sizeMapping);
+      const allocatedPoints = ribPoints * (alloc.percentage / 100);
+      acc.totalAllocatedPoints += allocatedPoints;
 
-          const ribPoints = getRibItemPoints(rib, product.sizeMapping);
-          const allocatedPoints = ribPoints * (alloc.percentage / 100);
-          totalAllocatedPoints += allocatedPoints;
-
-          // Use per-release progress directly
-          const releaseProgress = getRibReleaseProgressAsOf(rib, releaseId, sprint.id, product.sprints);
-          const releasePortionComplete = alloc.percentage > 0
-            ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
-            : 0;
-          completedPoints += allocatedPoints * releasePortionComplete;
-        }
-      }
-    }
+      const releaseProgress = getRibReleaseProgressAsOf(rib, releaseId, sprint.id, product.sprints);
+      const releasePortionComplete = alloc.percentage > 0
+        ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
+        : 0;
+      acc.completedPoints += allocatedPoints * releasePortionComplete;
+      return acc;
+    }, { totalAllocatedPoints: 0, completedPoints: 0 });
 
     return {
       sprintName: sprint.name,

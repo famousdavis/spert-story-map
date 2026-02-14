@@ -1,11 +1,13 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { getAllRibItems, getPointsForRelease, getCoreNonCorePointsForRelease, getTotalProjectPoints, getCoreNonCorePoints } from '../lib/calculations';
-import RibCard from '../components/releases/RibCard';
+import { useProductMutations } from '../hooks/useProductMutations';
+import ReleaseColumn from '../components/releases/ReleaseColumn';
 import AllocationModal from '../components/releases/AllocationModal';
 
 export default function ReleasePlanningView() {
   const { product, updateProduct } = useOutletContext();
+  const { addRelease } = useProductMutations(updateProduct);
   const [filter, setFilter] = useState('all');
   const [allocModal, setAllocModal] = useState(null);
 
@@ -197,19 +199,6 @@ export default function ReleasePlanningView() {
     }
   };
 
-  const addRelease = () => {
-    updateProduct(prev => ({
-      ...prev,
-      releases: [...prev.releases, {
-        id: crypto.randomUUID(),
-        name: `Release ${prev.releases.length + 1}`,
-        order: prev.releases.length + 1,
-        description: '',
-        targetDate: null,
-      }],
-    }));
-  };
-
   // Column drag handlers
   const handleColDragStart = (e, releaseId) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -290,124 +279,51 @@ export default function ReleasePlanningView() {
 
       <div className="flex gap-4 overflow-x-auto pb-4">
           {/* Unassigned column */}
-          <div
-            className="flex-shrink-0 w-72"
-            onDragOver={e => handleColumnDragOver(e, 'unassigned')}
-            onDrop={e => { e.preventDefault(); handleDrop('unassigned'); }}
-          >
-            <div className={`bg-amber-50 border rounded-xl overflow-hidden transition-colors ${
-              isDragOver('unassigned') ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200'
-            }`}>
-              <div className="px-4 py-3 border-b border-amber-200">
-                <h3 className="text-sm font-semibold text-amber-800">Unassigned</h3>
-                <p className="text-xs text-amber-600 mt-0.5">{unassigned.length} items</p>
-              </div>
-              <div className="p-2 min-h-[60px] max-h-[calc(100vh-250px)] overflow-y-auto">
-                {unassigned.map(rib => (
-                  <RibCard
-                    key={rib.id}
-                    rib={rib}
-                    product={product}
-                    isDragging={dragRibId === rib.id}
-                    isDropBefore={dropTarget?.col === 'unassigned' && dropTarget?.beforeRibId === rib.id}
-                    onDragStart={() => handleDragStart(rib.id, 'unassigned')}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={e => handleCardDragOver(e, 'unassigned', rib.id)}
-                    onDrop={e => { e.preventDefault(); e.stopPropagation(); handleDrop('unassigned'); }}
-                    onClick={() => setAllocModal(rib)}
-                  />
-                ))}
-                {unassigned.length === 0 && !isDragOver('unassigned') && (
-                  <p className="text-xs text-amber-400 text-center py-4 italic">All items assigned</p>
-                )}
-                {isDragOver('unassigned') && unassigned.length === 0 && (
-                  <div className="h-10 border-2 border-dashed border-amber-300 rounded-lg mx-1" />
-                )}
-              </div>
-            </div>
-          </div>
+          <ReleaseColumn
+            colId="unassigned"
+            release={null}
+            ribs={unassigned}
+            product={product}
+            dragRibId={dragRibId}
+            dropTarget={dropTarget}
+            onColumnDragOver={handleColumnDragOver}
+            onColumnDrop={handleDrop}
+            onCardDragStart={handleDragStart}
+            onCardDragEnd={handleDragEnd}
+            onCardDragOver={handleCardDragOver}
+            onCardDrop={handleDrop}
+            onCardClick={setAllocModal}
+          />
 
           {/* Release columns */}
-          {product.releases.map(release => {
-            const releaseRibs = ribsForRelease(release.id);
-            const totalPts = Math.round(getPointsForRelease(product, release.id));
-            const { core, nonCore } = getCoreNonCorePointsForRelease(product, release.id);
-            const isOver = isDragOver(release.id);
-            const isColDropTarget = dropBeforeColId === release.id && dragColId && dragColId !== release.id;
-            const isColDragging = dragColId === release.id;
-
-            return (
-              <div
-                key={release.id}
-                className="flex-shrink-0 flex"
-                onDragOver={e => {
-                  if (dragColId) { handleColDragOver(e, release.id); }
-                  else { handleColumnDragOver(e, release.id); }
-                }}
-                onDrop={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (dragColId) { handleColDrop(e); }
-                  else { handleDrop(release.id); }
-                }}
-              >
-                {isColDropTarget && (
-                  <div className="w-1 bg-blue-400 rounded-full flex-shrink-0 mx-1 self-stretch" />
-                )}
-                <div className={`w-72 transition-opacity ${isColDragging ? 'opacity-40' : ''}`}>
-                <div className={`bg-white border rounded-xl overflow-hidden h-full transition-colors ${
-                  isOver ? 'border-blue-400 ring-2 ring-blue-200' : 'border-gray-200'
-                }`}>
-                  <div
-                    draggable
-                    onDragStart={e => handleColDragStart(e, release.id)}
-                    onDragEnd={handleColDragEnd}
-                    className="px-4 py-3 border-b border-gray-100 bg-gray-50 cursor-grab active:cursor-grabbing"
-                  >
-                    <h3 className="text-sm font-semibold text-gray-900">{release.name}</h3>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                      <span>{totalPts} pts</span>
-                      <span className="text-blue-600">{Math.round(core)} core</span>
-                      <span className="text-gray-400">{Math.round(nonCore)} non-core</span>
-                      <span>{releaseRibs.length} items</span>
-                    </div>
-                    {release.targetDate && (
-                      <p className="text-xs text-gray-400 mt-1">Target: {new Date(release.targetDate).toLocaleDateString()}</p>
-                    )}
-                  </div>
-                  <div className="p-2 min-h-[60px] max-h-[calc(100vh-280px)] overflow-y-auto">
-                    {releaseRibs.map(rib => {
-                      const alloc = rib.releaseAllocations.find(a => a.releaseId === release.id);
-                      return (
-                        <RibCard
-                          key={rib.id}
-                          rib={rib}
-                          product={product}
-                          allocation={alloc}
-                          isDragging={dragRibId === rib.id}
-                          isDropBefore={dropTarget?.col === release.id && dropTarget?.beforeRibId === rib.id}
-                          onDragStart={() => handleDragStart(rib.id, release.id)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={e => handleCardDragOver(e, release.id, rib.id)}
-                          onDrop={e => { e.preventDefault(); e.stopPropagation(); handleDrop(release.id); }}
-                          onClick={() => setAllocModal(rib)}
-                        />
-                      );
-                    })}
-                    {releaseRibs.length === 0 && !isOver && (
-                      <p className="text-xs text-gray-400 text-center py-4 italic">
-                        Drag items here or click to assign
-                      </p>
-                    )}
-                    {isOver && releaseRibs.length === 0 && (
-                      <div className="h-10 border-2 border-dashed border-blue-300 rounded-lg mx-1" />
-                    )}
-                  </div>
-                </div>
-                </div>
-              </div>
-            );
-          })}
+          {product.releases.map(release => (
+            <ReleaseColumn
+              key={release.id}
+              colId={release.id}
+              release={release}
+              ribs={ribsForRelease(release.id)}
+              stats={{
+                totalPts: Math.round(getPointsForRelease(product, release.id)),
+                ...getCoreNonCorePointsForRelease(product, release.id),
+              }}
+              product={product}
+              dragRibId={dragRibId}
+              dropTarget={dropTarget}
+              isColDropTarget={dropBeforeColId === release.id && dragColId && dragColId !== release.id}
+              isColDragging={dragColId === release.id}
+              onColumnDragOver={dragColId ? undefined : handleColumnDragOver}
+              onColumnDrop={handleDrop}
+              onColDragStart={handleColDragStart}
+              onColDragEnd={handleColDragEnd}
+              onColDragOver={dragColId ? handleColDragOver : undefined}
+              onColDrop={dragColId ? handleColDrop : undefined}
+              onCardDragStart={handleDragStart}
+              onCardDragEnd={handleDragEnd}
+              onCardDragOver={handleCardDragOver}
+              onCardDrop={handleDrop}
+              onCardClick={setAllocModal}
+            />
+          ))}
 
           {/* Add release column */}
           <div className="flex-shrink-0 w-72">

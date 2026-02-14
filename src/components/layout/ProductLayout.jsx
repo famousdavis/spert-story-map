@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { NavLink, useParams, Outlet } from 'react-router-dom';
 import { useProduct } from '../../hooks/useProduct';
+import { onSaveError } from '../../lib/storage';
 import { Footer } from '../../pages/ChangelogView';
 
 const tabs = [
@@ -14,6 +16,12 @@ const tabs = [
 export default function ProductLayout() {
   const { productId } = useParams();
   const { product, loading, lastSaved, updateProduct, undo, redo } = useProduct(productId);
+  const [saveError, setSaveError] = useState(false);
+
+  useEffect(() => {
+    onSaveError(() => setSaveError(true));
+    return () => onSaveError(null);
+  }, []);
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen text-gray-400">Loading...</div>;
@@ -74,6 +82,15 @@ export default function ProductLayout() {
           </nav>
         </div>
       </header>
+
+      {/* Save error banner */}
+      {saveError && (
+        <div className="bg-red-50 border-b border-red-200 px-6 py-2 text-center">
+          <p className="text-xs text-red-700">
+            Storage full — your latest changes may not be saved. Export your data from Settings to avoid data loss.
+          </p>
+        </div>
+      )}
 
       {/* Content */}
       <main className="flex-1 max-w-[1600px] mx-auto w-full px-6 py-6">

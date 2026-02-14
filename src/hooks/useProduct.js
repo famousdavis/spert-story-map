@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
-import { loadProduct, saveProduct } from '../lib/storage';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { loadProduct, saveProduct, flushPendingSaves } from '../lib/storage';
 
 const MAX_UNDO = 30;
 
@@ -75,6 +75,12 @@ export function useProduct(productId) {
       return next;
     });
   }, [setProduct, scheduleSave]);
+
+  // Flush pending debounced saves before the tab closes
+  useEffect(() => {
+    window.addEventListener('beforeunload', flushPendingSaves);
+    return () => window.removeEventListener('beforeunload', flushPendingSaves);
+  }, []);
 
   const forceRefresh = useCallback(() => {
     if (productId) {

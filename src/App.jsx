@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 import ProductList from './pages/ProductList';
 import ProductLayout from './components/layout/ProductLayout';
 import StructureView from './pages/StructureView';
@@ -12,6 +13,7 @@ import AboutView from './pages/AboutView';
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/" element={<ProductList />} />
       <Route path="/about" element={<AboutView />} />
@@ -26,5 +28,6 @@ export default function App() {
         <Route path="settings" element={<SettingsView />} />
       </Route>
     </Routes>
+    </ErrorBoundary>
   );
 }
