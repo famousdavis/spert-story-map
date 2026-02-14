@@ -1,6 +1,4 @@
-import { LANE_LABEL_WIDTH } from './useMapLayout';
-
-export default function ReleaseDivider({ lane, totalWidth, isFirst, isDropTarget, onClick }) {
+export default function ReleaseDivider({ lane, totalWidth, isFirst, isDropTarget }) {
   return (
     <>
       {/* Lane background — highlight when drop target */}
@@ -30,23 +28,16 @@ export default function ReleaseDivider({ lane, totalWidth, isFirst, isDropTarget
         style={{
           top: lane.y,
           left: 0,
-          width: LANE_LABEL_WIDTH - 4,
+          width: 106,
           height: lane.height,
         }}
         data-release-id={lane.releaseId}
       >
-        <span
-          className={`text-xs font-semibold px-2 py-1 rounded truncate max-w-full cursor-pointer transition-colors ${
-            isDropTarget
-              ? 'text-blue-700 bg-blue-200'
-              : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onClick) onClick(lane.releaseId);
-          }}
-          title="Click for release details"
-        >
+        <span className={`text-xs font-semibold px-2 py-1 rounded truncate max-w-full ${
+          isDropTarget
+            ? 'text-blue-700 bg-blue-200'
+            : 'text-blue-600 bg-blue-50'
+        }`}>
           {lane.releaseName}
         </span>
       </div>

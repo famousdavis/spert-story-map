@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { exportProduct, importProductFromJSON, saveProductImmediate } from '../lib/storage';
+import { calculateNextSprintEndDate } from '../lib/progressMutations';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 export default function SettingsView() {
@@ -156,22 +157,14 @@ export default function SettingsView() {
   const addSprint = () => {
     updateProduct(prev => {
       const cadenceWeeks = prev.sprintCadenceWeeks || 2;
-      const lastSprint = prev.sprints.length > 0 ? prev.sprints[prev.sprints.length - 1] : null;
-
-      let newEndDate = null;
-      if (lastSprint?.endDate) {
-        const lastDate = new Date(lastSprint.endDate + 'T00:00:00');
-        lastDate.setDate(lastDate.getDate() + cadenceWeeks * 7);
-        newEndDate = lastDate.toISOString().split('T')[0];
-      }
-
+      const last = prev.sprints.length > 0 ? prev.sprints[prev.sprints.length - 1] : null;
       return {
         ...prev,
         sprints: [...prev.sprints, {
           id: crypto.randomUUID(),
           name: `Sprint ${prev.sprints.length + 1}`,
           order: prev.sprints.length + 1,
-          endDate: newEndDate,
+          endDate: calculateNextSprintEndDate(last?.endDate, cadenceWeeks),
         }],
       };
     });

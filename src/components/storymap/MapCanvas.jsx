@@ -41,57 +41,38 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
     return () => el.removeEventListener('wheel', handleWheel);
   }, [setZoom, setPan]);
 
-  // Window-level listeners for drag move/end — ensures reliable event delivery
-  // even when pointer is over child elements (grips, cards, etc.) or outside the canvas
-  useEffect(() => {
-    if (!dragState) return;
-
-    const handleMove = (e) => {
-      if (onDragMove) onDragMove(e);
-    };
-    const handleUp = () => {
-      if (onDragEnd) onDragEnd();
-    };
-
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
-    return () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-    };
-  }, [dragState, onDragMove, onDragEnd]);
-
   // Pointer pan (disabled when dragging a rib)
   const handlePointerDown = useCallback((e) => {
     // Don't start panning if a drag is in progress
     if (dragState) return;
-    // Don't pan when clicking on interactive elements (rib cards, release labels)
-    // Walk up from e.target to check for known interactive data attributes
-    let el = e.target;
-    while (el && el !== containerRef.current) {
-      if (el.dataset?.ribId || el.dataset?.releaseId) return;
-      el = el.parentElement;
-    }
+    // Only pan on background clicks (not on cards)
+    if (e.target !== containerRef.current && e.target.dataset.mapBg === undefined) return;
     isPanningRef.current = true;
     panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
     containerRef.current.setPointerCapture(e.pointerId);
   }, [pan, dragState]);
 
   const handlePointerMove = useCallback((e) => {
-    // Drag move is handled by window-level listeners; this only handles pan
-    if (dragState) return;
+    // If a rib drag is active, forward to drag handler
+    if (dragState) {
+      if (onDragMove) onDragMove(e);
+      return;
+    }
     if (!isPanningRef.current) return;
     setPan({
       x: e.clientX - panStartRef.current.x,
       y: e.clientY - panStartRef.current.y,
     });
-  }, [setPan, dragState]);
+  }, [setPan, dragState, onDragMove]);
 
-  const handlePointerUp = useCallback(() => {
-    // Drag end is handled by window-level listeners; this only handles pan
-    if (dragState) return;
+  const handlePointerUp = useCallback((e) => {
+    // If a rib drag is active, forward to drag handler
+    if (dragState) {
+      if (onDragEnd) onDragEnd(e);
+      return;
+    }
     isPanningRef.current = false;
-  }, [dragState]);
+  }, [dragState, onDragEnd]);
 
   // Keyboard shortcuts
   useEffect(() => {

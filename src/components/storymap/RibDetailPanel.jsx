@@ -1,27 +1,23 @@
 import { useEffect } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
 import { SIZE_COLORS } from '../ui/SizePicker';
-import useInlineEdit from './useInlineEdit';
 
-export default function RibDetailPanel({ rib, product, onClose, onRename }) {
+export default function RibDetailPanel({ rib, product, onClose }) {
   const sizeColor = rib.size ? (SIZE_COLORS[rib.size] || 'bg-gray-100 text-gray-800') : '';
   const pctComplete = getRibItemPercentComplete(rib);
-
-  const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
-    useInlineEdit(rib.name, (name) => onRename(rib.themeId, rib.backboneId, rib.id, name));
 
   // Find release names for allocations
   const releaseMap = {};
   product.releases.forEach(r => { releaseMap[r.id] = r.name; });
 
-  // Close on Escape (but not while editing)
+  // Close on Escape
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'Escape' && !editing) onClose();
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose, editing]);
+  }, [onClose]);
 
   return (
     <>
@@ -36,25 +32,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename }) {
         <div className="p-5 space-y-5">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
-            {editing ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onBlur={commit}
-                onKeyDown={handleKeyDown}
-                className="text-base font-semibold text-gray-900 leading-tight flex-1 bg-blue-50 border border-blue-300 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-300 min-w-0"
-              />
-            ) : (
-              <h3
-                className="text-base font-semibold text-gray-900 leading-tight cursor-text hover:text-blue-700 transition-colors"
-                onClick={startEditing}
-                title="Click to rename"
-              >
-                {rib.name}
-              </h3>
-            )}
+            <h3 className="text-base font-semibold text-gray-900 leading-tight">{rib.name}</h3>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 text-lg leading-none flex-shrink-0 -mt-0.5"

@@ -24,7 +24,8 @@ src/
 │   ├── version.js                    # APP_VERSION constant (single source of truth)
 │   ├── storage.js                    # localStorage CRUD with debouncing
 │   ├── sampleData.js                 # Sample "Billing System v2" product factory
-│   └── calculations.js              # Pure computation functions (points, progress, stats)
+│   ├── calculations.js              # Pure computation functions (points, progress, stats)
+│   └── progressMutations.js         # Shared progress tracking helpers (update, remove, comment)
 │
 ├── hooks/
 │   ├── useProduct.js                 # Load/save product state with debounced persistence
@@ -40,6 +41,8 @@ src/
 │   │   └── ProgressBar.jsx           # Animated horizontal progress bar
 │   ├── layout/
 │   │   └── ProductLayout.jsx         # Header, tab nav, footer, outlet context
+│   ├── progress/
+│   │   └── CommentPanel.jsx          # Assessment note panel for progress rows
 │   ├── releases/
 │   │   ├── RibCard.jsx               # Draggable card for release kanban
 │   │   └── AllocationModal.jsx       # Split-allocation editor modal

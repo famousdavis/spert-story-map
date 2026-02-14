@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 0.5.0 (2026-02-14)
+
+### Refactored
+- Decomposed `ProgressTrackingView` (743→634 LOC) into `ProgressRow`, `SprintSummaryCard`, and `CollapsibleSection` sub-components
+- Extracted `CommentPanel` into `src/components/progress/CommentPanel.jsx`
+- Created `src/lib/progressMutations.js` — shared `updateProgress`, `removeProgress`, `updateComment` mutations eliminate triple-nested traversal duplication across views
+- Shared `calculateNextSprintEndDate` helper replaces duplicated sprint date logic in ProgressTrackingView and SettingsView
+- Extracted `spliceCardOrder` helper in `mapMutations.js` — consolidates 4 duplicated card-order splice patterns
+- Added `moveRib2D` and `moveRibs2D` — atomic combined backbone + release move mutations for story map drag-and-drop
+
+### Fixed
+- Fixed setState-during-render bug in ProgressTrackingView comment draft initialization (replaced `setTimeout` with proper `useEffect`)
+
+### Technical
+- Added `progressMutations.test.js` test suite (15 tests); 128 tests total across 6 files
+- Cleaned up 9 macOS "copy 2" duplicate files from storymap directory
+- Added `.gitignore` pattern to prevent future macOS duplicates
+
 ## Version 0.4.0 (2026-02-14)
 
 ### Features

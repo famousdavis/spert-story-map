@@ -7,8 +7,8 @@ import UnassignedLane from './UnassignedLane';
 import DropHighlight from './DropHighlight';
 
 export default function MapContent({
-  layout, onRibClick, onReleaseClick, mapSizeRef,
-  onRenameTheme, onRenameBackbone,
+  layout, onRibClick, mapSizeRef,
+  onRenameTheme, onRenameBackbone, onRenameRib,
   dragState, onDragStart, onBackboneDragStart,
 }) {
   const { columns, themeSpans, releaseLanes, cells, unassignedLane, totalWidth, totalHeight } = layout;
@@ -78,7 +78,6 @@ export default function MapContent({
           totalWidth={totalWidth}
           isFirst={i === 0}
           isDropTarget={highlightReleaseId === lane.releaseId}
-          onClick={onReleaseClick}
         />
       ))}
 
@@ -121,6 +120,7 @@ export default function MapContent({
           key={`${cell.id}-${cell.releaseId || 'unassigned'}`}
           cell={cell}
           onClick={onRibClick}
+          onRename={onRenameRib}
           onDragStart={onDragStart}
           isDragging={isRibDrag && dragState.ribId === cell.id && dragState.releaseId === cell.releaseId}
         />

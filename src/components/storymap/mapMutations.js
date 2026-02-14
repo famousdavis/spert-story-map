@@ -6,6 +6,15 @@
  * drag hook so they can be tested and reused independently.
  */
 
+/** Insert ribId into cardOrder[key] at insertIndex, removing any prior occurrence. */
+function spliceCardOrder(cardOrder, key, ribId, insertIndex) {
+  const list = [...(cardOrder[key] || [])].filter(id => id !== ribId);
+  const idx = insertIndex != null && insertIndex >= 0 && insertIndex <= list.length
+    ? insertIndex : list.length;
+  list.splice(idx, 0, ribId);
+  cardOrder[key] = list;
+}
+
 /**
  * Move a rib item from one release lane to another (Y-axis drag).
  * Handles unassigned ↔ assigned transitions and updates releaseCardOrder.
@@ -47,20 +56,13 @@ export function moveRibToRelease(updateProduct, ribId, fromReleaseId, toReleaseI
       })),
     };
 
-    // Update releaseCardOrder — insert at specified position
     const cardOrder = { ...(next.releaseCardOrder || {}) };
     const srcKey = fromReleaseId || 'unassigned';
     const dstKey = toReleaseId || 'unassigned';
     if (cardOrder[srcKey]) {
       cardOrder[srcKey] = cardOrder[srcKey].filter(id => id !== ribId);
     }
-    const dstList = [...(cardOrder[dstKey] || [])].filter(id => id !== ribId);
-    if (insertIndex != null && insertIndex >= 0 && insertIndex <= dstList.length) {
-      dstList.splice(insertIndex, 0, ribId);
-    } else {
-      dstList.push(ribId);
-    }
-    cardOrder[dstKey] = dstList;
+    spliceCardOrder(cardOrder, dstKey, ribId, insertIndex);
     next.releaseCardOrder = cardOrder;
 
     return next;
@@ -75,10 +77,7 @@ export function reorderRibInRelease(updateProduct, ribId, releaseId, insertIndex
   updateProduct(prev => {
     const cardOrder = { ...(prev.releaseCardOrder || {}) };
     const key = releaseId || 'unassigned';
-    const list = [...(cardOrder[key] || [])].filter(id => id !== ribId);
-    const idx = Math.max(0, Math.min(insertIndex ?? list.length, list.length));
-    list.splice(idx, 0, ribId);
-    cardOrder[key] = list;
+    spliceCardOrder(cardOrder, key, ribId, insertIndex);
     return { ...prev, releaseCardOrder: cardOrder };
   });
 }
@@ -159,5 +158,178 @@ export function moveBackboneToTheme(updateProduct, backboneId, fromThemeId, toTh
     });
 
     return { ...prev, themes: themesWithBb };
+  });
+}
+
+/**
+ * Move a single rib in both axes simultaneously (backbone + release).
+ * Combines moveRibToBackbone and moveRibToRelease into one atomic update.
+ */
+export function moveRib2D(updateProduct, ribId, from, to) {
+  const backboneChanged = from.backboneId !== to.backboneId || from.themeId !== to.themeId;
+  const releaseChanged = from.releaseId !== to.releaseId;
+  if (!backboneChanged && !releaseChanged) return;
+
+  updateProduct(prev => {
+    let next = prev;
+
+    // 1. Move backbone if changed
+    if (backboneChanged) {
+      let ribData = null;
+      const themes = next.themes.map(t => {
+        if (t.id !== from.themeId) return t;
+        return {
+          ...t,
+          backboneItems: t.backboneItems.map(b => {
+            if (b.id !== from.backboneId) return b;
+            const rib = b.ribItems.find(r => r.id === ribId);
+            if (rib) ribData = { ...rib };
+            return { ...b, ribItems: b.ribItems.filter(r => r.id !== ribId) };
+          }),
+        };
+      });
+      if (!ribData) return prev;
+      const themesWithRib = themes.map(t => {
+        if (t.id !== to.themeId) return t;
+        return {
+          ...t,
+          backboneItems: t.backboneItems.map(b => {
+            if (b.id !== to.backboneId) return b;
+            return { ...b, ribItems: [...b.ribItems, { ...ribData, order: b.ribItems.length + 1 }] };
+          }),
+        };
+      });
+      next = { ...next, themes: themesWithRib };
+    }
+
+    // 2. Move release if changed
+    if (releaseChanged) {
+      next = {
+        ...next,
+        themes: next.themes.map(t => ({
+          ...t,
+          backboneItems: t.backboneItems.map(b => ({
+            ...b,
+            ribItems: b.ribItems.map(r => {
+              if (r.id !== ribId) return r;
+              const fromId = from.releaseId;
+              const toId = to.releaseId;
+              if (toId === null) return { ...r, releaseAllocations: [] };
+              if (fromId === null) return { ...r, releaseAllocations: [{ releaseId: toId, percentage: 100, memo: '' }] };
+              if (r.releaseAllocations.some(a => a.releaseId === toId)) return r;
+              const oldAlloc = r.releaseAllocations.find(a => a.releaseId === fromId);
+              const pct = oldAlloc ? oldAlloc.percentage : 100;
+              const memo = oldAlloc?.memo || '';
+              return {
+                ...r,
+                releaseAllocations: r.releaseAllocations
+                  .filter(a => a.releaseId !== fromId)
+                  .concat({ releaseId: toId, percentage: pct, memo }),
+              };
+            }),
+          })),
+        })),
+      };
+
+      const cardOrder = { ...(next.releaseCardOrder || {}) };
+      const srcKey = from.releaseId || 'unassigned';
+      const dstKey = to.releaseId || 'unassigned';
+      if (cardOrder[srcKey]) {
+        cardOrder[srcKey] = cardOrder[srcKey].filter(id => id !== ribId);
+      }
+      spliceCardOrder(cardOrder, dstKey, ribId, to.insertIndex);
+      next = { ...next, releaseCardOrder: cardOrder };
+    }
+
+    return next;
+  });
+}
+
+/**
+ * Batch-move multiple ribs in both axes simultaneously.
+ * Each entry in `entries` has { ribId, fromThemeId, fromBackboneId, fromReleaseId }.
+ */
+export function moveRibs2D(updateProduct, entries, to) {
+  if (!entries.length) return;
+
+  updateProduct(prev => {
+    let next = prev;
+    let insertOffset = 0;
+
+    for (const entry of entries) {
+      const backboneChanged = entry.fromBackboneId !== to.backboneId || entry.fromThemeId !== to.themeId;
+      const releaseChanged = entry.fromReleaseId !== to.releaseId;
+
+      if (backboneChanged) {
+        let ribData = null;
+        const themes = next.themes.map(t => {
+          if (t.id !== entry.fromThemeId) return t;
+          return {
+            ...t,
+            backboneItems: t.backboneItems.map(b => {
+              if (b.id !== entry.fromBackboneId) return b;
+              const rib = b.ribItems.find(r => r.id === entry.ribId);
+              if (rib) ribData = { ...rib };
+              return { ...b, ribItems: b.ribItems.filter(r => r.id !== entry.ribId) };
+            }),
+          };
+        });
+        if (ribData) {
+          const themesWithRib = themes.map(t => {
+            if (t.id !== to.themeId) return t;
+            return {
+              ...t,
+              backboneItems: t.backboneItems.map(b => {
+                if (b.id !== to.backboneId) return b;
+                return { ...b, ribItems: [...b.ribItems, { ...ribData, order: b.ribItems.length + 1 }] };
+              }),
+            };
+          });
+          next = { ...next, themes: themesWithRib };
+        }
+      }
+
+      if (releaseChanged) {
+        next = {
+          ...next,
+          themes: next.themes.map(t => ({
+            ...t,
+            backboneItems: t.backboneItems.map(b => ({
+              ...b,
+              ribItems: b.ribItems.map(r => {
+                if (r.id !== entry.ribId) return r;
+                const fromId = entry.fromReleaseId;
+                const toId = to.releaseId;
+                if (toId === null) return { ...r, releaseAllocations: [] };
+                if (fromId === null) return { ...r, releaseAllocations: [{ releaseId: toId, percentage: 100, memo: '' }] };
+                if (r.releaseAllocations.some(a => a.releaseId === toId)) return r;
+                const oldAlloc = r.releaseAllocations.find(a => a.releaseId === fromId);
+                const pct = oldAlloc ? oldAlloc.percentage : 100;
+                const memo = oldAlloc?.memo || '';
+                return {
+                  ...r,
+                  releaseAllocations: r.releaseAllocations
+                    .filter(a => a.releaseId !== fromId)
+                    .concat({ releaseId: toId, percentage: pct, memo }),
+                };
+              }),
+            })),
+          })),
+        };
+
+        const cardOrder = { ...(next.releaseCardOrder || {}) };
+        const srcKey = entry.fromReleaseId || 'unassigned';
+        const dstKey = to.releaseId || 'unassigned';
+        if (cardOrder[srcKey]) {
+          cardOrder[srcKey] = cardOrder[srcKey].filter(id => id !== entry.ribId);
+        }
+        const idx = to.insertIndex != null ? to.insertIndex + insertOffset : to.insertIndex;
+        spliceCardOrder(cardOrder, dstKey, entry.ribId, idx);
+        next = { ...next, releaseCardOrder: cardOrder };
+        insertOffset++;
+      }
+    }
+
+    return next;
   });
 }

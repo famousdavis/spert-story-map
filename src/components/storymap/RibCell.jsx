@@ -1,8 +1,12 @@
 import { SIZE_COLORS } from '../ui/SizePicker';
+import useInlineEdit from './useInlineEdit';
 
-export default function RibCell({ cell, onClick, onDragStart, isDragging }) {
+export default function RibCell({ cell, onClick, onRename, onDragStart, isDragging }) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const allocWarning = cell.allocTotal > 0 && cell.allocTotal !== 100;
+
+  const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
+    useInlineEdit(cell.name, (name) => onRename(cell.themeId, cell.backboneId, cell.id, name));
 
   const handleGripPointerDown = (e) => {
     e.stopPropagation();
@@ -28,7 +32,7 @@ export default function RibCell({ cell, onClick, onDragStart, isDragging }) {
       }}
       onClick={(e) => {
         e.stopPropagation();
-        onClick(cell);
+        if (!editing) onClick(cell);
       }}
       data-rib-id={cell.id}
       data-backbone-id={cell.backboneId}
@@ -44,9 +48,26 @@ export default function RibCell({ cell, onClick, onDragStart, isDragging }) {
         >
           ⠿
         </span>
-        <span className="text-xs text-gray-800 leading-tight truncate flex-1 font-medium">
-          {cell.name}
-        </span>
+        {editing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            onClick={e => e.stopPropagation()}
+            className="text-xs leading-tight flex-1 font-medium bg-blue-50 border border-blue-300 rounded px-1 py-0 outline-none focus:ring-1 focus:ring-blue-300 min-w-0"
+          />
+        ) : (
+          <span
+            className="text-xs text-gray-800 leading-tight truncate flex-1 font-medium"
+            onDoubleClick={startEditing}
+            title="Double-click to rename"
+          >
+            {cell.name}
+          </span>
+        )}
         {cell.size && (
           <span className={`text-[10px] font-medium px-1 py-0.5 rounded flex-shrink-0 leading-none ${sizeColor}`}>
             {cell.size}

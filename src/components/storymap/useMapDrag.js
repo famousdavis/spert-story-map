@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme } from './mapMutations';
+import { moveRibToRelease, moveRibToBackbone, moveBackboneToTheme } from './mapMutations';
 
 /**
  * Hook for drag-and-drop on the story map.
@@ -45,22 +45,6 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct }) {
     }
     return null;
   }, [layout]);
-
-  // Find insertion index within a release lane for the dragged rib's backbone column
-  const findInsertIndex = useCallback((mapY, targetReleaseId, backboneId, dragRibId) => {
-    const targetCells = layout.cells.filter(c =>
-      c.backboneId === backboneId &&
-      (targetReleaseId === null ? c.releaseId === null : c.releaseId === targetReleaseId) &&
-      c.id !== dragRibId
-    );
-    if (targetCells.length === 0) return 0;
-    const sorted = [...targetCells].sort((a, b) => a.y - b.y);
-    for (let i = 0; i < sorted.length; i++) {
-      const midY = sorted[i].y + sorted[i].height / 2;
-      if (mapY < midY) return i;
-    }
-    return sorted.length;
-  }, [layout.cells]);
 
   const findColumn = useCallback((mapX) => {
     for (const col of layout.columns) {
@@ -151,14 +135,14 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct }) {
 
     let state;
     if (prev.dragType === 'rib') {
-      state = buildRibMoveState(prev, mapPos, dx, dy, dist, findReleaseLane, findColumn, findInsertIndex);
+      state = buildRibMoveState(prev, mapPos, dx, dy, dist, findReleaseLane, findColumn);
     } else {
       state = buildBackboneMoveState(prev, mapPos, findThemeSpan);
     }
 
     dragRef.current = state;
     setDragState(state);
-  }, [screenToMap, findReleaseLane, findColumn, findThemeSpan, findInsertIndex]);
+  }, [screenToMap, findReleaseLane, findColumn, findThemeSpan]);
 
   // --- Shared end handler ---
   const handleDragEnd = useCallback(() => {
@@ -196,7 +180,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct }) {
 
 // --- Internal helpers (pure, not hooks) ---
 
-function buildRibMoveState(prev, mapPos, dx, dy, dist, findReleaseLane, findColumn, findInsertIndex) {
+function buildRibMoveState(prev, mapPos, dx, dy, dist, findReleaseLane, findColumn) {
   let axis = prev.axis;
   if (!axis && dist >= AXIS_LOCK_THRESHOLD) {
     axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
@@ -205,17 +189,12 @@ function buildRibMoveState(prev, mapPos, dx, dy, dist, findReleaseLane, findColu
   let targetReleaseId = prev.targetReleaseId;
   let targetBackboneId = prev.targetBackboneId;
   let targetThemeId = prev.targetThemeId;
-  let insertIndex = prev.insertIndex ?? null;
 
   if (axis === 'y') {
     const lane = findReleaseLane(mapPos.y);
     if (lane) targetReleaseId = lane.releaseId;
     targetBackboneId = prev.backboneId;
     targetThemeId = prev.themeId;
-    // Compute insertion position within the target release lane
-    if (targetReleaseId !== undefined) {
-      insertIndex = findInsertIndex(mapPos.y, targetReleaseId, prev.backboneId, prev.ribId);
-    }
   } else if (axis === 'x') {
     const col = findColumn(mapPos.x);
     if (col) {
@@ -223,7 +202,6 @@ function buildRibMoveState(prev, mapPos, dx, dy, dist, findReleaseLane, findColu
       targetThemeId = col.themeId;
     }
     targetReleaseId = prev.releaseId;
-    insertIndex = null;
   }
 
   return {
@@ -234,7 +212,6 @@ function buildRibMoveState(prev, mapPos, dx, dy, dist, findReleaseLane, findColu
     targetReleaseId,
     targetBackboneId,
     targetThemeId,
-    insertIndex,
     isDragging: true,
   };
 }
@@ -251,15 +228,10 @@ function buildBackboneMoveState(prev, mapPos, findThemeSpan) {
 }
 
 function commitRibDrag(state, updateProduct) {
-  const { axis, ribId, themeId, backboneId, releaseId, targetReleaseId, targetBackboneId, targetThemeId, insertIndex } = state;
+  const { axis, ribId, themeId, backboneId, releaseId, targetReleaseId, targetBackboneId, targetThemeId } = state;
 
-  if (axis === 'y' && targetReleaseId !== undefined) {
-    if (targetReleaseId !== releaseId) {
-      moveRibToRelease(updateProduct, ribId, releaseId, targetReleaseId, insertIndex);
-    } else if (insertIndex != null) {
-      // Reorder within the same release lane
-      reorderRibInRelease(updateProduct, ribId, releaseId, insertIndex);
-    }
+  if (axis === 'y' && targetReleaseId !== undefined && targetReleaseId !== releaseId) {
+    moveRibToRelease(updateProduct, ribId, releaseId, targetReleaseId);
   }
   if (axis === 'x' && targetBackboneId && targetBackboneId !== backboneId) {
     moveRibToBackbone(updateProduct, ribId, themeId, backboneId, targetThemeId, targetBackboneId);

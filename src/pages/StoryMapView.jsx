@@ -16,6 +16,7 @@ export default function StoryMapView() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [selectedRibId, setSelectedRibId] = useState(null);
   const [selectedReleaseId, setSelectedReleaseId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   // Derive selectedRib from layout so it stays in sync with product changes (e.g. renames)
   const selectedRib = useMemo(() => {
@@ -31,6 +32,7 @@ export default function StoryMapView() {
     zoom,
     pan,
     updateProduct,
+    selectedIds,
   });
 
   // Track recent drag completion to suppress click-after-drag
@@ -45,15 +47,37 @@ export default function StoryMapView() {
     }
   }, [dragState]);
 
-  const handleRibClick = useCallback((ribData) => {
+  const handleRibClick = useCallback((ribData, e) => {
     // Don't open detail panel if we just finished dragging
     if (recentDragRef.current) return;
-    setSelectedReleaseId(null);
-    setSelectedRibId(ribData.id);
+
+    const isMod = e?.metaKey || e?.ctrlKey;
+    const isShift = e?.shiftKey;
+
+    if (isMod || isShift) {
+      // Toggle in/out of multi-selection
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(ribData.id)) {
+          next.delete(ribData.id);
+        } else {
+          next.add(ribData.id);
+        }
+        return next;
+      });
+      setSelectedRibId(null);
+      setSelectedReleaseId(null);
+    } else {
+      // Single select — clear multi-select, open detail panel
+      setSelectedIds(new Set());
+      setSelectedReleaseId(null);
+      setSelectedRibId(ribData.id);
+    }
   }, []);
 
   const handleReleaseClick = useCallback((releaseId) => {
     if (recentDragRef.current) return;
+    setSelectedIds(new Set());
     setSelectedRibId(null);
     setSelectedReleaseId(releaseId);
   }, []);
@@ -107,14 +131,18 @@ export default function StoryMapView() {
         e.preventDefault();
         redo();
       }
-      // Escape cancels drag
-      if (e.key === 'Escape' && dragState?.isDragging) {
-        cancelDrag();
+      // Escape cancels drag or clears selection
+      if (e.key === 'Escape') {
+        if (dragState?.isDragging) {
+          cancelDrag();
+        } else if (selectedIds.size > 0) {
+          setSelectedIds(new Set());
+        }
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [undo, redo, dragState, cancelDrag]);
+  }, [undo, redo, dragState, cancelDrag, selectedIds]);
 
   // Rename handlers
   const handleRenameTheme = useCallback((themeId, newName) => {
@@ -138,6 +166,27 @@ export default function StoryMapView() {
     }));
   }, [updateProduct]);
 
+  // Compute drag indicator label
+  const dragLabel = useMemo(() => {
+    if (!dragState?.isDragging) return null;
+    if (dragState.dragType === 'backbone') return '↔ Moving backbone between themes';
+
+    const backboneChanged = dragState.targetBackboneId && dragState.targetBackboneId !== dragState.backboneId;
+    const releaseChanged = dragState.targetReleaseId !== undefined && dragState.targetReleaseId !== dragState.releaseId;
+    if (!backboneChanged && !releaseChanged) return null;
+
+    const targetCol = layout.columns.find(c => c.backboneId === dragState.targetBackboneId);
+    const targetLane = layout.releaseLanes.find(l => l.releaseId === dragState.targetReleaseId);
+    const releaseName = targetLane?.releaseName || (dragState.targetReleaseId === null ? 'Unassigned' : '');
+
+    const count = dragState.selectedIds?.size || 1;
+    const prefix = count > 1 ? `Moving ${count} items` : 'Moving';
+
+    if (backboneChanged && releaseChanged) return `${prefix} → ${targetCol?.backboneName} / ${releaseName}`;
+    if (backboneChanged) return `${prefix} → ${targetCol?.backboneName}`;
+    return `${prefix} → ${releaseName}`;
+  }, [dragState, layout.columns, layout.releaseLanes]);
+
   return (
     <div ref={containerRef} className="-mx-6 -mt-6 relative" style={{ height: 'calc(100vh - 112px)' }}>
       <MapCanvas
@@ -149,6 +198,7 @@ export default function StoryMapView() {
         dragState={dragState}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
+        layoutCells={layout.cells}
       >
         <MapContent
           layout={layout}
@@ -160,6 +210,7 @@ export default function StoryMapView() {
           dragState={dragState}
           onDragStart={handleDragStart}
           onBackboneDragStart={handleBackboneDragStart}
+          selectedIds={selectedIds}
         />
       </MapCanvas>
 
@@ -181,12 +232,17 @@ export default function StoryMapView() {
         />
       )}
 
-      {/* Drag axis indicator */}
-      {dragState?.isDragging && dragState.axis && (
+      {/* Drag indicator badge */}
+      {dragLabel && (
         <div className="absolute top-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
-          {dragState.dragType === 'backbone'
-            ? '↔ Moving backbone between themes'
-            : dragState.axis === 'y' ? '↕ Moving between releases' : '↔ Moving between backbones'}
+          {dragLabel}
+        </div>
+      )}
+
+      {/* Selection count badge */}
+      {selectedIds.size > 0 && !dragState?.isDragging && (
+        <div className="absolute bottom-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
+          {selectedIds.size} selected
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme } from '../components/storymap/mapMutations';
+import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, moveRib2D, moveRibs2D } from '../components/storymap/mapMutations';
 
 // Helper: creates a minimal product with configurable themes/backbones/ribs
 function makeProduct({
@@ -397,5 +397,209 @@ describe('moveBackboneToTheme', () => {
     );
 
     expect(result).toBe(product);
+  });
+});
+
+// --- moveRib2D ---
+describe('moveRib2D', () => {
+  it('moves rib to different backbone only', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib]), makeBackbone('b2', [])])],
+    });
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A' }
+      ),
+      product,
+    );
+
+    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
+    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(1);
+    expect(result.themes[0].backboneItems[1].ribItems[0].id).toBe('r1');
+    // Allocation unchanged
+    expect(result.themes[0].backboneItems[1].ribItems[0].releaseAllocations[0].releaseId).toBe('rel-A');
+  });
+
+  it('moves rib to different release only', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
+      releaseCardOrder: { 'rel-A': ['r1'] },
+    });
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B' }
+      ),
+      product,
+    );
+
+    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
+    expect(updatedRib.releaseAllocations[0].releaseId).toBe('rel-B');
+    expect(result.releaseCardOrder['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder['rel-B']).toEqual(['r1']);
+  });
+
+  it('moves rib to different backbone AND release simultaneously', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 80, memo: 'test' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib]), makeBackbone('b2', [])])],
+      releaseCardOrder: { 'rel-A': ['r1'] },
+    });
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-B', insertIndex: 0 }
+      ),
+      product,
+    );
+
+    // Backbone changed
+    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
+    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(1);
+    // Release changed with preserved memo
+    const movedRib = result.themes[0].backboneItems[1].ribItems[0];
+    expect(movedRib.releaseAllocations[0].releaseId).toBe('rel-B');
+    expect(movedRib.releaseAllocations[0].percentage).toBe(80);
+    expect(movedRib.releaseAllocations[0].memo).toBe('test');
+    // Card order updated
+    expect(result.releaseCardOrder['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder['rel-B']).toEqual(['r1']);
+  });
+
+  it('is a no-op when neither backbone nor release changed', () => {
+    let called = false;
+    const fakeUpdate = () => { called = true; };
+    moveRib2D(fakeUpdate, 'r1',
+      { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+      { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' }
+    );
+    expect(called).toBe(false);
+  });
+
+  it('inserts at specified position in card order', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
+      releaseCardOrder: { 'rel-A': ['r1'], 'rel-B': ['r2', 'r3'] },
+    });
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B', insertIndex: 1 }
+      ),
+      product,
+    );
+
+    expect(result.releaseCardOrder['rel-B']).toEqual(['r2', 'r1', 'r3']);
+  });
+});
+
+// --- moveRibs2D (batch) ---
+describe('moveRibs2D', () => {
+  it('batch moves ribs to a different backbone', () => {
+    const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2]), makeBackbone('b2', [])])],
+    });
+
+    const result = captureUpdate(
+      (update) => moveRibs2D(update, [
+        { ribId: 'r1', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+        { ribId: 'r2', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+      ], { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A' }),
+      product,
+    );
+
+    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
+    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(2);
+  });
+
+  it('batch moves ribs to a different release', () => {
+    const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2])])],
+      releaseCardOrder: { 'rel-A': ['r1', 'r2'] },
+    });
+
+    const result = captureUpdate(
+      (update) => moveRibs2D(update, [
+        { ribId: 'r1', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+        { ribId: 'r2', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+      ], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B', insertIndex: 0 }),
+      product,
+    );
+
+    const rib1 = result.themes[0].backboneItems[0].ribItems[0];
+    const rib2 = result.themes[0].backboneItems[0].ribItems[1];
+    expect(rib1.releaseAllocations[0].releaseId).toBe('rel-B');
+    expect(rib2.releaseAllocations[0].releaseId).toBe('rel-B');
+    expect(result.releaseCardOrder['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder['rel-B']).toEqual(['r1', 'r2']);
+  });
+
+  it('batch moves ribs to different backbone AND release', () => {
+    const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 50, memo: 'note' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2]), makeBackbone('b2', [])])],
+      releaseCardOrder: { 'rel-A': ['r1', 'r2'] },
+    });
+
+    const result = captureUpdate(
+      (update) => moveRibs2D(update, [
+        { ribId: 'r1', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+        { ribId: 'r2', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+      ], { themeId: 't1', backboneId: 'b2', releaseId: 'rel-B' }),
+      product,
+    );
+
+    // Backbone changed
+    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
+    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(2);
+    // Release changed with preserved memo
+    const movedR2 = result.themes[0].backboneItems[1].ribItems.find(r => r.id === 'r2');
+    expect(movedR2.releaseAllocations[0].releaseId).toBe('rel-B');
+    expect(movedR2.releaseAllocations[0].percentage).toBe(50);
+    expect(movedR2.releaseAllocations[0].memo).toBe('note');
+  });
+
+  it('skips ribs that already have target release allocation', () => {
+    const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 50, memo: '' }, { releaseId: 'rel-B', percentage: 50, memo: '' }]);
+    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2])])],
+      releaseCardOrder: { 'rel-A': ['r1', 'r2'] },
+    });
+
+    const result = captureUpdate(
+      (update) => moveRibs2D(update, [
+        { ribId: 'r1', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+        { ribId: 'r2', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
+      ], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B' }),
+      product,
+    );
+
+    // r1 already had rel-B allocation, should be unchanged
+    const updatedR1 = result.themes[0].backboneItems[0].ribItems[0];
+    expect(updatedR1.releaseAllocations).toHaveLength(2);
+    // r2 should have moved
+    const updatedR2 = result.themes[0].backboneItems[0].ribItems[1];
+    expect(updatedR2.releaseAllocations[0].releaseId).toBe('rel-B');
+  });
+
+  it('is a no-op with empty entries', () => {
+    let called = false;
+    const fakeUpdate = () => { called = true; };
+    moveRibs2D(fakeUpdate, [], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' });
+    expect(called).toBe(false);
   });
 });

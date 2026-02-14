@@ -9,7 +9,7 @@ const CELL_GAP = 6;
 const CELL_PAD = 6;
 const THEME_HEIGHT = 40;
 const BACKBONE_HEIGHT = 32;
-const LANE_LABEL_WIDTH = 160;
+const LANE_LABEL_WIDTH = 110;
 const MIN_LANE_HEIGHT = 72;
 
 export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, MIN_LANE_HEIGHT };
@@ -21,7 +21,6 @@ export default function useMapLayout(product) {
 export function computeLayout(product) {
   const themes = product.themes || [];
   const releases = [...(product.releases || [])].sort((a, b) => a.order - b.order);
-  const cardOrder = product.releaseCardOrder || {};
 
   if (themes.length === 0) {
     return { columns: [], themeSpans: [], releaseLanes: [], cells: [], unassignedLane: null, totalWidth: 0, totalHeight: 0 };
@@ -149,21 +148,8 @@ export function computeLayout(product) {
 
   const totalHeight = currentY;
 
-  // 6. Place rib cells with absolute positions, sorted by releaseCardOrder
+  // 6. Place rib cells with absolute positions
   const cells = [];
-
-  // Sort ribs within a lane/column by releaseCardOrder (or data order as fallback)
-  const sortByCardOrder = (ribs, orderKey) => {
-    const order = cardOrder[orderKey];
-    if (!order || order.length === 0) return ribs;
-    const idxMap = {};
-    order.forEach((id, i) => { idxMap[id] = i; });
-    return [...ribs].sort((a, b) => {
-      const ai = idxMap[a.id] ?? Infinity;
-      const bi = idxMap[b.id] ?? Infinity;
-      return ai - bi;
-    });
-  };
 
   for (const lane of releaseLanes) {
     for (let ci = 0; ci < totalColumns; ci++) {
@@ -171,8 +157,7 @@ export function computeLayout(product) {
       const ribs = ribsByRelCol[key];
       if (!ribs) continue;
       const col = columns[ci];
-      const sorted = sortByCardOrder(ribs, lane.releaseId);
-      sorted.forEach((rib, i) => {
+      ribs.forEach((rib, i) => {
         cells.push({
           ...rib,
           x: col.x + CELL_PAD,
@@ -190,8 +175,7 @@ export function computeLayout(product) {
       const ribs = unassignedByCol[ci];
       if (!ribs) continue;
       const col = columns[ci];
-      const sorted = sortByCardOrder(ribs, 'unassigned');
-      sorted.forEach((rib, i) => {
+      ribs.forEach((rib, i) => {
         cells.push({
           ...rib,
           x: col.x + CELL_PAD,

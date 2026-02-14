@@ -1,5 +1,3 @@
-import { LANE_LABEL_WIDTH } from './useMapLayout';
-
 /**
  * Renders the "Unassigned" lane at the bottom of the story map.
  * Extracted from MapContent for readability.
@@ -31,7 +29,7 @@ export default function UnassignedLane({ lane, totalWidth, isDropTarget }) {
         style={{
           top: lane.y,
           left: 0,
-          width: LANE_LABEL_WIDTH - 4,
+          width: 106,
           height: lane.height,
         }}
       >
