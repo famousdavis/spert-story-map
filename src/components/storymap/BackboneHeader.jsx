@@ -12,7 +12,7 @@ const BACKBONE_BG_COLORS = [
   'bg-orange-100 text-orange-800',
 ];
 
-export default function BackboneHeader({ column, themeIndex, onRename, isDropTarget, isDragging, onDragStart }) {
+export default function BackboneHeader({ column, themeIndex, onRename, onDelete, isDropTarget, isDragging, onDragStart }) {
   const color = BACKBONE_BG_COLORS[themeIndex % BACKBONE_BG_COLORS.length];
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(column.backboneName, (name) => onRename(column.themeId, column.backboneId, name));
@@ -65,6 +65,15 @@ export default function BackboneHeader({ column, themeIndex, onRename, isDropTar
         >
           {column.backboneName}
         </span>
+      )}
+      {onDelete && (
+        <button
+          className="text-[10px] leading-none opacity-30 hover:opacity-100 text-red-700 flex-shrink-0 ml-auto transition-opacity"
+          onClick={(e) => { e.stopPropagation(); onDelete(column.themeId, column.backboneId); }}
+          title="Delete backbone"
+        >
+          ×
+        </button>
       )}
     </div>
   );

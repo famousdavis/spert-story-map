@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { moveRib2D, moveRibs2D, moveBackboneToTheme } from './mapMutations';
-import { CELL_HEIGHT, CELL_GAP } from './useMapLayout';
+import { moveRib2D, moveRibs2D, moveBackboneToTheme, reorderTheme } from './mapMutations';
+import { CELL_HEIGHT, CELL_GAP, COL_WIDTH, COL_GAP } from './useMapLayout';
 
 /**
  * Hook for drag-and-drop on the story map.
@@ -124,6 +124,29 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     setDragState(state);
   }, [screenToMap, getContainerRect]);
 
+  // --- Theme drag start ---
+  const handleThemeDragStart = useCallback((e, themeSpan) => {
+    const rect = getContainerRect(e);
+    if (!rect) return;
+    const mapPos = screenToMap(e.clientX, e.clientY, rect);
+
+    const state = {
+      dragType: 'theme',
+      themeId: themeSpan.themeId,
+      startScreenX: e.clientX,
+      startScreenY: e.clientY,
+      startMapX: mapPos.x,
+      startMapY: mapPos.y,
+      currentMapX: mapPos.x,
+      currentMapY: mapPos.y,
+      targetInsertIndex: null,
+      isDragging: false,
+      mapContainerRect: rect,
+    };
+    dragRef.current = state;
+    setDragState(state);
+  }, [screenToMap, getContainerRect]);
+
   // --- Shared move handler ---
   const handleDragMove = useCallback((e) => {
     const prev = dragRef.current;
@@ -141,8 +164,10 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     let state;
     if (prev.dragType === 'rib') {
       state = buildRibMoveState(prev, mapPos, e.clientX, e.clientY, findReleaseLane, findColumn, layout.cells);
+    } else if (prev.dragType === 'backbone') {
+      state = buildBackboneMoveState(prev, mapPos, findThemeSpan, layout.columns);
     } else {
-      state = buildBackboneMoveState(prev, mapPos, findThemeSpan);
+      state = buildThemeMoveState(prev, mapPos, layout.themeSpans);
     }
 
     dragRef.current = state;
@@ -162,6 +187,8 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
       commitRibDrag(state, updateProduct, layout.cells);
     } else if (state.dragType === 'backbone') {
       commitBackboneDrag(state, updateProduct);
+    } else if (state.dragType === 'theme') {
+      commitThemeDrag(state, updateProduct);
     }
 
     dragRef.current = null;
@@ -177,6 +204,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     dragState,
     handleDragStart,
     handleBackboneDragStart,
+    handleThemeDragStart,
     handleDragMove,
     handleDragEnd,
     cancelDrag,
@@ -220,13 +248,30 @@ function buildRibMoveState(prev, mapPos, screenX, screenY, findReleaseLane, find
   };
 }
 
-function buildBackboneMoveState(prev, mapPos, findThemeSpan) {
+function buildBackboneMoveState(prev, mapPos, findThemeSpan, columns) {
   const ts = findThemeSpan(mapPos.x);
+  const targetThemeId = ts ? ts.themeId : prev.targetThemeId;
+
+  // Compute insertion index among columns in the target theme (excluding the dragged backbone)
+  const themeCols = columns
+    .filter(c => c.themeId === targetThemeId && c.backboneId !== prev.backboneId)
+    .sort((a, b) => a.x - b.x);
+
+  let insertIndex = themeCols.length; // default: append at end
+  for (let i = 0; i < themeCols.length; i++) {
+    const colMid = themeCols[i].x + COL_WIDTH / 2;
+    if (mapPos.x < colMid) {
+      insertIndex = i;
+      break;
+    }
+  }
+
   return {
     ...prev,
     currentMapX: mapPos.x,
     currentMapY: mapPos.y,
-    targetThemeId: ts ? ts.themeId : prev.targetThemeId,
+    targetThemeId,
+    insertIndex,
     isDragging: true,
   };
 }
@@ -288,8 +333,39 @@ function commitRibDrag(state, updateProduct, layoutCells) {
 }
 
 function commitBackboneDrag(state, updateProduct) {
-  const { backboneId, themeId, targetThemeId } = state;
-  if (targetThemeId && targetThemeId !== themeId) {
-    moveBackboneToTheme(updateProduct, backboneId, themeId, targetThemeId);
+  const { backboneId, themeId, targetThemeId, insertIndex } = state;
+  if (!targetThemeId) return;
+
+  // Cross-theme move or same-theme reorder
+  moveBackboneToTheme(updateProduct, backboneId, themeId, targetThemeId, insertIndex);
+}
+
+function buildThemeMoveState(prev, mapPos, themeSpans) {
+  // Compute insertion index among themes (excluding the dragged theme)
+  const otherSpans = themeSpans
+    .filter(ts => ts.themeId !== prev.themeId)
+    .sort((a, b) => a.x - b.x);
+
+  let insertIndex = otherSpans.length; // default: append at end
+  for (let i = 0; i < otherSpans.length; i++) {
+    const spanMid = otherSpans[i].x + otherSpans[i].width / 2;
+    if (mapPos.x < spanMid) {
+      insertIndex = i;
+      break;
+    }
   }
+
+  return {
+    ...prev,
+    currentMapX: mapPos.x,
+    currentMapY: mapPos.y,
+    insertIndex,
+    isDragging: true,
+  };
+}
+
+function commitThemeDrag(state, updateProduct) {
+  const { themeId, insertIndex } = state;
+  if (insertIndex == null) return;
+  reorderTheme(updateProduct, themeId, insertIndex);
 }

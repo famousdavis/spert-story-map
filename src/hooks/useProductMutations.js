@@ -1,6 +1,16 @@
 import { useCallback } from 'react';
 import { calculateNextSprintEndDate } from '../lib/progressMutations';
 
+/** Remove deleted rib IDs from releaseCardOrder. */
+function cleanCardOrder(cardOrder, ribIds) {
+  if (!cardOrder || ribIds.size === 0) return cardOrder;
+  const cleaned = {};
+  for (const [col, ids] of Object.entries(cardOrder)) {
+    cleaned[col] = ids.filter(id => !ribIds.has(id));
+  }
+  return cleaned;
+}
+
 /**
  * Provides reusable CRUD operations for the product's theme/backbone/rib hierarchy.
  * Keeps mutation logic DRY between StructureView, SettingsView, and anywhere else
@@ -123,6 +133,67 @@ export function useProductMutations(updateProduct) {
     return newId;
   }, [updateProduct]);
 
+  const deleteTheme = useCallback((themeId) => {
+    updateProduct(prev => {
+      const ribIds = new Set();
+      const theme = prev.themes.find(t => t.id === themeId);
+      if (theme) theme.backboneItems.forEach(b => b.ribItems.forEach(r => ribIds.add(r.id)));
+      return {
+        ...prev,
+        themes: prev.themes.filter(t => t.id !== themeId),
+        releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, ribIds),
+      };
+    });
+  }, [updateProduct]);
+
+  const deleteBackbone = useCallback((themeId, backboneId) => {
+    updateProduct(prev => {
+      const ribIds = new Set();
+      const theme = prev.themes.find(t => t.id === themeId);
+      const bb = theme?.backboneItems.find(b => b.id === backboneId);
+      if (bb) bb.ribItems.forEach(r => ribIds.add(r.id));
+      return {
+        ...prev,
+        themes: prev.themes.map(t =>
+          t.id === themeId ? { ...t, backboneItems: t.backboneItems.filter(b => b.id !== backboneId) } : t
+        ),
+        releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, ribIds),
+      };
+    });
+  }, [updateProduct]);
+
+  const deleteRib = useCallback((themeId, backboneId, ribId) => {
+    updateProduct(prev => ({
+      ...prev,
+      themes: prev.themes.map(t =>
+        t.id === themeId
+          ? { ...t, backboneItems: t.backboneItems.map(b =>
+              b.id === backboneId ? { ...b, ribItems: b.ribItems.filter(r => r.id !== ribId) } : b
+            )}
+          : t
+      ),
+      releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, new Set([ribId])),
+    }));
+  }, [updateProduct]);
+
+  const deleteRibs = useCallback((entries) => {
+    if (!entries.length) return;
+    updateProduct(prev => {
+      const allRibIds = new Set(entries.map(e => e.ribId));
+      return {
+        ...prev,
+        themes: prev.themes.map(t => ({
+          ...t,
+          backboneItems: t.backboneItems.map(b => ({
+            ...b,
+            ribItems: b.ribItems.filter(r => !allRibIds.has(r.id)),
+          })),
+        })),
+        releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, allRibIds),
+      };
+    });
+  }, [updateProduct]);
+
   const moveItem = useCallback((items, id, direction, key = 'id') => {
     const arr = [...items];
     const idx = arr.findIndex(item => item[key] === id);
@@ -142,6 +213,10 @@ export function useProductMutations(updateProduct) {
     addRib,
     addRelease,
     addSprint,
+    deleteTheme,
+    deleteBackbone,
+    deleteRib,
+    deleteRibs,
     moveItem,
   };
 }

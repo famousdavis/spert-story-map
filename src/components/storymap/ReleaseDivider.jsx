@@ -1,3 +1,5 @@
+import { LANE_LABEL_WIDTH } from './useMapLayout';
+
 export default function ReleaseDivider({ lane, totalWidth, isFirst, isDropTarget }) {
   return (
     <>
@@ -28,7 +30,7 @@ export default function ReleaseDivider({ lane, totalWidth, isFirst, isDropTarget
         style={{
           top: lane.y,
           left: 0,
-          width: 106,
+          width: LANE_LABEL_WIDTH,
           height: lane.height,
         }}
         data-release-id={lane.releaseId}

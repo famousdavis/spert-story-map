@@ -20,57 +20,17 @@ export default function StructureView() {
   const [dropBeforeRib, setDropBeforeRib] = useState(null); // ribId to insert before
   const dropBeforeRef = useRef(null);
 
-  const { updateTheme, updateBackbone, updateRib, addTheme, addBackbone, addRib, moveItem } = useProductMutations(updateProduct);
+  const mutations = useProductMutations(updateProduct);
+  const { updateTheme, updateBackbone, updateRib, addTheme, addBackbone, addRib, moveItem } = mutations;
 
   const toggle = (id) => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
-
-  // Remove deleted rib IDs from releaseCardOrder
-  const cleanCardOrder = (cardOrder, ribIds) => {
-    if (!cardOrder || ribIds.size === 0) return cardOrder;
-    const cleaned = {};
-    for (const [col, ids] of Object.entries(cardOrder)) {
-      cleaned[col] = ids.filter(id => !ribIds.has(id));
-    }
-    return cleaned;
-  };
 
   const deleteItem = () => {
     if (!deleteTarget) return;
     const { type, themeId, backboneId, ribId } = deleteTarget;
-    if (type === 'theme') {
-      updateProduct(prev => {
-        const ribIds = new Set();
-        const theme = prev.themes.find(t => t.id === themeId);
-        if (theme) theme.backboneItems.forEach(b => b.ribItems.forEach(r => ribIds.add(r.id)));
-        return { ...prev, themes: prev.themes.filter(t => t.id !== themeId), releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, ribIds) };
-      });
-    } else if (type === 'backbone') {
-      updateProduct(prev => {
-        const ribIds = new Set();
-        const theme = prev.themes.find(t => t.id === themeId);
-        const bb = theme?.backboneItems.find(b => b.id === backboneId);
-        if (bb) bb.ribItems.forEach(r => ribIds.add(r.id));
-        return {
-          ...prev,
-          themes: prev.themes.map(t =>
-            t.id === themeId ? { ...t, backboneItems: t.backboneItems.filter(b => b.id !== backboneId) } : t
-          ),
-          releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, ribIds),
-        };
-      });
-    } else if (type === 'rib') {
-      updateProduct(prev => ({
-        ...prev,
-        themes: prev.themes.map(t =>
-          t.id === themeId
-            ? { ...t, backboneItems: t.backboneItems.map(b =>
-                b.id === backboneId ? { ...b, ribItems: b.ribItems.filter(r => r.id !== ribId) } : b
-              )}
-            : t
-        ),
-        releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, new Set([ribId])),
-      }));
-    }
+    if (type === 'theme') mutations.deleteTheme(themeId);
+    else if (type === 'backbone') mutations.deleteBackbone(themeId, backboneId);
+    else if (type === 'rib') mutations.deleteRib(themeId, backboneId, ribId);
   };
 
   const moveBackbone = (themeId, backboneId, direction) => {

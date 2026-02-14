@@ -126,7 +126,7 @@ export function moveRibToBackbone(updateProduct, ribId, fromThemeId, fromBackbon
  * Move a backbone (and all its ribs) from one theme to another (X-axis drag).
  * Recalculates order fields in both source and target themes.
  */
-export function moveBackboneToTheme(updateProduct, backboneId, fromThemeId, toThemeId) {
+export function moveBackboneToTheme(updateProduct, backboneId, fromThemeId, toThemeId, insertIndex) {
   updateProduct(prev => {
     let backboneData = null;
 
@@ -145,19 +145,40 @@ export function moveBackboneToTheme(updateProduct, backboneId, fromThemeId, toTh
 
     if (!backboneData) return prev;
 
-    // 2. Add backbone to target theme
+    // 2. Add backbone to target theme at insertion index
     const themesWithBb = themes.map(t => {
       if (t.id !== toThemeId) return t;
+      const items = [...t.backboneItems];
+      const idx = insertIndex != null && insertIndex >= 0 && insertIndex <= items.length
+        ? insertIndex : items.length;
+      items.splice(idx, 0, backboneData);
       return {
         ...t,
-        backboneItems: [
-          ...t.backboneItems,
-          { ...backboneData, order: t.backboneItems.length + 1 },
-        ],
+        backboneItems: items.map((b, i) => ({ ...b, order: i + 1 })),
       };
     });
 
     return { ...prev, themes: themesWithBb };
+  });
+}
+
+/**
+ * Reorder a theme within the product.themes array.
+ * Removes the theme from its current position and inserts at insertIndex.
+ */
+export function reorderTheme(updateProduct, themeId, insertIndex) {
+  updateProduct(prev => {
+    const idx = prev.themes.findIndex(t => t.id === themeId);
+    if (idx === -1) return prev;
+    const theme = prev.themes[idx];
+    const without = prev.themes.filter(t => t.id !== themeId);
+    const pos = insertIndex != null && insertIndex >= 0 && insertIndex <= without.length
+      ? insertIndex : without.length;
+    without.splice(pos, 0, theme);
+    return {
+      ...prev,
+      themes: without.map((t, i) => ({ ...t, order: i + 1 })),
+    };
   });
 }
 

@@ -1,7 +1,7 @@
 import { SIZE_COLORS } from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 
-export default function RibCell({ cell, onClick, onRename, onDragStart, isDragging, isSelected }) {
+export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart, isDragging, isSelected }) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const allocWarning = cell.allocTotal > 0 && cell.allocTotal !== 100;
 
@@ -24,7 +24,7 @@ export default function RibCell({ cell, onClick, onRename, onDragStart, isDraggi
             : allocWarning
               ? 'border-amber-300 bg-amber-50 hover:border-amber-400'
               : 'border-gray-200 bg-white hover:border-blue-400'
-      } cursor-pointer px-2 py-1.5 overflow-hidden`}
+      } group cursor-pointer px-2 py-1.5 overflow-hidden`}
       style={{
         left: cell.x,
         top: cell.y,
@@ -75,13 +75,22 @@ export default function RibCell({ cell, onClick, onRename, onDragStart, isDraggi
             {cell.size}
           </span>
         )}
+        {onDelete && (
+          <button
+            className="text-[10px] leading-none text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 -mr-0.5"
+            onClick={(e) => { e.stopPropagation(); onDelete(cell.themeId, cell.backboneId, cell.id); }}
+            title="Delete"
+          >
+            ×
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-1.5 mt-0.5 text-[10px]">
         {cell.points > 0 && <span className="text-gray-400">{cell.points}pts</span>}
         {cell.isPartial && <span className="text-blue-600 font-medium">{cell.allocation.percentage}%</span>}
         {allocWarning && <span className="text-amber-600 font-medium">{cell.allocTotal}%</span>}
         <span className={`ml-auto ${cell.category === 'core' ? 'text-blue-500' : 'text-gray-400'}`}>
-          {cell.category === 'core' ? 'Core' : 'N-C'}
+          {cell.category === 'core' ? 'Core' : 'Non-Core'}
         </span>
       </div>
     </div>

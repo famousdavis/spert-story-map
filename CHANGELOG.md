@@ -1,5 +1,22 @@
 # Changelog
 
+## Version 0.7.0 (2026-02-14)
+
+### Added
+- **Map CRUD** — Create and delete themes, backbones, and rib items directly on the story map without switching to the Structure tab
+- **Delete with confirmation** — All × delete buttons (rib, backbone, theme) show a confirmation dialog before deleting; theme/backbone dialogs warn about cascading child deletion
+- **Multi-select keyboard delete** — Shift+click to select multiple rib cards, then Delete/Backspace to remove all at once (no confirmation, undoable with Cmd/Ctrl+Z)
+- **Add buttons on map** — `+ Theme` and `+ Backbone` buttons after the last column; `+ Rib` button at bottom of each backbone column
+- **Backbone drag insertion bar** — Vertical blue line shows where backbone will be placed when dragging between positions
+- **Theme drag-and-drop** — Grab handle on theme headers to reorder themes left/right with insertion indicator
+
+### Fixed
+- **Release lane labels** — Labels now use the shared `LANE_LABEL_WIDTH` constant (widened to 160px) instead of a hardcoded 106px that truncated release names
+- **Rib card category label** — Changed "N-C" to "Non-Core" for clarity
+
+### Refactored
+- Centralized delete logic (`deleteTheme`, `deleteBackbone`, `deleteRib`, `deleteRibs`) in `useProductMutations` hook — StructureView now delegates to shared methods
+
 ## Version 0.6.0 (2026-02-14)
 
 ### Added

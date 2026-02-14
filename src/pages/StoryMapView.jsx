@@ -6,6 +6,7 @@ import MapContent from '../components/storymap/MapContent';
 import RibDetailPanel from '../components/storymap/RibDetailPanel';
 import ReleaseDetailPanel from '../components/storymap/ReleaseDetailPanel';
 import DragGhost from '../components/storymap/DragGhost';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import useMapDrag from '../components/storymap/useMapDrag';
 import useMapLayout from '../components/storymap/useMapLayout';
 
@@ -18,6 +19,7 @@ export default function StoryMapView() {
   const [selectedRibId, setSelectedRibId] = useState(null);
   const [selectedReleaseId, setSelectedReleaseId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // Derive selectedRib from layout so it stays in sync with product changes (e.g. renames)
   const selectedRib = useMemo(() => {
@@ -28,7 +30,7 @@ export default function StoryMapView() {
   const containerRef = useRef(null);
   const didAutoFit = useRef(false);
 
-  const { dragState, handleDragStart, handleBackboneDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({
+  const { dragState, handleDragStart, handleBackboneDragStart, handleThemeDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({
     layout,
     zoom,
     pan,
@@ -137,10 +139,21 @@ export default function StoryMapView() {
           setSelectedIds(new Set());
         }
       }
+      // Delete/Backspace removes selected ribs
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
+        e.preventDefault();
+        const entries = [];
+        for (const ribId of selectedIds) {
+          const cell = layout.cells.find(c => c.id === ribId);
+          if (cell) entries.push({ themeId: cell.themeId, backboneId: cell.backboneId, ribId: cell.id });
+        }
+        if (entries.length > 0) mutations.deleteRibs(entries);
+        setSelectedIds(new Set());
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [undo, redo, dragState, cancelDrag, selectedIds]);
+  }, [undo, redo, dragState, cancelDrag, selectedIds, layout.cells, mutations]);
 
   // Rename handlers
   const handleRenameTheme = useCallback((themeId, newName) => {
@@ -155,6 +168,50 @@ export default function StoryMapView() {
     mutations.updateRib(themeId, backboneId, ribId, { name: newName });
   }, [mutations]);
 
+  // Delete handlers
+  const handleDeleteTheme = useCallback((themeId) => {
+    const theme = product.themes.find(t => t.id === themeId);
+    setDeleteTarget({ type: 'theme', themeId, name: theme?.name || 'Theme' });
+  }, [product.themes]);
+
+  const handleDeleteBackbone = useCallback((themeId, backboneId) => {
+    const theme = product.themes.find(t => t.id === themeId);
+    const bb = theme?.backboneItems?.find(b => b.id === backboneId);
+    setDeleteTarget({ type: 'backbone', themeId, backboneId, name: bb?.name || 'Backbone' });
+  }, [product.themes]);
+
+  const handleDeleteRib = useCallback((themeId, backboneId, ribId) => {
+    const theme = product.themes.find(t => t.id === themeId);
+    const bb = theme?.backboneItems?.find(b => b.id === backboneId);
+    const rib = bb?.ribItems?.find(r => r.id === ribId);
+    setDeleteTarget({ type: 'rib', themeId, backboneId, ribId, name: rib?.name || 'Rib Item' });
+  }, [product.themes]);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'theme') {
+      mutations.deleteTheme(deleteTarget.themeId);
+    } else if (deleteTarget.type === 'backbone') {
+      mutations.deleteBackbone(deleteTarget.themeId, deleteTarget.backboneId);
+    } else if (deleteTarget.type === 'rib') {
+      mutations.deleteRib(deleteTarget.themeId, deleteTarget.backboneId, deleteTarget.ribId);
+    }
+    setDeleteTarget(null);
+  }, [deleteTarget, mutations]);
+
+  // Add handlers
+  const handleAddTheme = useCallback(() => {
+    mutations.addTheme();
+  }, [mutations]);
+
+  const handleAddBackbone = useCallback((themeId) => {
+    mutations.addBackbone(themeId);
+  }, [mutations]);
+
+  const handleAddRib = useCallback((themeId, backboneId) => {
+    mutations.addRib(themeId, backboneId);
+  }, [mutations]);
+
   const handleRenameRelease = useCallback((releaseId, newName) => {
     updateProduct(prev => ({
       ...prev,
@@ -167,7 +224,8 @@ export default function StoryMapView() {
   // Compute drag indicator label
   const dragLabel = useMemo(() => {
     if (!dragState?.isDragging) return null;
-    if (dragState.dragType === 'backbone') return '↔ Moving backbone between themes';
+    if (dragState.dragType === 'theme') return '↔ Reordering theme';
+    if (dragState.dragType === 'backbone') return '↔ Moving backbone';
 
     const backboneChanged = dragState.targetBackboneId && dragState.targetBackboneId !== dragState.backboneId;
     const releaseChanged = dragState.targetReleaseId !== undefined && dragState.targetReleaseId !== dragState.releaseId;
@@ -206,9 +264,16 @@ export default function StoryMapView() {
           onRenameTheme={handleRenameTheme}
           onRenameBackbone={handleRenameBackbone}
           onRenameRib={handleRenameRib}
+          onDeleteTheme={handleDeleteTheme}
+          onDeleteBackbone={handleDeleteBackbone}
+          onDeleteRib={handleDeleteRib}
+          onAddTheme={handleAddTheme}
+          onAddBackbone={handleAddBackbone}
+          onAddRib={handleAddRib}
           dragState={dragState}
           onDragStart={handleDragStart}
           onBackboneDragStart={handleBackboneDragStart}
+          onThemeDragStart={handleThemeDragStart}
           selectedIds={selectedIds}
         />
       </MapCanvas>
@@ -244,9 +309,23 @@ export default function StoryMapView() {
       {/* Selection count badge */}
       {selectedIds.size > 0 && !dragState?.isDragging && (
         <div className="absolute bottom-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
-          {selectedIds.size} selected
+          {selectedIds.size} selected — press Delete to remove
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title={`Delete ${deleteTarget?.type === 'theme' ? 'Theme' : deleteTarget?.type === 'backbone' ? 'Backbone' : 'Rib Item'}`}
+        message={
+          deleteTarget?.type === 'theme'
+            ? `Delete "${deleteTarget.name}"? All backbone items and rib items within it will also be deleted.`
+            : deleteTarget?.type === 'backbone'
+              ? `Delete "${deleteTarget?.name}"? All rib items within it will also be deleted.`
+              : `Delete "${deleteTarget?.name}"?`
+        }
+      />
     </div>
   );
 }

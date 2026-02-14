@@ -48,19 +48,21 @@ src/
 │   │   └── AllocationModal.jsx       # Split-allocation editor modal
 │   └── storymap/                     # Interactive story map components
 │       ├── MapCanvas.jsx             # Pan/zoom container with pointer events
-│       ├── MapContent.jsx            # Map rendering (headers, lanes, cells)
-│       ├── ThemeHeader.jsx           # Theme label with inline rename
-│       ├── BackboneHeader.jsx        # Backbone label with inline rename + drag handle
-│       ├── RibCell.jsx               # Rib card on the map with drag grip
+│       ├── MapContent.jsx            # Map rendering (headers, lanes, cells, add buttons)
+│       ├── ThemeHeader.jsx           # Theme label with inline rename, drag handle, delete
+│       ├── BackboneHeader.jsx        # Backbone label with inline rename, drag handle, delete
+│       ├── RibCell.jsx               # Rib card on the map with drag grip and delete
 │       ├── ReleaseDivider.jsx        # Release lane divider with clickable label
 │       ├── UnassignedLane.jsx        # Unassigned lane at bottom of map
 │       ├── DropHighlight.jsx         # Visual drop target indicator
+│       ├── InsertionIndicator.jsx    # Blue line showing drop position (rib/backbone/theme)
+│       ├── DragGhost.jsx             # Card-stack preview following cursor during drags
 │       ├── RibDetailPanel.jsx        # Slide-out panel for rib details
 │       ├── ReleaseDetailPanel.jsx    # Slide-out panel for release details
-│       ├── useMapLayout.js           # Layout computation (columns, lanes, cells)
-│       ├── useMapDrag.js             # Drag-and-drop hook (axis detection, drop logic)
+│       ├── useMapLayout.js           # Layout computation + constants (columns, lanes, cells)
+│       ├── useMapDrag.js             # Pointer-event drag hook (rib/backbone/theme drags)
 │       ├── useInlineEdit.js          # Shared inline-edit hook for map headers
-│       └── mapMutations.js           # Pure mutation helpers (move rib/backbone)
+│       └── mapMutations.js           # Pure mutation helpers (move rib/backbone/theme)
 │
 └── pages/                            # Route-level views
     ├── ProductList.jsx               # Home — product listing with CRUD
@@ -107,7 +109,7 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 1. **Pure calculations** — `calculations.js` has zero side effects. Every function derives values from the product object. This makes the logic testable and cacheable with `useMemo`.
 
-2. **Native HTML5 DnD** — We use the browser's built-in drag-and-drop API rather than a library. Refs (`dropTargetRef`, `dropBeforeRef`) track the latest drop position to avoid stale closures in event handlers.
+2. **Dual DnD systems** — Release planning uses native HTML5 DnD with refs (`dropTargetRef`, `dropBeforeRef`) to avoid stale closures. The story map uses pointer events (`useMapDrag`) for smoother drag with three types: `'rib'`, `'backbone'`, `'theme'`. Window-level `pointermove`/`pointerup` listeners ensure reliable delivery.
 
 3. **Atomic state updates** — Cross-column card moves combine allocation changes + card order into a single `updateProduct` call to prevent race conditions between separate state updates.
 

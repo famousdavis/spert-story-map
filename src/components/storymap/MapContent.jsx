@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { COL_WIDTH, COL_GAP, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH } from './useMapLayout';
 import ThemeHeader from './ThemeHeader';
 import BackboneHeader from './BackboneHeader';
 import ReleaseDivider from './ReleaseDivider';
@@ -10,17 +11,24 @@ import InsertionIndicator from './InsertionIndicator';
 export default function MapContent({
   layout, onRibClick, mapSizeRef,
   onRenameTheme, onRenameBackbone, onRenameRib,
-  dragState, onDragStart, onBackboneDragStart,
+  onDeleteTheme, onDeleteBackbone, onDeleteRib,
+  onAddTheme, onAddBackbone, onAddRib,
+  dragState, onDragStart, onBackboneDragStart, onThemeDragStart,
   selectedIds,
 }) {
   const { columns, themeSpans, releaseLanes, cells, unassignedLane, totalWidth, totalHeight } = layout;
 
+  // Extra width for the "+ Theme" button
+  const addBtnWidth = 100;
+  const mapWidth = themeSpans.length > 0 ? totalWidth + COL_GAP + addBtnWidth : addBtnWidth + LANE_LABEL_WIDTH;
+  const mapHeight = Math.max(totalHeight, THEME_HEIGHT + BACKBONE_HEIGHT + 72);
+
   // Expose map size to parent for fit-to-screen
   useEffect(() => {
     if (mapSizeRef) {
-      mapSizeRef.current = { width: totalWidth, height: totalHeight };
+      mapSizeRef.current = { width: mapWidth, height: mapHeight };
     }
-  }, [totalWidth, totalHeight, mapSizeRef]);
+  }, [mapWidth, mapHeight, mapSizeRef]);
 
   // Build a theme index lookup for backbone coloring
   const themeIndexMap = {};
@@ -29,15 +37,24 @@ export default function MapContent({
   // Determine highlighted drop zones from drag state
   const isRibDrag = dragState?.isDragging && dragState.dragType === 'rib';
   const isBackboneDrag = dragState?.isDragging && dragState.dragType === 'backbone';
+  const isThemeDrag = dragState?.isDragging && dragState.dragType === 'theme';
   const highlightReleaseId = isRibDrag ? dragState.targetReleaseId : undefined;
   const highlightBackboneId = isRibDrag ? dragState.targetBackboneId : undefined;
   const highlightThemeId = isBackboneDrag ? dragState.targetThemeId : undefined;
 
   if (themeSpans.length === 0) {
     return (
-      <div className="p-12 text-center text-gray-400" data-map-bg="">
-        <p className="text-lg mb-2">No themes defined yet</p>
-        <p className="text-sm">Add themes and backbone items in the Structure tab to see the story map.</p>
+      <div className="relative" style={{ width: mapWidth, height: mapHeight }} data-map-bg="">
+        <p className="absolute left-32 top-16 text-gray-400 text-sm">No themes yet — add one to get started.</p>
+        {onAddTheme && (
+          <button
+            className="absolute bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded px-2 py-1 transition-colors"
+            style={{ left: LANE_LABEL_WIDTH, top: 4, height: 32 }}
+            onClick={onAddTheme}
+          >
+            + Theme
+          </button>
+        )}
       </div>
     );
   }
@@ -45,7 +62,7 @@ export default function MapContent({
   return (
     <div
       className="relative"
-      style={{ width: totalWidth, height: totalHeight, minWidth: totalWidth, minHeight: totalHeight }}
+      style={{ width: mapWidth, height: mapHeight, minWidth: mapWidth, minHeight: mapHeight }}
       data-map-bg=""
     >
       {/* Theme headers */}
@@ -55,7 +72,10 @@ export default function MapContent({
           themeSpan={ts}
           index={i}
           onRename={onRenameTheme}
+          onDelete={onDeleteTheme}
           isDropTarget={highlightThemeId === ts.themeId && ts.themeId !== dragState?.themeId}
+          isDragging={isThemeDrag && dragState.themeId === ts.themeId}
+          onDragStart={onThemeDragStart}
         />
       ))}
 
@@ -66,6 +86,7 @@ export default function MapContent({
           column={col}
           themeIndex={themeIndexMap[col.themeId] || 0}
           onRename={onRenameBackbone}
+          onDelete={onDeleteBackbone}
           isDropTarget={highlightBackboneId === col.backboneId}
           isDragging={isBackboneDrag && dragState.backboneId === col.backboneId}
           onDragStart={onBackboneDragStart}
@@ -131,10 +152,49 @@ export default function MapContent({
             cell={cell}
             onClick={onRibClick}
             onRename={onRenameRib}
+            onDelete={onDeleteRib}
             onDragStart={onDragStart}
             isDragging={draggedIds?.has(cell.id)}
             isSelected={selectedIds?.has(cell.id)}
           />
+        );
+      })}
+
+      {/* + Theme button (after last theme) */}
+      {onAddTheme && (
+        <button
+          className="absolute bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded px-2 py-1 transition-colors"
+          style={{ left: totalWidth + COL_GAP, top: 4, height: 32 }}
+          onClick={onAddTheme}
+        >
+          + Theme
+        </button>
+      )}
+
+      {/* + Backbone button (below + Theme, adds to last theme) */}
+      {onAddBackbone && (
+        <button
+          className="absolute bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded px-2 py-1 whitespace-nowrap transition-colors"
+          style={{ left: totalWidth + COL_GAP, top: THEME_HEIGHT + 2, height: 28 }}
+          onClick={() => onAddBackbone(themeSpans[themeSpans.length - 1].themeId)}
+        >
+          + Backbone
+        </button>
+      )}
+
+      {/* + Rib buttons (bottom of each backbone column) */}
+      {onAddRib && columns.map(col => {
+        const bottomY = totalHeight - 4;
+        return (
+          <button
+            key={`add-rib-${col.backboneId}`}
+            className="absolute bg-gray-50 hover:bg-gray-200 text-gray-400 hover:text-gray-600 text-[10px] rounded px-1 py-0.5 transition-colors"
+            style={{ left: col.x + 4, bottom: undefined, top: bottomY - 20, width: col.width - 8 }}
+            onClick={() => onAddRib(col.themeId, col.backboneId)}
+            title="Add rib item"
+          >
+            + Rib
+          </button>
         );
       })}
     </div>
