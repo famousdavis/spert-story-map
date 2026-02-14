@@ -7,7 +7,8 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
     rib.releaseAllocations.map(a => ({ ...a }))
   );
 
-  const total = allocations.reduce((s, a) => s + a.percentage, 0);
+  const parsePct = (v) => { const n = parseInt(v); return isNaN(n) ? 0 : Math.max(0, Math.min(100, n)); };
+  const total = allocations.reduce((s, a) => s + parsePct(a.percentage), 0);
   const pts = getRibItemPoints(rib, product.sizeMapping);
 
   const addRelease = (releaseId) => {
@@ -16,9 +17,9 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
     setAllocations([...allocations, { releaseId, percentage: remaining, memo: '' }]);
   };
 
-  const updatePct = (releaseId, pct) => {
+  const updatePct = (releaseId, raw) => {
     setAllocations(allocations.map(a =>
-      a.releaseId === releaseId ? { ...a, percentage: Math.max(0, Math.min(100, pct)) } : a
+      a.releaseId === releaseId ? { ...a, percentage: raw } : a
     ));
   };
 
@@ -58,12 +59,13 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
                     min={0}
                     max={100}
                     value={alloc.percentage}
-                    onChange={e => updatePct(alloc.releaseId, parseInt(e.target.value) || 0)}
+                    onChange={e => updatePct(alloc.releaseId, e.target.value)}
+                    onBlur={e => updatePct(alloc.releaseId, parsePct(e.target.value))}
                     className="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center"
                   />
                   <span className="text-xs text-gray-400">%</span>
                   {pts > 0 && (
-                    <span className="text-xs text-gray-500">{Math.round(pts * alloc.percentage / 100)} pts</span>
+                    <span className="text-xs text-gray-500">{Math.round(pts * parsePct(alloc.percentage) / 100)} pts</span>
                   )}
                   <button onClick={() => removeAlloc(alloc.releaseId)} className="text-red-400 hover:text-red-600 text-sm ml-auto">Remove</button>
                 </div>
@@ -113,7 +115,7 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
             <button
-              onClick={() => onSave(allocations.filter(a => a.percentage > 0))}
+              onClick={() => onSave(allocations.map(a => ({ ...a, percentage: parsePct(a.percentage) })).filter(a => a.percentage > 0))}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
             >
               Save Allocation

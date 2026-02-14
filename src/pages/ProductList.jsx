@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { loadProductIndex, loadProduct, saveProductImmediate, deleteProduct, exportProduct, importProductFromJSON, createNewProduct, duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
@@ -7,8 +7,21 @@ import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { Footer } from './ChangelogView';
 
+function loadProducts() {
+  const index = loadProductIndex();
+  return index.map(entry => {
+    const full = loadProduct(entry.id);
+    if (!full) return null;
+    const allRibs = getAllRibItems(full);
+    const totalPoints = getTotalProjectPoints(full);
+    const unsized = allRibs.filter(r => !r.size).length;
+    const pctComplete = getProjectPercentComplete(full);
+    return { ...entry, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
+  }).filter(Boolean);
+}
+
 export default function ProductList() {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(loadProducts);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -16,21 +29,7 @@ export default function ProductList() {
   const [showWarning, setShowWarning] = useState(true);
   const navigate = useNavigate();
 
-  const refresh = () => {
-    const index = loadProductIndex();
-    const loaded = index.map(entry => {
-      const full = loadProduct(entry.id);
-      if (!full) return null;
-      const allRibs = getAllRibItems(full);
-      const totalPoints = getTotalProjectPoints(full);
-      const unsized = allRibs.filter(r => !r.size).length;
-      const pctComplete = getProjectPercentComplete(full);
-      return { ...entry, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
-    }).filter(Boolean);
-    setProducts(loaded);
-  };
-
-  useEffect(() => { refresh(); }, []);
+  const refresh = useCallback(() => setProducts(loadProducts()), []);
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -79,7 +78,7 @@ export default function ProductList() {
           const product = importProductFromJSON(ev.target.result);
           const existing = loadProduct(product.id);
           if (existing) {
-            if (!window.confirm(`A product with the same ID already exists ("${existing.name}"). Overwrite it?`)) return;
+            if (!window.confirm(`A project with the same ID already exists ("${existing.name}"). Overwrite it?`)) return;
           }
           saveProductImmediate(product);
           refresh();
@@ -102,7 +101,7 @@ export default function ProductList() {
               SPERT<sup className="text-[0.45em] text-gray-400 font-normal tracking-wide">®</sup> Story Map
             </h1>
             <p className="text-sm text-gray-500">
-              Plan and track agile product releases. Data is stored locally in your browser.
+              Plan and track agile project releases. Data is stored locally in your browser.
             </p>
           </div>
           <Link to="/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors mt-1">
@@ -116,7 +115,7 @@ export default function ProductList() {
             onClick={() => setShowCreate(true)}
             className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
-            + New Product
+            + New Project
           </button>
           <button
             onClick={handleImport}
@@ -128,7 +127,7 @@ export default function ProductList() {
             onClick={handleLoadSample}
             className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
           >
-            Load Sample Product
+            Load Sample Project
           </button>
         </div>
 
@@ -151,8 +150,8 @@ export default function ProductList() {
         {/* Product List */}
         {products.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
-            <p className="text-lg mb-2">No products yet</p>
-            <p className="text-sm">Create a new product or load the sample to get started.</p>
+            <p className="text-lg mb-2">No projects yet</p>
+            <p className="text-sm">Create a new project or load the sample to get started.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -210,10 +209,10 @@ export default function ProductList() {
       </div>
 
       {/* Create Product Modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create New Product">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create New Project">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
             <input
               type="text"
               value={newName}
@@ -229,7 +228,7 @@ export default function ProductList() {
             <textarea
               value={newDesc}
               onChange={e => setNewDesc(e.target.value)}
-              placeholder="Brief description of the product"
+              placeholder="Brief description of the project"
               rows={2}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none resize-none"
             />
@@ -257,7 +256,7 @@ export default function ProductList() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => handleDelete(deleteTarget.id)}
-        title="Delete Product"
+        title="Delete Project"
         message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone. Consider exporting first.`}
       />
 

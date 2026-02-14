@@ -287,7 +287,7 @@ export default function StructureView() {
                                       onDragOver={e => e.preventDefault()}
                                       onDrop={e => handleRibDrop(e, theme.id, backbone.id)}
                                     >
-                                    {backbone.ribItems.map((rib, ribIdx) => {
+                                    {backbone.ribItems.map((rib) => {
                                       const pts = getRibItemPoints(rib, product.sizeMapping);
                                       const allocTotal = getAllocationTotal(rib);
                                       const pctComplete = getRibItemPercentComplete(rib);

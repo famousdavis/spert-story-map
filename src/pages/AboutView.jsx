@@ -9,7 +9,7 @@ export default function AboutView() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <Link to="/" className="text-sm text-gray-400 hover:text-gray-600">← Back to Products</Link>
+          <Link to="/" className="text-sm text-gray-400 hover:text-gray-600">← Back to Projects</Link>
         </div>
 
         <h1 className="text-2xl font-bold text-gray-900 mb-8">About This App</h1>
@@ -19,7 +19,7 @@ export default function AboutView() {
           <p className="text-sm text-gray-600 leading-relaxed">
             <strong>SPERT<R /> Story Map</strong> is a browser-based agile release planning tool that
             replaces spreadsheet-driven story mapping workflows. It provides a three-level hierarchy
-            (Theme → Backbone → Rib Item) for organizing product work, with features for:
+            (Theme → Backbone → Rib Item) for organizing project work, with features for:
           </p>
           <ul className="mt-2 ml-6 list-disc text-sm text-gray-600 leading-relaxed space-y-1">
             <li><strong>Story map structure:</strong> Organize work into themes, backbone items, and rib items with inline editing and drag-to-reorder</li>
@@ -41,7 +41,7 @@ export default function AboutView() {
             <li>Safe for corporate/organizational data — all data stays within your network</li>
             <li>Use <strong>Export</strong> to back up your data to your file system anytime</li>
             <li>Use <strong>Import</strong> to restore from a backup or share with colleagues</li>
-            <li><strong>Note:</strong> If you clear your browser cache/data, you will lose all stored products unless you've exported a backup</li>
+            <li><strong>Note:</strong> If you clear your browser cache/data, you will lose all stored projects unless you've exported a backup</li>
           </ul>
         </Section>
 
