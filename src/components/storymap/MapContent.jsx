@@ -5,11 +5,13 @@ import ReleaseDivider from './ReleaseDivider';
 import RibCell from './RibCell';
 import UnassignedLane from './UnassignedLane';
 import DropHighlight from './DropHighlight';
+import InsertionIndicator from './InsertionIndicator';
 
 export default function MapContent({
   layout, onRibClick, mapSizeRef,
   onRenameTheme, onRenameBackbone, onRenameRib,
   dragState, onDragStart, onBackboneDragStart,
+  selectedIds,
 }) {
   const { columns, themeSpans, releaseLanes, cells, unassignedLane, totalWidth, totalHeight } = layout;
 
@@ -27,8 +29,8 @@ export default function MapContent({
   // Determine highlighted drop zones from drag state
   const isRibDrag = dragState?.isDragging && dragState.dragType === 'rib';
   const isBackboneDrag = dragState?.isDragging && dragState.dragType === 'backbone';
-  const highlightReleaseId = isRibDrag && dragState.axis === 'y' ? dragState.targetReleaseId : undefined;
-  const highlightBackboneId = isRibDrag && dragState.axis === 'x' ? dragState.targetBackboneId : undefined;
+  const highlightReleaseId = isRibDrag ? dragState.targetReleaseId : undefined;
+  const highlightBackboneId = isRibDrag ? dragState.targetBackboneId : undefined;
   const highlightThemeId = isBackboneDrag ? dragState.targetThemeId : undefined;
 
   if (themeSpans.length === 0) {
@@ -86,7 +88,7 @@ export default function MapContent({
         <UnassignedLane
           lane={unassignedLane}
           totalWidth={totalWidth}
-          isDropTarget={highlightReleaseId === null && isRibDrag && dragState.axis === 'y'}
+          isDropTarget={highlightReleaseId === null && isRibDrag}
         />
       )}
 
@@ -108,23 +110,33 @@ export default function MapContent({
       <DropHighlight
         columns={columns}
         themeSpans={themeSpans}
+        releaseLanes={releaseLanes}
+        unassignedLane={unassignedLane}
         totalHeight={totalHeight}
         highlightBackboneId={highlightBackboneId}
+        highlightReleaseId={highlightReleaseId}
         highlightThemeId={highlightThemeId}
         dragSourceThemeId={dragState?.themeId}
       />
 
+      {/* Insertion indicator (blue line showing drop position) */}
+      {dragState && <InsertionIndicator dragState={dragState} layout={layout} />}
+
       {/* Rib cells */}
-      {cells.map(cell => (
-        <RibCell
-          key={`${cell.id}-${cell.releaseId || 'unassigned'}`}
-          cell={cell}
-          onClick={onRibClick}
-          onRename={onRenameRib}
-          onDragStart={onDragStart}
-          isDragging={isRibDrag && dragState.ribId === cell.id && dragState.releaseId === cell.releaseId}
-        />
-      ))}
+      {cells.map(cell => {
+        const draggedIds = isRibDrag ? (dragState.selectedIds || new Set([dragState.ribId])) : null;
+        return (
+          <RibCell
+            key={`${cell.id}-${cell.releaseId || 'unassigned'}`}
+            cell={cell}
+            onClick={onRibClick}
+            onRename={onRenameRib}
+            onDragStart={onDragStart}
+            isDragging={draggedIds?.has(cell.id)}
+            isSelected={selectedIds?.has(cell.id)}
+          />
+        );
+      })}
     </div>
   );
 }

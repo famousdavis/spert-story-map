@@ -45,8 +45,9 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
   const handlePointerDown = useCallback((e) => {
     // Don't start panning if a drag is in progress
     if (dragState) return;
-    // Only pan on background clicks (not on cards)
-    if (e.target !== containerRef.current && e.target.dataset.mapBg === undefined) return;
+    // Don't pan when clicking interactive elements (cards, headers, labels, inputs)
+    const interactive = e.target.closest('[data-rib-id], [data-backbone-id], [data-theme-id], [data-release-id], input, button, textarea');
+    if (interactive) return;
     isPanningRef.current = true;
     panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
     containerRef.current.setPointerCapture(e.pointerId);

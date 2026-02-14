@@ -1,7 +1,7 @@
 import { SIZE_COLORS } from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 
-export default function RibCell({ cell, onClick, onRename, onDragStart, isDragging }) {
+export default function RibCell({ cell, onClick, onRename, onDragStart, isDragging, isSelected }) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const allocWarning = cell.allocTotal > 0 && cell.allocTotal !== 100;
 
@@ -19,9 +19,11 @@ export default function RibCell({ cell, onClick, onRename, onDragStart, isDraggi
       className={`absolute rounded border text-left select-none transition-colors ${
         isDragging
           ? 'border-blue-400 bg-blue-50 opacity-50 shadow-lg ring-2 ring-blue-300'
-          : allocWarning
-            ? 'border-amber-300 bg-amber-50 hover:border-amber-400'
-            : 'border-gray-200 bg-white hover:border-blue-400'
+          : isSelected
+            ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200'
+            : allocWarning
+              ? 'border-amber-300 bg-amber-50 hover:border-amber-400'
+              : 'border-gray-200 bg-white hover:border-blue-400'
       } cursor-pointer px-2 py-1.5 overflow-hidden`}
       style={{
         left: cell.x,
@@ -32,7 +34,7 @@ export default function RibCell({ cell, onClick, onRename, onDragStart, isDraggi
       }}
       onClick={(e) => {
         e.stopPropagation();
-        if (!editing) onClick(cell);
+        if (!editing) onClick(cell, e);
       }}
       data-rib-id={cell.id}
       data-backbone-id={cell.backboneId}

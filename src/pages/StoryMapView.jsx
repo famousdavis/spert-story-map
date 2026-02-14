@@ -5,6 +5,7 @@ import MapCanvas from '../components/storymap/MapCanvas';
 import MapContent from '../components/storymap/MapContent';
 import RibDetailPanel from '../components/storymap/RibDetailPanel';
 import ReleaseDetailPanel from '../components/storymap/ReleaseDetailPanel';
+import DragGhost from '../components/storymap/DragGhost';
 import useMapDrag from '../components/storymap/useMapDrag';
 import useMapLayout from '../components/storymap/useMapLayout';
 
@@ -51,10 +52,7 @@ export default function StoryMapView() {
     // Don't open detail panel if we just finished dragging
     if (recentDragRef.current) return;
 
-    const isMod = e?.metaKey || e?.ctrlKey;
-    const isShift = e?.shiftKey;
-
-    if (isMod || isShift) {
+    if (e?.shiftKey) {
       // Toggle in/out of multi-selection
       setSelectedIds(prev => {
         const next = new Set(prev);
@@ -207,6 +205,7 @@ export default function StoryMapView() {
           mapSizeRef={mapSizeRef}
           onRenameTheme={handleRenameTheme}
           onRenameBackbone={handleRenameBackbone}
+          onRenameRib={handleRenameRib}
           dragState={dragState}
           onDragStart={handleDragStart}
           onBackboneDragStart={handleBackboneDragStart}
@@ -231,6 +230,9 @@ export default function StoryMapView() {
           onRename={handleRenameRelease}
         />
       )}
+
+      {/* Drag ghost (follows cursor during rib drags) */}
+      <DragGhost dragState={dragState} cells={layout.cells} zoom={zoom} />
 
       {/* Drag indicator badge */}
       {dragLabel && (

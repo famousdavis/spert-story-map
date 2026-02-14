@@ -19,6 +19,14 @@
 - Replaced manual stats loop in StructureView with `reduceRibs`
 
 ### Fixed
+- **Map panning** — Switched from whitelist (`data-map-bg`) to blacklist approach so panning works when clicking release lane backgrounds, column dividers, and other non-interactive areas
+- **2D rib drags** — Rib cards now move freely in both X (backbone) and Y (release) axes simultaneously using `moveRib2D`; removed axis-lock that restricted movement to one direction
+- **Insertion indicator** — Wired up `InsertionIndicator` component and `insertIndex` computation so a blue line shows where cards will land during drag
+- **Multi-select and bulk drag** — Shift+click to select multiple rib cards; drag any selected card's grip to move all selected items together via `moveRibs2D`; selected cards show blue ring highlight
+- **Drag ghost** — Card-stack preview follows cursor during rib drags showing up to 3 names
+- **Rib detail panel inline edit** — Click the rib name in the detail panel to rename it; Escape while editing cancels without closing the panel
+- **Missing `onRenameRib` prop** — Restored the prop on `MapContent` so double-click rename on map rib cards works
+- **Click event forwarding** — `RibCell` now passes the click event to the handler so Shift+click detection works
 - `parseInt` calls missing radix parameter in SettingsView size mapping
 - Sprint cadence input NaN fallback (empty input now defaults to 2 weeks)
 
