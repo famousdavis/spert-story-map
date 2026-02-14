@@ -30,10 +30,10 @@ export default function ReleasePlanningView() {
   }, [allRibs, filter]);
 
   // Card ordering per column — stored in product.releaseCardOrder
-  const cardOrder = product.releaseCardOrder || {};
+  const cardOrder = product.releaseCardOrder;
 
   const getSortedRibs = useCallback((colId, ribs) => {
-    const order = cardOrder[colId];
+    const order = cardOrder?.[colId];
     if (!order || order.length === 0) return ribs;
     // Sort by position in order array; items not in order go to end
     const sorted = [...ribs].sort((a, b) => {
@@ -72,6 +72,23 @@ export default function ReleasePlanningView() {
       })),
     }));
   }, [updateProduct]);
+
+  // Drag handlers — declared before handleDrop so they're available
+  const setDropTargetBoth = useCallback((val) => {
+    setDropTarget(val);
+    dropTargetRef.current = val;
+  }, []);
+
+  const handleDragStart = useCallback((ribId, fromCol) => {
+    setDragRibId(ribId);
+    setDragFromCol(fromCol);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDragRibId(null);
+    setDragFromCol(null);
+    setDropTargetBoth(null);
+  }, [setDropTargetBoth]);
 
   // Full drop handler: move between columns + reorder
   // Does everything in a single updateProduct call to avoid race conditions
@@ -161,24 +178,7 @@ export default function ReleasePlanningView() {
     });
 
     handleDragEnd();
-  }, [dragRibId, dragFromCol, allRibs, unassigned, ribsForRelease, updateProduct]);
-
-  // Drag handlers
-  const handleDragStart = (ribId, fromCol) => {
-    setDragRibId(ribId);
-    setDragFromCol(fromCol);
-  };
-
-  const handleDragEnd = () => {
-    setDragRibId(null);
-    setDragFromCol(null);
-    setDropTargetBoth(null);
-  };
-
-  const setDropTargetBoth = (val) => {
-    setDropTarget(val);
-    dropTargetRef.current = val;
-  };
+  }, [dragRibId, dragFromCol, allRibs, unassigned, ribsForRelease, updateProduct, handleDragEnd]);
 
   const handleColumnDragOver = (e, col) => {
     e.preventDefault();

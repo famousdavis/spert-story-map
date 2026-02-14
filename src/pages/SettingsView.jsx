@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { exportProduct, importProductFromJSON, saveProductImmediate } from '../lib/storage';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -7,12 +7,26 @@ export default function SettingsView() {
   const { product, updateProduct } = useOutletContext();
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Release drag-to-reorder state
+  const [dragReleaseId, setDragReleaseId] = useState(null);
+  const [dropBeforeReleaseId, setDropBeforeReleaseId] = useState(null);
+  const dropBeforeReleaseRef = useRef(null);
+
   // Size mapping
   const updateSizeMapping = (index, field, value) => {
     updateProduct(prev => ({
       ...prev,
       sizeMapping: prev.sizeMapping.map((m, i) =>
-        i === index ? { ...m, [field]: field === 'points' ? (parseInt(value) || 0) : value } : m
+        i === index ? { ...m, [field]: value } : m
+      ),
+    }));
+  };
+
+  const commitSizePoints = (index) => {
+    updateProduct(prev => ({
+      ...prev,
+      sizeMapping: prev.sizeMapping.map((m, i) =>
+        i === index ? { ...m, points: parseInt(m.points) || 0 } : m
       ),
     }));
   };
@@ -52,15 +66,44 @@ export default function SettingsView() {
     }));
   };
 
-  const moveRelease = (id, direction) => {
+  const handleReleaseDragStart = (e, releaseId) => {
+    e.dataTransfer.effectAllowed = 'move';
+    setDragReleaseId(releaseId);
+  };
+
+  const handleReleaseDragOver = (e, releaseId) => {
+    e.preventDefault();
+    if (releaseId === dragReleaseId) return;
+    if (dropBeforeReleaseRef.current !== releaseId) {
+      dropBeforeReleaseRef.current = releaseId;
+      setDropBeforeReleaseId(releaseId);
+    }
+  };
+
+  const handleReleaseDrop = (e) => {
+    e.preventDefault();
+    if (!dragReleaseId) return;
+    const beforeId = dropBeforeReleaseRef.current;
     updateProduct(prev => {
-      const items = [...prev.releases];
-      const idx = items.findIndex(r => r.id === id);
-      const newIdx = idx + direction;
-      if (newIdx < 0 || newIdx >= items.length) return prev;
-      [items[idx], items[newIdx]] = [items[newIdx], items[idx]];
-      return { ...prev, releases: items.map((r, i) => ({ ...r, order: i + 1 })) };
+      const releases = [...prev.releases];
+      const dragIdx = releases.findIndex(r => r.id === dragReleaseId);
+      if (dragIdx < 0) return prev;
+      const [dragged] = releases.splice(dragIdx, 1);
+      if (beforeId) {
+        const beforeIdx = releases.findIndex(r => r.id === beforeId);
+        releases.splice(beforeIdx >= 0 ? beforeIdx : releases.length, 0, dragged);
+      } else {
+        releases.push(dragged);
+      }
+      return { ...prev, releases: releases.map((r, i) => ({ ...r, order: i + 1 })) };
     });
+    handleReleaseDragEnd();
+  };
+
+  const handleReleaseDragEnd = () => {
+    setDragReleaseId(null);
+    setDropBeforeReleaseId(null);
+    dropBeforeReleaseRef.current = null;
   };
 
   const deleteRelease = (id) => {
@@ -111,15 +154,27 @@ export default function SettingsView() {
 
   // Sprints
   const addSprint = () => {
-    updateProduct(prev => ({
-      ...prev,
-      sprints: [...prev.sprints, {
-        id: crypto.randomUUID(),
-        name: `Sprint ${prev.sprints.length + 1}`,
-        order: prev.sprints.length + 1,
-        endDate: null,
-      }],
-    }));
+    updateProduct(prev => {
+      const cadenceWeeks = prev.sprintCadenceWeeks || 2;
+      const lastSprint = prev.sprints.length > 0 ? prev.sprints[prev.sprints.length - 1] : null;
+
+      let newEndDate = null;
+      if (lastSprint?.endDate) {
+        const lastDate = new Date(lastSprint.endDate + 'T00:00:00');
+        lastDate.setDate(lastDate.getDate() + cadenceWeeks * 7);
+        newEndDate = lastDate.toISOString().split('T')[0];
+      }
+
+      return {
+        ...prev,
+        sprints: [...prev.sprints, {
+          id: crypto.randomUUID(),
+          name: `Sprint ${prev.sprints.length + 1}`,
+          order: prev.sprints.length + 1,
+          endDate: newEndDate,
+        }],
+      };
+    });
   };
 
   const updateSprint = (id, updates) => {
@@ -127,17 +182,6 @@ export default function SettingsView() {
       ...prev,
       sprints: prev.sprints.map(s => s.id === id ? { ...s, ...updates } : s),
     }));
-  };
-
-  const moveSprint = (id, direction) => {
-    updateProduct(prev => {
-      const items = [...prev.sprints];
-      const idx = items.findIndex(s => s.id === id);
-      const newIdx = idx + direction;
-      if (newIdx < 0 || newIdx >= items.length) return prev;
-      [items[idx], items[newIdx]] = [items[newIdx], items[idx]];
-      return { ...prev, sprints: items.map((s, i) => ({ ...s, order: i + 1 })) };
-    });
   };
 
   const deleteSprint = (id) => {
@@ -171,7 +215,7 @@ export default function SettingsView() {
       reader.onload = (ev) => {
         try {
           const imported = importProductFromJSON(ev.target.result);
-          if (!window.confirm(`Import "${imported.name}"? This will overwrite the current product data.`)) return;
+          if (!window.confirm(`Import "${imported.name}"? This will overwrite the current project data.`)) return;
           // Overwrite current product with imported data, keeping same ID
           const merged = { ...imported, id: product.id };
           saveProductImmediate(merged);
@@ -188,12 +232,13 @@ export default function SettingsView() {
   const handleDownloadTemplate = () => {
     const template = {
       id: 'example-id',
-      name: 'Example Product',
+      name: 'Example Project',
       description: '',
       schemaVersion: 2,
       sizeMapping: product.sizeMapping,
       releases: [{ id: 'release-1', name: 'Release 1', order: 1, description: '', targetDate: null }],
       sprints: [{ id: 'sprint-1', name: 'Sprint 1', order: 1, endDate: null }],
+      sprintCadenceWeeks: 2,
       themes: [{
         id: 'theme-1',
         name: 'Example Theme',
@@ -229,8 +274,8 @@ export default function SettingsView() {
     <div className="max-w-3xl">
       <h2 className="text-lg font-semibold text-gray-900 mb-6">Settings</h2>
 
-      {/* Product Info */}
-      <Section title="Product Details">
+      {/* Project Info */}
+      <Section title="Project Details">
         <div className="space-y-3">
           <Field label="Name">
             <input
@@ -267,6 +312,7 @@ export default function SettingsView() {
                 type="number"
                 value={m.points}
                 onChange={e => updateSizeMapping(i, 'points', e.target.value)}
+                onBlur={() => commitSizePoints(i)}
                 className="w-24 border border-gray-300 rounded px-2 py-1.5 text-sm text-center"
                 placeholder="Points"
               />
@@ -280,26 +326,38 @@ export default function SettingsView() {
 
       {/* Releases */}
       <Section title="Releases">
-        <div className="space-y-2">
-          {product.releases.map((r, i) => (
-            <div key={r.id} className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-1">
-                <button onClick={() => moveRelease(r.id, -1)} disabled={i === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-30 text-xs">↑</button>
-                <button onClick={() => moveRelease(r.id, 1)} disabled={i === product.releases.length - 1} className="text-gray-300 hover:text-gray-500 disabled:opacity-30 text-xs">↓</button>
+        <div className="space-y-1" onDragOver={e => { e.preventDefault(); if (!dropBeforeReleaseRef.current) setDropBeforeReleaseId(null); }} onDrop={handleReleaseDrop}>
+          {product.releases.map((r) => (
+            <div key={r.id}>
+              {dropBeforeReleaseId === r.id && dragReleaseId !== r.id && (
+                <div className="h-0.5 bg-blue-400 rounded-full mx-1 my-0.5" />
+              )}
+              <div
+                onDragOver={e => handleReleaseDragOver(e, r.id)}
+                className={`flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2 ${dragReleaseId === r.id ? 'opacity-40' : ''}`}
+              >
+                <div
+                  draggable
+                  onDragStart={e => handleReleaseDragStart(e, r.id)}
+                  onDragEnd={handleReleaseDragEnd}
+                  className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 select-none"
+                >
+                  <span className="text-sm leading-none">⠿</span>
+                </div>
+                <input
+                  type="text"
+                  value={r.name}
+                  onChange={e => updateRelease(r.id, { name: e.target.value })}
+                  className="w-64 border border-gray-300 rounded px-2 py-1.5 text-sm"
+                />
+                <input
+                  type="date"
+                  value={r.targetDate || ''}
+                  onChange={e => updateRelease(r.id, { targetDate: e.target.value || null })}
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-600"
+                />
+                <button onClick={() => deleteRelease(r.id)} className="text-red-400 hover:text-red-600 text-sm">Delete</button>
               </div>
-              <input
-                type="text"
-                value={r.name}
-                onChange={e => updateRelease(r.id, { name: e.target.value })}
-                className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm"
-              />
-              <input
-                type="date"
-                value={r.targetDate || ''}
-                onChange={e => updateRelease(r.id, { targetDate: e.target.value || null })}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-600"
-              />
-              <button onClick={() => deleteRelease(r.id)} className="text-red-400 hover:text-red-600 text-sm">Delete</button>
             </div>
           ))}
           <button onClick={addRelease} className="text-sm text-blue-600 hover:text-blue-700 mt-2">+ Add Release</button>
@@ -308,18 +366,27 @@ export default function SettingsView() {
 
       {/* Sprints */}
       <Section title="Sprints">
+        <div className="flex items-center gap-3 mb-4">
+          <label className="text-xs font-medium text-gray-500">Sprint cadence</label>
+          <select
+            value={product.sprintCadenceWeeks || 2}
+            onChange={e => updateProduct(prev => ({ ...prev, sprintCadenceWeeks: parseInt(e.target.value) }))}
+            className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-700"
+          >
+            <option value={1}>1 week</option>
+            <option value={2}>2 weeks</option>
+            <option value={3}>3 weeks</option>
+            <option value={4}>4 weeks</option>
+          </select>
+        </div>
         <div className="space-y-2">
-          {product.sprints.map((s, i) => (
+          {product.sprints.map((s) => (
             <div key={s.id} className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-1">
-                <button onClick={() => moveSprint(s.id, -1)} disabled={i === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-30 text-xs">↑</button>
-                <button onClick={() => moveSprint(s.id, 1)} disabled={i === product.sprints.length - 1} className="text-gray-300 hover:text-gray-500 disabled:opacity-30 text-xs">↓</button>
-              </div>
               <input
                 type="text"
                 value={s.name}
                 onChange={e => updateSprint(s.id, { name: e.target.value })}
-                className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm"
+                className="w-64 border border-gray-300 rounded px-2 py-1.5 text-sm"
               />
               <input
                 type="date"

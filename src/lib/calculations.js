@@ -70,7 +70,7 @@ export function getRibReleaseProgressForSprint(ribItem, releaseId, sprintId) {
   const entry = ribItem.progressHistory?.find(
     p => p.sprintId === sprintId && p.releaseId === releaseId
   );
-  return entry ? entry.percentComplete : null;
+  return entry?.percentComplete ?? null;
 }
 
 // Get a single release's progress "as of" a given sprint (walk-back)
@@ -88,6 +88,7 @@ export function getRibReleaseProgressAsOf(ribItem, releaseId, sprintId, sprints)
   let bestOrder = -1;
   for (const entry of ribItem.progressHistory) {
     if (entry.releaseId !== releaseId) continue;
+    if (entry.percentComplete === null) continue;
     const order = sprintOrder[entry.sprintId];
     if (order !== undefined && order <= targetOrder && order > bestOrder) {
       best = entry;
@@ -101,7 +102,9 @@ export function getRibReleaseProgressAsOf(ribItem, releaseId, sprintId, sprints)
 // Get the latest progress for a single release (last entry by array position)
 export function getRibReleaseProgress(ribItem, releaseId) {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
-  const entries = ribItem.progressHistory.filter(p => p.releaseId === releaseId);
+  const entries = ribItem.progressHistory.filter(
+    p => p.releaseId === releaseId && p.percentComplete !== null
+  );
   return entries.length > 0 ? entries[entries.length - 1].percentComplete : 0;
 }
 
@@ -110,16 +113,19 @@ export function getRibReleaseProgress(ribItem, releaseId) {
 // Sum per-release entries for the latest sprint to get overall rib %
 export function getRibItemPercentComplete(ribItem) {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
-  // Find the latest sprint (last entry's sprintId)
-  const lastEntry = ribItem.progressHistory[ribItem.progressHistory.length - 1];
-  const sprintId = lastEntry.sprintId;
-  return getRibItemPercentCompleteForSprint(ribItem, sprintId);
+  // Find the latest entry with an explicit progress value
+  const realEntries = ribItem.progressHistory.filter(e => e.percentComplete !== null);
+  if (realEntries.length === 0) return 0;
+  const lastEntry = realEntries[realEntries.length - 1];
+  return getRibItemPercentCompleteForSprint(ribItem, lastEntry.sprintId);
 }
 
 // Sum all per-release entries for a given sprint
 export function getRibItemPercentCompleteForSprint(ribItem, sprintId) {
   if (!ribItem.progressHistory) return null;
-  const entries = ribItem.progressHistory.filter(p => p.sprintId === sprintId);
+  const entries = ribItem.progressHistory.filter(
+    p => p.sprintId === sprintId && p.percentComplete !== null
+  );
   if (entries.length === 0) return null;
   return Math.min(100, entries.reduce((sum, e) => sum + e.percentComplete, 0));
 }
@@ -156,6 +162,7 @@ function _legacyPercentCompleteAsOf(ribItem, sprintId, sprints) {
   let best = null;
   let bestOrder = -1;
   for (const entry of ribItem.progressHistory) {
+    if (entry.percentComplete === null) continue;
     const order = sprintOrder[entry.sprintId];
     if (order !== undefined && order <= targetOrder && order > bestOrder) {
       best = entry;
@@ -327,6 +334,92 @@ export function getProgressOverTime(product) {
       percentComplete: totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 1000) / 10 : 0,
     };
   });
+}
+
+export function getSprintSummary(product, sprintId) {
+  const sprints = product.sprints;
+  const sprint = sprints.find(s => s.id === sprintId);
+  if (!sprint) return null;
+
+  const prevSprint = sprints.find(s => s.order === sprint.order - 1);
+
+  let totalPoints = 0;
+  let completedPointsAsOf = 0;
+  let completedPointsPrev = 0;
+  let itemsUpdated = 0;
+  let itemsTotal = 0;
+
+  let coreTotalPts = 0;
+  let coreCompletedPts = 0;
+  let coreCompletedPrev = 0;
+  let nonCoreTotalPts = 0;
+  let nonCoreCompletedPts = 0;
+  let nonCoreCompletedPrev = 0;
+
+  for (const theme of product.themes) {
+    for (const backbone of theme.backboneItems) {
+      for (const rib of backbone.ribItems) {
+        if (rib.releaseAllocations.length === 0) continue;
+        const pts = getRibItemPoints(rib, product.sizeMapping);
+        totalPoints += pts;
+        itemsTotal++;
+
+        const pctAsOf = getRibItemPercentCompleteAsOf(rib, sprintId, sprints);
+        const completed = pts * (pctAsOf / 100);
+        completedPointsAsOf += completed;
+
+        let prevCompleted = 0;
+        if (prevSprint) {
+          const pctPrev = getRibItemPercentCompleteAsOf(rib, prevSprint.id, sprints);
+          prevCompleted = pts * (pctPrev / 100);
+          completedPointsPrev += prevCompleted;
+        }
+
+        if (rib.category === 'non-core') {
+          nonCoreTotalPts += pts;
+          nonCoreCompletedPts += completed;
+          nonCoreCompletedPrev += prevCompleted;
+        } else {
+          coreTotalPts += pts;
+          coreCompletedPts += completed;
+          coreCompletedPrev += prevCompleted;
+        }
+
+        // Check if this rib has any non-null progress entry for this sprint
+        const hasEntry = rib.progressHistory?.some(
+          p => p.sprintId === sprintId && p.percentComplete !== null
+        );
+        if (hasEntry) itemsUpdated++;
+      }
+    }
+  }
+
+  const round1 = v => Math.round(v * 10) / 10;
+  const pct = (completed, total) => total > 0 ? Math.round((completed / total) * 1000) / 10 : 0;
+
+  return {
+    sprintName: sprint.name,
+    endDate: sprint.endDate,
+    totalPoints,
+    completedPoints: round1(completedPointsAsOf),
+    remainingPoints: round1(totalPoints - completedPointsAsOf),
+    pointsThisSprint: round1(completedPointsAsOf - completedPointsPrev),
+    percentComplete: pct(completedPointsAsOf, totalPoints),
+    itemsUpdated,
+    itemsTotal,
+    core: {
+      totalPoints: coreTotalPts,
+      completedPoints: round1(coreCompletedPts),
+      pointsThisSprint: round1(coreCompletedPts - coreCompletedPrev),
+      percentComplete: pct(coreCompletedPts, coreTotalPts),
+    },
+    nonCore: {
+      totalPoints: nonCoreTotalPts,
+      completedPoints: round1(nonCoreCompletedPts),
+      pointsThisSprint: round1(nonCoreCompletedPts - nonCoreCompletedPrev),
+      percentComplete: pct(nonCoreCompletedPts, nonCoreTotalPts),
+    },
+  };
 }
 
 export function getReleaseProgressOverTime(product, releaseId) {

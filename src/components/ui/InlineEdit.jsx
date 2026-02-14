@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 
-export default function InlineEdit({ value, onSave, className = '', placeholder = 'Click to edit', tag: Tag = 'span', inputClassName = '' }) {
+export default function InlineEdit({ value, onSave, className = '', placeholder = 'Click to edit', tag = 'span', inputClassName = '' }) {
+  const Tag = tag;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef(null);
@@ -41,7 +42,7 @@ export default function InlineEdit({ value, onSave, className = '', placeholder 
         onChange={e => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        className={`border border-blue-400 rounded px-1.5 py-0.5 text-sm outline-none focus:ring-2 focus:ring-blue-300 bg-white ${inputClassName}`}
+        className={`border border-blue-400 rounded px-1.5 py-0.5 text-sm outline-none focus:ring-2 focus:ring-blue-300 bg-white w-full ${inputClassName}`}
       />
     );
   }

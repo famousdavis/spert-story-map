@@ -12,12 +12,12 @@ export function createSampleProduct() {
     { id: crypto.randomUUID(), name: 'Release 4 - Future', order: 4, description: 'Advanced features and integrations', targetDate: '2026-03-31' },
   ];
 
-  // Sprints
+  // Sprints (2-week cadence starting Jan 5 2026)
   const sprints = [
-    { id: crypto.randomUUID(), name: 'Sprint 1', order: 1, endDate: '2025-04-11' },
-    { id: crypto.randomUUID(), name: 'Sprint 2', order: 2, endDate: '2025-04-25' },
-    { id: crypto.randomUUID(), name: 'Sprint 3', order: 3, endDate: '2025-05-09' },
-    { id: crypto.randomUUID(), name: 'Sprint 4', order: 4, endDate: '2025-05-23' },
+    { id: crypto.randomUUID(), name: 'Sprint 1', order: 1, endDate: '2026-01-16' },
+    { id: crypto.randomUUID(), name: 'Sprint 2', order: 2, endDate: '2026-01-30' },
+    { id: crypto.randomUUID(), name: 'Sprint 3', order: 3, endDate: '2026-02-13' },
+    { id: crypto.randomUUID(), name: 'Sprint 4', order: 4, endDate: '2026-02-27' },
   ];
 
   // progress entries: [sprintIdx, releaseIdx, percentComplete, comment?]
@@ -38,7 +38,7 @@ export function createSampleProduct() {
         sprintId: sprints[spIdx].id,
         releaseId: releases[relIdx].id,
         percentComplete: pct,
-        ...(comment ? { comment, updatedAt: now } : {}),
+        ...(comment ? { comment, updatedAt: sprints[spIdx].endDate + 'T17:00:00.000Z' } : {}),
       })),
     };
   }
@@ -200,6 +200,7 @@ export function createSampleProduct() {
     sizeMapping: [...DEFAULT_SIZE_MAPPING],
     releases,
     sprints,
+    sprintCadenceWeeks: 2,
     themes,
   };
 }

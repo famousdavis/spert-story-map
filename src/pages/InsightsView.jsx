@@ -3,8 +3,8 @@ import { useOutletContext } from 'react-router-dom';
 import {
   getTotalProjectPoints, getCoreNonCorePoints, getProjectPercentComplete,
   getPointsForRelease, getReleasePercentComplete, getCoreNonCorePointsForRelease,
-  getSizingDistribution, getAllRibItems, getProgressOverTime, getReleaseProgressOverTime,
-  getRibItemPoints, getAllocationTotal,
+  getSizingDistribution, getAllRibItems, getProgressOverTime,
+  getAllocationTotal,
 } from '../lib/calculations';
 import ProgressBar from '../components/ui/ProgressBar';
 import {

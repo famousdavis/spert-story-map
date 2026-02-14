@@ -157,6 +157,7 @@ export function createNewProduct(name, description = '') {
     sizeMapping: [...DEFAULT_SIZE_MAPPING],
     releases: [],
     sprints: [],
+    sprintCadenceWeeks: 2,
     themes: [],
   };
 }
