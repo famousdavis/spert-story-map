@@ -1,5 +1,28 @@
 # Changelog
 
+## Version 0.4.0 (2026-02-14)
+
+### Features
+- **Interactive Story Map** — New visual story map tab with pan/zoom canvas showing themes, backbones, and rib items laid out in a 2D grid by release
+- **Drag-and-drop on map** — Drag rib items between releases (Y-axis) and between backbones (X-axis) with position-aware drops; drag backbones between themes
+- **Inline rename on map** — Click to rename themes and backbones directly on the story map headers
+- **Rib detail panel** — Click a rib card to open a slide-out panel with size, category, allocation breakdown, progress, and click-to-edit name
+- **Release detail panel** — Click a release label to view progress, points breakdown (total/core/non-core), scope counts, and inline-edit the release name
+- **Undo/redo** — Ctrl+Z / Ctrl+Shift+Z (Cmd on Mac) with a 30-level in-memory snapshot stack for all map operations
+- **Settings improvements** — Enhanced settings page layout and product list UX
+
+### Bug Fixes
+- **Map panning** — Fixed panning not working when clicking empty space inside the map (switched from whitelist to blacklist approach for interactive elements)
+- **Release label click** — Fixed pointer capture swallowing clicks on release labels
+- **Allocation modal** — UI refinements for release allocation editing
+
+### Technical
+- 14 new components in `src/components/storymap/` (MapCanvas, MapContent, RibCell, BackboneHeader, ThemeHeader, ReleaseDivider, UnassignedLane, DropHighlight, RibDetailPanel, ReleaseDetailPanel, useMapLayout, useMapDrag, useInlineEdit, mapMutations)
+- Pointer-event-based drag system with axis detection and window-level event listeners
+- `releaseCardOrder`-aware layout sorting for consistent card positioning
+- 103 tests across 5 test files (calculations, layout, mutations, storage, product mutations)
+- Vitest test runner added to project
+
 ## Version 0.3.0 (2026-02-13)
 
 ### Features
