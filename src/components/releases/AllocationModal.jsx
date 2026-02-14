@@ -13,12 +13,18 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
   const addRelease = (releaseId) => {
     if (allocations.some(a => a.releaseId === releaseId)) return;
     const remaining = Math.max(0, 100 - total);
-    setAllocations([...allocations, { releaseId, percentage: remaining }]);
+    setAllocations([...allocations, { releaseId, percentage: remaining, memo: '' }]);
   };
 
   const updatePct = (releaseId, pct) => {
     setAllocations(allocations.map(a =>
       a.releaseId === releaseId ? { ...a, percentage: Math.max(0, Math.min(100, pct)) } : a
+    ));
+  };
+
+  const updateMemo = (releaseId, memo) => {
+    setAllocations(allocations.map(a =>
+      a.releaseId === releaseId ? { ...a, memo } : a
     ));
   };
 
@@ -44,21 +50,32 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
             const release = product.releases.find(r => r.id === alloc.releaseId);
             if (!release) return null;
             return (
-              <div key={alloc.releaseId} className="flex items-center gap-3">
-                <span className="text-sm text-gray-700 w-40 truncate">{release.name}</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={alloc.percentage}
-                  onChange={e => updatePct(alloc.releaseId, parseInt(e.target.value) || 0)}
-                  className="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center"
-                />
-                <span className="text-xs text-gray-400">%</span>
-                {pts > 0 && (
-                  <span className="text-xs text-gray-500">{Math.round(pts * alloc.percentage / 100)} pts</span>
-                )}
-                <button onClick={() => removeAlloc(alloc.releaseId)} className="text-red-400 hover:text-red-600 text-sm ml-auto">Remove</button>
+              <div key={alloc.releaseId} className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-700 w-40 truncate">{release.name}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={alloc.percentage}
+                    onChange={e => updatePct(alloc.releaseId, parseInt(e.target.value) || 0)}
+                    className="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center"
+                  />
+                  <span className="text-xs text-gray-400">%</span>
+                  {pts > 0 && (
+                    <span className="text-xs text-gray-500">{Math.round(pts * alloc.percentage / 100)} pts</span>
+                  )}
+                  <button onClick={() => removeAlloc(alloc.releaseId)} className="text-red-400 hover:text-red-600 text-sm ml-auto">Remove</button>
+                </div>
+                <div className="ml-43">
+                  <input
+                    type="text"
+                    value={alloc.memo || ''}
+                    onChange={e => updateMemo(alloc.releaseId, e.target.value)}
+                    placeholder="Add a note..."
+                    className="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-600 placeholder:text-gray-300 focus:border-blue-300 focus:ring-1 focus:ring-blue-200 outline-none"
+                  />
+                </div>
               </div>
             );
           })}

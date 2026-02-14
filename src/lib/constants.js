@@ -5,7 +5,7 @@ export const STORAGE_KEYS = {
   PREFERENCES: 'rp_app_preferences',
 };
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const DEFAULT_SIZE_MAPPING = [
   { label: 'XS', points: 5 },

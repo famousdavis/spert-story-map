@@ -63,31 +63,31 @@ export function getCoreNonCorePoints(product) {
   return { core, nonCore };
 }
 
-export function getRibItemPercentComplete(ribItem) {
-  if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
-  return ribItem.progressHistory[ribItem.progressHistory.length - 1].percentComplete;
-}
+// --- Per-release progress helpers ---
 
-export function getRibItemPercentCompleteForSprint(ribItem, sprintId) {
-  const entry = ribItem.progressHistory?.find(p => p.sprintId === sprintId);
+// Get a single release's progress for a specific sprint
+export function getRibReleaseProgressForSprint(ribItem, releaseId, sprintId) {
+  const entry = ribItem.progressHistory?.find(
+    p => p.sprintId === sprintId && p.releaseId === releaseId
+  );
   return entry ? entry.percentComplete : null;
 }
 
-// Get progress "as of" a given sprint — uses that sprint's entry, or the latest prior sprint entry
-export function getRibItemPercentCompleteAsOf(ribItem, sprintId, sprints) {
+// Get a single release's progress "as of" a given sprint (walk-back)
+export function getRibReleaseProgressAsOf(ribItem, releaseId, sprintId, sprints) {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
-  if (!sprintId || !sprints) return getRibItemPercentComplete(ribItem);
+  if (!sprintId || !sprints) return getRibReleaseProgress(ribItem, releaseId);
 
   const sprintOrder = {};
   for (const s of sprints) sprintOrder[s.id] = s.order;
 
   const targetOrder = sprintOrder[sprintId];
-  if (targetOrder === undefined) return getRibItemPercentComplete(ribItem);
+  if (targetOrder === undefined) return getRibReleaseProgress(ribItem, releaseId);
 
-  // Find the most recent entry at or before the selected sprint
   let best = null;
   let bestOrder = -1;
   for (const entry of ribItem.progressHistory) {
+    if (entry.releaseId !== releaseId) continue;
     const order = sprintOrder[entry.sprintId];
     if (order !== undefined && order <= targetOrder && order > bestOrder) {
       best = entry;
@@ -97,6 +97,75 @@ export function getRibItemPercentCompleteAsOf(ribItem, sprintId, sprints) {
 
   return best ? best.percentComplete : 0;
 }
+
+// Get the latest progress for a single release (last entry by array position)
+export function getRibReleaseProgress(ribItem, releaseId) {
+  if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
+  const entries = ribItem.progressHistory.filter(p => p.releaseId === releaseId);
+  return entries.length > 0 ? entries[entries.length - 1].percentComplete : 0;
+}
+
+// --- Overall rib % (sum of per-release entries) ---
+
+// Sum per-release entries for the latest sprint to get overall rib %
+export function getRibItemPercentComplete(ribItem) {
+  if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
+  // Find the latest sprint (last entry's sprintId)
+  const lastEntry = ribItem.progressHistory[ribItem.progressHistory.length - 1];
+  const sprintId = lastEntry.sprintId;
+  return getRibItemPercentCompleteForSprint(ribItem, sprintId);
+}
+
+// Sum all per-release entries for a given sprint
+export function getRibItemPercentCompleteForSprint(ribItem, sprintId) {
+  if (!ribItem.progressHistory) return null;
+  const entries = ribItem.progressHistory.filter(p => p.sprintId === sprintId);
+  if (entries.length === 0) return null;
+  return Math.min(100, entries.reduce((sum, e) => sum + e.percentComplete, 0));
+}
+
+// Get overall progress "as of" a given sprint — sum per-release walk-backs
+export function getRibItemPercentCompleteAsOf(ribItem, sprintId, sprints) {
+  if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
+  if (!sprintId || !sprints) return getRibItemPercentComplete(ribItem);
+
+  // Collect unique releaseIds from progressHistory
+  const releaseIds = [...new Set(ribItem.progressHistory.map(p => p.releaseId).filter(Boolean))];
+
+  if (releaseIds.length === 0) {
+    // Legacy fallback: no releaseId entries — treat as global
+    return _legacyPercentCompleteAsOf(ribItem, sprintId, sprints);
+  }
+
+  // Sum per-release walk-backs
+  let total = 0;
+  for (const releaseId of releaseIds) {
+    total += getRibReleaseProgressAsOf(ribItem, releaseId, sprintId, sprints);
+  }
+  return Math.min(100, total);
+}
+
+// Fallback for any un-migrated entries (shouldn't happen after migration, but safe)
+function _legacyPercentCompleteAsOf(ribItem, sprintId, sprints) {
+  const sprintOrder = {};
+  for (const s of sprints) sprintOrder[s.id] = s.order;
+
+  const targetOrder = sprintOrder[sprintId];
+  if (targetOrder === undefined) return getRibItemPercentComplete(ribItem);
+
+  let best = null;
+  let bestOrder = -1;
+  for (const entry of ribItem.progressHistory) {
+    const order = sprintOrder[entry.sprintId];
+    if (order !== undefined && order <= targetOrder && order > bestOrder) {
+      best = entry;
+      bestOrder = order;
+    }
+  }
+  return best ? best.percentComplete : 0;
+}
+
+// --- Release-level calculations (use per-release progress directly) ---
 
 export function getReleasePercentComplete(product, releaseId, sprintId) {
   let totalAllocatedPoints = 0;
@@ -112,11 +181,14 @@ export function getReleasePercentComplete(product, releaseId, sprintId) {
         const allocatedPoints = ribPoints * (alloc.percentage / 100);
         totalAllocatedPoints += allocatedPoints;
 
-        const overallComplete = sprintId
-          ? getRibItemPercentCompleteAsOf(rib, sprintId, product.sprints)
-          : getRibItemPercentComplete(rib);
-        const allocationCeiling = alloc.percentage;
-        const releasePortionComplete = Math.min(overallComplete, allocationCeiling) / allocationCeiling;
+        // Read release-specific progress directly
+        const releaseProgress = sprintId
+          ? getRibReleaseProgressAsOf(rib, releaseId, sprintId, product.sprints)
+          : getRibReleaseProgress(rib, releaseId);
+        // releaseProgress is 0..alloc.percentage; convert to fraction of allocation
+        const releasePortionComplete = alloc.percentage > 0
+          ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
+          : 0;
         totalCompletedPoints += allocatedPoints * releasePortionComplete;
       }
     }
@@ -274,10 +346,11 @@ export function getReleaseProgressOverTime(product, releaseId) {
           const allocatedPoints = ribPoints * (alloc.percentage / 100);
           totalAllocatedPoints += allocatedPoints;
 
-          const pct = getRibItemPercentCompleteAsOf(rib, sprint.id, product.sprints);
-
-          const allocationCeiling = alloc.percentage;
-          const releasePortionComplete = Math.min(pct, allocationCeiling) / allocationCeiling;
+          // Use per-release progress directly
+          const releaseProgress = getRibReleaseProgressAsOf(rib, releaseId, sprint.id, product.sprints);
+          const releasePortionComplete = alloc.percentage > 0
+            ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
+            : 0;
           completedPoints += allocatedPoints * releasePortionComplete;
         }
       }

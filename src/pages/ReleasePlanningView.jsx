@@ -120,13 +120,14 @@ export default function ReleasePlanningView() {
         if (targetCol === 'unassigned') {
           newAllocations = [];
         } else if (dragFromCol === 'unassigned') {
-          newAllocations = [{ releaseId: targetCol, percentage: 100 }];
+          newAllocations = [{ releaseId: targetCol, percentage: 100, memo: '' }];
         } else {
           const oldAlloc = rib.releaseAllocations.find(a => a.releaseId === dragFromCol);
           const pct = oldAlloc ? oldAlloc.percentage : 100;
+          const memo = oldAlloc?.memo || '';
           newAllocations = rib.releaseAllocations
             .filter(a => a.releaseId !== dragFromCol)
-            .concat({ releaseId: targetCol, percentage: pct });
+            .concat({ releaseId: targetCol, percentage: pct, memo });
         }
 
         next = {

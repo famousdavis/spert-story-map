@@ -32,9 +32,61 @@ export function saveProductIndex(index) {
   debouncedSave(STORAGE_KEYS.PRODUCTS_INDEX, index, 100);
 }
 
+// Schema migration: v1 → v2 (per-release progress)
+function migrateToV2(product) {
+  if (!product || (product.schemaVersion || 1) >= 2) return product;
+
+  for (const theme of product.themes) {
+    for (const backbone of theme.backboneItems) {
+      for (const rib of backbone.ribItems) {
+        if (!rib.progressHistory || rib.progressHistory.length === 0) continue;
+        const allocations = rib.releaseAllocations || [];
+        if (allocations.length === 0) {
+          // No allocations — drop progress (nowhere to assign it)
+          rib.progressHistory = [];
+          continue;
+        }
+
+        // Convert each old entry { sprintId, percentComplete } into per-release entries
+        const newHistory = [];
+        for (const entry of rib.progressHistory) {
+          let remaining = entry.percentComplete;
+          // Waterfall: fill first allocation up to its %, then next, etc.
+          for (const alloc of allocations) {
+            const portion = Math.min(remaining, alloc.percentage);
+            if (portion > 0) {
+              newHistory.push({
+                sprintId: entry.sprintId,
+                releaseId: alloc.releaseId,
+                percentComplete: portion,
+              });
+            }
+            remaining -= portion;
+            if (remaining <= 0) break;
+          }
+        }
+        rib.progressHistory = newHistory;
+      }
+    }
+  }
+
+  product.schemaVersion = SCHEMA_VERSION;
+  return product;
+}
+
 // Products
 export function loadProduct(id) {
-  return immediatelyLoad(`${STORAGE_KEYS.PRODUCT_PREFIX}${id}`);
+  let product = immediatelyLoad(`${STORAGE_KEYS.PRODUCT_PREFIX}${id}`);
+  if (product && (product.schemaVersion || 1) < SCHEMA_VERSION) {
+    product = migrateToV2(product);
+    // Save immediately so migration only runs once
+    try {
+      localStorage.setItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${id}`, JSON.stringify(product));
+    } catch (e) {
+      console.error('Failed to save migrated product:', e);
+    }
+  }
+  return product;
 }
 
 export function saveProduct(product) {
@@ -140,6 +192,7 @@ export function duplicateProduct(product) {
           progressHistory: ri.progressHistory.map(p => ({
             ...p,
             sprintId: newId(p.sprintId),
+            ...(p.releaseId ? { releaseId: newId(p.releaseId) } : {}),
           })),
         };
       }),
@@ -180,14 +233,17 @@ export function exportProduct(product) {
 }
 
 export function importProductFromJSON(jsonString) {
-  const data = JSON.parse(jsonString);
+  let data = JSON.parse(jsonString);
   // Basic validation
   if (!data.id || !data.name || !Array.isArray(data.themes)) {
     throw new Error('Invalid product data: missing required fields');
   }
-  if (!data.schemaVersion) data.schemaVersion = SCHEMA_VERSION;
   if (!data.sizeMapping) data.sizeMapping = [...DEFAULT_SIZE_MAPPING];
   if (!data.releases) data.releases = [];
   if (!data.sprints) data.sprints = [];
+  // Migrate if needed
+  if (!data.schemaVersion || data.schemaVersion < SCHEMA_VERSION) {
+    data = migrateToV2(data);
+  }
   return data;
 }

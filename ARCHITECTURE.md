@@ -68,8 +68,8 @@ Product
     └── backboneItems: [Backbone]
         └── ribItems: [RibItem]
             ├── size, category (core/non-core)
-            ├── releaseAllocations: [{ releaseId, percentage }]
-            └── progressHistory: [{ sprintId, percentComplete }]
+            ├── releaseAllocations: [{ releaseId, percentage, memo }]
+            └── progressHistory: [{ sprintId, releaseId, percentComplete, comment?, updatedAt? }]
 ```
 
 ## Data Flow
@@ -92,6 +92,10 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 3. **Atomic state updates** — Cross-column card moves combine allocation changes + card order into a single `updateProduct` call to prevent race conditions between separate state updates.
 
-4. **Sprint-aware progress** — `getRibItemPercentCompleteAsOf()` walks backward through sprint history to find the most recent progress entry at or before a selected sprint, enabling historical views.
+4. **Per-release progress** — Progress is tracked per-release per-sprint. Each `progressHistory` entry has a `releaseId` and `percentComplete` capped at the allocation percentage. Overall rib % is the sum of per-release entries. Schema migration (v1→v2) uses a waterfall algorithm to distribute old global entries across allocations.
 
-5. **Debounced persistence** — Saves are debounced (500ms for products, 100ms for index) to avoid excessive writes during rapid edits, while `saveProductImmediate` is used for critical operations like create/import.
+5. **Assessment notes** — Each progress entry can carry an optional `comment` and `updatedAt` timestamp. Notes are entered via expandable rows in the progress table, with full history shown newest-first. Clearing a progress value removes the entry entirely unless it has a comment attached.
+
+6. **Sprint-aware progress** — `getRibItemPercentCompleteAsOf()` walks backward through sprint history to find the most recent progress entry at or before a selected sprint, enabling historical views. Progress regression (negative deltas) is allowed to keep data honest.
+
+7. **Debounced persistence** — Saves are debounced (500ms for products, 100ms for index) to avoid excessive writes during rapid edits, while `saveProductImmediate` is used for critical operations like create/import.

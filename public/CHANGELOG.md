@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 0.3.0 (2026-02-13)
+
+### Features
+- **Per-release progress tracking** — Progress is now tracked per-release per-sprint instead of globally per-rib. Split-allocated items show separate rows for each release with target ceiling enforcement
+- **Assessment notes** — Expandable rows in the progress table let teams capture reasoning for each sprint's progress assessment, with auto-timestamped history shown newest-first
+- **Expand All / Collapse All** — Toggle button to open or close all comment panels at once for scanning notes across the board
+- **Multi-expand** — Multiple rows can be expanded simultaneously (previously only one at a time)
+- **Alphabetical sorting** — Progress table items sorted by backbone → rib name (release grouping) or rib name (backbone/theme grouping)
+- **Allocation memo field** — Each release allocation line can carry a free-text memo
+
+### Bug Fixes
+- **Progress input clearing** — Clearing a sprint progress value now removes the entry entirely instead of writing 0, fixing broken delta calculations
+- **Comment-preserving clear** — When clearing progress on a row with an assessment note, the note is preserved (progress set to 0 instead of deleting)
+
+### Technical
+- Schema version bumped to v2 with waterfall migration for legacy progress entries
+- `progressHistory` entries now include optional `comment` and `updatedAt` fields
+- `removeProgress` function for clean entry deletion
+- `expandedRows` changed from single string to Set for multi-expand support
+- Updated `ARCHITECTURE.md` and `CLAUDE.md` with new patterns
+
 ## Version 0.2.0 (2026-02-13)
 
 ### Features
