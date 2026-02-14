@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { loadProductIndex, loadProduct, saveProductImmediate, deleteProduct, exportProduct, importProductFromJSON, createNewProduct, duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
@@ -13,6 +13,7 @@ export default function ProductList() {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showWarning, setShowWarning] = useState(true);
   const navigate = useNavigate();
 
   const refresh = () => {
@@ -95,11 +96,18 @@ export default function ProductList() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Release Planner</h1>
-          <p className="text-sm text-gray-500">
-            Plan and track agile product releases. Data is stored locally in your browser.
-          </p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              SPERT<sup className="text-[0.45em] text-gray-400 font-normal tracking-wide">®</sup> Story Map
+            </h1>
+            <p className="text-sm text-gray-500">
+              Plan and track agile product releases. Data is stored locally in your browser.
+            </p>
+          </div>
+          <Link to="/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors mt-1">
+            About
+          </Link>
         </div>
 
         {/* Actions */}
@@ -125,11 +133,20 @@ export default function ProductList() {
         </div>
 
         {/* Data warning */}
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6">
-          <p className="text-xs text-amber-800">
-            Your data is stored in this browser's localStorage. Export regularly to avoid data loss if browser data is cleared.
-          </p>
-        </div>
+        {showWarning && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 flex items-start justify-between gap-3">
+            <p className="text-xs text-amber-800">
+              Your data is stored in this browser's localStorage. Export regularly to avoid data loss if browser data is cleared.
+            </p>
+            <button
+              onClick={() => setShowWarning(false)}
+              className="text-amber-400 hover:text-amber-600 text-sm leading-none flex-shrink-0 mt-0.5"
+              aria-label="Dismiss warning"
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         {/* Product List */}
         {products.length === 0 ? (

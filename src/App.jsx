@@ -7,11 +7,13 @@ import ProgressTrackingView from './pages/ProgressTrackingView';
 import InsightsView from './pages/InsightsView';
 import SettingsView from './pages/SettingsView';
 import ChangelogView from './pages/ChangelogView';
+import AboutView from './pages/AboutView';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<ProductList />} />
+      <Route path="/about" element={<AboutView />} />
       <Route path="/changelog" element={<ChangelogView />} />
       <Route path="/product/:productId" element={<ProductLayout />}>
         <Route index element={<Navigate to="structure" replace />} />

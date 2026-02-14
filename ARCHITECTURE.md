@@ -51,7 +51,8 @@ src/
     ├── ProgressTrackingView.jsx      # Sprint progress tracking
     ├── InsightsView.jsx              # Analytics dashboard
     ├── SettingsView.jsx              # Product configuration
-    └── ChangelogView.jsx             # Version history (reads CHANGELOG.md)
+    ├── ChangelogView.jsx             # Version history (reads CHANGELOG.md)
+    └── AboutView.jsx                 # About page (purpose, data security, license)
 ```
 
 ## Data Model

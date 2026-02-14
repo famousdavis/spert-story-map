@@ -1,5 +1,25 @@
 # Changelog
 
+## Version 0.2.0 (2026-02-13)
+
+### Features
+- **About Page** — Purpose, data security, author info, GitHub link, license, and warranty disclaimer
+- **App Branding** — Renamed to "SPERT® Story Map" with registered trademark symbol
+- **Dismissible Warning** — localStorage warning banner can now be closed (reappears on next visit)
+
+### Bug Fixes
+- **Duplicate product** — `releaseCardOrder` now correctly remaps release and rib IDs
+- **Progress history** — `getProgressOverTime` and `getReleaseProgressOverTime` now use `getRibItemPercentCompleteAsOf()` for correct sprint ordering
+- **Delete cleanup** — Deleting ribs, backbones, themes, and releases now cleans stale IDs from `releaseCardOrder`
+- **Progress input** — Clearing the sprint progress field now sets value to 0 instead of being ignored
+
+### Technical
+- Extracted `RibCard` and `AllocationModal` into `src/components/releases/`
+- Created shared `useProductMutations` hook for DRY hierarchy updates
+- Added documentation: `ARCHITECTURE.md`, `CLAUDE.md`, `CHANGELOG.md`
+- Added footer with version link and changelog page (reads `CHANGELOG.md` at runtime)
+- Removed unused `App.css` and `@dnd-kit` packages
+
 ## Version 0.1.0 (2026-02-13)
 
 ### Features
