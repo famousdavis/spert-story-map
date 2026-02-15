@@ -178,13 +178,23 @@ describe('buildThemeMoveState', () => {
 });
 
 describe('commitRibDrag', () => {
-  it('is a no-op when nothing changed', () => {
+  it('is a no-op when nothing changed and no insertIndex', () => {
     const updateProduct = vi.fn();
     commitRibDrag({
       ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
       targetReleaseId: 'rel-1', targetBackboneId: 'b1', targetThemeId: 't1',
     }, updateProduct, []);
     expect(updateProduct).not.toHaveBeenCalled();
+  });
+
+  it('reorders within same lane when insertIndex is set', () => {
+    const updateProduct = vi.fn();
+    commitRibDrag({
+      ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
+      targetReleaseId: 'rel-1', targetBackboneId: 'b1', targetThemeId: 't1',
+      insertIndex: 2, selectedIds: null,
+    }, updateProduct, []);
+    expect(updateProduct).toHaveBeenCalled();
   });
 
   it('is a no-op when targetReleaseId is undefined (never set)', () => {
