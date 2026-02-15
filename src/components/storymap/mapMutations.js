@@ -72,12 +72,64 @@ export function moveRibToRelease(updateProduct, ribId, fromReleaseId, toReleaseI
 /**
  * Reorder a rib item within the same release lane (Y-axis drag, same release).
  * Only updates releaseCardOrder — no allocation changes needed.
+ *
+ * insertIndex is a per-column (backbone-scoped) index, but releaseCardOrder
+ * stores all ribs for a release across all backbones. We translate the
+ * per-column index to the correct global position among sibling ribs.
  */
-export function reorderRibInRelease(updateProduct, ribId, releaseId, insertIndex) {
+export function reorderRibInRelease(updateProduct, ribId, releaseId, insertIndex, backboneId) {
   updateProduct(prev => {
     const cardOrder = { ...(prev.releaseCardOrder || {}) };
     const key = releaseId || 'unassigned';
-    spliceCardOrder(cardOrder, key, ribId, insertIndex);
+    const list = [...(cardOrder[key] || [])].filter(id => id !== ribId);
+
+    if (backboneId && insertIndex != null && insertIndex >= 0) {
+      // Find all rib IDs in this column (same backbone + release)
+      const columnRibIds = new Set();
+      for (const t of prev.themes) {
+        for (const b of t.backboneItems) {
+          if (b.id !== backboneId) continue;
+          for (const r of b.ribItems) {
+            if (r.id === ribId) continue; // already removed
+            if (releaseId === null) {
+              if (r.releaseAllocations.length === 0) columnRibIds.add(r.id);
+            } else {
+              if (r.releaseAllocations.some(a => a.releaseId === releaseId)) columnRibIds.add(r.id);
+            }
+          }
+        }
+      }
+
+      // Walk the global order list to find the Nth sibling and insert after it
+      let siblingCount = 0;
+      let globalIdx = list.length; // default: append
+      for (let i = 0; i < list.length; i++) {
+        if (columnRibIds.has(list[i])) {
+          if (siblingCount === insertIndex) {
+            globalIdx = i;
+            break;
+          }
+          siblingCount++;
+        }
+      }
+      // If insertIndex is beyond all siblings, place after the last sibling
+      if (siblingCount < insertIndex) {
+        for (let i = list.length - 1; i >= 0; i--) {
+          if (columnRibIds.has(list[i])) {
+            globalIdx = i + 1;
+            break;
+          }
+        }
+      }
+      list.splice(globalIdx, 0, ribId);
+    } else {
+      // Fallback: just splice at insertIndex directly
+      const idx = insertIndex != null && insertIndex >= 0 && insertIndex <= list.length
+        ? insertIndex : list.length;
+      list.splice(idx, 0, ribId);
+    }
+
+    cardOrder[key] = list;
     return { ...prev, releaseCardOrder: cardOrder };
   });
 }

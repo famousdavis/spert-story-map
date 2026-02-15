@@ -97,7 +97,7 @@ export function commitRibDrag(state, updateProduct, layoutCells) {
   // Same lane reorder — just update card order within this release
   if (!releaseChanged && !backboneChanged) {
     if (insertIndex != null && targetReleaseId !== undefined) {
-      reorderRibInRelease(updateProduct, ribId, targetReleaseId, insertIndex);
+      reorderRibInRelease(updateProduct, ribId, targetReleaseId, insertIndex, backboneId);
     }
     return;
   }

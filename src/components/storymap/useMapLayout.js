@@ -150,6 +150,20 @@ export function computeLayout(product) {
 
   // 6. Place rib cells with absolute positions
   const cells = [];
+  const cardOrder = product.releaseCardOrder || {};
+
+  // Sort ribs within a lane column by releaseCardOrder position
+  const sortByCardOrder = (ribs, releaseId) => {
+    const order = cardOrder[releaseId];
+    if (!order || order.length === 0) return ribs;
+    const posMap = {};
+    for (let i = 0; i < order.length; i++) posMap[order[i]] = i;
+    return [...ribs].sort((a, b) => {
+      const pa = posMap[a.id] ?? Infinity;
+      const pb = posMap[b.id] ?? Infinity;
+      return pa - pb;
+    });
+  };
 
   for (const lane of releaseLanes) {
     for (let ci = 0; ci < totalColumns; ci++) {
@@ -157,7 +171,8 @@ export function computeLayout(product) {
       const ribs = ribsByRelCol[key];
       if (!ribs) continue;
       const col = columns[ci];
-      ribs.forEach((rib, i) => {
+      const sorted = sortByCardOrder(ribs, lane.releaseId);
+      sorted.forEach((rib, i) => {
         cells.push({
           ...rib,
           x: col.x + CELL_PAD,
@@ -175,7 +190,8 @@ export function computeLayout(product) {
       const ribs = unassignedByCol[ci];
       if (!ribs) continue;
       const col = columns[ci];
-      ribs.forEach((rib, i) => {
+      const sorted = sortByCardOrder(ribs, 'unassigned');
+      sorted.forEach((rib, i) => {
         cells.push({
           ...rib,
           x: col.x + CELL_PAD,
