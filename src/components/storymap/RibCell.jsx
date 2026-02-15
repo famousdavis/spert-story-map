@@ -1,4 +1,5 @@
 import { SIZE_COLORS } from '../ui/SizePicker';
+import { useTooltip } from '../ui/Tooltip';
 import useInlineEdit from './useInlineEdit';
 
 export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart, isDragging, isSelected }) {
@@ -8,6 +9,8 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(cell.name, (name) => onRename(cell.themeId, cell.backboneId, cell.id, name));
 
+  const { tooltipProps, tooltipEl } = useTooltip(cell.name);
+
   const handleGripPointerDown = (e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -16,6 +19,9 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
 
   return (
     <div
+      ref={tooltipProps.ref}
+      onMouseEnter={tooltipProps.onMouseEnter}
+      onMouseLeave={tooltipProps.onMouseLeave}
       className={`absolute rounded border text-left select-none transition-colors ${
         isDragging
           ? 'border-blue-400 bg-blue-50 opacity-50 shadow-lg ring-2 ring-blue-300'
@@ -36,7 +42,6 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
         e.stopPropagation();
         if (!editing) onClick(cell, e);
       }}
-      title={cell.name}
       data-rib-id={cell.id}
       data-backbone-id={cell.backboneId}
       data-theme-id={cell.themeId}
@@ -93,6 +98,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
           {cell.category === 'core' ? 'Core' : 'Non-Core'}
         </span>
       </div>
+      {tooltipEl}
     </div>
   );
 }
