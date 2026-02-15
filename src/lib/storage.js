@@ -234,6 +234,13 @@ export function duplicateProduct(product) {
     newCardOrder[newColId] = ribIds.map(id => ribIdMap.get(id) || id);
   }
 
+  // Remap sizingCardOrder values (rib IDs); keys are size labels so no remap needed
+  const oldSizingOrder = product.sizingCardOrder || {};
+  const newSizingOrder = {};
+  for (const [key, ribIds] of Object.entries(oldSizingOrder)) {
+    newSizingOrder[key] = ribIds.map(id => ribIdMap.get(id) || id);
+  }
+
   return {
     ...product,
     id: crypto.randomUUID(),
@@ -244,6 +251,7 @@ export function duplicateProduct(product) {
     sprints: product.sprints.map(s => ({ ...s, id: newId(s.id) })),
     themes,
     releaseCardOrder: newCardOrder,
+    sizingCardOrder: newSizingOrder,
   };
 }
 

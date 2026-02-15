@@ -167,6 +167,7 @@ export function useProductMutations(updateProduct) {
         ...prev,
         themes: prev.themes.filter(t => t.id !== themeId),
         releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, ribIds),
+        sizingCardOrder: cleanCardOrder(prev.sizingCardOrder, ribIds),
       };
     });
   }, [updateProduct]);
@@ -183,6 +184,7 @@ export function useProductMutations(updateProduct) {
           t.id === themeId ? { ...t, backboneItems: t.backboneItems.filter(b => b.id !== backboneId) } : t
         ),
         releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, ribIds),
+        sizingCardOrder: cleanCardOrder(prev.sizingCardOrder, ribIds),
       };
     });
   }, [updateProduct]);
@@ -198,6 +200,7 @@ export function useProductMutations(updateProduct) {
           : t
       ),
       releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, new Set([ribId])),
+      sizingCardOrder: cleanCardOrder(prev.sizingCardOrder, new Set([ribId])),
     }));
   }, [updateProduct]);
 
@@ -215,6 +218,7 @@ export function useProductMutations(updateProduct) {
           })),
         })),
         releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, allRibIds),
+        sizingCardOrder: cleanCardOrder(prev.sizingCardOrder, allRibIds),
       };
     });
   }, [updateProduct]);

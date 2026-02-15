@@ -10,6 +10,7 @@
 
 ### Fixed
 - **Map rib card reorder** — Rib cards on the story map can now be reordered within a release lane and placed precisely when dragged across columns/releases. Fixed layout not respecting `releaseCardOrder`, per-column vs global index translation in card order mutations, and layout instability when `releaseCardOrder` was previously empty or sparse
+- **Sizing board card placement** — Rib cards on the sizing board now land exactly where the insertion indicator shows. Added `sizingCardOrder` to persist ordering within size columns and the unsized zone; same-column reorders and cross-column moves both respect insertion position
 
 ### Refactored
 - Decomposed `StructureView` (413→228 LOC) — extracted `BackboneSection` and `RibRow` into `src/components/structure/`
@@ -23,7 +24,10 @@
 - Added `themeColors.test.js` (9 tests) for color palette and fallback logic
 - Added `reorderTheme` tests (5 tests) and rib drag placement tests (18 tests) in `mapMutations.test.js`
 - Added end-to-end rib drag tests verifying full flow: computeLayout → computeInsertIndex → mutation → computeLayout → verify
-- 224 tests total across 10 test files
+- `useSizingLayout.js` — `computeSizingLayout` now sorts cells by `sizingCardOrder`
+- `useSizingDrag.js` — Drag end commits both size change and card order in a single `updateProduct` call
+- Added `sizingLayout.test.js` (7 tests) for sizing card order sorting and cell placement
+- 231 tests total across 11 test files
 
 ## Version 0.9.0 (2026-02-14)
 

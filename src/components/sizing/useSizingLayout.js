@@ -65,18 +65,37 @@ export function computeSizingLayout(product) {
     }
   });
 
-  // 3. Compute unsized zone (multi-column grid)
+  // 3. Sort ribs by sizingCardOrder (if present)
+  const cardOrder = product.sizingCardOrder || {};
+  const sortByCardOrder = (ribs, key) => {
+    const order = cardOrder[key];
+    if (!order || order.length === 0) return ribs;
+    const posMap = {};
+    for (let i = 0; i < order.length; i++) posMap[order[i]] = i;
+    return [...ribs].sort((a, b) => {
+      const pa = posMap[a.id] ?? Infinity;
+      const pb = posMap[b.id] ?? Infinity;
+      return pa - pb;
+    });
+  };
+
+  const sortedUnsized = sortByCardOrder(unsizedRibs, 'unsized');
+  for (const [label, ribs] of sizedByLabel.entries()) {
+    sizedByLabel.set(label, sortByCardOrder(ribs, label));
+  }
+
+  // 4. Compute unsized zone (multi-column grid)
   const unsizedGridCols = Math.max(1, Math.floor(totalColumnsWidth / (CELL_WIDTH + CELL_GAP)));
-  const unsizedRows = Math.ceil(unsizedRibs.length / unsizedGridCols) || 0;
+  const unsizedRows = Math.ceil(sortedUnsized.length / unsizedGridCols) || 0;
   const unsizedHeight = Math.max(
     unsizedRows * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2,
     UNSIZED_MIN_HEIGHT,
   );
   const unsizedZone = { y: 0, height: unsizedHeight, width: totalColumnsWidth };
 
-  // 4. Place unsized cells in grid
+  // 5. Place unsized cells in grid
   const cells = [];
-  unsizedRibs.forEach((rib, i) => {
+  sortedUnsized.forEach((rib, i) => {
     const row = Math.floor(i / unsizedGridCols);
     const col = i % unsizedGridCols;
     cells.push({
@@ -90,7 +109,7 @@ export function computeSizingLayout(product) {
     });
   });
 
-  // 5. Compute size column zone
+  // 6. Compute size column zone
   const sizeColumnsY = unsizedHeight + ZONE_GAP + HEADER_HEIGHT;
 
   // Find tallest column
@@ -104,7 +123,7 @@ export function computeSizingLayout(product) {
     }
   }
 
-  // 6. Place sized cells
+  // 7. Place sized cells
   for (const col of sizeColumns) {
     const ribsInCol = sizedByLabel.get(col.label) || [];
     ribsInCol.forEach((rib, i) => {
@@ -125,7 +144,7 @@ export function computeSizingLayout(product) {
   return {
     sizeColumns,
     unsizedZone,
-    unsizedCount: unsizedRibs.length,
+    unsizedCount: sortedUnsized.length,
     sizeColumnsY,
     cells,
     totalWidth: totalColumnsWidth,

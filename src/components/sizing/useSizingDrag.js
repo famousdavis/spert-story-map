@@ -7,7 +7,7 @@ const DRAG_THRESHOLD = 8;
  * Pointer-event drag hook for the sizing board.
  * Only handles rib drags between size columns / unsized zone.
  */
-export default function useSizingDrag({ layout, zoom, pan, mutations }) {
+export default function useSizingDrag({ layout, zoom, pan, mutations, updateProduct }) {
   const [dragState, setDragState] = useState(null);
   const dragRef = useRef(null);
 
@@ -143,15 +143,71 @@ export default function useSizingDrag({ layout, zoom, pan, mutations }) {
       return;
     }
 
-    // Only commit if size actually changed
-    const { sourceSize, targetSize, ribId, themeId, backboneId } = state;
-    if (targetSize !== sourceSize) {
-      mutations.updateRib(themeId, backboneId, ribId, { size: targetSize || null });
-    }
+    const { sourceSize, targetSize, ribId, themeId, backboneId, insertIndex } = state;
+    const sizeChanged = targetSize !== sourceSize;
+
+    // Commit size change + card order in a single updateProduct call
+    updateProduct(prev => {
+      let next = prev;
+
+      // Update size on the rib item if it changed
+      if (sizeChanged) {
+        next = {
+          ...next,
+          themes: next.themes.map(t =>
+            t.id === themeId
+              ? {
+                ...t,
+                backboneItems: t.backboneItems.map(b =>
+                  b.id === backboneId
+                    ? { ...b, ribItems: b.ribItems.map(r => r.id === ribId ? { ...r, size: targetSize || null } : r) }
+                    : b
+                ),
+              }
+              : t
+          ),
+        };
+      }
+
+      // Update sizingCardOrder
+      const cardOrder = { ...(next.sizingCardOrder || {}) };
+      const dstKey = targetSize === null ? 'unsized' : targetSize;
+      const srcKey = sourceSize === null ? 'unsized' : sourceSize;
+
+      // Remove from source list
+      if (sizeChanged && cardOrder[srcKey]) {
+        cardOrder[srcKey] = cardOrder[srcKey].filter(id => id !== ribId);
+      }
+
+      // Insert into destination list at correct position
+      const dstList = [...(cardOrder[dstKey] || [])].filter(id => id !== ribId);
+
+      // Ensure all sibling ribs in the target column are in the list
+      // (prevents layout instability when sizingCardOrder was previously empty)
+      const siblingIds = new Set();
+      for (const cell of layout.cells) {
+        if (cell.sizeLabel === targetSize && cell.id !== ribId) {
+          siblingIds.add(cell.id);
+        }
+      }
+      for (const sibId of siblingIds) {
+        if (!dstList.includes(sibId)) {
+          dstList.push(sibId);
+        }
+      }
+
+      // Insert at the correct position
+      const idx = insertIndex != null && insertIndex >= 0 && insertIndex <= dstList.length
+        ? insertIndex : dstList.length;
+      dstList.splice(idx, 0, ribId);
+      cardOrder[dstKey] = dstList;
+
+      return { ...next, sizingCardOrder: cardOrder };
+    });
 
     dragRef.current = null;
     setDragState(null);
-  }, [mutations]);
+  }, [updateProduct, layout.cells]);
 
   const cancelDrag = useCallback(() => {
     dragRef.current = null;

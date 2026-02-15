@@ -104,6 +104,7 @@ Product
 ├── releases: [{ id, name, order, description, targetDate }]
 ├── sprints: [{ id, name, order, endDate }]
 ├── releaseCardOrder: { [colId]: [ribId, ...] }
+├── sizingCardOrder: { [sizeLabel|'unsized']: [ribId, ...] }
 └── themes: [Theme]
     ├── color?                                      # Optional color key (blue, teal, violet, etc.)
     └── backboneItems: [Backbone]
@@ -147,7 +148,7 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 10. **Map pan vs click disambiguation** — `MapCanvas` uses a blacklist approach: `setPointerCapture` starts panning on any pointerdown except when the target is inside an element with `data-rib-id` or `data-release-id`. This allows clicks on rib cards and release labels to reach their handlers while panning works everywhere else.
 
-11. **Sizing view** — A dedicated tab for bulk-sizing rib items. Reuses `MapCanvas` (pan/zoom) and `DragGhost`. Layout is computed by `useSizingLayout` with an unsized grid zone on top and t-shirt size columns below. Rib items with progress > 0% are locked (visually dimmed, no drag handle) to prevent re-sizing active work. Drag hook (`useSizingDrag`) is a simplified version of `useMapDrag` supporting only rib drags.
+11. **Sizing view** — A dedicated tab for bulk-sizing rib items. Reuses `MapCanvas` (pan/zoom) and `DragGhost`. Layout is computed by `useSizingLayout` with an unsized grid zone on top and t-shirt size columns below. Rib items with progress > 0% are locked (visually dimmed, no drag handle) to prevent re-sizing active work. Drag hook (`useSizingDrag`) commits both size change and `sizingCardOrder` position in a single `updateProduct` call. `computeSizingLayout` sorts cells by `sizingCardOrder` (keyed by size label or `'unsized'`).
 
 12. **Click/double-click disambiguation** — Release labels use a 200ms timer to distinguish single-click (open detail panel) from double-click (inline rename). The timer is cancelled if a double-click fires within the window.
 

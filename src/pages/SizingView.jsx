@@ -18,7 +18,7 @@ export default function SizingView() {
   const didAutoFit = useRef(false);
 
   const { dragState, handleDragStart, handleDragMove, handleDragEnd, cancelDrag } =
-    useSizingDrag({ layout, zoom, pan, mutations });
+    useSizingDrag({ layout, zoom, pan, mutations, updateProduct });
 
   // Auto-fit on first render once map dimensions are known
   useEffect(() => {
