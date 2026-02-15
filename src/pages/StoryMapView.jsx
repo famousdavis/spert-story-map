@@ -7,6 +7,7 @@ import RibDetailPanel from '../components/storymap/RibDetailPanel';
 import ReleaseDetailPanel from '../components/storymap/ReleaseDetailPanel';
 import DragGhost from '../components/storymap/DragGhost';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { deleteReleaseFromProduct } from '../lib/settingsMutations';
 import useMapDrag from '../components/storymap/useMapDrag';
 import useMapLayout from '../components/storymap/useMapLayout';
 
@@ -187,6 +188,11 @@ export default function StoryMapView() {
     setDeleteTarget({ type: 'rib', themeId, backboneId, ribId, name: rib?.name || 'Rib Item' });
   }, [product.themes]);
 
+  const handleDeleteRelease = useCallback((releaseId) => {
+    const release = product.releases.find(r => r.id === releaseId);
+    setDeleteTarget({ type: 'release', releaseId, name: release?.name || 'Release' });
+  }, [product.releases]);
+
   const handleConfirmDelete = useCallback(() => {
     if (!deleteTarget) return;
     if (deleteTarget.type === 'theme') {
@@ -195,9 +201,12 @@ export default function StoryMapView() {
       mutations.deleteBackbone(deleteTarget.themeId, deleteTarget.backboneId);
     } else if (deleteTarget.type === 'rib') {
       mutations.deleteRib(deleteTarget.themeId, deleteTarget.backboneId, deleteTarget.ribId);
+    } else if (deleteTarget.type === 'release') {
+      updateProduct(prev => deleteReleaseFromProduct(prev, deleteTarget.releaseId));
+      setSelectedReleaseId(null);
     }
     setDeleteTarget(null);
-  }, [deleteTarget, mutations]);
+  }, [deleteTarget, mutations, updateProduct]);
 
   // Add handlers
   const handleAddTheme = useCallback(() => {
@@ -211,6 +220,21 @@ export default function StoryMapView() {
   const handleAddRib = useCallback((themeId, backboneId) => {
     mutations.addRib(themeId, backboneId);
   }, [mutations]);
+
+  const handleAddRelease = useCallback((beforeReleaseId) => {
+    if (!beforeReleaseId) {
+      // Clicked on unassigned lane divider — append after all releases
+      const sorted = [...product.releases].sort((a, b) => a.order - b.order);
+      const lastId = sorted.length > 0 ? sorted[sorted.length - 1].id : null;
+      mutations.addReleaseAfter(lastId);
+    } else {
+      // Clicked on a release divider — insert before that release (= after the previous one)
+      const sorted = [...product.releases].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex(r => r.id === beforeReleaseId);
+      const prevId = idx > 0 ? sorted[idx - 1].id : null;
+      mutations.addReleaseAfter(prevId);
+    }
+  }, [product.releases, mutations]);
 
   const handleRenameRelease = useCallback((releaseId, newName) => {
     updateProduct(prev => ({
@@ -264,12 +288,14 @@ export default function StoryMapView() {
           onRenameTheme={handleRenameTheme}
           onRenameBackbone={handleRenameBackbone}
           onRenameRib={handleRenameRib}
+          onRenameRelease={handleRenameRelease}
           onDeleteTheme={handleDeleteTheme}
           onDeleteBackbone={handleDeleteBackbone}
           onDeleteRib={handleDeleteRib}
           onAddTheme={handleAddTheme}
           onAddBackbone={handleAddBackbone}
           onAddRib={handleAddRib}
+          onAddRelease={handleAddRelease}
           dragState={dragState}
           onDragStart={handleDragStart}
           onBackboneDragStart={handleBackboneDragStart}
@@ -293,6 +319,7 @@ export default function StoryMapView() {
           product={product}
           onClose={handleCloseDetail}
           onRename={handleRenameRelease}
+          onDelete={handleDeleteRelease}
         />
       )}
 
@@ -317,13 +344,20 @@ export default function StoryMapView() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
-        title={`Delete ${deleteTarget?.type === 'theme' ? 'Theme' : deleteTarget?.type === 'backbone' ? 'Backbone' : 'Rib Item'}`}
+        title={`Delete ${
+          deleteTarget?.type === 'theme' ? 'Theme'
+            : deleteTarget?.type === 'backbone' ? 'Backbone'
+            : deleteTarget?.type === 'release' ? 'Release'
+            : 'Rib Item'
+        }`}
         message={
           deleteTarget?.type === 'theme'
             ? `Delete "${deleteTarget.name}"? All backbone items and rib items within it will also be deleted.`
             : deleteTarget?.type === 'backbone'
-              ? `Delete "${deleteTarget?.name}"? All rib items within it will also be deleted.`
-              : `Delete "${deleteTarget?.name}"?`
+              ? `Delete "${deleteTarget.name}"? All rib items within it will also be deleted.`
+              : deleteTarget?.type === 'release'
+                ? `Delete "${deleteTarget.name}"? Any remaining allocations and progress history for this release will be removed.`
+                : `Delete "${deleteTarget?.name}"?`
         }
       />
     </div>

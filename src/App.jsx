@@ -8,6 +8,7 @@ import ProgressTrackingView from './pages/ProgressTrackingView';
 import InsightsView from './pages/InsightsView';
 import SettingsView from './pages/SettingsView';
 import StoryMapView from './pages/StoryMapView';
+import SizingView from './pages/SizingView';
 import ChangelogView from './pages/ChangelogView';
 import AboutView from './pages/AboutView';
 
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="structure" element={<StructureView />} />
         <Route path="releases" element={<ReleasePlanningView />} />
         <Route path="storymap" element={<StoryMapView />} />
+        <Route path="sizing" element={<SizingView />} />
         <Route path="progress" element={<ProgressTrackingView />} />
         <Route path="insights" element={<InsightsView />} />
         <Route path="settings" element={<SettingsView />} />

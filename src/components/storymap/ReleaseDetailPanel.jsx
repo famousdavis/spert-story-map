@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { getPointsForRelease, getReleasePercentComplete, getCoreNonCorePointsForRelease } from '../../lib/calculations';
 import useInlineEdit from './useInlineEdit';
 
-export default function ReleaseDetailPanel({ releaseId, product, onClose, onRename }) {
+export default function ReleaseDetailPanel({ releaseId, product, onClose, onRename, onDelete }) {
   const release = product.releases.find(r => r.id === releaseId);
   const releaseName = release?.name || '';
 
@@ -128,6 +128,28 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
               )}
             </div>
           </div>
+
+          {/* Delete release */}
+          {onDelete && (
+            <div className="pt-2 border-t border-gray-100">
+              {stats.ribCount > 0 ? (
+                <button
+                  disabled
+                  className="w-full px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 rounded-lg cursor-not-allowed"
+                  title="Move all rib items out of this release first"
+                >
+                  Delete Release — {stats.ribCount} rib{stats.ribCount !== 1 ? 's' : ''} allocated
+                </button>
+              ) : (
+                <button
+                  onClick={() => onDelete(releaseId)}
+                  className="w-full px-3 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                >
+                  Delete Release
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

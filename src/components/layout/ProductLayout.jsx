@@ -8,6 +8,7 @@ const tabs = [
   { path: 'structure', label: 'Structure', icon: '◫' },
   { path: 'releases', label: 'Releases', icon: '▦' },
   { path: 'storymap', label: 'Map', icon: '▤' },
+  { path: 'sizing', label: 'Sizing', icon: '⊞' },
   { path: 'progress', label: 'Progress', icon: '◔' },
   { path: 'insights', label: 'Insights', icon: '◨' },
   { path: 'settings', label: 'Settings', icon: '⚙' },

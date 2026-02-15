@@ -9,10 +9,10 @@ import DropHighlight from './DropHighlight';
 import InsertionIndicator from './InsertionIndicator';
 
 export default function MapContent({
-  layout, onRibClick, mapSizeRef,
-  onRenameTheme, onRenameBackbone, onRenameRib,
+  layout, onRibClick, onReleaseClick, mapSizeRef,
+  onRenameTheme, onRenameBackbone, onRenameRib, onRenameRelease,
   onDeleteTheme, onDeleteBackbone, onDeleteRib,
-  onAddTheme, onAddBackbone, onAddRib,
+  onAddTheme, onAddBackbone, onAddRib, onAddRelease,
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart,
   selectedIds,
 }) {
@@ -48,7 +48,7 @@ export default function MapContent({
         <p className="absolute left-32 top-16 text-gray-400 text-sm">No themes yet — add one to get started.</p>
         {onAddTheme && (
           <button
-            className="absolute bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded px-2 py-1 transition-colors"
+            className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-xs font-medium rounded px-2 py-1 transition-colors"
             style={{ left: LANE_LABEL_WIDTH, top: 4, height: 32 }}
             onClick={onAddTheme}
           >
@@ -101,6 +101,9 @@ export default function MapContent({
           totalWidth={totalWidth}
           isFirst={i === 0}
           isDropTarget={highlightReleaseId === lane.releaseId}
+          onRename={onRenameRelease}
+          onAddRelease={onAddRelease}
+          onClick={onReleaseClick}
         />
       ))}
 
@@ -110,6 +113,7 @@ export default function MapContent({
           lane={unassignedLane}
           totalWidth={totalWidth}
           isDropTarget={highlightReleaseId === null && isRibDrag}
+          onAddRelease={onAddRelease}
         />
       )}
 
@@ -163,7 +167,7 @@ export default function MapContent({
       {/* + Theme button (after last theme) */}
       {onAddTheme && (
         <button
-          className="absolute bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded px-2 py-1 transition-colors"
+          className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-xs font-medium rounded px-2 py-1 transition-colors"
           style={{ left: totalWidth + COL_GAP, top: 4, height: 32 }}
           onClick={onAddTheme}
         >
@@ -174,7 +178,7 @@ export default function MapContent({
       {/* + Backbone button (below + Theme, adds to last theme) */}
       {onAddBackbone && (
         <button
-          className="absolute bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded px-2 py-1 whitespace-nowrap transition-colors"
+          className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-xs font-medium rounded px-2 py-1 whitespace-nowrap transition-colors"
           style={{ left: totalWidth + COL_GAP, top: THEME_HEIGHT + 2, height: 28 }}
           onClick={() => onAddBackbone(themeSpans[themeSpans.length - 1].themeId)}
         >
@@ -188,7 +192,7 @@ export default function MapContent({
         return (
           <button
             key={`add-rib-${col.backboneId}`}
-            className="absolute bg-gray-50 hover:bg-gray-200 text-gray-400 hover:text-gray-600 text-[10px] rounded px-1 py-0.5 transition-colors"
+            className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-[10px] rounded px-1 py-0.5 transition-colors"
             style={{ left: col.x + 4, bottom: undefined, top: bottomY - 20, width: col.width - 8 }}
             onClick={() => onAddRib(col.themeId, col.backboneId)}
             title="Add rib item"
