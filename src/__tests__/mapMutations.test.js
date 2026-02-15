@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, reorderTheme, moveRib2D, moveRibs2D } from '../components/storymap/mapMutations';
+import { computeLayout, CELL_HEIGHT, CELL_GAP, CELL_PAD } from '../components/storymap/useMapLayout';
+import { computeInsertIndex } from '../components/storymap/mapDragHelpers';
 
 // Helper: creates a minimal product with configurable themes/backbones/ribs
 function makeProduct({
@@ -671,5 +673,491 @@ describe('reorderTheme', () => {
     );
 
     expect(result.themes.map(t => t.id)).toEqual(['t2', 't1']);
+  });
+});
+
+// --- Card order placement (reorderRibInRelease + moveRib2D) ---
+// These tests verify that releaseCardOrder is correctly maintained
+// when the visual per-column insertIndex must be translated into
+// the global per-release card order list.
+describe('card order placement', () => {
+  // Two backbones (b1, b2) in one theme, all ribs in rel-A.
+  // Global card order for rel-A: [r1, r2, r3, r4]
+  //   b1 has r1, r3  (visually indices 0, 1 in the column)
+  //   b2 has r2, r4  (visually indices 0, 1 in the column)
+  function twoColumnProduct() {
+    return makeProduct({
+      themes: [makeTheme('t1', [
+        makeBackbone('b1', [
+          makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r3', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+        makeBackbone('b2', [
+          makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r4', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+      ])],
+      releaseCardOrder: { 'rel-A': ['r1', 'r2', 'r3', 'r4'] },
+    });
+  }
+
+  describe('reorderRibInRelease', () => {
+    it('moves r3 before r1 in column b1 (insertIndex=0)', () => {
+      const product = twoColumnProduct();
+      // r3 is at visual index 1 in b1, move it to visual index 0
+      const result = captureUpdate(
+        (update) => reorderRibInRelease(update, 'r3', 'rel-A', 0, 'b1'),
+        product,
+      );
+      const order = result.releaseCardOrder['rel-A'];
+      // r3 should now be before r1 among b1 siblings
+      const b1Ribs = order.filter(id => ['r1', 'r3'].includes(id));
+      expect(b1Ribs).toEqual(['r3', 'r1']);
+      // b2 ribs should be unchanged relative to each other
+      const b2Ribs = order.filter(id => ['r2', 'r4'].includes(id));
+      expect(b2Ribs).toEqual(['r2', 'r4']);
+    });
+
+    it('moves r1 after r3 in column b1 (insertIndex=1)', () => {
+      const product = twoColumnProduct();
+      // r1 is at visual index 0, move to visual index 1 (after r3)
+      const result = captureUpdate(
+        (update) => reorderRibInRelease(update, 'r1', 'rel-A', 1, 'b1'),
+        product,
+      );
+      const order = result.releaseCardOrder['rel-A'];
+      const b1Ribs = order.filter(id => ['r1', 'r3'].includes(id));
+      expect(b1Ribs).toEqual(['r3', 'r1']);
+    });
+
+    it('insert at end of column (insertIndex = sibling count)', () => {
+      // 3 ribs in b1: r1, r3, r5. Move r1 to end (insertIndex=2)
+      const product = makeProduct({
+        themes: [makeTheme('t1', [
+          makeBackbone('b1', [
+            makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+            makeRib('r3', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+            makeRib('r5', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          ]),
+          makeBackbone('b2', [
+            makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          ]),
+        ])],
+        releaseCardOrder: { 'rel-A': ['r1', 'r2', 'r3', 'r5'] },
+      });
+
+      const result = captureUpdate(
+        (update) => reorderRibInRelease(update, 'r1', 'rel-A', 2, 'b1'),
+        product,
+      );
+      const order = result.releaseCardOrder['rel-A'];
+      const b1Ribs = order.filter(id => ['r1', 'r3', 'r5'].includes(id));
+      expect(b1Ribs).toEqual(['r3', 'r5', 'r1']);
+    });
+
+    it('handles empty card order gracefully', () => {
+      const product = makeProduct({
+        themes: [makeTheme('t1', [
+          makeBackbone('b1', [
+            makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+            makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          ]),
+        ])],
+        releaseCardOrder: {},
+      });
+
+      const result = captureUpdate(
+        (update) => reorderRibInRelease(update, 'r1', 'rel-A', 1, 'b1'),
+        product,
+      );
+      // Should create an order with r1 after r2
+      const order = result.releaseCardOrder['rel-A'];
+      expect(order).toContain('r1');
+    });
+  });
+
+  describe('moveRib2D card order', () => {
+    it('places rib at correct position when moving to different column', () => {
+      const product = twoColumnProduct();
+      // Move r1 from b1 to b2 (same release), insertIndex=1 (after r2, before r4)
+      const result = captureUpdate(
+        (update) => moveRib2D(update, 'r1',
+          { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+          { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex: 1 },
+        ),
+        product,
+      );
+      const order = result.releaseCardOrder['rel-A'];
+      // In b2 column, order should be: r2, r1, r4
+      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4'].includes(id));
+      expect(b2Ribs).toEqual(['r2', 'r1', 'r4']);
+    });
+
+    it('places rib at start when moving to different column with insertIndex=0', () => {
+      const product = twoColumnProduct();
+      // Move r1 from b1 to b2, insertIndex=0 (before r2)
+      const result = captureUpdate(
+        (update) => moveRib2D(update, 'r1',
+          { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+          { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex: 0 },
+        ),
+        product,
+      );
+      const order = result.releaseCardOrder['rel-A'];
+      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4'].includes(id));
+      expect(b2Ribs).toEqual(['r1', 'r2', 'r4']);
+    });
+
+    it('places rib at end when moving to different column with insertIndex=2', () => {
+      const product = twoColumnProduct();
+      // Move r1 from b1 to b2, insertIndex=2 (after both r2 and r4)
+      const result = captureUpdate(
+        (update) => moveRib2D(update, 'r1',
+          { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+          { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex: 2 },
+        ),
+        product,
+      );
+      const order = result.releaseCardOrder['rel-A'];
+      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4'].includes(id));
+      expect(b2Ribs).toEqual(['r2', 'r4', 'r1']);
+    });
+
+    it('places rib correctly when moving to different release', () => {
+      // r1 in rel-A/b1. Move to rel-B/b2 where r5 already exists, insertIndex=0
+      const product = makeProduct({
+        themes: [makeTheme('t1', [
+          makeBackbone('b1', [
+            makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          ]),
+          makeBackbone('b2', [
+            makeRib('r5', [{ releaseId: 'rel-B', percentage: 100, memo: '' }]),
+          ]),
+        ])],
+        releaseCardOrder: { 'rel-A': ['r1'], 'rel-B': ['r5'] },
+      });
+
+      const result = captureUpdate(
+        (update) => moveRib2D(update, 'r1',
+          { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+          { themeId: 't1', backboneId: 'b2', releaseId: 'rel-B', insertIndex: 0 },
+        ),
+        product,
+      );
+      expect(result.releaseCardOrder['rel-A']).toEqual([]);
+      const orderB = result.releaseCardOrder['rel-B'];
+      const b2Ribs = orderB.filter(id => ['r1', 'r5'].includes(id));
+      expect(b2Ribs).toEqual(['r1', 'r5']);
+    });
+
+    it('places rib correctly when destination has no card order yet', () => {
+      // b2 has r2, r4 in rel-A but releaseCardOrder has no entry for rel-A
+      const product = makeProduct({
+        themes: [makeTheme('t1', [
+          makeBackbone('b1', [
+            makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          ]),
+          makeBackbone('b2', [
+            makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+            makeRib('r4', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          ]),
+        ])],
+        releaseCardOrder: {}, // no entries at all
+      });
+
+      const result = captureUpdate(
+        (update) => moveRib2D(update, 'r1',
+          { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+          { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex: 1 },
+        ),
+        product,
+      );
+      const order = result.releaseCardOrder['rel-A'];
+      // r1 should be in the card order
+      expect(order).toContain('r1');
+    });
+
+    it('places rib after existing when moving to different release with insertIndex=1', () => {
+      const product = makeProduct({
+        themes: [makeTheme('t1', [
+          makeBackbone('b1', [
+            makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          ]),
+          makeBackbone('b2', [
+            makeRib('r5', [{ releaseId: 'rel-B', percentage: 100, memo: '' }]),
+          ]),
+        ])],
+        releaseCardOrder: { 'rel-A': ['r1'], 'rel-B': ['r5'] },
+      });
+
+      const result = captureUpdate(
+        (update) => moveRib2D(update, 'r1',
+          { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+          { themeId: 't1', backboneId: 'b2', releaseId: 'rel-B', insertIndex: 1 },
+        ),
+        product,
+      );
+      const orderB = result.releaseCardOrder['rel-B'];
+      const b2Ribs = orderB.filter(id => ['r1', 'r5'].includes(id));
+      expect(b2Ribs).toEqual(['r5', 'r1']);
+    });
+  });
+});
+
+// --- End-to-end: layout → insertIndex → mutation → layout → verify ---
+// These tests simulate the full drag flow to catch any mismatches between
+// the visual insertion indicator and the actual card placement.
+describe('end-to-end rib drag placement', () => {
+  // Helper to extract cell Y positions for a backbone in a release from layout
+  function getCellOrder(layout, backboneId, releaseId) {
+    return layout.cells
+      .filter(c => c.backboneId === backboneId && c.releaseId === releaseId)
+      .sort((a, b) => a.y - b.y)
+      .map(c => c.id);
+  }
+
+  function e2eProduct() {
+    // Two backbones, 3 ribs in b1 and 2 ribs in b2, all in rel-A
+    return makeProduct({
+      themes: [makeTheme('t1', [
+        makeBackbone('b1', [
+          makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r3', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+        makeBackbone('b2', [
+          makeRib('r4', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r5', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+      ])],
+      releases: [{ id: 'rel-A', name: 'Release A', order: 1 }],
+      releaseCardOrder: { 'rel-A': ['r1', 'r2', 'r3', 'r4', 'r5'] },
+    });
+  }
+
+  it('reorder: move r1 to after r3 in b1 (last position)', () => {
+    const product = e2eProduct();
+    const layout1 = computeLayout(product);
+
+    // r1, r2, r3 are in b1. We want to move r1 to after r3 (insertIndex=2).
+    // Compute the Y position that would give insertIndex=2: below r3's midpoint
+    const b1Cells = layout1.cells
+      .filter(c => c.backboneId === 'b1' && c.releaseId === 'rel-A')
+      .sort((a, b) => a.y - b.y);
+    const lastCellY = b1Cells[b1Cells.length - 1].y + CELL_HEIGHT; // below last cell
+    const insertIndex = computeInsertIndex(
+      layout1.cells, 'b1', 'rel-A', new Set(['r1']), lastCellY,
+    );
+    expect(insertIndex).toBe(2); // after r2 and r3 (excluding r1)
+
+    // Commit the reorder
+    const result = captureUpdate(
+      (update) => reorderRibInRelease(update, 'r1', 'rel-A', insertIndex, 'b1'),
+      product,
+    );
+
+    // Verify layout reflects the change
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b1', 'rel-A')).toEqual(['r2', 'r3', 'r1']);
+    // b2 should be unchanged
+    expect(getCellOrder(layout2, 'b2', 'rel-A')).toEqual(['r4', 'r5']);
+  });
+
+  it('reorder: move r3 to before r1 in b1 (first position)', () => {
+    const product = e2eProduct();
+    const layout1 = computeLayout(product);
+
+    const lane = layout1.releaseLanes[0];
+    const insertIndex = computeInsertIndex(
+      layout1.cells, 'b1', 'rel-A', new Set(['r3']), lane.y, // above all cells
+    );
+    expect(insertIndex).toBe(0);
+
+    const result = captureUpdate(
+      (update) => reorderRibInRelease(update, 'r3', 'rel-A', insertIndex, 'b1'),
+      product,
+    );
+
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b1', 'rel-A')).toEqual(['r3', 'r1', 'r2']);
+  });
+
+  it('cross-column: move r1 from b1 to end of b2', () => {
+    const product = e2eProduct();
+    const layout1 = computeLayout(product);
+
+    // Compute insertIndex for end of b2 column
+    const b2Cells = layout1.cells
+      .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-A')
+      .sort((a, b) => a.y - b.y);
+    const belowLast = b2Cells[b2Cells.length - 1].y + CELL_HEIGHT;
+    const insertIndex = computeInsertIndex(
+      layout1.cells, 'b2', 'rel-A', new Set(['r1']), belowLast,
+    );
+    expect(insertIndex).toBe(2); // after r4 and r5
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex },
+      ),
+      product,
+    );
+
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b1', 'rel-A')).toEqual(['r2', 'r3']);
+    expect(getCellOrder(layout2, 'b2', 'rel-A')).toEqual(['r4', 'r5', 'r1']);
+  });
+
+  it('cross-column: move r1 from b1 to start of b2', () => {
+    const product = e2eProduct();
+    const layout1 = computeLayout(product);
+
+    const lane = layout1.releaseLanes[0];
+    const insertIndex = computeInsertIndex(
+      layout1.cells, 'b2', 'rel-A', new Set(['r1']), lane.y,
+    );
+    expect(insertIndex).toBe(0);
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex },
+      ),
+      product,
+    );
+
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b2', 'rel-A')).toEqual(['r1', 'r4', 'r5']);
+  });
+
+  it('cross-column: move r1 from b1 to middle of b2', () => {
+    const product = e2eProduct();
+    const layout1 = computeLayout(product);
+
+    // Between r4 and r5: above r5 midpoint, below r4 midpoint
+    const b2Cells = layout1.cells
+      .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-A')
+      .sort((a, b) => a.y - b.y);
+    const betweenY = b2Cells[0].y + CELL_HEIGHT + CELL_GAP / 2; // between r4 and r5
+    const insertIndex = computeInsertIndex(
+      layout1.cells, 'b2', 'rel-A', new Set(['r1']), betweenY,
+    );
+    expect(insertIndex).toBe(1); // after r4, before r5
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex },
+      ),
+      product,
+    );
+
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b2', 'rel-A')).toEqual(['r4', 'r1', 'r5']);
+  });
+
+  it('sparse card order: reorder r3 to position 0 in b1 when no card order exists', () => {
+    // This is the critical case: releaseCardOrder is empty, so layout uses
+    // default iteration order (r1, r2, r3). Reorder r3 to position 0.
+    // After the mutation, the card order should reflect r3, r1, r2 — and
+    // ALL sibling ribs should be in the order (not just r3).
+    const product = makeProduct({
+      themes: [makeTheme('t1', [
+        makeBackbone('b1', [
+          makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r3', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+      ])],
+      releases: [{ id: 'rel-A', name: 'Release A', order: 1 }],
+      releaseCardOrder: {}, // empty!
+    });
+
+    const layout1 = computeLayout(product);
+    // Default order should be r1, r2, r3
+    expect(getCellOrder(layout1, 'b1', 'rel-A')).toEqual(['r1', 'r2', 'r3']);
+
+    const result = captureUpdate(
+      (update) => reorderRibInRelease(update, 'r3', 'rel-A', 0, 'b1'),
+      product,
+    );
+
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b1', 'rel-A')).toEqual(['r3', 'r1', 'r2']);
+  });
+
+  it('sparse card order: move r1 cross-column when no card order exists', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [
+        makeBackbone('b1', [
+          makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+        makeBackbone('b2', [
+          makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r3', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+      ])],
+      releases: [{ id: 'rel-A', name: 'Release A', order: 1 }],
+      releaseCardOrder: {}, // empty!
+    });
+
+    const layout1 = computeLayout(product);
+    expect(getCellOrder(layout1, 'b2', 'rel-A')).toEqual(['r2', 'r3']);
+
+    // Move r1 between r2 and r3 in b2
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex: 1 },
+      ),
+      product,
+    );
+
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b2', 'rel-A')).toEqual(['r2', 'r1', 'r3']);
+  });
+
+  it('cross-release: move r1 to rel-B with existing ribs', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [
+        makeBackbone('b1', [
+          makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+          makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]),
+        ]),
+        makeBackbone('b2', [
+          makeRib('r3', [{ releaseId: 'rel-B', percentage: 100, memo: '' }]),
+          makeRib('r4', [{ releaseId: 'rel-B', percentage: 100, memo: '' }]),
+        ]),
+      ])],
+      releases: [
+        { id: 'rel-A', name: 'Release A', order: 1 },
+        { id: 'rel-B', name: 'Release B', order: 2 },
+      ],
+      releaseCardOrder: { 'rel-A': ['r1', 'r2'], 'rel-B': ['r3', 'r4'] },
+    });
+
+    const layout1 = computeLayout(product);
+
+    // Move r1 to b2/rel-B, after r3 but before r4
+    const b2Cells = layout1.cells
+      .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-B')
+      .sort((a, b) => a.y - b.y);
+    const betweenY = b2Cells[0].y + CELL_HEIGHT + CELL_GAP / 2;
+    const insertIndex = computeInsertIndex(
+      layout1.cells, 'b2', 'rel-B', new Set(['r1']), betweenY,
+    );
+    expect(insertIndex).toBe(1);
+
+    const result = captureUpdate(
+      (update) => moveRib2D(update, 'r1',
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-B', insertIndex },
+      ),
+      product,
+    );
+
+    const layout2 = computeLayout(result);
+    expect(getCellOrder(layout2, 'b2', 'rel-B')).toEqual(['r3', 'r1', 'r4']);
   });
 });

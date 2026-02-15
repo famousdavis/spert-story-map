@@ -19,32 +19,46 @@ function spliceCardOrder(cardOrder, key, ribId, insertIndex) {
  * Insert ribId into cardOrder[key] at a per-column (backbone-scoped) insertIndex.
  * Translates the column-local index to the correct global position by walking
  * the global list and counting sibling ribs (same backbone + release).
+ *
+ * Also ensures all columnRibIds are present in the list (appends any missing ones),
+ * so that a sparse/empty releaseCardOrder doesn't cause layout instability after
+ * the first drag operation.
  */
 function spliceCardOrderByColumn(cardOrder, key, ribId, insertIndex, columnRibIds) {
   const list = [...(cardOrder[key] || [])].filter(id => id !== ribId);
 
   if (columnRibIds && columnRibIds.size > 0 && insertIndex != null && insertIndex >= 0) {
+    // Ensure all sibling ribs are in the list (preserving their existing order
+    // if present, appending at end if not). This prevents layout instability
+    // when releaseCardOrder was previously empty or sparse.
+    for (const sibId of columnRibIds) {
+      if (!list.includes(sibId)) {
+        list.push(sibId);
+      }
+    }
+
+    // Now translate the per-column insertIndex to a global list position.
+    // Walk the list counting siblings; insert before the Nth sibling.
     let siblingCount = 0;
-    let globalIdx = list.length;
-    let found = false;
+    let globalIdx = -1;
     for (let i = 0; i < list.length; i++) {
       if (columnRibIds.has(list[i])) {
         if (siblingCount === insertIndex) {
           globalIdx = i;
-          found = true;
           break;
         }
         siblingCount++;
       }
     }
-    // insertIndex is at or beyond all siblings — place after the last sibling
-    if (!found) {
+    // insertIndex at or beyond all siblings — place after the last sibling
+    if (globalIdx === -1) {
       for (let i = list.length - 1; i >= 0; i--) {
         if (columnRibIds.has(list[i])) {
           globalIdx = i + 1;
           break;
         }
       }
+      if (globalIdx === -1) globalIdx = list.length;
     }
     list.splice(globalIdx, 0, ribId);
   } else {
