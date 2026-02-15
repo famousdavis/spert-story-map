@@ -26,16 +26,19 @@ function spliceCardOrderByColumn(cardOrder, key, ribId, insertIndex, columnRibId
   if (columnRibIds && columnRibIds.size > 0 && insertIndex != null && insertIndex >= 0) {
     let siblingCount = 0;
     let globalIdx = list.length;
+    let found = false;
     for (let i = 0; i < list.length; i++) {
       if (columnRibIds.has(list[i])) {
         if (siblingCount === insertIndex) {
           globalIdx = i;
+          found = true;
           break;
         }
         siblingCount++;
       }
     }
-    if (siblingCount < insertIndex) {
+    // insertIndex is at or beyond all siblings — place after the last sibling
+    if (!found) {
       for (let i = list.length - 1; i >= 0; i--) {
         if (columnRibIds.has(list[i])) {
           globalIdx = i + 1;
