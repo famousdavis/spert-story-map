@@ -1,27 +1,39 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import InlineEdit from '../components/ui/InlineEdit';
-import SizePicker from '../components/ui/SizePicker';
-import CategoryBadge from '../components/ui/CategoryBadge';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import BackboneSection from '../components/structure/BackboneSection';
 import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, getRibItemPercentComplete } from '../lib/calculations';
 import { reduceRibs } from '../lib/ribHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
-
-const GRID_COLS = '24px minmax(120px, 1fr) 48px 44px 80px 56px 56px 56px 36px';
+import { THEME_COLOR_OPTIONS, getThemeColorClasses } from '../lib/themeColors';
 
 export default function StructureView() {
   const { product, updateProduct } = useOutletContext();
   const [collapsed, setCollapsed] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [colorPickerThemeId, setColorPickerThemeId] = useState(null);
+  const colorPickerRef = useRef(null);
 
   // Rib drag-to-reorder state
-  const [dragRib, setDragRib] = useState(null); // { themeId, backboneId, ribId }
-  const [dropBeforeRib, setDropBeforeRib] = useState(null); // ribId to insert before
+  const [dragRib, setDragRib] = useState(null);
+  const [dropBeforeRib, setDropBeforeRib] = useState(null);
   const dropBeforeRef = useRef(null);
 
   const mutations = useProductMutations(updateProduct);
   const { updateTheme, updateBackbone, updateRib, addTheme, addBackbone, addRib, moveItem } = mutations;
+
+  // Close color picker on click outside
+  useEffect(() => {
+    if (!colorPickerThemeId) return;
+    const handler = (e) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+        setColorPickerThemeId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [colorPickerThemeId]);
 
   const toggle = (id) => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -69,7 +81,6 @@ export default function StructureView() {
     const beforeRibId = dropBeforeRef.current;
 
     updateProduct(prev => {
-      // Find and remove the rib from its source backbone
       let draggedRib = null;
       const next = {
         ...prev,
@@ -87,7 +98,6 @@ export default function StructureView() {
 
       if (!draggedRib) return prev;
 
-      // Insert into target backbone
       return {
         ...next,
         themes: next.themes.map(t => ({
@@ -97,11 +107,8 @@ export default function StructureView() {
               const items = [...b.ribItems];
               if (beforeRibId) {
                 const idx = items.findIndex(r => r.id === beforeRibId);
-                if (idx >= 0) {
-                  items.splice(idx, 0, draggedRib);
-                } else {
-                  items.push(draggedRib);
-                }
+                if (idx >= 0) items.splice(idx, 0, draggedRib);
+                else items.push(draggedRib);
               } else {
                 items.push(draggedRib);
               }
@@ -115,6 +122,36 @@ export default function StructureView() {
 
     handleRibDragEnd();
   };
+
+  const handleDeleteRib = (themeId, backboneId, ribId, name) => {
+    setDeleteTarget({ type: 'rib', themeId, backboneId, ribId, name });
+  };
+
+  const handleDeleteBackbone = (themeId, backboneId, name) => {
+    setDeleteTarget({ type: 'backbone', themeId, backboneId, name });
+  };
+
+  // Pre-compute rib stats to pass down as flat props
+  const enrichedProduct = useMemo(() => ({
+    ...product,
+    themes: product.themes.map(theme => ({
+      ...theme,
+      backboneItems: theme.backboneItems.map(backbone => ({
+        ...backbone,
+        ribItems: backbone.ribItems.map(rib => {
+          const pts = getRibItemPoints(rib, product.sizeMapping);
+          const pctComplete = getRibItemPercentComplete(rib);
+          return {
+            ...rib,
+            _pts: pts,
+            _allocTotal: getAllocationTotal(rib),
+            _pctComplete: pctComplete,
+            _remaining: Math.round(pts * (100 - pctComplete) / 100),
+          };
+        }),
+      })),
+    })),
+  }), [product]);
 
   const stats = useMemo(() => reduceRibs(product, (acc, rib) => {
     acc.totalItems++;
@@ -148,9 +185,10 @@ export default function StructureView() {
         </div>
       ) : (
         <div className="space-y-3">
-          {product.themes.map((theme, themeIdx) => {
+          {enrichedProduct.themes.map((theme, themeIdx) => {
             const themeStats = getThemeStats(theme, product.sizeMapping);
             const isThemeCollapsed = collapsed[theme.id];
+            const themeColor = getThemeColorClasses(theme, themeIdx);
 
             return (
               <div key={theme.id} className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 overflow-hidden">
@@ -159,6 +197,24 @@ export default function StructureView() {
                   <button onClick={() => toggle(theme.id)} className="text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 w-5 flex-shrink-0 text-base leading-none">
                     {isThemeCollapsed ? '▶' : '▼'}
                   </button>
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={() => setColorPickerThemeId(prev => prev === theme.id ? null : theme.id)}
+                      className={`w-4 h-4 rounded-full ${themeColor.swatch} ring-1 ring-black/10 hover:ring-2 hover:ring-black/20 transition-shadow`}
+                      title="Change theme color"
+                    />
+                    {colorPickerThemeId === theme.id && (
+                      <div ref={colorPickerRef} className="absolute top-6 left-0 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2 flex gap-1.5">
+                        {THEME_COLOR_OPTIONS.map(opt => (
+                          <button
+                            key={opt.key}
+                            onClick={() => { updateTheme(theme.id, { color: opt.key }); setColorPickerThemeId(null); }}
+                            className={`w-5 h-5 rounded-full ${opt.swatch} hover:scale-110 transition-transform ${theme.color === opt.key ? 'ring-2 ring-offset-1 ring-gray-800 dark:ring-gray-200 dark:ring-offset-gray-800' : 'ring-1 ring-black/10'}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <InlineEdit
                     value={theme.name}
                     onSave={name => updateTheme(theme.id, { name })}
@@ -183,176 +239,31 @@ export default function StructureView() {
                         No backbone items. <button onClick={() => addBackbone(theme.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 not-italic">Add one</button>
                       </div>
                     ) : (
-                      theme.backboneItems.map((backbone, bbIdx) => {
-                        const bbStats = getBackboneStats(backbone, product.sizeMapping);
-                        const isBBCollapsed = collapsed[backbone.id];
-
-                        return (
-                          <div key={backbone.id} className={bbIdx > 0 ? 'border-t border-gray-100 dark:border-gray-800' : ''}>
-                            {/* Backbone header */}
-                            <div className="flex items-center gap-2 pl-8 pr-4 py-2 group/bb">
-                              <button onClick={() => toggle(backbone.id)} className="text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 w-4 flex-shrink-0 text-sm leading-none">
-                                {isBBCollapsed ? '▶' : '▼'}
-                              </button>
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                              <InlineEdit
-                                value={backbone.name}
-                                onSave={name => updateBackbone(theme.id, backbone.id, { name })}
-                                className="font-medium text-gray-900 dark:text-gray-100 text-sm"
-                              />
-                              <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
-                                {bbStats.totalItems} items &middot; {bbStats.totalPoints} pts &middot; <span className={bbStats.percentComplete === 100 ? 'text-emerald-700 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}>{bbStats.percentComplete}% done</span> &middot; {bbStats.remainingPoints} remaining
-                                {bbStats.unsized > 0 && <span className="text-amber-700 dark:text-amber-400"> &middot; {bbStats.unsized} unsized</span>}
-                              </span>
-                              <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover/bb:opacity-100 transition-opacity flex-shrink-0">
-                                <button onClick={() => moveBackbone(theme.id, backbone.id, -1)} disabled={bbIdx === 0} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 disabled:opacity-30 text-xs px-1">↑</button>
-                                <button onClick={() => moveBackbone(theme.id, backbone.id, 1)} disabled={bbIdx === theme.backboneItems.length - 1} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 disabled:opacity-30 text-xs px-1">↓</button>
-                                <button onClick={() => addRib(theme.id, backbone.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs px-1.5">+ Rib</button>
-                                <button onClick={() => setDeleteTarget({ type: 'backbone', themeId: theme.id, backboneId: backbone.id, name: backbone.name })} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-xs px-1">&times;</button>
-                              </div>
-                            </div>
-
-                            {/* Rib items — table-like grid */}
-                            {!isBBCollapsed && (
-                              <div className="pb-1">
-                                {backbone.ribItems.length === 0 ? (
-                                  <div className="pl-16 pr-4 py-2 text-sm text-gray-500 dark:text-gray-400 italic">
-                                    No rib items. <button onClick={() => addRib(theme.id, backbone.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 not-italic">Add one</button>
-                                  </div>
-                                ) : (
-                                  <div className="ml-14 mr-4">
-                                    {/* Column header */}
-                                    <div
-                                      className="grid items-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pb-0.5 border-b border-gray-100 dark:border-gray-800 mb-0.5"
-                                      style={{ gridTemplateColumns: GRID_COLS }}
-                                    >
-                                      <span></span>
-                                      <span>Name</span>
-                                      <span className="text-center">Size</span>
-                                      <span className="text-right">Pts</span>
-                                      <span className="text-center">Type</span>
-                                      <span className="text-right">Alloc</span>
-                                      <span className="text-right">Done</span>
-                                      <span className="text-right">Rem</span>
-                                      <span></span>
-                                    </div>
-
-                                    <div
-                                      onDragOver={e => e.preventDefault()}
-                                      onDrop={e => handleRibDrop(e, theme.id, backbone.id)}
-                                    >
-                                    {backbone.ribItems.map((rib) => {
-                                      const pts = getRibItemPoints(rib, product.sizeMapping);
-                                      const allocTotal = getAllocationTotal(rib);
-                                      const pctComplete = getRibItemPercentComplete(rib);
-                                      const remaining = Math.round(pts * (100 - pctComplete) / 100);
-                                      const isDragging = dragRib?.ribId === rib.id;
-                                      const isDropTarget = dropBeforeRib === rib.id && dragRib?.ribId !== rib.id;
-
-                                      return (
-                                        <div key={rib.id}>
-                                          {isDropTarget && (
-                                            <div className="h-0.5 bg-blue-400 rounded-full mx-1 my-0.5" />
-                                          )}
-                                          <div
-                                            draggable
-                                            onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; handleRibDragStart(theme.id, backbone.id, rib.id); }}
-                                            onDragEnd={handleRibDragEnd}
-                                            onDragOver={e => handleRibDragOver(e, rib.id)}
-                                            className={`grid items-center py-1 group/rib hover:bg-blue-50/50 dark:hover:bg-blue-900/20 rounded transition-colors ${isDragging ? 'opacity-40' : ''}`}
-                                            style={{ gridTemplateColumns: GRID_COLS }}
-                                          >
-                                            {/* Drag handle */}
-                                            <div className="flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 opacity-0 group-hover/rib:opacity-100 transition-opacity">
-                                              <span className="text-sm leading-none select-none dark:text-gray-600">⠿</span>
-                                            </div>
-
-                                            {/* Name */}
-                                            <div className="min-w-0 pr-2">
-                                              <InlineEdit
-                                                value={rib.name}
-                                                onSave={name => updateRib(theme.id, backbone.id, rib.id, { name })}
-                                                className="text-[13px] text-gray-800 dark:text-gray-200 truncate"
-                                              />
-                                            </div>
-
-                                            {/* Size */}
-                                            <div className="text-center">
-                                              <SizePicker
-                                                value={rib.size}
-                                                sizeMapping={product.sizeMapping}
-                                                onChange={size => updateRib(theme.id, backbone.id, rib.id, { size })}
-                                              />
-                                            </div>
-
-                                            {/* Points */}
-                                            <div className="text-right">
-                                              <span className="text-[13px] text-gray-600 dark:text-gray-400 tabular-nums">{pts || '—'}</span>
-                                            </div>
-
-                                            {/* Category */}
-                                            <div className="text-center">
-                                              <CategoryBadge
-                                                category={rib.category}
-                                                onClick={() => updateRib(theme.id, backbone.id, rib.id, { category: rib.category === 'core' ? 'non-core' : 'core' })}
-                                              />
-                                            </div>
-
-                                            {/* Allocation */}
-                                            <div className="text-right">
-                                              {allocTotal > 0 ? (
-                                                <span className={`text-[13px] tabular-nums ${allocTotal === 100 ? 'text-gray-600 dark:text-gray-400' : 'text-amber-700 dark:text-amber-400 font-medium'}`}>
-                                                  {allocTotal}%
-                                                </span>
-                                              ) : (
-                                                <span className="text-[13px] text-gray-400 dark:text-gray-500">—</span>
-                                              )}
-                                            </div>
-
-                                            {/* Progress */}
-                                            <div className="text-right">
-                                              {pctComplete > 0 ? (
-                                                <span className={`text-[13px] tabular-nums ${pctComplete === 100 ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                  {pctComplete}%
-                                                </span>
-                                              ) : (
-                                                <span className="text-[13px] text-gray-400 dark:text-gray-500">—</span>
-                                              )}
-                                            </div>
-
-                                            {/* Remaining */}
-                                            <div className="text-right">
-                                              {pts > 0 ? (
-                                                <span className={`text-[13px] tabular-nums ${remaining === 0 ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                  {remaining}
-                                                </span>
-                                              ) : (
-                                                <span className="text-[13px] text-gray-400 dark:text-gray-500">—</span>
-                                              )}
-                                            </div>
-
-                                            {/* Delete */}
-                                            <div className="flex items-center justify-end opacity-0 group-hover/rib:opacity-100 transition-opacity">
-                                              <button onClick={() => setDeleteTarget({ type: 'rib', themeId: theme.id, backboneId: backbone.id, ribId: rib.id, name: rib.name })} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-xs px-0.5">&times;</button>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                    </div>
-                                  </div>
-                                )}
-                                <button
-                                  onClick={() => addRib(theme.id, backbone.id)}
-                                  className="ml-14 mt-0.5 mb-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                >
-                                  + Add rib item
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
+                      theme.backboneItems.map((backbone, bbIdx) => (
+                        <BackboneSection
+                          key={backbone.id}
+                          theme={theme}
+                          backbone={backbone}
+                          bbIdx={bbIdx}
+                          themeColor={themeColor}
+                          sizeMapping={product.sizeMapping}
+                          isCollapsed={collapsed[backbone.id]}
+                          onToggle={() => toggle(backbone.id)}
+                          dragRib={dragRib}
+                          dropBeforeRib={dropBeforeRib}
+                          onRibDragStart={handleRibDragStart}
+                          onRibDragEnd={handleRibDragEnd}
+                          onRibDragOver={handleRibDragOver}
+                          onRibDrop={handleRibDrop}
+                          onRenameBackbone={updateBackbone}
+                          onUpdateRib={updateRib}
+                          onDeleteBackbone={handleDeleteBackbone}
+                          onAddRib={addRib}
+                          onDeleteRib={handleDeleteRib}
+                          onMoveBackbone={moveBackbone}
+                          bbStats={getBackboneStats(backbone, product.sizeMapping)}
+                        />
+                      ))
                     )}
                   </div>
                 )}

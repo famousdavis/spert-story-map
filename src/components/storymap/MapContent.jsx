@@ -7,9 +7,10 @@ import RibCell from './RibCell';
 import UnassignedLane from './UnassignedLane';
 import DropHighlight from './DropHighlight';
 import InsertionIndicator from './InsertionIndicator';
+import { getThemeColorClasses } from '../../lib/themeColors';
 
 export default function MapContent({
-  layout, onRibClick, onReleaseClick, mapSizeRef,
+  layout, themes, onRibClick, onReleaseClick, mapSizeRef,
   onRenameTheme, onRenameBackbone, onRenameRib, onRenameRelease,
   onDeleteTheme, onDeleteBackbone, onDeleteRib,
   onAddTheme, onAddBackbone, onAddRib, onAddRelease,
@@ -30,9 +31,9 @@ export default function MapContent({
     }
   }, [mapWidth, mapHeight, mapSizeRef]);
 
-  // Build a theme index lookup for backbone coloring
-  const themeIndexMap = {};
-  themeSpans.forEach((ts, i) => { themeIndexMap[ts.themeId] = i; });
+  // Build theme color lookup
+  const themeColorMap = {};
+  (themes || []).forEach((t, i) => { themeColorMap[t.id] = getThemeColorClasses(t, i); });
 
   // Determine highlighted drop zones from drag state
   const isRibDrag = dragState?.isDragging && dragState.dragType === 'rib';
@@ -70,7 +71,7 @@ export default function MapContent({
         <ThemeHeader
           key={ts.themeId}
           themeSpan={ts}
-          index={i}
+          colorClasses={themeColorMap[ts.themeId]}
           onRename={onRenameTheme}
           onDelete={onDeleteTheme}
           isDropTarget={highlightThemeId === ts.themeId && ts.themeId !== dragState?.themeId}
@@ -84,7 +85,7 @@ export default function MapContent({
         <BackboneHeader
           key={col.backboneId}
           column={col}
-          themeIndex={themeIndexMap[col.themeId] || 0}
+          colorClasses={themeColorMap[col.themeId]}
           onRename={onRenameBackbone}
           onDelete={onDeleteBackbone}
           isDropTarget={highlightBackboneId === col.backboneId}

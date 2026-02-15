@@ -148,6 +148,7 @@ export default function StoryMapView() {
       >
         <MapContent
           layout={layout}
+          themes={product.themes}
           onRibClick={handleRibClick}
           onReleaseClick={handleReleaseClick}
           mapSizeRef={mapSizeRef}

@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import RibCard from './RibCard';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { useTooltip } from '../ui/Tooltip';
 
 /**
  * A single column in the release planning board.
@@ -25,7 +28,13 @@ export default function ReleaseColumn({
   onCardDragOver,
   onCardDrop,
   onCardClick,
+  onDeleteRelease,
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const hasItems = ribs.length > 0;
+  const deleteTooltip = useTooltip(
+    hasItems ? 'Move all items out first' : release ? `Delete ${release.name}` : null
+  );
   const isOver = dropTarget?.col === colId && dragRibId;
   const isUnassigned = !release;
 
@@ -100,7 +109,27 @@ export default function ReleaseColumn({
             onDragEnd={onColDragEnd}
             className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 cursor-grab active:cursor-grabbing"
           >
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{release.name}</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{release.name}</h3>
+              {onDeleteRelease && (
+                <>
+                  <button
+                    ref={deleteTooltip.triggerRef}
+                    onMouseEnter={deleteTooltip.onMouseEnter}
+                    onMouseLeave={deleteTooltip.onMouseLeave}
+                    onClick={e => { e.stopPropagation(); if (!hasItems) setConfirmDelete(true); }}
+                    className={`text-xs px-1 py-0.5 rounded transition-colors ${
+                      hasItems
+                        ? 'text-gray-300 dark:text-gray-600'
+                        : 'text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400'
+                    }`}
+                  >
+                    Delete
+                  </button>
+                  {deleteTooltip.tooltipEl}
+                </>
+              )}
+            </div>
             <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
               <span>{stats.totalPts} pts</span>
               <span className="text-blue-600 dark:text-blue-400">{Math.round(stats.core)} core</span>
@@ -124,6 +153,15 @@ export default function ReleaseColumn({
           </div>
         </div>
       </div>
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Delete "${release.name}"?`}
+          message="This release will be permanently removed."
+          confirmLabel="Delete"
+          onConfirm={() => { setConfirmDelete(false); onDeleteRelease(release.id); }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

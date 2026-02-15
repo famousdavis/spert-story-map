@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { getAllRibItems, getPointsForRelease, getCoreNonCorePointsForRelease, getTotalProjectPoints, getCoreNonCorePoints } from '../lib/calculations';
+import { deleteReleaseFromProduct } from '../lib/settingsMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
 import ReleaseColumn from '../components/releases/ReleaseColumn';
 import AllocationModal from '../components/releases/AllocationModal';
@@ -8,6 +9,9 @@ import AllocationModal from '../components/releases/AllocationModal';
 export default function ReleasePlanningView() {
   const { product, updateProduct } = useOutletContext();
   const { addRelease } = useProductMutations(updateProduct);
+  const handleDeleteRelease = useCallback((releaseId) => {
+    updateProduct(prev => deleteReleaseFromProduct(prev, releaseId));
+  }, [updateProduct]);
   const [filter, setFilter] = useState('all');
   const [allocModal, setAllocModal] = useState(null);
 
@@ -320,6 +324,7 @@ export default function ReleasePlanningView() {
               onCardDragOver={handleCardDragOver}
               onCardDrop={handleDrop}
               onCardClick={setAllocModal}
+              onDeleteRelease={handleDeleteRelease}
             />
           ))}
 

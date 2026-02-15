@@ -1,20 +1,8 @@
 import useInlineEdit from './useInlineEdit';
+import { THEME_COLOR_OPTIONS } from '../../lib/themeColors';
 
-const THEME_COLORS = [
-  'bg-blue-600',
-  'bg-teal-600',
-  'bg-violet-600',
-  'bg-rose-600',
-  'bg-amber-600',
-  'bg-emerald-600',
-  'bg-indigo-600',
-  'bg-orange-600',
-];
-
-export { THEME_COLORS };
-
-export default function ThemeHeader({ themeSpan, index, onRename, onDelete, isDropTarget, isDragging, onDragStart }) {
-  const color = THEME_COLORS[index % THEME_COLORS.length];
+export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelete, isDropTarget, isDragging, onDragStart }) {
+  const color = colorClasses?.solid || THEME_COLOR_OPTIONS[0].solid;
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(themeSpan.themeName, (name) => onRename(themeSpan.themeId, name));
 

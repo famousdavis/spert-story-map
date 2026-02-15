@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.10.0 (2026-02-15)
+
+### Added
+- **User-selectable theme colors** — Click the color swatch next to a theme name in Structure view to choose from 8 colors (blue, teal, violet, rose, amber, emerald, indigo, orange). Colors apply to theme and backbone headers on the story map
+- **Delete release in Release Planning** — Delete button on release column headers with same constraint as the Map tab (must move all items out first). Disabled state shows fast 200ms tooltip explaining why
+- **Progress table improvements** — Sprint column values display with `%` suffix; Points column shows done/total fraction (e.g. `18/20`); "Target" column renamed to "Alloc" for clarity
+- **Settings date labels** — Sprint dates labeled "Finish" and release dates labeled "Target" to clarify their purpose
+
+### Refactored
+- Decomposed `StructureView` (413→228 LOC) — extracted `BackboneSection` and `RibRow` into `src/components/structure/`
+- Centralized theme color definitions in `src/lib/themeColors.js` — single source of truth for 8-color palette used across Structure view, story map headers, and backbone dots
+
+### Technical
+- New file: `src/lib/themeColors.js` — `THEME_COLOR_OPTIONS`, `getThemeColorClasses()`, `DEFAULT_THEME_COLOR_KEYS`
+- New files: `src/components/structure/RibRow.jsx`, `src/components/structure/BackboneSection.jsx`
+- Added `themeColors.test.js` (9 tests) for color palette and fallback logic
+- Added `reorderTheme` tests (5 tests) in `mapMutations.test.js`
+- 205 tests total across 10 test files
+
 ## Version 0.9.0 (2026-02-14)
 
 ### Added
