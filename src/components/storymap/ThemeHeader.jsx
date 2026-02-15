@@ -40,7 +40,7 @@ export default function ThemeHeader({ themeSpan, index, onRename, onDelete, isDr
     >
       {/* Drag grip */}
       <span
-        className="text-[10px] leading-none text-white/40 hover:text-white/80 cursor-grab active:cursor-grabbing flex-shrink-0 select-none"
+        className="text-sm leading-none text-white/40 hover:text-white/80 cursor-grab active:cursor-grabbing flex-shrink-0 px-0.5 select-none"
         onPointerDown={handleGripPointerDown}
         title="Drag to reorder"
       >

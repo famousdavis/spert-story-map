@@ -50,7 +50,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
       <div className="flex items-start justify-between gap-1">
         {/* Drag grip */}
         <span
-          className="text-[10px] leading-none text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 select-none"
+          className="text-sm leading-none text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 px-0.5 select-none"
           onPointerDown={handleGripPointerDown}
           title="Drag to move"
         >
