@@ -149,6 +149,7 @@ function SizingRibCell({ cell, onDragStart, isDragging }) {
         height: cell.height,
         zIndex: isDragging ? 50 : undefined,
       }}
+      title={cell.name}
       data-rib-id={cell.id}
     >
       <div className="flex items-start justify-between gap-1">

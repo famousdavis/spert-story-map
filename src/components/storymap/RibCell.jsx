@@ -36,6 +36,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
         e.stopPropagation();
         if (!editing) onClick(cell, e);
       }}
+      title={cell.name}
       data-rib-id={cell.id}
       data-backbone-id={cell.backboneId}
       data-theme-id={cell.themeId}
@@ -65,7 +66,6 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
           <span
             className="text-xs text-gray-800 leading-tight truncate flex-1 font-medium"
             onDoubleClick={startEditing}
-            title="Double-click to rename"
           >
             {cell.name}
           </span>
