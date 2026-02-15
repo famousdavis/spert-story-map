@@ -233,7 +233,7 @@ export default function SettingsView() {
               )}
               <div
                 onDragOver={e => handleReleaseDragOver(e, r.id)}
-                className={`flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2 ${dragReleaseId === r.id ? 'opacity-40' : ''}`}
+                className={`flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 ${dragReleaseId === r.id ? 'opacity-40' : ''}`}
               >
                 <div
                   draggable
