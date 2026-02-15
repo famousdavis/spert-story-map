@@ -4,7 +4,7 @@ import { LANE_LABEL_WIDTH } from './useMapLayout';
  * Renders the "Unassigned" lane at the bottom of the story map.
  * Extracted from MapContent for readability.
  */
-export default function UnassignedLane({ lane, totalWidth, isDropTarget }) {
+export default function UnassignedLane({ lane, totalWidth, isDropTarget, onAddRelease }) {
   return (
     <>
       <div
@@ -39,6 +39,17 @@ export default function UnassignedLane({ lane, totalWidth, isDropTarget }) {
           Unassigned
         </span>
       </div>
+      {/* + Release button at right end of divider line */}
+      {onAddRelease && (
+        <button
+          className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
+          style={{ left: totalWidth + 8, top: lane.y - 8 }}
+          onClick={() => onAddRelease(null)}
+          title="Add release here"
+        >
+          + Release
+        </button>
+      )}
     </>
   );
 }

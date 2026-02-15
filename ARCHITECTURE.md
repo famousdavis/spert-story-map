@@ -46,6 +46,10 @@ src/
 │   ├── releases/
 │   │   ├── RibCard.jsx               # Draggable card for release kanban
 │   │   └── AllocationModal.jsx       # Split-allocation editor modal
+│   ├── sizing/                       # Sizing view components
+│   │   ├── SizingContent.jsx         # Sizing board renderer (unsized zone, size columns, cells)
+│   │   ├── useSizingLayout.js        # Layout computation + constants for sizing board
+│   │   └── useSizingDrag.js          # Pointer-event drag hook for sizing (rib drags only)
 │   └── storymap/                     # Interactive story map components
 │       ├── MapCanvas.jsx             # Pan/zoom container with pointer events
 │       ├── MapContent.jsx            # Map rendering (headers, lanes, cells, add buttons)
@@ -68,6 +72,7 @@ src/
     ├── ProductList.jsx               # Home — product listing with CRUD
     ├── StructureView.jsx             # Story map editor (themes/backbones/ribs)
     ├── StoryMapView.jsx              # Interactive visual story map
+    ├── SizingView.jsx                # Drag-and-drop t-shirt sizing board
     ├── ReleasePlanningView.jsx       # Kanban release board
     ├── ProgressTrackingView.jsx      # Sprint progress tracking
     ├── InsightsView.jsx              # Analytics dashboard
@@ -126,3 +131,7 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 9. **Undo/redo** — An in-memory stack of product snapshots (capped at 30) stored in `useProduct`. Every `updateProduct` call pushes the previous state onto the undo stack. Ctrl+Z pops undo, Ctrl+Shift+Z pops redo. No persistence — undo history resets on page refresh.
 
 10. **Map pan vs click disambiguation** — `MapCanvas` uses a blacklist approach: `setPointerCapture` starts panning on any pointerdown except when the target is inside an element with `data-rib-id` or `data-release-id`. This allows clicks on rib cards and release labels to reach their handlers while panning works everywhere else.
+
+11. **Sizing view** — A dedicated tab for bulk-sizing rib items. Reuses `MapCanvas` (pan/zoom) and `DragGhost`. Layout is computed by `useSizingLayout` with an unsized grid zone on top and t-shirt size columns below. Rib items with progress > 0% are locked (visually dimmed, no drag handle) to prevent re-sizing active work. Drag hook (`useSizingDrag`) is a simplified version of `useMapDrag` supporting only rib drags.
+
+12. **Click/double-click disambiguation** — Release labels use a 200ms timer to distinguish single-click (open detail panel) from double-click (inline rename). The timer is cancelled if a double-click fires within the window.

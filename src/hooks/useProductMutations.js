@@ -114,6 +114,28 @@ export function useProductMutations(updateProduct) {
     }));
   }, [updateProduct]);
 
+  /** Insert a new release after `afterReleaseId`. If null, appends at end. */
+  const addReleaseAfter = useCallback((afterReleaseId) => {
+    updateProduct(prev => {
+      const sorted = [...prev.releases].sort((a, b) => a.order - b.order);
+      const insertIdx = afterReleaseId
+        ? sorted.findIndex(r => r.id === afterReleaseId) + 1
+        : sorted.length;
+      const newRelease = {
+        id: crypto.randomUUID(),
+        name: `Release ${prev.releases.length + 1}`,
+        order: 0,
+        description: '',
+        targetDate: null,
+      };
+      sorted.splice(insertIdx, 0, newRelease);
+      return {
+        ...prev,
+        releases: sorted.map((r, i) => ({ ...r, order: i + 1 })),
+      };
+    });
+  }, [updateProduct]);
+
   const addSprint = useCallback((onCreated) => {
     const newId = crypto.randomUUID();
     updateProduct(prev => {
@@ -212,6 +234,7 @@ export function useProductMutations(updateProduct) {
     addBackbone,
     addRib,
     addRelease,
+    addReleaseAfter,
     addSprint,
     deleteTheme,
     deleteBackbone,
