@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { SIZE_COLORS } from '../ui/SizePicker';
+import { useTooltip } from '../ui/Tooltip';
 import { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, HEADER_HEIGHT, ZONE_GAP } from './useSizingLayout';
 
 // Header background colors keyed by size label (lighter fill for column headers)
@@ -132,9 +133,13 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
 function SizingRibCell({ cell, onDragStart, isDragging }) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const locked = cell.locked;
+  const { tooltipProps, tooltipEl } = useTooltip(cell.name);
 
   return (
     <div
+      ref={tooltipProps.ref}
+      onMouseEnter={tooltipProps.onMouseEnter}
+      onMouseLeave={tooltipProps.onMouseLeave}
       className={`absolute rounded border text-left select-none transition-colors ${
         isDragging
           ? 'border-blue-400 bg-blue-50 opacity-50 shadow-lg ring-2 ring-blue-300'
@@ -149,7 +154,6 @@ function SizingRibCell({ cell, onDragStart, isDragging }) {
         height: cell.height,
         zIndex: isDragging ? 50 : undefined,
       }}
-      title={cell.name}
       data-rib-id={cell.id}
     >
       <div className="flex items-start justify-between gap-1">
@@ -185,6 +189,7 @@ function SizingRibCell({ cell, onDragStart, isDragging }) {
           {cell.category === 'core' ? 'Core' : 'Non-Core'}
         </span>
       </div>
+      {tooltipEl}
     </div>
   );
 }
