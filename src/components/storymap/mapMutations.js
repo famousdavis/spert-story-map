@@ -16,6 +16,66 @@ function spliceCardOrder(cardOrder, key, ribId, insertIndex) {
 }
 
 /**
+ * Insert ribId into cardOrder[key] at a per-column (backbone-scoped) insertIndex.
+ * Translates the column-local index to the correct global position by walking
+ * the global list and counting sibling ribs (same backbone + release).
+ */
+function spliceCardOrderByColumn(cardOrder, key, ribId, insertIndex, columnRibIds) {
+  const list = [...(cardOrder[key] || [])].filter(id => id !== ribId);
+
+  if (columnRibIds && columnRibIds.size > 0 && insertIndex != null && insertIndex >= 0) {
+    let siblingCount = 0;
+    let globalIdx = list.length;
+    for (let i = 0; i < list.length; i++) {
+      if (columnRibIds.has(list[i])) {
+        if (siblingCount === insertIndex) {
+          globalIdx = i;
+          break;
+        }
+        siblingCount++;
+      }
+    }
+    if (siblingCount < insertIndex) {
+      for (let i = list.length - 1; i >= 0; i--) {
+        if (columnRibIds.has(list[i])) {
+          globalIdx = i + 1;
+          break;
+        }
+      }
+    }
+    list.splice(globalIdx, 0, ribId);
+  } else {
+    const idx = insertIndex != null && insertIndex >= 0 && insertIndex <= list.length
+      ? insertIndex : list.length;
+    list.splice(idx, 0, ribId);
+  }
+
+  cardOrder[key] = list;
+}
+
+/**
+ * Find all rib IDs in a specific backbone column for a given release.
+ * Used to translate per-column insert indices to global card order positions.
+ */
+function getColumnRibIds(themes, backboneId, releaseId, excludeRibId) {
+  const ids = new Set();
+  for (const t of themes) {
+    for (const b of t.backboneItems) {
+      if (b.id !== backboneId) continue;
+      for (const r of b.ribItems) {
+        if (r.id === excludeRibId) continue;
+        if (releaseId === null) {
+          if (r.releaseAllocations.length === 0) ids.add(r.id);
+        } else {
+          if (r.releaseAllocations.some(a => a.releaseId === releaseId)) ids.add(r.id);
+        }
+      }
+    }
+  }
+  return ids;
+}
+
+/**
  * Move a rib item from one release lane to another (Y-axis drag).
  * Handles unassigned ↔ assigned transitions and updates releaseCardOrder.
  */
@@ -72,64 +132,13 @@ export function moveRibToRelease(updateProduct, ribId, fromReleaseId, toReleaseI
 /**
  * Reorder a rib item within the same release lane (Y-axis drag, same release).
  * Only updates releaseCardOrder — no allocation changes needed.
- *
- * insertIndex is a per-column (backbone-scoped) index, but releaseCardOrder
- * stores all ribs for a release across all backbones. We translate the
- * per-column index to the correct global position among sibling ribs.
  */
 export function reorderRibInRelease(updateProduct, ribId, releaseId, insertIndex, backboneId) {
   updateProduct(prev => {
     const cardOrder = { ...(prev.releaseCardOrder || {}) };
     const key = releaseId || 'unassigned';
-    const list = [...(cardOrder[key] || [])].filter(id => id !== ribId);
-
-    if (backboneId && insertIndex != null && insertIndex >= 0) {
-      // Find all rib IDs in this column (same backbone + release)
-      const columnRibIds = new Set();
-      for (const t of prev.themes) {
-        for (const b of t.backboneItems) {
-          if (b.id !== backboneId) continue;
-          for (const r of b.ribItems) {
-            if (r.id === ribId) continue; // already removed
-            if (releaseId === null) {
-              if (r.releaseAllocations.length === 0) columnRibIds.add(r.id);
-            } else {
-              if (r.releaseAllocations.some(a => a.releaseId === releaseId)) columnRibIds.add(r.id);
-            }
-          }
-        }
-      }
-
-      // Walk the global order list to find the Nth sibling and insert after it
-      let siblingCount = 0;
-      let globalIdx = list.length; // default: append
-      for (let i = 0; i < list.length; i++) {
-        if (columnRibIds.has(list[i])) {
-          if (siblingCount === insertIndex) {
-            globalIdx = i;
-            break;
-          }
-          siblingCount++;
-        }
-      }
-      // If insertIndex is beyond all siblings, place after the last sibling
-      if (siblingCount < insertIndex) {
-        for (let i = list.length - 1; i >= 0; i--) {
-          if (columnRibIds.has(list[i])) {
-            globalIdx = i + 1;
-            break;
-          }
-        }
-      }
-      list.splice(globalIdx, 0, ribId);
-    } else {
-      // Fallback: just splice at insertIndex directly
-      const idx = insertIndex != null && insertIndex >= 0 && insertIndex <= list.length
-        ? insertIndex : list.length;
-      list.splice(idx, 0, ribId);
-    }
-
-    cardOrder[key] = list;
+    const columnRibIds = getColumnRibIds(prev.themes, backboneId, releaseId, ribId);
+    spliceCardOrderByColumn(cardOrder, key, ribId, insertIndex, columnRibIds);
     return { ...prev, releaseCardOrder: cardOrder };
   });
 }
@@ -303,14 +312,18 @@ export function moveRib2D(updateProduct, ribId, from, to) {
           })),
         })),
       };
+    }
 
+    // 3. Update card order — needed whenever backbone or release changes
+    {
       const cardOrder = { ...(next.releaseCardOrder || {}) };
       const srcKey = from.releaseId || 'unassigned';
-      const dstKey = to.releaseId || 'unassigned';
-      if (cardOrder[srcKey]) {
+      const dstKey = (releaseChanged ? to.releaseId : from.releaseId) || 'unassigned';
+      if (releaseChanged && cardOrder[srcKey]) {
         cardOrder[srcKey] = cardOrder[srcKey].filter(id => id !== ribId);
       }
-      spliceCardOrder(cardOrder, dstKey, ribId, to.insertIndex);
+      const columnRibIds = getColumnRibIds(next.themes, to.backboneId, releaseChanged ? to.releaseId : from.releaseId, ribId);
+      spliceCardOrderByColumn(cardOrder, dstKey, ribId, to.insertIndex, columnRibIds);
       next = { ...next, releaseCardOrder: cardOrder };
     }
 
@@ -389,15 +402,20 @@ export function moveRibs2D(updateProduct, entries, to) {
             })),
           })),
         };
+      }
 
+      // Update card order — needed whenever backbone or release changes
+      {
         const cardOrder = { ...(next.releaseCardOrder || {}) };
         const srcKey = entry.fromReleaseId || 'unassigned';
-        const dstKey = to.releaseId || 'unassigned';
-        if (cardOrder[srcKey]) {
+        const dstKey = (releaseChanged ? to.releaseId : entry.fromReleaseId) || 'unassigned';
+        if (releaseChanged && cardOrder[srcKey]) {
           cardOrder[srcKey] = cardOrder[srcKey].filter(id => id !== entry.ribId);
         }
+        const targetReleaseId = releaseChanged ? to.releaseId : entry.fromReleaseId;
+        const columnRibIds = getColumnRibIds(next.themes, to.backboneId, targetReleaseId, entry.ribId);
         const idx = to.insertIndex != null ? to.insertIndex + insertOffset : to.insertIndex;
-        spliceCardOrder(cardOrder, dstKey, entry.ribId, idx);
+        spliceCardOrderByColumn(cardOrder, dstKey, entry.ribId, idx, columnRibIds);
         next = { ...next, releaseCardOrder: cardOrder };
         insertOffset++;
       }
