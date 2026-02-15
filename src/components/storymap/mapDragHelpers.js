@@ -1,4 +1,4 @@
-import { moveRib2D, moveRibs2D, moveBackboneToTheme, reorderTheme } from './mapMutations';
+import { moveRib2D, moveRibs2D, reorderRibInRelease, moveBackboneToTheme, reorderTheme } from './mapMutations';
 import { CELL_HEIGHT, COL_WIDTH } from './useMapLayout';
 
 /**
@@ -93,7 +93,14 @@ export function commitRibDrag(state, updateProduct, layoutCells) {
 
   const releaseChanged = targetReleaseId !== undefined && targetReleaseId !== releaseId;
   const backboneChanged = targetBackboneId && targetBackboneId !== backboneId;
-  if (!releaseChanged && !backboneChanged) return;
+
+  // Same lane reorder — just update card order within this release
+  if (!releaseChanged && !backboneChanged) {
+    if (insertIndex != null && targetReleaseId !== undefined) {
+      reorderRibInRelease(updateProduct, ribId, targetReleaseId, insertIndex);
+    }
+    return;
+  }
 
   const to = {
     themeId: targetThemeId || themeId,
