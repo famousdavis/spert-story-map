@@ -98,7 +98,7 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-gray-100">
+    <div className="relative w-full h-full overflow-hidden bg-gray-100 dark:bg-gray-800">
       {/* Pannable/zoomable area */}
       <div
         ref={containerRef}
@@ -122,28 +122,28 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
       </div>
 
       {/* Zoom controls overlay */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-1">
+      <div className="absolute top-3 right-3 flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm px-1 py-1">
         <button
           onClick={() => setZoom(z => Math.min(MAX_ZOOM, z + ZOOM_STEP))}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded text-sm font-medium"
+          className="w-7 h-7 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-sm font-medium"
           title="Zoom in (+)"
         >
           +
         </button>
-        <span className="text-xs text-gray-500 tabular-nums w-10 text-center select-none">
+        <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-10 text-center select-none">
           {Math.round(zoom * 100)}%
         </span>
         <button
           onClick={() => setZoom(z => Math.max(MIN_ZOOM, z - ZOOM_STEP))}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded text-sm font-medium"
+          className="w-7 h-7 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-sm font-medium"
           title="Zoom out (-)"
         >
           −
         </button>
-        <div className="w-px h-5 bg-gray-200 mx-0.5" />
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5" />
         <button
           onClick={handleFitClick}
-          className="px-2 h-7 flex items-center justify-center text-xs text-gray-600 hover:bg-gray-100 rounded"
+          className="px-2 h-7 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
           title="Fit to screen (0)"
         >
           Fit

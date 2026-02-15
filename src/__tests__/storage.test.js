@@ -255,4 +255,51 @@ describe('importProductFromJSON', () => {
   it('throws for invalid JSON', () => {
     expect(() => importProductFromJSON('not json')).toThrow();
   });
+
+  it('throws for theme missing backboneItems', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
+      themes: [{ id: 't1' }],
+    });
+    expect(() => importProductFromJSON(json)).toThrow('theme missing id or backboneItems');
+  });
+
+  it('throws for theme missing id', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
+      themes: [{ backboneItems: [] }],
+    });
+    expect(() => importProductFromJSON(json)).toThrow('theme missing id or backboneItems');
+  });
+
+  it('throws for backbone missing ribItems', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
+      themes: [{ id: 't1', backboneItems: [{ id: 'b1' }] }],
+    });
+    expect(() => importProductFromJSON(json)).toThrow('backbone missing id or ribItems');
+  });
+
+  it('throws for backbone missing id', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
+      themes: [{ id: 't1', backboneItems: [{ ribItems: [] }] }],
+    });
+    expect(() => importProductFromJSON(json)).toThrow('backbone missing id or ribItems');
+  });
+
+  it('accepts valid nested structure', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
+      themes: [{
+        id: 't1',
+        backboneItems: [{
+          id: 'b1',
+          ribItems: [{ id: 'r1', name: 'Rib', size: 'M', category: 'core', releaseAllocations: [], progressHistory: [] }],
+        }],
+      }],
+    });
+    const result = importProductFromJSON(json);
+    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(1);
+  });
 });

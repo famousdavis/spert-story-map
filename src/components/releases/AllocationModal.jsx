@@ -40,7 +40,7 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
   return (
     <Modal open onClose={onClose} title={`Allocate: ${rib.name}`} wide>
       <div className="space-y-4">
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
           {rib.size && <span>Size: <strong>{rib.size}</strong></span>}
           {pts > 0 && <span>Points: <strong>{pts}</strong></span>}
           <span>Category: <strong>{rib.category}</strong></span>
@@ -53,7 +53,7 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
             return (
               <div key={alloc.releaseId} className="space-y-1">
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-700 w-40 truncate">{release.name}</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300 w-40 truncate">{release.name}</span>
                   <input
                     type="number"
                     min={0}
@@ -61,13 +61,13 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
                     value={alloc.percentage}
                     onChange={e => updatePct(alloc.releaseId, e.target.value)}
                     onBlur={e => updatePct(alloc.releaseId, parsePct(e.target.value))}
-                    className="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center"
+                    className="w-20 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1 text-sm text-center"
                   />
-                  <span className="text-xs text-gray-400">%</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
                   {pts > 0 && (
-                    <span className="text-xs text-gray-500">{Math.round(pts * parsePct(alloc.percentage) / 100)} pts</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{Math.round(pts * parsePct(alloc.percentage) / 100)} pts</span>
                   )}
-                  <button onClick={() => removeAlloc(alloc.releaseId)} className="text-red-400 hover:text-red-600 text-sm ml-auto">Remove</button>
+                  <button onClick={() => removeAlloc(alloc.releaseId)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm ml-auto">Remove</button>
                 </div>
                 <div className="ml-43">
                   <input
@@ -75,7 +75,7 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
                     value={alloc.memo || ''}
                     onChange={e => updateMemo(alloc.releaseId, e.target.value)}
                     placeholder="Add a note..."
-                    className="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-600 placeholder:text-gray-300 focus:border-blue-300 focus:ring-1 focus:ring-blue-200 outline-none"
+                    className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded px-2 py-1 text-xs text-gray-600 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-500 focus:border-blue-300 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-200 dark:focus:ring-blue-500 outline-none"
                   />
                 </div>
               </div>
@@ -85,12 +85,12 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
 
         {availableReleases.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Add to:</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">Add to:</span>
             {availableReleases.map(r => (
               <button
                 key={r.id}
                 onClick={() => addRelease(r.id)}
-                className="px-2 py-1 text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+                className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
               >
                 {r.name}
               </button>
@@ -98,7 +98,7 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
           </div>
         )}
 
-        <div className={`flex items-center gap-2 text-sm font-medium ${total === 100 ? 'text-green-600' : total > 100 ? 'text-red-600' : 'text-amber-600'}`}>
+        <div className={`flex items-center gap-2 text-sm font-medium ${total === 100 ? 'text-green-600 dark:text-green-400' : total > 100 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
           <span>Total: {total}%</span>
           {total !== 100 && total > 0 && <span className="text-xs font-normal">(should be 100%)</span>}
         </div>
@@ -107,13 +107,13 @@ export default function AllocationModal({ rib, product, onSave, onClose }) {
           {allocations.length > 0 ? (
             <button
               onClick={() => onSave([])}
-              className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             >
               Unassign All
             </button>
           ) : <div />}
           <div className="flex gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">Cancel</button>
             <button
               onClick={() => onSave(allocations.map(a => ({ ...a, percentage: parsePct(a.percentage) })).filter(a => a.percentage > 0))}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"

@@ -118,9 +118,10 @@ export function useProductMutations(updateProduct) {
   const addReleaseAfter = useCallback((afterReleaseId) => {
     updateProduct(prev => {
       const sorted = [...prev.releases].sort((a, b) => a.order - b.order);
-      const insertIdx = afterReleaseId
-        ? sorted.findIndex(r => r.id === afterReleaseId) + 1
-        : sorted.length;
+      const afterIdx = afterReleaseId
+        ? sorted.findIndex(r => r.id === afterReleaseId)
+        : -1;
+      const insertIdx = afterIdx >= 0 ? afterIdx + 1 : sorted.length;
       const newRelease = {
         id: crypto.randomUUID(),
         name: `Release ${prev.releases.length + 1}`,

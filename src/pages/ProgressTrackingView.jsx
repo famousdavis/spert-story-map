@@ -222,18 +222,18 @@ export default function ProgressTrackingView() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-900">Progress Tracking</h2>
-          <div className="text-xs text-gray-500">
-            Project: <span className="font-medium text-gray-700">{Math.round(sprintSummary?.percentComplete ?? 0)}%</span> complete
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Progress Tracking</h2>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Project: <span className="font-medium text-gray-700 dark:text-gray-300">{Math.round(sprintSummary?.percentComplete ?? 0)}%</span> complete
           </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Sprint:</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">Sprint:</span>
             <select
               value={selectedSprint || ''}
               onChange={e => setSelectedSprint(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"
+              className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
             >
               {product.sprints.length === 0 && <option value="">No sprints defined</option>}
               {product.sprints.map(s => (
@@ -242,19 +242,19 @@ export default function ProgressTrackingView() {
             </select>
             <button
               onClick={() => addSprint(setSelectedSprint)}
-              className="text-gray-400 hover:text-blue-600 text-lg leading-none px-1"
+              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 text-lg leading-none px-1"
               title="Add sprint"
             >
               +
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Group:</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">Group:</span>
             {['release', 'backbone', 'theme'].map(g => (
               <button
                 key={g}
                 onClick={() => setGroupBy(g)}
-                className={`px-2 py-1 text-xs rounded ${groupBy === g ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                className={`px-2 py-1 text-xs rounded ${groupBy === g ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'}`}
               >
                 {g.charAt(0).toUpperCase() + g.slice(1)}
               </button>
@@ -263,7 +263,7 @@ export default function ProgressTrackingView() {
           {assignedRibs.length > 0 && (
             <button
               onClick={toggleExpandAll}
-              className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-500 hover:bg-gray-200"
+              className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
               title={allExpanded ? 'Collapse all notes' : 'Expand all notes'}
             >
               {allExpanded ? 'Collapse All' : 'Expand All'}
@@ -280,11 +280,11 @@ export default function ProgressTrackingView() {
           { label: 'Non-core', pct: sprintSummary?.nonCore.percentComplete ?? 0, color: 'bg-amber-500' },
         ].map(({ label, pct, color }) => (
           <div key={label} className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-500 w-18 flex-shrink-0">{label}</span>
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-18 flex-shrink-0">{label}</span>
             <div className="flex-1">
               <ProgressBar percent={pct} height="h-2.5" color={color} />
             </div>
-            <span className="text-xs text-gray-500 tabular-nums w-10 text-right flex-shrink-0">{Math.round(pct)}%</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-10 text-right flex-shrink-0">{Math.round(pct)}%</span>
           </div>
         ))}
       </div>
@@ -297,16 +297,16 @@ export default function ProgressTrackingView() {
       {/* Release progress bars (collapsible) */}
       {product.releases.length > 0 && (
         <CollapsibleSection label="Release Progress" open={showReleaseBars} onToggle={() => setShowReleaseBars(v => !v)}>
-          <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-5 py-4 space-y-3">
             {product.releases.map(release => {
               const pct = getReleasePercentComplete(product, release.id, selectedSprint);
               return (
                 <div key={release.id} className="flex items-center gap-4">
-                  <span className="text-xs font-medium text-gray-700 w-40 truncate flex-shrink-0">{release.name}</span>
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-40 truncate flex-shrink-0">{release.name}</span>
                   <div className="flex-1">
                     <ProgressBar percent={pct} height="h-2" />
                   </div>
-                  <span className="text-xs text-gray-500 tabular-nums w-10 text-right flex-shrink-0">{Math.round(pct)}%</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-10 text-right flex-shrink-0">{Math.round(pct)}%</span>
                 </div>
               );
             })}
@@ -323,22 +323,22 @@ export default function ProgressTrackingView() {
 
       {/* Rib item progress table */}
       {product.sprints.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-gray-400 dark:text-gray-500">
           <p>No sprints defined. Add sprints in Settings to start tracking progress.</p>
         </div>
       ) : assignedRibs.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-gray-400 dark:text-gray-500">
           <p>No rib items assigned to releases yet.</p>
         </div>
       ) : (
         <div className="space-y-6">
           {grouped.map(group => (
             <div key={group.label}>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">{group.label}</h3>
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{group.label}</h3>
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 text-xs text-gray-500">
+                    <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400">
                       <th className="text-left px-3 py-2 font-medium" style={{ width: '40%' }}>Rib Item</th>
                       <th className="text-center px-2 py-2 font-medium w-12">Size</th>
                       <th className="text-center px-2 py-2 font-medium w-12">Pts</th>
@@ -351,7 +351,7 @@ export default function ProgressTrackingView() {
                       <th className="px-2 py-2 font-medium w-24">Progress</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                     {group.items.map((rib, idx) => (
                       <ProgressRow
                         key={`${rib.id}-${rib._releaseId || idx}`}

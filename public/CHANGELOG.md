@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 0.9.0 (2026-02-14)
+
+### Added
+- **Dark mode** — Full dark mode support across all views, components, and charts with appropriate contrast ratios
+- **Theme toggle** — Sun/moon icon button on the homepage and inside product views to switch between light and dark modes
+- **System preference detection** — Defaults to the user's OS-level `prefers-color-scheme` setting on first visit
+- **Theme persistence** — User's light/dark preference saved to localStorage and restored on subsequent visits
+- **FOUC prevention** — Synchronous inline script in `<head>` applies the `.dark` class before React renders, preventing flash of unstyled content
+
+### Technical
+- Tailwind CSS 4 dark mode via `@custom-variant dark (&:where(.dark, .dark *))` with `.dark` class on `<html>`
+- 2 new files: `src/hooks/useDarkMode.js`, `src/components/ui/ThemeToggle.jsx`
+- 38 files updated with `dark:` Tailwind variants across all UI components, page views, and layout files
+- Recharts components use conditional hex colors via `useDarkMode()` hook (grid, axis, tooltip, fill colors)
+
 ## Version 0.8.0 (2026-02-14)
 
 ### Added

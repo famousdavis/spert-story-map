@@ -31,33 +31,33 @@ export default function SizePicker({ value, sizeMapping, onChange }) {
         className={`text-xs font-medium px-2 py-0.5 rounded border transition-colors ${
           value
             ? colorClass
-            : 'bg-yellow-50 text-yellow-700 border-yellow-300 border-dashed'
+            : 'bg-yellow-50 text-yellow-700 border-yellow-300 border-dashed dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-700/50'
         }`}
       >
         {value || 'Size?'}
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[100px]">
+        <div className="absolute z-50 top-full left-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[100px]">
           {sizeMapping.map(m => (
             <button
               key={m.label}
               onClick={() => { onChange(m.label); setOpen(false); }}
-              className={`block w-full text-left px-3 py-1 text-sm hover:bg-gray-50 transition-colors ${
-                value === m.label ? 'font-semibold bg-gray-50' : ''
+              className={`block w-full text-left px-3 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                value === m.label ? 'font-semibold bg-gray-50 dark:bg-gray-800' : ''
               }`}
             >
               <span className={`inline-block w-10 text-xs font-medium px-1.5 py-0.5 rounded ${SIZE_COLORS[m.label] || 'bg-gray-100'}`}>
                 {m.label}
               </span>
-              <span className="ml-2 text-gray-500 text-xs">{m.points} pts</span>
+              <span className="ml-2 text-gray-500 dark:text-gray-400 text-xs">{m.points} pts</span>
             </button>
           ))}
           {value && (
             <>
-              <div className="border-t border-gray-100 my-1" />
+              <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
               <button
                 onClick={() => { onChange(null); setOpen(false); }}
-                className="block w-full text-left px-3 py-1 text-sm text-gray-400 hover:bg-gray-50"
+                className="block w-full text-left px-3 py-1 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 Clear size
               </button>

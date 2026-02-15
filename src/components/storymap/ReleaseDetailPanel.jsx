@@ -59,7 +59,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
       <div className="absolute inset-0 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="absolute top-0 right-0 z-50 h-full w-80 bg-white border-l border-gray-200 shadow-lg overflow-y-auto">
+      <div className="absolute top-0 right-0 z-50 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-lg overflow-y-auto">
         <div className="p-5 space-y-5">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
@@ -71,11 +71,11 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
                 onChange={e => setDraft(e.target.value)}
                 onBlur={commit}
                 onKeyDown={handleKeyDown}
-                className="text-base font-semibold text-gray-900 leading-tight flex-1 bg-blue-50 border border-blue-300 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-300 min-w-0"
+                className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-tight flex-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 min-w-0"
               />
             ) : (
               <h3
-                className="text-base font-semibold text-gray-900 leading-tight cursor-text hover:text-blue-700 transition-colors"
+                className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-tight cursor-text hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
                 onClick={startEditing}
                 title="Click to rename"
               >
@@ -84,7 +84,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
             )}
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-lg leading-none flex-shrink-0 -mt-0.5"
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-lg leading-none flex-shrink-0 -mt-0.5"
             >
               ×
             </button>
@@ -94,13 +94,13 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
           <div className="space-y-3">
             <DetailRow label="Progress">
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-24">
+                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-24">
                   <div
                     className="bg-blue-500 h-2 rounded-full transition-all"
                     style={{ width: `${Math.min(100, stats.pctComplete)}%` }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-700 tabular-nums">{stats.pctComplete}%</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 tabular-nums">{stats.pctComplete}%</span>
               </div>
             </DetailRow>
             <DetailRow label="Total Points" value={stats.totalPoints} />
@@ -110,7 +110,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
 
           {/* Scope */}
           <div>
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Scope</h4>
+            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Scope</h4>
             <div className="space-y-3">
               <DetailRow label="Rib Items" value={stats.ribCount} />
               <DetailRow label="Backbones" value={stats.backboneCount} />
@@ -120,7 +120,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
 
           {/* Release details */}
           <div>
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Details</h4>
+            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Details</h4>
             <div className="space-y-3">
               <DetailRow label="Order" value={`#${release.order}`} />
               {release.targetDate && (
@@ -131,11 +131,11 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
 
           {/* Delete release */}
           {onDelete && (
-            <div className="pt-2 border-t border-gray-100">
+            <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
               {stats.ribCount > 0 ? (
                 <button
                   disabled
-                  className="w-full px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 rounded-lg cursor-not-allowed"
+                  className="w-full px-3 py-2 text-xs font-medium text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 rounded-lg cursor-not-allowed"
                   title="Move all rib items out of this release first"
                 >
                   Delete Release — {stats.ribCount} rib{stats.ribCount !== 1 ? 's' : ''} allocated
@@ -143,7 +143,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
               ) : (
                 <button
                   onClick={() => onDelete(releaseId)}
-                  className="w-full px-3 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                  className="w-full px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
                 >
                   Delete Release
                 </button>
@@ -159,8 +159,8 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
 function DetailRow({ label, value, children }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-gray-400">{label}</span>
-      {children || <span className="text-sm text-gray-700">{value}</span>}
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      {children || <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>}
     </div>
   );
 }

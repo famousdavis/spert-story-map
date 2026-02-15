@@ -29,7 +29,7 @@ export default function CommentPanel({
       {/* Current sprint comment input */}
       {editable ? (
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             {sprint?.name || 'Sprint'} assessment note
           </label>
           <textarea
@@ -39,33 +39,33 @@ export default function CommentPanel({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             placeholder="Why did we assess this progress level?"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder:text-gray-300 focus:border-blue-300 focus:ring-1 focus:ring-blue-200 outline-none resize-y"
+            className="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-500 focus:border-blue-300 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-200 dark:focus:ring-blue-500 outline-none resize-y"
           />
         </div>
       ) : savedComment ? (
         <div>
-          <span className="text-xs font-medium text-gray-500">{sprint?.name || 'Sprint'} note:</span>
-          <p className="text-sm text-gray-600 mt-0.5">{savedComment}</p>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{sprint?.name || 'Sprint'} note:</span>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{savedComment}</p>
         </div>
       ) : null}
 
       {/* Comment history */}
       {pastHistory.length > 0 ? (
         <div className="space-y-2">
-          <span className="text-xs font-medium text-gray-400">Prior notes</span>
+          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Prior notes</span>
           {pastHistory.map(entry => (
-            <div key={`${entry.sprintId}-${entry.releaseId}`} className="border-l-2 border-gray-200 pl-3">
-              <div className="text-xs text-gray-400">
+            <div key={`${entry.sprintId}-${entry.releaseId}`} className="border-l-2 border-gray-200 dark:border-gray-700 pl-3">
+              <div className="text-xs text-gray-400 dark:text-gray-500">
                 {entry.sprintName}
                 {entry.updatedAt && <span> · {formatDate(entry.updatedAt)}</span>}
                 {entry.percentComplete !== null && <span> · {entry.percentComplete}%</span>}
               </div>
-              <div className="text-sm text-gray-600">{entry.comment}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">{entry.comment}</div>
             </div>
           ))}
         </div>
       ) : !editable && !savedComment ? (
-        <p className="text-xs text-gray-300 italic">No assessment notes yet.</p>
+        <p className="text-xs text-gray-300 dark:text-gray-600 italic">No assessment notes yet.</p>
       ) : null}
     </div>
   );
