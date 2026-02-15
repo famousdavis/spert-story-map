@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, moveRib2D, moveRibs2D } from '../components/storymap/mapMutations';
+import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, reorderTheme, moveRib2D, moveRibs2D } from '../components/storymap/mapMutations';
 
 // Helper: creates a minimal product with configurable themes/backbones/ribs
 function makeProduct({
@@ -601,5 +601,75 @@ describe('moveRibs2D', () => {
     const fakeUpdate = () => { called = true; };
     moveRibs2D(fakeUpdate, [], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' });
     expect(called).toBe(false);
+  });
+});
+
+// --- reorderTheme ---
+describe('reorderTheme', () => {
+  it('moves a theme to a new position', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1'), makeTheme('t2'), makeTheme('t3')],
+    });
+
+    const result = captureUpdate(
+      (update) => reorderTheme(update, 't3', 0),
+      product,
+    );
+
+    expect(result.themes.map(t => t.id)).toEqual(['t3', 't1', 't2']);
+    expect(result.themes.map(t => t.order)).toEqual([1, 2, 3]);
+  });
+
+  it('moves a theme to the end', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1'), makeTheme('t2'), makeTheme('t3')],
+    });
+
+    const result = captureUpdate(
+      (update) => reorderTheme(update, 't1', 2),
+      product,
+    );
+
+    expect(result.themes.map(t => t.id)).toEqual(['t2', 't3', 't1']);
+    expect(result.themes.map(t => t.order)).toEqual([1, 2, 3]);
+  });
+
+  it('returns prev if theme not found', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1')],
+    });
+
+    const result = captureUpdate(
+      (update) => reorderTheme(update, 'nonexistent', 0),
+      product,
+    );
+
+    expect(result).toBe(product);
+  });
+
+  it('appends to end when insertIndex is null', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1'), makeTheme('t2'), makeTheme('t3')],
+    });
+
+    const result = captureUpdate(
+      (update) => reorderTheme(update, 't1', null),
+      product,
+    );
+
+    expect(result.themes.map(t => t.id)).toEqual(['t2', 't3', 't1']);
+  });
+
+  it('handles negative insertIndex by appending to end', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1'), makeTheme('t2')],
+    });
+
+    const result = captureUpdate(
+      (update) => reorderTheme(update, 't1', -1),
+      product,
+    );
+
+    expect(result.themes.map(t => t.id)).toEqual(['t2', 't1']);
   });
 });

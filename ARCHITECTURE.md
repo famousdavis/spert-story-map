@@ -25,7 +25,10 @@ src/
 │   ├── storage.js                    # localStorage CRUD with debouncing
 │   ├── sampleData.js                 # Sample "Billing System v2" product factory
 │   ├── calculations.js              # Pure computation functions (points, progress, stats)
-│   └── progressMutations.js         # Shared progress tracking helpers (update, remove, comment)
+│   ├── progressMutations.js         # Shared progress tracking helpers (update, remove, comment)
+│   ├── settingsMutations.js         # Pure cascade deletion (release, sprint) + releaseHasAllocations
+│   ├── ribHelpers.js                # forEachRib / reduceRibs traversal utilities
+│   └── themeColors.js               # Centralized 8-color palette for themes (solid, light, dot, swatch)
 │
 ├── hooks/
 │   ├── useProduct.js                 # Load/save product state with debounced persistence
@@ -40,11 +43,19 @@ src/
 │   │   ├── Modal.jsx                 # Overlay dialog with Escape/backdrop close
 │   │   ├── ConfirmDialog.jsx         # Confirm/cancel dialog (wraps Modal)
 │   │   ├── ProgressBar.jsx           # Animated horizontal progress bar
+│   │   ├── CollapsibleSection.jsx    # Collapsible section with toggle
+│   │   ├── Tooltip.jsx               # Fast tooltip (200ms) via useTooltip hook
 │   │   └── ThemeToggle.jsx           # Sun/moon dark mode toggle button
 │   ├── layout/
 │   │   └── ProductLayout.jsx         # Header, tab nav, footer, outlet context
 │   ├── progress/
+│   │   ├── SprintSummaryCard.jsx     # Sprint summary stats card
+│   │   ├── BurnUpChart.jsx           # Burn-up progress chart
+│   │   ├── ProgressRow.jsx           # Individual progress table row
 │   │   └── CommentPanel.jsx          # Assessment note panel for progress rows
+│   ├── structure/                    # Structure view sub-components
+│   │   ├── BackboneSection.jsx       # Backbone header + rib table grid
+│   │   └── RibRow.jsx                # Individual rib item row with drag, edit, stats
 │   ├── releases/
 │   │   ├── RibCard.jsx               # Draggable card for release kanban
 │   │   └── AllocationModal.jsx       # Split-allocation editor modal
@@ -68,7 +79,8 @@ src/
 │       ├── useMapLayout.js           # Layout computation + constants (columns, lanes, cells)
 │       ├── useMapDrag.js             # Pointer-event drag hook (rib/backbone/theme drags)
 │       ├── useInlineEdit.js          # Shared inline-edit hook for map headers
-│       └── mapMutations.js           # Pure mutation helpers (move rib/backbone/theme)
+│       ├── mapMutations.js           # Pure mutation helpers (move rib/backbone/theme)
+│       └── mapDragHelpers.js         # Drag commit logic (dispatches to mapMutations)
 │
 └── pages/                            # Route-level views
     ├── ProductList.jsx               # Home — product listing with CRUD
@@ -93,6 +105,7 @@ Product
 ├── sprints: [{ id, name, order, endDate }]
 ├── releaseCardOrder: { [colId]: [ribId, ...] }
 └── themes: [Theme]
+    ├── color?                                      # Optional color key (blue, teal, violet, etc.)
     └── backboneItems: [Backbone]
         └── ribItems: [RibItem]
             ├── size, category (core/non-core)
@@ -139,3 +152,5 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 12. **Click/double-click disambiguation** — Release labels use a 200ms timer to distinguish single-click (open detail panel) from double-click (inline rename). The timer is cancelled if a double-click fires within the window.
 
 13. **Dark mode** — Class-based dark mode using Tailwind CSS 4's `@custom-variant dark`. The `.dark` class toggles on `<html>`. A synchronous inline script in `index.html` reads localStorage before React renders to prevent FOUC. The `useDarkMode` hook manages state, persists preference to `spert-theme` in localStorage, and falls back to `prefers-color-scheme`. Recharts components use conditional JS hex values (not Tailwind classes) via `isDark` from the hook.
+
+14. **Theme colors** — Each theme has an optional `color` field (e.g. `'blue'`, `'teal'`). `themeColors.js` defines 8 color options with Tailwind classes for solid (theme header), light (backbone header), dot, and swatch contexts. `getThemeColorClasses(theme, index)` resolves the color: uses `theme.color` if set, otherwise falls back to index-based cycling. No schema migration needed — themes without a `color` field use the fallback.

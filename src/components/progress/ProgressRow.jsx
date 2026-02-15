@@ -1,4 +1,4 @@
-import { useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { getRibItemPoints } from '../../lib/calculations';
 import ProgressBar from '../ui/ProgressBar';
 import CommentPanel from './CommentPanel';
@@ -61,9 +61,14 @@ export default function ProgressRow({
           <span className="text-xs text-gray-500 dark:text-gray-400">{rib.size || '—'}</span>
         </td>
         <td className="text-center px-2 py-2">
-          <span className="text-xs text-gray-500 tabular-nums">
-            {pts ? (rib._allocPct ? Math.round(pts * rib._allocPct / 100) : pts) : '—'}
-          </span>
+          {pts ? (
+            <span className="text-xs tabular-nums">
+              <span className="text-gray-700 dark:text-gray-300 font-medium">{Math.round(pts * currentPct / 100)}</span>
+              <span className="text-gray-400 dark:text-gray-500">/{rib._allocPct ? Math.round(pts * rib._allocPct / 100) : pts}</span>
+            </span>
+          ) : (
+            <span className="text-xs text-gray-500">—</span>
+          )}
         </td>
         {showTargetCol && (
           <td className="text-center px-2 py-2">
@@ -75,39 +80,47 @@ export default function ProgressRow({
         </td>
         <td className="text-center px-2 py-2">
           {rib._editable ? (
-            <input
-              type="number"
-              min={0}
-              max={maxPct}
-              value={progressDrafts[rowKey] ?? sprintPct ?? ''}
-              placeholder="—"
-              onClick={e => e.stopPropagation()}
-              onFocus={() => {
-                if (progressDrafts[rowKey] === undefined) {
-                  setProgressDrafts(prev => ({ ...prev, [rowKey]: sprintPct ?? '' }));
-                }
-              }}
-              onChange={e => {
-                setProgressDrafts(prev => ({ ...prev, [rowKey]: e.target.value }));
-              }}
-              onBlur={() => {
-                const raw = progressDrafts[rowKey];
-                if (raw === undefined) return;
-                if (raw === '' || raw === null) {
-                  removeProgress(rib.id, rib._releaseId);
-                } else {
-                  const val = parseInt(raw, 10);
-                  if (!isNaN(val) && val >= 0 && val <= maxPct) {
-                    updateProgress(rib.id, rib._releaseId, val);
+            progressDrafts[rowKey] !== undefined ? (
+              <input
+                type="number"
+                min={0}
+                max={maxPct}
+                value={progressDrafts[rowKey]}
+                placeholder="—"
+                autoFocus
+                onClick={e => e.stopPropagation()}
+                onChange={e => {
+                  setProgressDrafts(prev => ({ ...prev, [rowKey]: e.target.value }));
+                }}
+                onBlur={() => {
+                  const raw = progressDrafts[rowKey];
+                  if (raw === '' || raw === null) {
+                    removeProgress(rib.id, rib._releaseId);
+                  } else {
+                    const val = parseInt(raw, 10);
+                    if (!isNaN(val) && val >= 0 && val <= maxPct) {
+                      updateProgress(rib.id, rib._releaseId, val);
+                    }
                   }
-                }
-                setProgressDrafts(prev => { const next = { ...prev }; delete next[rowKey]; return next; });
-              }}
-              onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-              className="w-14 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-1 py-1 text-sm text-center focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
-            />
+                  setProgressDrafts(prev => { const next = { ...prev }; delete next[rowKey]; return next; });
+                }}
+                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                className="w-14 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-1 py-1 text-sm text-center focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  setProgressDrafts(prev => ({ ...prev, [rowKey]: sprintPct ?? '' }));
+                }}
+                className="w-14 border border-gray-200 dark:border-gray-600 rounded px-1 py-1 text-sm text-center tabular-nums text-gray-700 dark:text-gray-300 hover:border-blue-400 dark:hover:border-blue-500 cursor-text"
+              >
+                {sprintPct != null ? `${sprintPct}%` : '—'}
+              </button>
+            )
           ) : (
-            <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">{sprintPct ?? '—'}%</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">{sprintPct != null ? `${sprintPct}%` : '—'}</span>
           )}
         </td>
         {prevSprint && (

@@ -48,6 +48,7 @@ export function createSampleProduct() {
       id: crypto.randomUUID(),
       name: 'Customer Management',
       order: 1,
+      color: 'blue',
       backboneItems: [
         {
           id: crypto.randomUUID(),
@@ -100,6 +101,7 @@ export function createSampleProduct() {
     {
       id: crypto.randomUUID(),
       name: 'Invoicing & Payments',
+      color: 'teal',
       order: 2,
       backboneItems: [
         {
@@ -157,6 +159,7 @@ export function createSampleProduct() {
     {
       id: crypto.randomUUID(),
       name: 'Reporting & Analytics',
+      color: 'violet',
       order: 3,
       backboneItems: [
         {

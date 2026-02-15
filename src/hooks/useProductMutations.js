@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { calculateNextSprintEndDate } from '../lib/progressMutations';
+import { DEFAULT_THEME_COLOR_KEYS } from '../lib/themeColors';
 
 /** Remove deleted rib IDs from releaseCardOrder. */
 function cleanCardOrder(cardOrder, ribIds) {
@@ -67,6 +68,7 @@ export function useProductMutations(updateProduct) {
         id: crypto.randomUUID(),
         name: 'New Theme',
         order: prev.themes.length + 1,
+        color: DEFAULT_THEME_COLOR_KEYS[prev.themes.length % DEFAULT_THEME_COLOR_KEYS.length],
         backboneItems: [],
       }],
     }));

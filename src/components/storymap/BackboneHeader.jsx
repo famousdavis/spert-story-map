@@ -1,19 +1,9 @@
 import { THEME_HEIGHT } from './useMapLayout';
 import useInlineEdit from './useInlineEdit';
+import { THEME_COLOR_OPTIONS } from '../../lib/themeColors';
 
-const BACKBONE_BG_COLORS = [
-  'bg-blue-100 text-blue-800',
-  'bg-teal-100 text-teal-800',
-  'bg-violet-100 text-violet-800',
-  'bg-rose-100 text-rose-800',
-  'bg-amber-100 text-amber-800',
-  'bg-emerald-100 text-emerald-800',
-  'bg-indigo-100 text-indigo-800',
-  'bg-orange-100 text-orange-800',
-];
-
-export default function BackboneHeader({ column, themeIndex, onRename, onDelete, isDropTarget, isDragging, onDragStart }) {
-  const color = BACKBONE_BG_COLORS[themeIndex % BACKBONE_BG_COLORS.length];
+export default function BackboneHeader({ column, colorClasses, onRename, onDelete, isDropTarget, isDragging, onDragStart }) {
+  const color = colorClasses?.light || THEME_COLOR_OPTIONS[0].light;
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(column.backboneName, (name) => onRename(column.themeId, column.backboneId, name));
 

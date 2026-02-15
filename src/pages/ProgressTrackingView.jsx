@@ -342,7 +342,7 @@ export default function ProgressTrackingView() {
                       <th className="text-left px-3 py-2 font-medium" style={{ width: '40%' }}>Rib Item</th>
                       <th className="text-center px-2 py-2 font-medium w-12">Size</th>
                       <th className="text-center px-2 py-2 font-medium w-12">Pts</th>
-                      {showTargetCol && <th className="text-center px-2 py-2 font-medium w-14">Target</th>}
+                      {showTargetCol && <th className="text-center px-2 py-2 font-medium w-14">Alloc</th>}
                       <th className="text-center px-2 py-2 font-medium w-16">Done</th>
                       <th className="text-center px-2 py-2 font-medium w-20">
                         {sprint?.name || 'Sprint'}

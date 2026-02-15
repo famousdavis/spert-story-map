@@ -249,12 +249,15 @@ export default function SettingsView() {
                   onChange={e => updateRelease(r.id, { name: e.target.value })}
                   className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
                 />
-                <input
-                  type="date"
-                  value={r.targetDate || ''}
-                  onChange={e => updateRelease(r.id, { targetDate: e.target.value || null })}
-                  className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"
-                />
+                <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  Target
+                  <input
+                    type="date"
+                    value={r.targetDate || ''}
+                    onChange={e => updateRelease(r.id, { targetDate: e.target.value || null })}
+                    className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"
+                  />
+                </label>
                 <button onClick={() => deleteRelease(r.id)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm">Delete</button>
               </div>
             </div>
@@ -287,12 +290,15 @@ export default function SettingsView() {
                 onChange={e => updateSprint(s.id, { name: e.target.value })}
                 className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
               />
-              <input
-                type="date"
-                value={s.endDate || ''}
-                onChange={e => updateSprint(s.id, { endDate: e.target.value || null })}
-                className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"
-              />
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                Finish
+                <input
+                  type="date"
+                  value={s.endDate || ''}
+                  onChange={e => updateSprint(s.id, { endDate: e.target.value || null })}
+                  className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"
+                />
+              </label>
               <button onClick={() => deleteSprint(s.id)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm">Delete</button>
             </div>
           ))}
