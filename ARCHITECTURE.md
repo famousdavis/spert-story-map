@@ -17,7 +17,7 @@
 src/
 ├── main.jsx                          # Entry point, mounts BrowserRouter + App
 ├── App.jsx                           # Route definitions
-├── index.css                         # Tailwind imports + scrollbar styles
+├── index.css                         # Tailwind imports + dark mode variant + scrollbar styles
 │
 ├── lib/                              # Pure logic, no React
 │   ├── constants.js                  # Storage keys, schema version, size defaults
@@ -29,7 +29,8 @@ src/
 │
 ├── hooks/
 │   ├── useProduct.js                 # Load/save product state with debounced persistence
-│   └── useProductMutations.js        # Reusable CRUD for theme/backbone/rib hierarchy
+│   ├── useProductMutations.js        # Reusable CRUD for theme/backbone/rib hierarchy
+│   └── useDarkMode.js                # Theme toggle hook (localStorage + system preference)
 │
 ├── components/
 │   ├── ui/                           # Generic, reusable UI primitives
@@ -38,7 +39,8 @@ src/
 │   │   ├── SizePicker.jsx            # T-shirt size dropdown with color coding
 │   │   ├── Modal.jsx                 # Overlay dialog with Escape/backdrop close
 │   │   ├── ConfirmDialog.jsx         # Confirm/cancel dialog (wraps Modal)
-│   │   └── ProgressBar.jsx           # Animated horizontal progress bar
+│   │   ├── ProgressBar.jsx           # Animated horizontal progress bar
+│   │   └── ThemeToggle.jsx           # Sun/moon dark mode toggle button
 │   ├── layout/
 │   │   └── ProductLayout.jsx         # Header, tab nav, footer, outlet context
 │   ├── progress/
@@ -135,3 +137,5 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 11. **Sizing view** — A dedicated tab for bulk-sizing rib items. Reuses `MapCanvas` (pan/zoom) and `DragGhost`. Layout is computed by `useSizingLayout` with an unsized grid zone on top and t-shirt size columns below. Rib items with progress > 0% are locked (visually dimmed, no drag handle) to prevent re-sizing active work. Drag hook (`useSizingDrag`) is a simplified version of `useMapDrag` supporting only rib drags.
 
 12. **Click/double-click disambiguation** — Release labels use a 200ms timer to distinguish single-click (open detail panel) from double-click (inline rename). The timer is cancelled if a double-click fires within the window.
+
+13. **Dark mode** — Class-based dark mode using Tailwind CSS 4's `@custom-variant dark`. The `.dark` class toggles on `<html>`. A synchronous inline script in `index.html` reads localStorage before React renders to prevent FOUC. The `useDarkMode` hook manages state, persists preference to `spert-theme` in localStorage, and falls back to `prefers-color-scheme`. Recharts components use conditional JS hex values (not Tailwind classes) via `isDark` from the hook.

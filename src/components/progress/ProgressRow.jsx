@@ -37,15 +37,15 @@ export default function ProgressRow({
 
   return (
     <Fragment>
-      <tr className={`hover:bg-gray-50 transition-colors ${isExpanded ? 'bg-blue-50/30' : ''}`}>
+      <tr className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${isExpanded ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''}`}>
         <td className="px-3 py-2 cursor-pointer select-none" onClick={() => toggleRow(rowKey)}>
           <div className="flex items-center gap-1.5">
-            <span className={`text-gray-400 text-[10px] transition-transform duration-150 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>&#9654;</span>
+            <span className={`text-gray-400 dark:text-gray-500 text-[10px] transition-transform duration-150 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>&#9654;</span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm text-gray-800 truncate">{rib.name}</span>
+                <span className="text-sm text-gray-800 dark:text-gray-200 truncate">{rib.name}</span>
                 {commentCount > 0 && (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400 flex-shrink-0" title={`${commentCount} note${commentCount > 1 ? 's' : ''}`}>
+                  <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0" title={`${commentCount} note${commentCount > 1 ? 's' : ''}`}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
@@ -53,12 +53,12 @@ export default function ProgressRow({
                   </span>
                 )}
               </div>
-              <div className="text-xs text-gray-400 truncate">{rib.backboneName}</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500 truncate">{rib.backboneName}</div>
             </div>
           </div>
         </td>
         <td className="text-center px-2 py-2">
-          <span className="text-xs text-gray-500">{rib.size || '—'}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{rib.size || '—'}</span>
         </td>
         <td className="text-center px-2 py-2">
           <span className="text-xs text-gray-500 tabular-nums">
@@ -71,7 +71,7 @@ export default function ProgressRow({
           </td>
         )}
         <td className="text-center px-2 py-2">
-          <span className="text-sm font-medium text-gray-700 tabular-nums">{currentPct}%</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 tabular-nums">{currentPct}%</span>
         </td>
         <td className="text-center px-2 py-2">
           {rib._editable ? (
@@ -104,20 +104,20 @@ export default function ProgressRow({
                 setProgressDrafts(prev => { const next = { ...prev }; delete next[rowKey]; return next; });
               }}
               onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
-              className="w-14 border border-gray-200 rounded px-1 py-1 text-sm text-center focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"
+              className="w-14 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-1 py-1 text-sm text-center focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
             />
           ) : (
-            <span className="text-sm text-gray-500 tabular-nums">{sprintPct ?? '—'}%</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">{sprintPct ?? '—'}%</span>
           )}
         </td>
         {prevSprint && (
           <td className="text-center px-2 py-2">
             {delta !== null ? (
-              <span className={`text-xs font-medium tabular-nums ${delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+              <span className={`text-xs font-medium tabular-nums ${delta > 0 ? 'text-green-600 dark:text-green-400' : delta < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
                 {delta > 0 ? '+' : ''}{delta}%
               </span>
             ) : (
-              <span className="text-xs text-gray-300">—</span>
+              <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
             )}
           </td>
         )}
@@ -128,7 +128,7 @@ export default function ProgressRow({
 
       {isExpanded && (
         <tr>
-          <td colSpan={totalCols} className="px-4 py-3 bg-gray-50/60 border-t border-gray-100">
+          <td colSpan={totalCols} className="px-4 py-3 bg-gray-50/60 dark:bg-gray-800/60 border-t border-gray-100 dark:border-gray-800">
             <CommentPanel
               rib={rib}
               sprint={sprint}

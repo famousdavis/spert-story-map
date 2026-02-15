@@ -26,7 +26,7 @@ export default function DragGhost({ dragState, cells, zoom }) {
       {draggedCells.slice(0, 3).map((cell, i) => (
         <div
           key={cell.id}
-          className="bg-white border border-blue-300 rounded shadow-md px-2 py-1.5 text-xs font-medium text-gray-800 mb-1 w-44 truncate"
+          className="bg-white dark:bg-gray-900 border border-blue-300 dark:border-blue-500 rounded shadow-md px-2 py-1.5 text-xs font-medium text-gray-800 dark:text-gray-200 mb-1 w-44 truncate"
           style={{
             transform: i > 0 ? `translate(${i * 3}px, ${i * -2}px)` : undefined,
           }}
@@ -35,7 +35,7 @@ export default function DragGhost({ dragState, cells, zoom }) {
         </div>
       ))}
       {draggedCells.length > 3 && (
-        <div className="text-[10px] text-blue-600 font-medium ml-1">
+        <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium ml-1">
           +{draggedCells.length - 3} more
         </div>
       )}

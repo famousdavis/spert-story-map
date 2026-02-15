@@ -1,4 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock crypto.randomUUID
+let uuidCounter = 0;
+vi.stubGlobal('crypto', {
+  randomUUID: () => `uuid-${++uuidCounter}`,
+});
 
 // We test the mutation logic extracted from useProductMutations by simulating
 // the updateProduct callback pattern — same approach as mapMutations.test.js.
@@ -187,5 +193,70 @@ describe('moveItem', () => {
   it('returns original array if item not found', () => {
     const result = applyMoveItem(items, 'nonexistent', 1);
     expect(result).toBe(items);
+  });
+});
+
+// --- addReleaseAfter (updater logic) ---
+// Simulates the updater function from useProductMutations.addReleaseAfter
+function applyAddReleaseAfter(product, afterReleaseId) {
+  const sorted = [...product.releases].sort((a, b) => a.order - b.order);
+  const afterIdx = afterReleaseId
+    ? sorted.findIndex(r => r.id === afterReleaseId)
+    : -1;
+  const insertIdx = afterIdx >= 0 ? afterIdx + 1 : sorted.length;
+  const newRelease = {
+    id: crypto.randomUUID(),
+    name: `Release ${product.releases.length + 1}`,
+    order: 0,
+    description: '',
+    targetDate: null,
+  };
+  sorted.splice(insertIdx, 0, newRelease);
+  return {
+    ...product,
+    releases: sorted.map((r, i) => ({ ...r, order: i + 1 })),
+  };
+}
+
+describe('addReleaseAfter', () => {
+  const product = {
+    releases: [
+      { id: 'rel-1', name: 'R1', order: 1 },
+      { id: 'rel-2', name: 'R2', order: 2 },
+      { id: 'rel-3', name: 'R3', order: 3 },
+    ],
+  };
+
+  it('inserts after specified release', () => {
+    const result = applyAddReleaseAfter(product, 'rel-1');
+    expect(result.releases).toHaveLength(4);
+    expect(result.releases[0].id).toBe('rel-1');
+    expect(result.releases[1].name).toBe('Release 4'); // new release
+    expect(result.releases[2].id).toBe('rel-2');
+    expect(result.releases[3].id).toBe('rel-3');
+  });
+
+  it('appends at end when afterReleaseId is null', () => {
+    const result = applyAddReleaseAfter(product, null);
+    expect(result.releases).toHaveLength(4);
+    expect(result.releases[3].name).toBe('Release 4');
+  });
+
+  it('appends at end when afterReleaseId does not exist', () => {
+    const result = applyAddReleaseAfter(product, 'nonexistent');
+    expect(result.releases).toHaveLength(4);
+    expect(result.releases[3].name).toBe('Release 4');
+  });
+
+  it('re-indexes order fields to be consecutive', () => {
+    const result = applyAddReleaseAfter(product, 'rel-2');
+    expect(result.releases.map(r => r.order)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('inserts at beginning when afterReleaseId is null and no releases', () => {
+    const empty = { releases: [] };
+    const result = applyAddReleaseAfter(empty, null);
+    expect(result.releases).toHaveLength(1);
+    expect(result.releases[0].order).toBe(1);
   });
 });

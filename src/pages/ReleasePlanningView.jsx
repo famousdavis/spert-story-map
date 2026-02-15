@@ -249,26 +249,24 @@ export default function ReleasePlanningView() {
     handleColDragEnd();
   };
 
-  const isDragOver = (col) => dropTarget?.col === col && dragRibId;
-
   return (
     <div>
       {/* Top bar */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-baseline gap-3">
-          <h2 className="text-lg font-semibold text-gray-900">Release Planning</h2>
-          <span className="text-xs text-gray-400">{totalPoints} pts <span className="text-blue-500">{totalCore} core</span> · <span className="text-gray-400">{totalNonCore} non-core</span></span>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Release Planning</h2>
+          <span className="text-xs text-gray-400 dark:text-gray-500">{totalPoints} pts <span className="text-blue-500 dark:text-blue-400">{totalCore} core</span> · <span className="text-gray-400 dark:text-gray-500">{totalNonCore} non-core</span></span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 mr-2">Filter:</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">Filter:</span>
           {['all', 'core', 'non-core'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
                 filter === f
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
               }`}
             >
               {f === 'all' ? 'All' : f === 'core' ? 'Core' : 'Non-core'}
@@ -329,7 +327,7 @@ export default function ReleasePlanningView() {
           <div className="flex-shrink-0 w-72">
             <button
               onClick={addRelease}
-              className="w-full h-24 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-gray-300 hover:text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              className="w-full h-24 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
             >
               <span className="text-lg">+</span>
               <span className="text-sm font-medium">Add Release</span>

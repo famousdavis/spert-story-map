@@ -128,22 +128,22 @@ export default function StructureView() {
       {/* Top bar */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-900">Structure</h2>
-          <span className="text-sm text-gray-500">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Structure</h2>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             {stats.totalItems} items &middot; {stats.totalPoints} pts
-            {stats.unsized > 0 && <span className="text-amber-700"> &middot; {stats.unsized} unsized</span>}
+            {stats.unsized > 0 && <span className="text-amber-700 dark:text-amber-400"> &middot; {stats.unsized} unsized</span>}
           </span>
         </div>
         <button
           onClick={addTheme}
-          className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+          className="px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
         >
           + Theme
         </button>
       </div>
 
       {product.themes.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
+        <div className="text-center py-16 text-gray-500 dark:text-gray-400">
           <p>No themes yet. Add a theme to start building your story map.</p>
         </div>
       ) : (
@@ -153,34 +153,34 @@ export default function StructureView() {
             const isThemeCollapsed = collapsed[theme.id];
 
             return (
-              <div key={theme.id} className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+              <div key={theme.id} className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 overflow-hidden">
                 {/* Theme header */}
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50/80 border-b border-gray-100 group/theme">
-                  <button onClick={() => toggle(theme.id)} className="text-gray-400 hover:text-gray-700 w-5 flex-shrink-0 text-base leading-none">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50/80 dark:bg-gray-800/80 border-b border-gray-100 dark:border-gray-800 group/theme">
+                  <button onClick={() => toggle(theme.id)} className="text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 w-5 flex-shrink-0 text-base leading-none">
                     {isThemeCollapsed ? '▶' : '▼'}
                   </button>
                   <InlineEdit
                     value={theme.name}
                     onSave={name => updateTheme(theme.id, { name })}
-                    className="font-semibold text-gray-900 text-sm"
+                    className="font-semibold text-gray-900 dark:text-gray-100 text-sm"
                   />
-                  <span className="text-sm text-gray-500 flex-shrink-0">
-                    {themeStats.totalItems} items &middot; {themeStats.totalPoints} pts &middot; <span className={themeStats.percentComplete === 100 ? 'text-emerald-700' : 'text-emerald-600'}>{themeStats.percentComplete}% done</span>
-                    {themeStats.unsized > 0 && <span className="text-amber-700"> &middot; {themeStats.unsized} unsized</span>}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
+                    {themeStats.totalItems} items &middot; {themeStats.totalPoints} pts &middot; <span className={themeStats.percentComplete === 100 ? 'text-emerald-700 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}>{themeStats.percentComplete}% done</span>
+                    {themeStats.unsized > 0 && <span className="text-amber-700 dark:text-amber-400"> &middot; {themeStats.unsized} unsized</span>}
                   </span>
                   <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover/theme:opacity-100 transition-opacity flex-shrink-0">
-                    <button onClick={() => moveTheme(theme.id, -1)} disabled={themeIdx === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs px-1">↑</button>
-                    <button onClick={() => moveTheme(theme.id, 1)} disabled={themeIdx === product.themes.length - 1} className="text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs px-1">↓</button>
-                    <button onClick={() => addBackbone(theme.id)} className="text-blue-600 hover:text-blue-700 text-xs px-1.5">+ Backbone</button>
-                    <button onClick={() => setDeleteTarget({ type: 'theme', themeId: theme.id, name: theme.name })} className="text-red-400 hover:text-red-600 text-xs px-1">&times;</button>
+                    <button onClick={() => moveTheme(theme.id, -1)} disabled={themeIdx === 0} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 disabled:opacity-30 text-xs px-1">↑</button>
+                    <button onClick={() => moveTheme(theme.id, 1)} disabled={themeIdx === product.themes.length - 1} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 disabled:opacity-30 text-xs px-1">↓</button>
+                    <button onClick={() => addBackbone(theme.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs px-1.5">+ Backbone</button>
+                    <button onClick={() => setDeleteTarget({ type: 'theme', themeId: theme.id, name: theme.name })} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-xs px-1">&times;</button>
                   </div>
                 </div>
 
                 {!isThemeCollapsed && (
                   <div>
                     {theme.backboneItems.length === 0 ? (
-                      <div className="px-10 py-4 text-sm text-gray-500 italic">
-                        No backbone items. <button onClick={() => addBackbone(theme.id)} className="text-blue-600 hover:text-blue-700 not-italic">Add one</button>
+                      <div className="px-10 py-4 text-sm text-gray-500 dark:text-gray-400 italic">
+                        No backbone items. <button onClick={() => addBackbone(theme.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 not-italic">Add one</button>
                       </div>
                     ) : (
                       theme.backboneItems.map((backbone, bbIdx) => {
@@ -188,27 +188,27 @@ export default function StructureView() {
                         const isBBCollapsed = collapsed[backbone.id];
 
                         return (
-                          <div key={backbone.id} className={bbIdx > 0 ? 'border-t border-gray-100' : ''}>
+                          <div key={backbone.id} className={bbIdx > 0 ? 'border-t border-gray-100 dark:border-gray-800' : ''}>
                             {/* Backbone header */}
                             <div className="flex items-center gap-2 pl-8 pr-4 py-2 group/bb">
-                              <button onClick={() => toggle(backbone.id)} className="text-gray-400 hover:text-gray-700 w-4 flex-shrink-0 text-sm leading-none">
+                              <button onClick={() => toggle(backbone.id)} className="text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 w-4 flex-shrink-0 text-sm leading-none">
                                 {isBBCollapsed ? '▶' : '▼'}
                               </button>
                               <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
                               <InlineEdit
                                 value={backbone.name}
                                 onSave={name => updateBackbone(theme.id, backbone.id, { name })}
-                                className="font-medium text-gray-900 text-sm"
+                                className="font-medium text-gray-900 dark:text-gray-100 text-sm"
                               />
-                              <span className="text-sm text-gray-500 flex-shrink-0">
-                                {bbStats.totalItems} items &middot; {bbStats.totalPoints} pts &middot; <span className={bbStats.percentComplete === 100 ? 'text-emerald-700' : 'text-emerald-600'}>{bbStats.percentComplete}% done</span> &middot; {bbStats.remainingPoints} remaining
-                                {bbStats.unsized > 0 && <span className="text-amber-700"> &middot; {bbStats.unsized} unsized</span>}
+                              <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
+                                {bbStats.totalItems} items &middot; {bbStats.totalPoints} pts &middot; <span className={bbStats.percentComplete === 100 ? 'text-emerald-700 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}>{bbStats.percentComplete}% done</span> &middot; {bbStats.remainingPoints} remaining
+                                {bbStats.unsized > 0 && <span className="text-amber-700 dark:text-amber-400"> &middot; {bbStats.unsized} unsized</span>}
                               </span>
                               <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover/bb:opacity-100 transition-opacity flex-shrink-0">
-                                <button onClick={() => moveBackbone(theme.id, backbone.id, -1)} disabled={bbIdx === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs px-1">↑</button>
-                                <button onClick={() => moveBackbone(theme.id, backbone.id, 1)} disabled={bbIdx === theme.backboneItems.length - 1} className="text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs px-1">↓</button>
-                                <button onClick={() => addRib(theme.id, backbone.id)} className="text-blue-600 hover:text-blue-700 text-xs px-1.5">+ Rib</button>
-                                <button onClick={() => setDeleteTarget({ type: 'backbone', themeId: theme.id, backboneId: backbone.id, name: backbone.name })} className="text-red-400 hover:text-red-600 text-xs px-1">&times;</button>
+                                <button onClick={() => moveBackbone(theme.id, backbone.id, -1)} disabled={bbIdx === 0} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 disabled:opacity-30 text-xs px-1">↑</button>
+                                <button onClick={() => moveBackbone(theme.id, backbone.id, 1)} disabled={bbIdx === theme.backboneItems.length - 1} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 disabled:opacity-30 text-xs px-1">↓</button>
+                                <button onClick={() => addRib(theme.id, backbone.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs px-1.5">+ Rib</button>
+                                <button onClick={() => setDeleteTarget({ type: 'backbone', themeId: theme.id, backboneId: backbone.id, name: backbone.name })} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-xs px-1">&times;</button>
                               </div>
                             </div>
 
@@ -216,14 +216,14 @@ export default function StructureView() {
                             {!isBBCollapsed && (
                               <div className="pb-1">
                                 {backbone.ribItems.length === 0 ? (
-                                  <div className="pl-16 pr-4 py-2 text-sm text-gray-500 italic">
-                                    No rib items. <button onClick={() => addRib(theme.id, backbone.id)} className="text-blue-600 hover:text-blue-700 not-italic">Add one</button>
+                                  <div className="pl-16 pr-4 py-2 text-sm text-gray-500 dark:text-gray-400 italic">
+                                    No rib items. <button onClick={() => addRib(theme.id, backbone.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 not-italic">Add one</button>
                                   </div>
                                 ) : (
                                   <div className="ml-14 mr-4">
                                     {/* Column header */}
                                     <div
-                                      className="grid items-center text-[10px] font-medium text-gray-500 uppercase tracking-wider pb-0.5 border-b border-gray-100 mb-0.5"
+                                      className="grid items-center text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pb-0.5 border-b border-gray-100 dark:border-gray-800 mb-0.5"
                                       style={{ gridTemplateColumns: GRID_COLS }}
                                     >
                                       <span></span>
@@ -259,12 +259,12 @@ export default function StructureView() {
                                             onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; handleRibDragStart(theme.id, backbone.id, rib.id); }}
                                             onDragEnd={handleRibDragEnd}
                                             onDragOver={e => handleRibDragOver(e, rib.id)}
-                                            className={`grid items-center py-1 group/rib hover:bg-blue-50/50 rounded transition-colors ${isDragging ? 'opacity-40' : ''}`}
+                                            className={`grid items-center py-1 group/rib hover:bg-blue-50/50 dark:hover:bg-blue-900/20 rounded transition-colors ${isDragging ? 'opacity-40' : ''}`}
                                             style={{ gridTemplateColumns: GRID_COLS }}
                                           >
                                             {/* Drag handle */}
                                             <div className="flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 opacity-0 group-hover/rib:opacity-100 transition-opacity">
-                                              <span className="text-[10px] leading-none select-none">⠿</span>
+                                              <span className="text-[10px] leading-none select-none dark:text-gray-600">⠿</span>
                                             </div>
 
                                             {/* Name */}
@@ -272,7 +272,7 @@ export default function StructureView() {
                                               <InlineEdit
                                                 value={rib.name}
                                                 onSave={name => updateRib(theme.id, backbone.id, rib.id, { name })}
-                                                className="text-[13px] text-gray-800 truncate"
+                                                className="text-[13px] text-gray-800 dark:text-gray-200 truncate"
                                               />
                                             </div>
 
@@ -287,7 +287,7 @@ export default function StructureView() {
 
                                             {/* Points */}
                                             <div className="text-right">
-                                              <span className="text-[13px] text-gray-600 tabular-nums">{pts || '—'}</span>
+                                              <span className="text-[13px] text-gray-600 dark:text-gray-400 tabular-nums">{pts || '—'}</span>
                                             </div>
 
                                             {/* Category */}
@@ -301,39 +301,39 @@ export default function StructureView() {
                                             {/* Allocation */}
                                             <div className="text-right">
                                               {allocTotal > 0 ? (
-                                                <span className={`text-[13px] tabular-nums ${allocTotal === 100 ? 'text-gray-600' : 'text-amber-700 font-medium'}`}>
+                                                <span className={`text-[13px] tabular-nums ${allocTotal === 100 ? 'text-gray-600 dark:text-gray-400' : 'text-amber-700 dark:text-amber-400 font-medium'}`}>
                                                   {allocTotal}%
                                                 </span>
                                               ) : (
-                                                <span className="text-[13px] text-gray-400">—</span>
+                                                <span className="text-[13px] text-gray-400 dark:text-gray-500">—</span>
                                               )}
                                             </div>
 
                                             {/* Progress */}
                                             <div className="text-right">
                                               {pctComplete > 0 ? (
-                                                <span className={`text-[13px] tabular-nums ${pctComplete === 100 ? 'text-emerald-700 font-medium' : 'text-emerald-600'}`}>
+                                                <span className={`text-[13px] tabular-nums ${pctComplete === 100 ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                                   {pctComplete}%
                                                 </span>
                                               ) : (
-                                                <span className="text-[13px] text-gray-400">—</span>
+                                                <span className="text-[13px] text-gray-400 dark:text-gray-500">—</span>
                                               )}
                                             </div>
 
                                             {/* Remaining */}
                                             <div className="text-right">
                                               {pts > 0 ? (
-                                                <span className={`text-[13px] tabular-nums ${remaining === 0 ? 'text-gray-400' : 'text-gray-700'}`}>
+                                                <span className={`text-[13px] tabular-nums ${remaining === 0 ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
                                                   {remaining}
                                                 </span>
                                               ) : (
-                                                <span className="text-[13px] text-gray-400">—</span>
+                                                <span className="text-[13px] text-gray-400 dark:text-gray-500">—</span>
                                               )}
                                             </div>
 
                                             {/* Delete */}
                                             <div className="flex items-center justify-end opacity-0 group-hover/rib:opacity-100 transition-opacity">
-                                              <button onClick={() => setDeleteTarget({ type: 'rib', themeId: theme.id, backboneId: backbone.id, ribId: rib.id, name: rib.name })} className="text-red-400 hover:text-red-600 text-xs px-0.5">&times;</button>
+                                              <button onClick={() => setDeleteTarget({ type: 'rib', themeId: theme.id, backboneId: backbone.id, ribId: rib.id, name: rib.name })} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-xs px-0.5">&times;</button>
                                             </div>
                                           </div>
                                         </div>
@@ -344,7 +344,7 @@ export default function StructureView() {
                                 )}
                                 <button
                                   onClick={() => addRib(theme.id, backbone.id)}
-                                  className="ml-14 mt-0.5 mb-1 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                                  className="ml-14 mt-0.5 mb-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                 >
                                   + Add rib item
                                 </button>

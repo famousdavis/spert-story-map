@@ -2,12 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
- * Hook that provides tooltip props and a portal element.
- * Attach tooltipProps to the target element, render tooltipEl anywhere.
+ * Hook that provides tooltip binding and a portal element.
  *
  * Usage:
- *   const { tooltipProps, tooltipEl } = useTooltip(cell.name);
- *   return <><div {...tooltipProps} …>…</div>{tooltipEl}</>
+ *   const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(text);
+ *   return <><div ref={triggerRef} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>…</div>{tooltipEl}</>
  */
 export function useTooltip(text, delay = 200) {
   const [visible, setVisible] = useState(false);
@@ -37,12 +36,6 @@ export function useTooltip(text, delay = 200) {
   // Cleanup on unmount
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  const tooltipProps = {
-    ref: triggerRef,
-    onMouseEnter,
-    onMouseLeave,
-  };
-
   const tooltipEl = visible && text
     ? createPortal(
         <div
@@ -59,5 +52,5 @@ export function useTooltip(text, delay = 200) {
       )
     : null;
 
-  return { tooltipProps, tooltipEl };
+  return { triggerRef, onMouseEnter, onMouseLeave, tooltipEl };
 }

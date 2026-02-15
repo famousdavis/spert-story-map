@@ -19,7 +19,7 @@ export default function DropHighlight({
       {/* Backbone column highlight (rib drag) */}
       {col && (
         <div
-          className="absolute bg-blue-100/30 border-2 border-blue-300 border-dashed rounded pointer-events-none"
+          className="absolute bg-blue-100/30 dark:bg-blue-500/10 border-2 border-blue-300 dark:border-blue-500 border-dashed rounded pointer-events-none"
           style={{
             left: col.x,
             top: 0,
@@ -33,7 +33,7 @@ export default function DropHighlight({
       {/* Cell intersection highlight (column + lane overlap) */}
       {col && lane && (
         <div
-          className="absolute bg-blue-200/40 border-2 border-blue-400 rounded pointer-events-none"
+          className="absolute bg-blue-200/40 dark:bg-blue-500/20 border-2 border-blue-400 dark:border-blue-500 rounded pointer-events-none"
           style={{
             left: col.x,
             top: lane.y,
@@ -50,7 +50,7 @@ export default function DropHighlight({
         return (
           <div
             key={`theme-highlight-${ts.themeId}`}
-            className="absolute bg-blue-100/30 border-2 border-blue-300 border-dashed rounded pointer-events-none"
+            className="absolute bg-blue-100/30 dark:bg-blue-500/10 border-2 border-blue-300 dark:border-blue-500 border-dashed rounded pointer-events-none"
             style={{
               left: ts.x,
               top: 0,

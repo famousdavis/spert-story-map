@@ -265,6 +265,16 @@ export function importProductFromJSON(jsonString) {
   if (!data.id || !data.name || !Array.isArray(data.themes)) {
     throw new Error('Invalid product data: missing required fields');
   }
+  for (const theme of data.themes) {
+    if (!theme.id || !Array.isArray(theme.backboneItems)) {
+      throw new Error('Invalid product data: theme missing id or backboneItems');
+    }
+    for (const bb of theme.backboneItems) {
+      if (!bb.id || !Array.isArray(bb.ribItems)) {
+        throw new Error('Invalid product data: backbone missing id or ribItems');
+      }
+    }
+  }
   if (!data.sizeMapping) data.sizeMapping = [...DEFAULT_SIZE_MAPPING];
   if (!data.releases) data.releases = [];
   if (!data.sprints) data.sprints = [];

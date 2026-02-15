@@ -171,7 +171,7 @@ export default function SettingsView() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-lg font-semibold text-gray-900 mb-6">Settings</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Settings</h2>
 
       {/* Project Info */}
       <Section title="Project Details">
@@ -181,7 +181,7 @@ export default function SettingsView() {
               type="text"
               value={product.name}
               onChange={e => updateProduct(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
             />
           </Field>
           <Field label="Description">
@@ -204,7 +204,7 @@ export default function SettingsView() {
                 type="text"
                 value={m.label}
                 onChange={e => updateSizeMapping(i, 'label', e.target.value)}
-                className="w-24 border border-gray-300 rounded px-2 py-1.5 text-sm text-center"
+                className="w-24 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm text-center"
                 placeholder="Label"
               />
               <input
@@ -212,14 +212,14 @@ export default function SettingsView() {
                 value={m.points}
                 onChange={e => updateSizeMapping(i, 'points', e.target.value)}
                 onBlur={() => commitSizePoints(i)}
-                className="w-24 border border-gray-300 rounded px-2 py-1.5 text-sm text-center"
+                className="w-24 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm text-center"
                 placeholder="Points"
               />
-              <span className="text-xs text-gray-400">pts</span>
-              <button onClick={() => removeSize(i)} className="text-red-400 hover:text-red-600 text-sm ml-auto">Remove</button>
+              <span className="text-xs text-gray-400 dark:text-gray-500">pts</span>
+              <button onClick={() => removeSize(i)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm ml-auto">Remove</button>
             </div>
           ))}
-          <button onClick={addSize} className="text-sm text-blue-600 hover:text-blue-700 mt-2">+ Add Size</button>
+          <button onClick={addSize} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2">+ Add Size</button>
         </div>
       </Section>
 
@@ -239,7 +239,7 @@ export default function SettingsView() {
                   draggable
                   onDragStart={e => handleReleaseDragStart(e, r.id)}
                   onDragEnd={handleReleaseDragEnd}
-                  className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 select-none"
+                  className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 select-none"
                 >
                   <span className="text-sm leading-none">⠿</span>
                 </div>
@@ -247,30 +247,30 @@ export default function SettingsView() {
                   type="text"
                   value={r.name}
                   onChange={e => updateRelease(r.id, { name: e.target.value })}
-                  className="w-64 border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
                 />
                 <input
                   type="date"
                   value={r.targetDate || ''}
                   onChange={e => updateRelease(r.id, { targetDate: e.target.value || null })}
-                  className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-600"
+                  className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"
                 />
-                <button onClick={() => deleteRelease(r.id)} className="text-red-400 hover:text-red-600 text-sm">Delete</button>
+                <button onClick={() => deleteRelease(r.id)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm">Delete</button>
               </div>
             </div>
           ))}
-          <button onClick={addRelease} className="text-sm text-blue-600 hover:text-blue-700 mt-2">+ Add Release</button>
+          <button onClick={addRelease} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2">+ Add Release</button>
         </div>
       </Section>
 
       {/* Sprints */}
       <Section title="Sprints">
         <div className="flex items-center gap-3 mb-4">
-          <label className="text-xs font-medium text-gray-500">Sprint cadence</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Sprint cadence</label>
           <select
             value={product.sprintCadenceWeeks || 2}
             onChange={e => updateProduct(prev => ({ ...prev, sprintCadenceWeeks: parseInt(e.target.value, 10) || 2 }))}
-            className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-700"
+            className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm text-gray-700"
           >
             <option value={1}>1 week</option>
             <option value={2}>2 weeks</option>
@@ -280,23 +280,23 @@ export default function SettingsView() {
         </div>
         <div className="space-y-2">
           {product.sprints.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2">
+            <div key={s.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
               <input
                 type="text"
                 value={s.name}
                 onChange={e => updateSprint(s.id, { name: e.target.value })}
-                className="w-64 border border-gray-300 rounded px-2 py-1.5 text-sm"
+                className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
               />
               <input
                 type="date"
                 value={s.endDate || ''}
                 onChange={e => updateSprint(s.id, { endDate: e.target.value || null })}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-600"
+                className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"
               />
-              <button onClick={() => deleteSprint(s.id)} className="text-red-400 hover:text-red-600 text-sm">Delete</button>
+              <button onClick={() => deleteSprint(s.id)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm">Delete</button>
             </div>
           ))}
-          <button onClick={addSprint} className="text-sm text-blue-600 hover:text-blue-700 mt-2">+ Add Sprint</button>
+          <button onClick={addSprint} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2">+ Add Sprint</button>
         </div>
       </Section>
 
@@ -304,8 +304,8 @@ export default function SettingsView() {
       <Section title="Data">
         <div className="flex flex-wrap gap-3">
           <button onClick={handleExport} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Export as JSON</button>
-          <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-300">Import from JSON</button>
-          <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-lg border border-gray-200">Download Template</button>
+          <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import from JSON</button>
+          <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
         </div>
       </Section>
 
@@ -326,7 +326,7 @@ export default function SettingsView() {
 function Section({ title, children }) {
   return (
     <div className="mb-8">
-      <h3 className="text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">{title}</h3>
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">{title}</h3>
       {children}
     </div>
   );
@@ -335,7 +335,7 @@ function Section({ title, children }) {
 function Field({ label, children }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
       {children}
     </div>
   );
