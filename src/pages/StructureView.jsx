@@ -264,7 +264,7 @@ export default function StructureView() {
                                           >
                                             {/* Drag handle */}
                                             <div className="flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 opacity-0 group-hover/rib:opacity-100 transition-opacity">
-                                              <span className="text-[10px] leading-none select-none dark:text-gray-600">⠿</span>
+                                              <span className="text-sm leading-none select-none dark:text-gray-600">⠿</span>
                                             </div>
 
                                             {/* Name */}

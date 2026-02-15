@@ -158,12 +158,12 @@ function SizingRibCell({ cell, onDragStart, isDragging }) {
     >
       <div className="flex items-start justify-between gap-1">
         {locked ? (
-          <span className="text-[10px] leading-none text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5 select-none" title={`${cell.percentComplete}% complete`}>
+          <span className="text-sm leading-none text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5 px-0.5 select-none" title={`${cell.percentComplete}% complete`}>
             {cell.percentComplete >= 100 ? '✓' : `${cell.percentComplete}%`}
           </span>
         ) : (
           <span
-            className="text-[10px] leading-none text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 select-none"
+            className="text-sm leading-none text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 px-0.5 select-none"
             onPointerDown={(e) => {
               e.stopPropagation();
               e.preventDefault();
