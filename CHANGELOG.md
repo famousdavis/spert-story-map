@@ -8,6 +8,9 @@
 - **Progress table improvements** — Sprint column values display with `%` suffix; Points column shows done/total fraction (e.g. `18/20`); "Target" column renamed to "Alloc" for clarity
 - **Settings date labels** — Sprint dates labeled "Finish" and release dates labeled "Target" to clarify their purpose
 
+### Fixed
+- **Map rib card reorder** — Rib cards on the story map can now be reordered within a release lane and placed precisely when dragged across columns/releases. Fixed layout not respecting `releaseCardOrder`, per-column vs global index translation in card order mutations, and layout instability when `releaseCardOrder` was previously empty or sparse
+
 ### Refactored
 - Decomposed `StructureView` (413→228 LOC) — extracted `BackboneSection` and `RibRow` into `src/components/structure/`
 - Centralized theme color definitions in `src/lib/themeColors.js` — single source of truth for 8-color palette used across Structure view, story map headers, and backbone dots
@@ -15,9 +18,12 @@
 ### Technical
 - New file: `src/lib/themeColors.js` — `THEME_COLOR_OPTIONS`, `getThemeColorClasses()`, `DEFAULT_THEME_COLOR_KEYS`
 - New files: `src/components/structure/RibRow.jsx`, `src/components/structure/BackboneSection.jsx`
+- `mapMutations.js` — Added `spliceCardOrderByColumn` and `getColumnRibIds` helpers for backbone-aware card order insertion
+- `useMapLayout.js` — `computeLayout` now sorts cells by `releaseCardOrder`
 - Added `themeColors.test.js` (9 tests) for color palette and fallback logic
-- Added `reorderTheme` tests (5 tests) in `mapMutations.test.js`
-- 205 tests total across 10 test files
+- Added `reorderTheme` tests (5 tests) and rib drag placement tests (18 tests) in `mapMutations.test.js`
+- Added end-to-end rib drag tests verifying full flow: computeLayout → computeInsertIndex → mutation → computeLayout → verify
+- 224 tests total across 10 test files
 
 ## Version 0.9.0 (2026-02-14)
 

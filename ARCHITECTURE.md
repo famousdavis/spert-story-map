@@ -141,7 +141,7 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 7. **Debounced persistence** — Saves are debounced (500ms for products, 100ms for index) to avoid excessive writes during rapid edits, while `saveProductImmediate` is used for critical operations like create/import.
 
-8. **Interactive story map** — The visual map uses absolute positioning with a computed layout (`useMapLayout`). Pan/zoom is handled via CSS `transform` on a container div. Pointer events (not HTML5 DnD) power drag-and-drop with axis detection: after an 8px threshold, the dominant axis locks (X = backbone move, Y = release move). Window-level `pointermove`/`pointerup` listeners ensure reliable event delivery even when the pointer moves over child elements.
+8. **Interactive story map** — The visual map uses absolute positioning with a computed layout (`useMapLayout`). Pan/zoom is handled via CSS `transform` on a container div. Pointer events (not HTML5 DnD) power drag-and-drop: after an 8px threshold, rib drags are free-form 2D (track both release lane and backbone column simultaneously), backbone drags are X-axis only, theme drags are X-axis only. `computeLayout` sorts cells by `releaseCardOrder`; `mapMutations.js` translates per-column insert indices to global card order positions via `spliceCardOrderByColumn`. Window-level `pointermove`/`pointerup` listeners ensure reliable event delivery even when the pointer moves over child elements.
 
 9. **Undo/redo** — An in-memory stack of product snapshots (capped at 30) stored in `useProduct`. Every `updateProduct` call pushes the previous state onto the undo stack. Ctrl+Z pops undo, Ctrl+Shift+Z pops redo. No persistence — undo history resets on page refresh.
 
