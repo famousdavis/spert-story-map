@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, reorderTheme, moveRib2D, moveRibs2D } from '../components/storymap/mapMutations';
+import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, reorderTheme, moveRib2D, moveRibs2D, transferAllocation } from '../components/storymap/mapMutations';
 import { computeLayout, CELL_HEIGHT, CELL_GAP, CELL_PAD } from '../components/storymap/useMapLayout';
 import { computeInsertIndex } from '../components/storymap/mapDragHelpers';
 
@@ -1159,5 +1159,45 @@ describe('end-to-end rib drag placement', () => {
 
     const layout2 = computeLayout(result);
     expect(getCellOrder(layout2, 'b2', 'rel-B')).toEqual(['r3', 'r1', 'r4']);
+  });
+});
+
+// --- transferAllocation ---
+describe('transferAllocation', () => {
+  it('clears allocations when moving to unassigned', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: 'note' }]);
+    expect(transferAllocation(rib, 'rel-A', null)).toEqual([]);
+  });
+
+  it('creates fresh allocation when moving from unassigned', () => {
+    const rib = makeRib('r1');
+    expect(transferAllocation(rib, null, 'rel-B')).toEqual([
+      { releaseId: 'rel-B', percentage: 100, memo: '' },
+    ]);
+  });
+
+  it('swaps allocation from one release to another', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 60, memo: 'keep' }]);
+    const result = transferAllocation(rib, 'rel-A', 'rel-B');
+    expect(result).toEqual([{ releaseId: 'rel-B', percentage: 60, memo: 'keep' }]);
+  });
+
+  it('returns null when rib already has the target release (duplicate guard)', () => {
+    const rib = makeRib('r1', [
+      { releaseId: 'rel-A', percentage: 50, memo: '' },
+      { releaseId: 'rel-B', percentage: 50, memo: '' },
+    ]);
+    expect(transferAllocation(rib, 'rel-A', 'rel-B')).toBeNull();
+  });
+
+  it('preserves other allocations during release-to-release transfer', () => {
+    const rib = makeRib('r1', [
+      { releaseId: 'rel-A', percentage: 40, memo: '' },
+      { releaseId: 'rel-C', percentage: 60, memo: 'other' },
+    ]);
+    const result = transferAllocation(rib, 'rel-A', 'rel-B');
+    expect(result).toHaveLength(2);
+    expect(result.find(a => a.releaseId === 'rel-C')).toEqual({ releaseId: 'rel-C', percentage: 60, memo: 'other' });
+    expect(result.find(a => a.releaseId === 'rel-B')).toEqual({ releaseId: 'rel-B', percentage: 40, memo: '' });
   });
 });

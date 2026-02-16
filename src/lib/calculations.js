@@ -205,32 +205,13 @@ export function getSizingDistribution(product) {
   return dist;
 }
 
-export function getThemeStats(theme, sizeMapping) {
+export function computeItemStats(ribItems, sizeMapping) {
   let totalItems = 0;
   let totalPoints = 0;
   let completedPoints = 0;
-  let unsized = 0;
-  for (const backbone of theme.backboneItems) {
-    for (const rib of backbone.ribItems) {
-      totalItems++;
-      const pts = getRibItemPoints(rib, sizeMapping);
-      totalPoints += pts;
-      const pctComplete = getRibItemPercentComplete(rib);
-      completedPoints += Math.round(pts * pctComplete / 100);
-      if (!rib.size) unsized++;
-    }
-  }
-  const percentComplete = totalPoints > 0 ? Math.round(completedPoints / totalPoints * 100) : 0;
-  return { totalItems, totalPoints, unsized, percentComplete };
-}
-
-export function getBackboneStats(backbone, sizeMapping) {
-  let totalItems = 0;
-  let totalPoints = 0;
-  let completedPoints = 0;
-  let unsized = 0;
   let remainingPoints = 0;
-  for (const rib of backbone.ribItems) {
+  let unsized = 0;
+  for (const rib of ribItems) {
     totalItems++;
     const pts = getRibItemPoints(rib, sizeMapping);
     totalPoints += pts;
@@ -241,6 +222,15 @@ export function getBackboneStats(backbone, sizeMapping) {
   }
   const percentComplete = totalPoints > 0 ? Math.round(completedPoints / totalPoints * 100) : 0;
   return { totalItems, totalPoints, unsized, remainingPoints, percentComplete };
+}
+
+export function getThemeStats(theme, sizeMapping) {
+  const allRibs = theme.backboneItems.flatMap(b => b.ribItems);
+  return computeItemStats(allRibs, sizeMapping);
+}
+
+export function getBackboneStats(backbone, sizeMapping) {
+  return computeItemStats(backbone.ribItems, sizeMapping);
 }
 
 export function getProgressOverTime(product) {

@@ -1,4 +1,6 @@
-export default function SprintSummaryCard({ summary, formatDate }) {
+import { formatDate } from '../../lib/formatDate';
+
+export default function SprintSummaryCard({ summary }) {
   return (
     <div className="mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-5 py-4 space-y-3">
       <div className="flex items-center gap-8">

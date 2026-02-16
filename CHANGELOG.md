@@ -1,5 +1,25 @@
 # Changelog
 
+## Version 0.11.1 (2026-02-15)
+
+### Fixed
+- **Settings dark mode** — Description textarea was missing dark mode classes, appearing as a white box in dark theme
+
+### Refactored
+- **DRY mapMutations.js** (443 → ~310 LOC) — Extracted `transferAllocation`, `moveRibBetweenBackbones`, and `applyAllocationTransfer` helpers, eliminating 4× duplication of allocation-transfer logic across `moveRibToRelease`, `moveRib2D`, `moveRibs2D`, and `ReleasePlanningView`
+- **Extracted GroupSummaryHeader** — Moved from inline definition in `ProgressTrackingView.jsx` to `src/components/progress/GroupSummaryHeader.jsx`
+- **Extracted formatDate utility** — Moved to `src/lib/formatDate.js`, imported directly by `SprintSummaryCard`, `ProgressRow`, and `CommentPanel` instead of prop drilling through 3 layers
+- **Unified stats computation** — Extracted `computeItemStats` in `calculations.js`, shared by `getThemeStats` and `getBackboneStats`
+- **Improved formatDate** — Added `isNaN` guard for invalid date strings
+
+### Technical
+- New file: `src/lib/formatDate.js` — shared date formatting utility
+- New file: `src/components/progress/GroupSummaryHeader.jsx` — extracted collapsible group header component
+- New test file: `src/__tests__/formatDate.test.js` (4 tests)
+- Added `transferAllocation` tests in `mapMutations.test.js` (5 tests)
+- Added `computeItemStats` tests in `calculations.test.js` (2 tests)
+- 281 tests total across 13 test files
+
 ## Version 0.11.0 (2026-02-15)
 
 ### Added

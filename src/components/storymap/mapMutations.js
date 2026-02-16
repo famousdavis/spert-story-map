@@ -92,6 +92,89 @@ function getColumnRibIds(themes, backboneId, releaseId, excludeRibId) {
   return ids;
 }
 
+// ─── Shared pure helpers ────────────────────────────────────────────
+
+/**
+ * Compute new releaseAllocations for a rib being moved between releases.
+ * Returns new allocations array, or null if rib should be left unchanged
+ * (e.g. duplicate release guard).
+ */
+export function transferAllocation(rib, fromReleaseId, toReleaseId) {
+  if (toReleaseId === null) {
+    // Moving to unassigned — clear all allocations
+    return [];
+  }
+  if (fromReleaseId === null) {
+    // Moving from unassigned — create a fresh allocation
+    return [{ releaseId: toReleaseId, percentage: 100, memo: '' }];
+  }
+  // Release → release: guard against duplicate
+  if (rib.releaseAllocations.some(a => a.releaseId === toReleaseId)) {
+    return null; // already has target release
+  }
+  const oldAlloc = rib.releaseAllocations.find(a => a.releaseId === fromReleaseId);
+  const pct = oldAlloc ? oldAlloc.percentage : 100;
+  const memo = oldAlloc?.memo || '';
+  return rib.releaseAllocations
+    .filter(a => a.releaseId !== fromReleaseId)
+    .concat({ releaseId: toReleaseId, percentage: pct, memo });
+}
+
+/**
+ * Remove a rib from its source backbone/theme and add it to a target.
+ * Returns { themes, ribData } or null if the rib wasn't found.
+ */
+function moveRibBetweenBackbones(themes, ribId, fromThemeId, fromBackboneId, toThemeId, toBackboneId) {
+  let ribData = null;
+
+  // 1. Remove rib from source backbone
+  const stripped = themes.map(t => {
+    if (t.id !== fromThemeId) return t;
+    return {
+      ...t,
+      backboneItems: t.backboneItems.map(b => {
+        if (b.id !== fromBackboneId) return b;
+        const rib = b.ribItems.find(r => r.id === ribId);
+        if (rib) ribData = { ...rib };
+        return { ...b, ribItems: b.ribItems.filter(r => r.id !== ribId) };
+      }),
+    };
+  });
+
+  if (!ribData) return null;
+
+  // 2. Add rib to target backbone
+  const result = stripped.map(t => {
+    if (t.id !== toThemeId) return t;
+    return {
+      ...t,
+      backboneItems: t.backboneItems.map(b => {
+        if (b.id !== toBackboneId) return b;
+        return { ...b, ribItems: [...b.ribItems, { ...ribData, order: b.ribItems.length + 1 }] };
+      }),
+    };
+  });
+
+  return { themes: result, ribData };
+}
+
+/** Apply transferAllocation to a single rib across all themes. */
+function applyAllocationTransfer(themes, ribId, fromReleaseId, toReleaseId) {
+  return themes.map(t => ({
+    ...t,
+    backboneItems: t.backboneItems.map(b => ({
+      ...b,
+      ribItems: b.ribItems.map(r => {
+        if (r.id !== ribId) return r;
+        const newAlloc = transferAllocation(r, fromReleaseId, toReleaseId);
+        return newAlloc !== null ? { ...r, releaseAllocations: newAlloc } : r;
+      }),
+    })),
+  }));
+}
+
+// ─── Exported mutation functions ────────────────────────────────────
+
 /**
  * Move a rib item from one release lane to another (Y-axis drag).
  * Handles unassigned ↔ assigned transitions and updates releaseCardOrder.
@@ -100,37 +183,7 @@ export function moveRibToRelease(updateProduct, ribId, fromReleaseId, toReleaseI
   updateProduct(prev => {
     const next = {
       ...prev,
-      themes: prev.themes.map(t => ({
-        ...t,
-        backboneItems: t.backboneItems.map(b => ({
-          ...b,
-          ribItems: b.ribItems.map(r => {
-            if (r.id !== ribId) return r;
-
-            let newAllocations;
-            if (toReleaseId === null) {
-              // Moving to unassigned — clear all allocations
-              newAllocations = [];
-            } else if (fromReleaseId === null) {
-              // Moving from unassigned — create a fresh allocation
-              newAllocations = [{ releaseId: toReleaseId, percentage: 100, memo: '' }];
-            } else {
-              // Transfer allocation from one release to another
-              // Guard: if target release already has an allocation, skip (no duplicate)
-              if (r.releaseAllocations.some(a => a.releaseId === toReleaseId)) {
-                return r;
-              }
-              const oldAlloc = r.releaseAllocations.find(a => a.releaseId === fromReleaseId);
-              const pct = oldAlloc ? oldAlloc.percentage : 100;
-              const memo = oldAlloc?.memo || '';
-              newAllocations = r.releaseAllocations
-                .filter(a => a.releaseId !== fromReleaseId)
-                .concat({ releaseId: toReleaseId, percentage: pct, memo });
-            }
-            return { ...r, releaseAllocations: newAllocations };
-          }),
-        })),
-      })),
+      themes: applyAllocationTransfer(prev.themes, ribId, fromReleaseId, toReleaseId),
     };
 
     const cardOrder = { ...(next.releaseCardOrder || {}) };
@@ -166,37 +219,9 @@ export function reorderRibInRelease(updateProduct, ribId, releaseId, insertIndex
  */
 export function moveRibToBackbone(updateProduct, ribId, fromThemeId, fromBackboneId, toThemeId, toBackboneId) {
   updateProduct(prev => {
-    let ribData = null;
-
-    // 1. Remove rib from source backbone
-    const themes = prev.themes.map(t => {
-      if (t.id !== fromThemeId) return t;
-      return {
-        ...t,
-        backboneItems: t.backboneItems.map(b => {
-          if (b.id !== fromBackboneId) return b;
-          const rib = b.ribItems.find(r => r.id === ribId);
-          if (rib) ribData = { ...rib };
-          return { ...b, ribItems: b.ribItems.filter(r => r.id !== ribId) };
-        }),
-      };
-    });
-
-    if (!ribData) return prev;
-
-    // 2. Add rib to target backbone
-    const themesWithRib = themes.map(t => {
-      if (t.id !== toThemeId) return t;
-      return {
-        ...t,
-        backboneItems: t.backboneItems.map(b => {
-          if (b.id !== toBackboneId) return b;
-          return { ...b, ribItems: [...b.ribItems, { ...ribData, order: b.ribItems.length + 1 }] };
-        }),
-      };
-    });
-
-    return { ...prev, themes: themesWithRib };
+    const result = moveRibBetweenBackbones(prev.themes, ribId, fromThemeId, fromBackboneId, toThemeId, toBackboneId);
+    if (!result) return prev;
+    return { ...prev, themes: result.themes };
   });
 }
 
@@ -274,61 +299,14 @@ export function moveRib2D(updateProduct, ribId, from, to) {
 
     // 1. Move backbone if changed
     if (backboneChanged) {
-      let ribData = null;
-      const themes = next.themes.map(t => {
-        if (t.id !== from.themeId) return t;
-        return {
-          ...t,
-          backboneItems: t.backboneItems.map(b => {
-            if (b.id !== from.backboneId) return b;
-            const rib = b.ribItems.find(r => r.id === ribId);
-            if (rib) ribData = { ...rib };
-            return { ...b, ribItems: b.ribItems.filter(r => r.id !== ribId) };
-          }),
-        };
-      });
-      if (!ribData) return prev;
-      const themesWithRib = themes.map(t => {
-        if (t.id !== to.themeId) return t;
-        return {
-          ...t,
-          backboneItems: t.backboneItems.map(b => {
-            if (b.id !== to.backboneId) return b;
-            return { ...b, ribItems: [...b.ribItems, { ...ribData, order: b.ribItems.length + 1 }] };
-          }),
-        };
-      });
-      next = { ...next, themes: themesWithRib };
+      const result = moveRibBetweenBackbones(next.themes, ribId, from.themeId, from.backboneId, to.themeId, to.backboneId);
+      if (!result) return prev;
+      next = { ...next, themes: result.themes };
     }
 
     // 2. Move release if changed
     if (releaseChanged) {
-      next = {
-        ...next,
-        themes: next.themes.map(t => ({
-          ...t,
-          backboneItems: t.backboneItems.map(b => ({
-            ...b,
-            ribItems: b.ribItems.map(r => {
-              if (r.id !== ribId) return r;
-              const fromId = from.releaseId;
-              const toId = to.releaseId;
-              if (toId === null) return { ...r, releaseAllocations: [] };
-              if (fromId === null) return { ...r, releaseAllocations: [{ releaseId: toId, percentage: 100, memo: '' }] };
-              if (r.releaseAllocations.some(a => a.releaseId === toId)) return r;
-              const oldAlloc = r.releaseAllocations.find(a => a.releaseId === fromId);
-              const pct = oldAlloc ? oldAlloc.percentage : 100;
-              const memo = oldAlloc?.memo || '';
-              return {
-                ...r,
-                releaseAllocations: r.releaseAllocations
-                  .filter(a => a.releaseId !== fromId)
-                  .concat({ releaseId: toId, percentage: pct, memo }),
-              };
-            }),
-          })),
-        })),
-      };
+      next = { ...next, themes: applyAllocationTransfer(next.themes, ribId, from.releaseId, to.releaseId) };
     }
 
     // 3. Update card order — needed whenever backbone or release changes
@@ -364,61 +342,14 @@ export function moveRibs2D(updateProduct, entries, to) {
       const releaseChanged = entry.fromReleaseId !== to.releaseId;
 
       if (backboneChanged) {
-        let ribData = null;
-        const themes = next.themes.map(t => {
-          if (t.id !== entry.fromThemeId) return t;
-          return {
-            ...t,
-            backboneItems: t.backboneItems.map(b => {
-              if (b.id !== entry.fromBackboneId) return b;
-              const rib = b.ribItems.find(r => r.id === entry.ribId);
-              if (rib) ribData = { ...rib };
-              return { ...b, ribItems: b.ribItems.filter(r => r.id !== entry.ribId) };
-            }),
-          };
-        });
-        if (ribData) {
-          const themesWithRib = themes.map(t => {
-            if (t.id !== to.themeId) return t;
-            return {
-              ...t,
-              backboneItems: t.backboneItems.map(b => {
-                if (b.id !== to.backboneId) return b;
-                return { ...b, ribItems: [...b.ribItems, { ...ribData, order: b.ribItems.length + 1 }] };
-              }),
-            };
-          });
-          next = { ...next, themes: themesWithRib };
+        const result = moveRibBetweenBackbones(next.themes, entry.ribId, entry.fromThemeId, entry.fromBackboneId, to.themeId, to.backboneId);
+        if (result) {
+          next = { ...next, themes: result.themes };
         }
       }
 
       if (releaseChanged) {
-        next = {
-          ...next,
-          themes: next.themes.map(t => ({
-            ...t,
-            backboneItems: t.backboneItems.map(b => ({
-              ...b,
-              ribItems: b.ribItems.map(r => {
-                if (r.id !== entry.ribId) return r;
-                const fromId = entry.fromReleaseId;
-                const toId = to.releaseId;
-                if (toId === null) return { ...r, releaseAllocations: [] };
-                if (fromId === null) return { ...r, releaseAllocations: [{ releaseId: toId, percentage: 100, memo: '' }] };
-                if (r.releaseAllocations.some(a => a.releaseId === toId)) return r;
-                const oldAlloc = r.releaseAllocations.find(a => a.releaseId === fromId);
-                const pct = oldAlloc ? oldAlloc.percentage : 100;
-                const memo = oldAlloc?.memo || '';
-                return {
-                  ...r,
-                  releaseAllocations: r.releaseAllocations
-                    .filter(a => a.releaseId !== fromId)
-                    .concat({ releaseId: toId, percentage: pct, memo }),
-                };
-              }),
-            })),
-          })),
-        };
+        next = { ...next, themes: applyAllocationTransfer(next.themes, entry.ribId, entry.fromReleaseId, to.releaseId) };
       }
 
       // Update card order — needed whenever backbone or release changes

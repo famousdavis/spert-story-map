@@ -1,3 +1,5 @@
+import { formatDate } from '../../lib/formatDate';
+
 /**
  * Expandable comment/notes panel for a progress table row.
  * Shows current sprint's comment input + history of past notes.
@@ -5,7 +7,7 @@
 export default function CommentPanel({
   rib, sprint, selectedSprint, rowKey,
   savedComment, commentDrafts, setCommentDrafts,
-  updateComment, getCommentHistory, formatDate, editable,
+  updateComment, getCommentHistory, editable,
 }) {
   const draft = commentDrafts[rowKey] ?? savedComment;
   const history = getCommentHistory(rib, rib._releaseId);

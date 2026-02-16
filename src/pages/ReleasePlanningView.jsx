@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { getAllRibItems, getPointsForRelease, getCoreNonCorePointsForRelease, getTotalProjectPoints, getCoreNonCorePoints, getReleasePercentComplete } from '../lib/calculations';
 import { deleteReleaseFromProduct } from '../lib/settingsMutations';
+import { transferAllocation } from '../components/storymap/mapMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
 import ReleaseColumn from '../components/releases/ReleaseColumn';
 import AllocationModal from '../components/releases/AllocationModal';
@@ -139,29 +140,19 @@ export default function ReleasePlanningView() {
 
       // 1. Handle allocation change for cross-column moves
       if (!sameColumn) {
-        let newAllocations;
-        if (targetCol === 'unassigned') {
-          newAllocations = [];
-        } else if (dragFromCol === 'unassigned') {
-          newAllocations = [{ releaseId: targetCol, percentage: 100, memo: '' }];
-        } else {
-          const oldAlloc = rib.releaseAllocations.find(a => a.releaseId === dragFromCol);
-          const pct = oldAlloc ? oldAlloc.percentage : 100;
-          const memo = oldAlloc?.memo || '';
-          newAllocations = rib.releaseAllocations
-            .filter(a => a.releaseId !== dragFromCol)
-            .concat({ releaseId: targetCol, percentage: pct, memo });
-        }
-
+        const fromId = dragFromCol === 'unassigned' ? null : dragFromCol;
+        const toId = targetCol === 'unassigned' ? null : targetCol;
         next = {
           ...next,
           themes: next.themes.map(t => ({
             ...t,
             backboneItems: t.backboneItems.map(b => ({
               ...b,
-              ribItems: b.ribItems.map(r =>
-                r.id === dragRibId ? { ...r, releaseAllocations: newAllocations } : r
-              ),
+              ribItems: b.ribItems.map(r => {
+                if (r.id !== dragRibId) return r;
+                const newAlloc = transferAllocation(r, fromId, toId);
+                return newAlloc !== null ? { ...r, releaseAllocations: newAlloc } : r;
+              }),
             })),
           })),
         };

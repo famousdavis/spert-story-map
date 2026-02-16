@@ -18,6 +18,7 @@ import {
   getSizingDistribution,
   getThemeStats,
   getBackboneStats,
+  computeItemStats,
   getProgressOverTime,
   getSprintSummary,
   getReleaseProgressOverTime,
@@ -366,6 +367,28 @@ describe('getSizingDistribution', () => {
     expect(dist['M']).toBe(1);
     expect(dist['L']).toBe(0);
     expect(dist['Unsized']).toBe(1);
+  });
+});
+
+// --- computeItemStats ---
+describe('computeItemStats', () => {
+  it('returns zeroed stats for empty list', () => {
+    const stats = computeItemStats([], SIZE_MAPPING);
+    expect(stats).toEqual({ totalItems: 0, totalPoints: 0, unsized: 0, remainingPoints: 0, percentComplete: 0 });
+  });
+
+  it('computes stats for mixed items with progress', () => {
+    const items = [
+      makeRib('r1', { size: 'S', history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 100 }] }),
+      makeRib('r2', { size: 'M' }), // no progress
+      makeRib('r3'), // unsized
+    ];
+    const stats = computeItemStats(items, SIZE_MAPPING);
+    expect(stats.totalItems).toBe(3);
+    expect(stats.totalPoints).toBe(30); // 10 + 20 + 0
+    expect(stats.unsized).toBe(1);
+    expect(stats.remainingPoints).toBe(20); // 0 + 20 + 0
+    expect(stats.percentComplete).toBe(33); // 10/30 = 33%
   });
 });
 

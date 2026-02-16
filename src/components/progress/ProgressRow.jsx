@@ -8,7 +8,7 @@ export default function ProgressRow({
   showTargetCol, totalCols, expandedRows, toggleRow,
   commentDrafts, setCommentDrafts, progressDrafts, setProgressDrafts,
   getSprintPct, getCurrentPct, getDelta, getCommentCount, getCommentHistory,
-  updateProgress, removeProgress, updateComment, formatDate, sizeMapping,
+  updateProgress, removeProgress, updateComment, sizeMapping,
 }) {
   const rowKey = `${rib.id}-${rib._releaseId || idx}`;
   const isExpanded = expandedRows.has(rowKey);
@@ -152,7 +152,6 @@ export default function ProgressRow({
               setCommentDrafts={setCommentDrafts}
               updateComment={updateComment}
               getCommentHistory={getCommentHistory}
-              formatDate={formatDate}
               editable={rib._editable}
             />
           </td>
