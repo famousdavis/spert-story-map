@@ -28,7 +28,8 @@ src/
 │   ├── progressMutations.js         # Shared progress tracking helpers (update, remove, comment)
 │   ├── settingsMutations.js         # Pure cascade deletion (release, sprint) + releaseHasAllocations
 │   ├── ribHelpers.js                # forEachRib / reduceRibs traversal utilities
-│   └── themeColors.js               # Centralized 8-color palette for themes (solid, light, dot, swatch)
+│   ├── themeColors.js               # Centralized 8-color palette for themes (solid, light, dot, swatch)
+│   └── exportForForecaster.js       # Pure transformation: Story Map → SPERT Release Forecaster import format
 │
 ├── hooks/
 │   ├── useProduct.js                 # Load/save product state with debounced persistence
@@ -155,3 +156,7 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 13. **Dark mode** — Class-based dark mode using Tailwind CSS 4's `@custom-variant dark`. The `.dark` class toggles on `<html>`. A synchronous inline script in `index.html` reads localStorage before React renders to prevent FOUC. The `useDarkMode` hook manages state, persists preference to `spert-theme` in localStorage, and falls back to `prefers-color-scheme`. Recharts components use conditional JS hex values (not Tailwind classes) via `isDark` from the hook.
 
 14. **Theme colors** — Each theme has an optional `color` field (e.g. `'blue'`, `'teal'`). `themeColors.js` defines 8 color options with Tailwind classes for solid (theme header), light (backbone header), dot, and swatch contexts. `getThemeColorClasses(theme, index)` resolves the color: uses `theme.color` if set, otherwise falls back to index-based cycling. No schema migration needed — themes without a `color` field use the fallback.
+
+15. **Forecaster export** — `exportForForecaster.js` transforms Story Map data into the SPERT Release Forecaster's import format. Releases map to milestones with incremental `backlogSize` (per-release allocated points, not cumulative). Sprint velocity (`doneValue`) is computed via delta-percent math: `Σ(ribPoints × (pctAsOf − pctPrev) / 100)` using `getRibItemPercentCompleteAsOf`. Zero-point releases are skipped. The export is a pure function with no side effects; `downloadForecasterExport` handles the browser download.
+
+16. **Collapsible group summaries** — Progress tab group headers display item count, total points, % done, and a mini progress bar. Groups are collapsible via a `collapsedGroups` Set (reset on groupBy or sprint change). Release groups use `getReleasePercentComplete` (allocation-weighted); backbone/theme groups compute a weighted average from visible group items. Release Planning column headers also show a progress bar via the same `ProgressBar` component.

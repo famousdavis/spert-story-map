@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-  getAllRibItems, getRibItemPercentComplete,
+  getAllRibItems, getRibItemPercentComplete, getRibItemPoints,
   getReleasePercentComplete, getProgressOverTime,
   getRibReleaseProgressForSprint, getRibReleaseProgress, getSprintSummary,
 } from '../lib/calculations';
@@ -17,6 +17,40 @@ import SprintSummaryCard from '../components/progress/SprintSummaryCard';
 import BurnUpChart from '../components/progress/BurnUpChart';
 import ProgressRow from '../components/progress/ProgressRow';
 
+function GroupSummaryHeader({ label, items, sizeMapping, groupBy, releaseId, product, collapsed, onToggle }) {
+  const totalItems = items.length;
+  const totalPoints = items.reduce((sum, rib) => sum + getRibItemPoints(rib, sizeMapping), 0);
+
+  let percentComplete;
+  if (groupBy === 'release' && releaseId) {
+    percentComplete = getReleasePercentComplete(product, releaseId);
+  } else if (totalPoints === 0) {
+    percentComplete = 0;
+  } else {
+    const completedPoints = items.reduce((sum, rib) => {
+      const pts = getRibItemPoints(rib, sizeMapping);
+      return sum + pts * getRibItemPercentComplete(rib) / 100;
+    }, 0);
+    percentComplete = (completedPoints / totalPoints) * 100;
+  }
+
+  return (
+    <button onClick={onToggle} className="flex items-center gap-2 w-full text-left mb-2">
+      <span className={`text-gray-400 dark:text-gray-500 text-xs transition-transform duration-150 ${collapsed ? '' : 'rotate-90'}`}>&#9654;</span>
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{label}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {totalItems} items &middot; {totalPoints} pts &middot;{' '}
+        <span className={Math.round(percentComplete) === 100 ? 'text-emerald-700 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}>
+          {Math.round(percentComplete)}% done
+        </span>
+      </span>
+      <div className="flex-1 max-w-32">
+        <ProgressBar percent={percentComplete} height="h-1.5" />
+      </div>
+    </button>
+  );
+}
+
 export default function ProgressTrackingView() {
   const { product, updateProduct } = useOutletContext();
   const { addSprint } = useProductMutations(updateProduct);
@@ -29,13 +63,20 @@ export default function ProgressTrackingView() {
   const [showReleaseBars, setShowReleaseBars] = useState(false);
   const [showChart, setShowChart] = useState(false);
   const [progressDrafts, setProgressDrafts] = useState({});
-  // Track previous sprint selection to reset transient state on change
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  // Track previous sprint/groupBy to reset transient state on change
   const [lastSprint, setLastSprint] = useState(selectedSprint);
+  const [lastGroupBy, setLastGroupBy] = useState(groupBy);
   if (lastSprint !== selectedSprint) {
     setLastSprint(selectedSprint);
     setExpandedRows(new Set());
     setCommentDrafts({});
     setProgressDrafts({});
+    setCollapsedGroups(new Set());
+  }
+  if (lastGroupBy !== groupBy) {
+    setLastGroupBy(groupBy);
+    setCollapsedGroups(new Set());
   }
 
   const toggleRow = (rowKey) => {
@@ -43,6 +84,15 @@ export default function ProgressTrackingView() {
       const next = new Set(prev);
       if (next.has(rowKey)) next.delete(rowKey);
       else next.add(rowKey);
+      return next;
+    });
+  };
+
+  const toggleGroup = (groupKey) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
       return next;
     });
   };
@@ -143,7 +193,7 @@ export default function ProgressTrackingView() {
         key = rib.themeId;
         label = rib.themeName;
       }
-      if (!groups[key]) groups[key] = { label, items: [] };
+      if (!groups[key]) groups[key] = { label, entityId: key, items: [] };
       groups[key].items.push({
         ...rib,
         _releaseId: null,
@@ -332,59 +382,74 @@ export default function ProgressTrackingView() {
         </div>
       ) : (
         <div className="space-y-6">
-          {grouped.map(group => (
-            <div key={group.label}>
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{group.label}</h3>
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400">
-                      <th className="text-left px-3 py-2 font-medium" style={{ width: '40%' }}>Rib Item</th>
-                      <th className="text-center px-2 py-2 font-medium w-12">Size</th>
-                      <th className="text-center px-2 py-2 font-medium w-12">Pts</th>
-                      {showTargetCol && <th className="text-center px-2 py-2 font-medium w-14">Alloc</th>}
-                      <th className="text-center px-2 py-2 font-medium w-16">Done</th>
-                      <th className="text-center px-2 py-2 font-medium w-20">
-                        {sprint?.name || 'Sprint'}
-                      </th>
-                      {prevSprint && <th className="text-center px-2 py-2 font-medium w-14">Δ</th>}
-                      <th className="px-2 py-2 font-medium w-24">Progress</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                    {group.items.map((rib, idx) => (
-                      <ProgressRow
-                        key={`${rib.id}-${rib._releaseId || idx}`}
-                        rib={rib}
-                        idx={idx}
-                        sprint={sprint}
-                        prevSprint={prevSprint}
-                        selectedSprint={selectedSprint}
-                        showTargetCol={showTargetCol}
-                        totalCols={totalCols}
-                        expandedRows={expandedRows}
-                        toggleRow={toggleRow}
-                        commentDrafts={commentDrafts}
-                        setCommentDrafts={setCommentDrafts}
-                        progressDrafts={progressDrafts}
-                        setProgressDrafts={setProgressDrafts}
-                        getSprintPct={getSprintPct}
-                        getCurrentPct={getCurrentPct}
-                        getDelta={getDelta}
-                        getCommentCount={getCommentCount}
-                        getCommentHistory={getCommentHistory}
-                        updateProgress={updateProgress}
-                        removeProgress={removeProgress}
-                        updateComment={updateComment}
-                        formatDate={formatDate}
-                        sizeMapping={product.sizeMapping}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+          {grouped.map(group => {
+            const groupKey = group.releaseId || group.entityId;
+            const isCollapsed = collapsedGroups.has(groupKey);
+            return (
+              <div key={groupKey}>
+                <GroupSummaryHeader
+                  label={group.label}
+                  items={group.items}
+                  sizeMapping={product.sizeMapping}
+                  groupBy={groupBy}
+                  releaseId={group.releaseId}
+                  product={product}
+                  collapsed={isCollapsed}
+                  onToggle={() => toggleGroup(groupKey)}
+                />
+                {!isCollapsed && (
+                  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400">
+                          <th className="text-left px-3 py-2 font-medium" style={{ width: '40%' }}>Rib Item</th>
+                          <th className="text-center px-2 py-2 font-medium w-12">Size</th>
+                          <th className="text-center px-2 py-2 font-medium w-12">Pts</th>
+                          {showTargetCol && <th className="text-center px-2 py-2 font-medium w-14">Alloc</th>}
+                          <th className="text-center px-2 py-2 font-medium w-16">Done</th>
+                          <th className="text-center px-2 py-2 font-medium w-20">
+                            {sprint?.name || 'Sprint'}
+                          </th>
+                          {prevSprint && <th className="text-center px-2 py-2 font-medium w-14">Δ</th>}
+                          <th className="px-2 py-2 font-medium w-24">Progress</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                        {group.items.map((rib, idx) => (
+                          <ProgressRow
+                            key={`${rib.id}-${rib._releaseId || idx}`}
+                            rib={rib}
+                            idx={idx}
+                            sprint={sprint}
+                            prevSprint={prevSprint}
+                            selectedSprint={selectedSprint}
+                            showTargetCol={showTargetCol}
+                            totalCols={totalCols}
+                            expandedRows={expandedRows}
+                            toggleRow={toggleRow}
+                            commentDrafts={commentDrafts}
+                            setCommentDrafts={setCommentDrafts}
+                            progressDrafts={progressDrafts}
+                            setProgressDrafts={setProgressDrafts}
+                            getSprintPct={getSprintPct}
+                            getCurrentPct={getCurrentPct}
+                            getDelta={getDelta}
+                            getCommentCount={getCommentCount}
+                            getCommentHistory={getCommentHistory}
+                            updateProgress={updateProgress}
+                            removeProgress={removeProgress}
+                            updateComment={updateComment}
+                            formatDate={formatDate}
+                            sizeMapping={product.sizeMapping}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

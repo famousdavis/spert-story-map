@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { getAllRibItems, getPointsForRelease, getCoreNonCorePointsForRelease, getTotalProjectPoints, getCoreNonCorePoints } from '../lib/calculations';
+import { getAllRibItems, getPointsForRelease, getCoreNonCorePointsForRelease, getTotalProjectPoints, getCoreNonCorePoints, getReleasePercentComplete } from '../lib/calculations';
 import { deleteReleaseFromProduct } from '../lib/settingsMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
 import ReleaseColumn from '../components/releases/ReleaseColumn';
@@ -307,6 +307,7 @@ export default function ReleasePlanningView() {
               stats={{
                 totalPts: Math.round(getPointsForRelease(product, release.id)),
                 ...getCoreNonCorePointsForRelease(product, release.id),
+                percentComplete: getReleasePercentComplete(product, release.id),
               }}
               product={product}
               dragRibId={dragRibId}

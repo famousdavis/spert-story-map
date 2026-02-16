@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import RibCard from './RibCard';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import ProgressBar from '../ui/ProgressBar';
 import { useTooltip } from '../ui/Tooltip';
 
 /**
@@ -136,6 +137,11 @@ export default function ReleaseColumn({
               <span className="text-gray-400 dark:text-gray-500">{Math.round(stats.nonCore)} non-core</span>
               <span>{ribs.length} items</span>
             </div>
+            {stats.percentComplete !== undefined && (
+              <div className="mt-1.5">
+                <ProgressBar percent={stats.percentComplete} height="h-1.5" showLabel />
+              </div>
+            )}
             {release.targetDate && (
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Target: {new Date(release.targetDate).toLocaleDateString()}</p>
             )}
