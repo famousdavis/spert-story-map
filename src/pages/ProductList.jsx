@@ -28,6 +28,7 @@ export default function ProductList() {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importConfirm, setImportConfirm] = useState(null);
   const [showWarning, setShowWarning] = useState(true);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useDarkMode();
@@ -69,14 +70,23 @@ export default function ProductList() {
   };
 
   const handleImport = () => {
-    readImportFile((product) => {
-      const existing = loadProduct(product.id);
+    readImportFile((imported) => {
+      const existing = loadProduct(imported.id);
       if (existing) {
-        if (!window.confirm(`A project with the same ID already exists ("${existing.name}"). Overwrite it?`)) return;
+        setImportConfirm({ product: imported, existingName: existing.name });
+      } else {
+        saveProductImmediate(imported);
+        refresh();
       }
-      saveProductImmediate(product);
-      refresh();
     });
+  };
+
+  const confirmImport = () => {
+    if (importConfirm) {
+      saveProductImmediate(importConfirm.product);
+      setImportConfirm(null);
+      refresh();
+    }
   };
 
   return (
@@ -112,7 +122,7 @@ export default function ProductList() {
             onClick={handleImport}
             className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
-            Import JSON
+            Import Project
           </button>
           <button
             onClick={handleLoadSample}
@@ -249,6 +259,16 @@ export default function ProductList() {
         onConfirm={() => handleDelete(deleteTarget.id)}
         title="Delete Project"
         message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone. Consider exporting first.`}
+      />
+
+      {/* Import Confirm (overwrite existing) */}
+      <ConfirmDialog
+        open={!!importConfirm}
+        onClose={() => setImportConfirm(null)}
+        onConfirm={confirmImport}
+        title="Overwrite Project"
+        message={`Importing "${importConfirm?.product.name}" will overwrite the existing project "${importConfirm?.existingName}" because they share the same internal ID. This cannot be undone.`}
+        confirmLabel="Overwrite"
       />
 
       <div className="max-w-4xl mx-auto px-6">

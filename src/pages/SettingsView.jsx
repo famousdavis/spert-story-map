@@ -10,6 +10,7 @@ export default function SettingsView() {
   const { product, updateProduct } = useOutletContext();
   const { addRelease, addSprint } = useProductMutations(updateProduct);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importConfirm, setImportConfirm] = useState(null);
 
   // Release drag-to-reorder state
   const [dragReleaseId, setDragReleaseId] = useState(null);
@@ -122,11 +123,17 @@ export default function SettingsView() {
 
   const handleImport = () => {
     readImportFile((imported) => {
-      if (!window.confirm(`Import "${imported.name}"? This will overwrite the current project data.`)) return;
-      const merged = { ...imported, id: product.id };
-      saveProductImmediate(merged);
-      window.location.reload();
+      setImportConfirm(imported);
     });
+  };
+
+  const confirmImport = () => {
+    if (importConfirm) {
+      const merged = { ...importConfirm, id: product.id };
+      saveProductImmediate(merged);
+      setImportConfirm(null);
+      window.location.reload();
+    }
   };
 
   const handleDownloadTemplate = () => {
@@ -309,10 +316,11 @@ export default function SettingsView() {
 
       {/* Import/Export */}
       <Section title="Data">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Export and import this project's data.</p>
         <div className="flex flex-wrap gap-3">
           <button onClick={handleExport} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Export as JSON</button>
           <button onClick={() => downloadForecasterExport(product)} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Export for SPERT Forecaster</button>
-          <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import from JSON</button>
+          <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Project from JSON</button>
           <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
         </div>
       </Section>
@@ -326,6 +334,16 @@ export default function SettingsView() {
         }}
         title="Confirm Delete"
         message={deleteTarget?.message || ''}
+      />
+
+      {/* Import confirm */}
+      <ConfirmDialog
+        open={!!importConfirm}
+        onClose={() => setImportConfirm(null)}
+        onConfirm={confirmImport}
+        title="Replace Project Data"
+        message={`Importing "${importConfirm?.name}" will permanently replace all data in "${product.name}" — themes, backbones, rib items, releases, sprints, and progress history. This cannot be undone.`}
+        confirmLabel="Replace All Data"
       />
     </div>
   );
