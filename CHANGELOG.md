@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.11.3 (2026-02-16)
+
+### Fixed
+- **Size picker truncation** — Size dropdown in Structure view was clipped by the theme card's `overflow-hidden`. Dropdown now renders via portal to `document.body` with viewport-aware positioning (flips above when near bottom edge)
+
+### Added
+- **Release rename on Release Planning** — Double-click a release column header to rename it inline. Uses the same `useInlineEdit` hook as the Story Map. Dragging remains on single-click; editing disables drag while active
+
 ## Version 0.11.2 (2026-02-15)
 
 ### Improved

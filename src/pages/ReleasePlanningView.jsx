@@ -13,6 +13,12 @@ export default function ReleasePlanningView() {
   const handleDeleteRelease = useCallback((releaseId) => {
     updateProduct(prev => deleteReleaseFromProduct(prev, releaseId));
   }, [updateProduct]);
+  const handleRenameRelease = useCallback((releaseId, newName) => {
+    updateProduct(prev => ({
+      ...prev,
+      releases: prev.releases.map(r => r.id === releaseId ? { ...r, name: newName } : r),
+    }));
+  }, [updateProduct]);
   const [filter, setFilter] = useState('all');
   const [allocModal, setAllocModal] = useState(null);
 
@@ -317,6 +323,7 @@ export default function ReleasePlanningView() {
               onCardDrop={handleDrop}
               onCardClick={setAllocModal}
               onDeleteRelease={handleDeleteRelease}
+              onRenameRelease={handleRenameRelease}
             />
           ))}
 

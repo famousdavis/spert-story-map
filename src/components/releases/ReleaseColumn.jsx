@@ -3,6 +3,7 @@ import RibCard from './RibCard';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import ProgressBar from '../ui/ProgressBar';
 import { useTooltip } from '../ui/Tooltip';
+import useInlineEdit from '../storymap/useInlineEdit';
 
 /**
  * A single column in the release planning board.
@@ -30,8 +31,13 @@ export default function ReleaseColumn({
   onCardDrop,
   onCardClick,
   onDeleteRelease,
+  onRenameRelease,
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const nameEdit = useInlineEdit(
+    release?.name || '',
+    (newName) => onRenameRelease?.(release.id, newName),
+  );
   const hasItems = ribs.length > 0;
   const deleteTooltip = useTooltip(
     hasItems ? 'Move all items out first' : release ? `Delete ${release.name}` : null
@@ -105,13 +111,28 @@ export default function ReleaseColumn({
           isOver ? 'border-blue-400 ring-2 ring-blue-200 dark:border-blue-500 dark:ring-blue-700' : 'border-gray-200 dark:border-gray-700'
         }`}>
           <div
-            draggable
-            onDragStart={e => onColDragStart(e, release.id)}
+            draggable={!nameEdit.editing}
+            onDragStart={e => { if (nameEdit.editing) { e.preventDefault(); return; } onColDragStart(e, release.id); }}
             onDragEnd={onColDragEnd}
-            className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 cursor-grab active:cursor-grabbing"
+            className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 ${nameEdit.editing ? '' : 'cursor-grab active:cursor-grabbing'}`}
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{release.name}</h3>
+              {nameEdit.editing ? (
+                <input
+                  ref={nameEdit.inputRef}
+                  value={nameEdit.draft}
+                  onChange={e => nameEdit.setDraft(e.target.value)}
+                  onBlur={nameEdit.commit}
+                  onKeyDown={nameEdit.handleKeyDown}
+                  className="text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 border border-blue-400 dark:border-blue-500 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-48"
+                />
+              ) : (
+                <h3
+                  onDoubleClick={nameEdit.startEditing}
+                  className="text-sm font-semibold text-gray-900 dark:text-gray-100 cursor-text"
+                  title="Double-click to rename"
+                >{release.name}</h3>
+              )}
               {onDeleteRelease && (
                 <>
                   <button
