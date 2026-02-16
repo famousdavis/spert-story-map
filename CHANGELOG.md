@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.11.2 (2026-02-15)
+
+### Improved
+- **Import warnings** — Both dashboard and Settings import now use a proper confirmation dialog instead of browser `confirm()`. Dashboard warns when overwriting an existing project by ID; Settings warns that all project data (themes, backbones, rib items, releases, sprints, progress history) will be permanently replaced
+- **Import/export labeling** — Dashboard button renamed to "Import Project"; Settings button renamed to "Import Project from JSON" with a subtitle clarifying scope: "Export and import this project's data"
+
 ## Version 0.11.1 (2026-02-15)
 
 ### Fixed
