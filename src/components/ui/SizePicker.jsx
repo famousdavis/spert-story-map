@@ -18,14 +18,21 @@ export default function SizePicker({ value, sizeMapping, onChange }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => {
+    const handleClick = (e) => {
       if (ref.current && !ref.current.contains(e.target) &&
           dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, []);
 
   const handleToggle = () => {

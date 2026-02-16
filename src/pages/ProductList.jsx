@@ -170,7 +170,7 @@ export default function ProductList() {
                       {p.name}
                     </h3>
                     <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                      <span>{p.totalItems} items</span>
+                      <span>{p.totalItems} {p.totalItems === 1 ? 'item' : 'items'}</span>
                       <span>{p.totalPoints} pts</span>
                       {p.unsized > 0 && (
                         <span className="text-amber-600 dark:text-amber-400">{p.unsized} unsized</span>
