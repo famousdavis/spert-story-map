@@ -3,7 +3,10 @@ export const STORAGE_KEYS = {
   PRODUCT_PREFIX: 'rp_product_',
   DEFAULTS: 'rp_defaults',
   PREFERENCES: 'rp_app_preferences',
+  WORKSPACE_ID: 'rp_workspace_id',
 };
+
+export const CHANGELOG_MAX_ENTRIES = 500;
 
 export const SCHEMA_VERSION = 2;
 

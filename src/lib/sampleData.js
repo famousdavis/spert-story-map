@@ -1,4 +1,5 @@
 import { DEFAULT_SIZE_MAPPING, SCHEMA_VERSION } from './constants';
+import { getWorkspaceId } from './storage';
 
 export function createSampleProduct() {
   const now = new Date().toISOString();
@@ -205,5 +206,7 @@ export function createSampleProduct() {
     sprints,
     sprintCadenceWeeks: 2,
     themes,
+    _originRef: getWorkspaceId(),
+    _changeLog: [{ t: Math.floor(Date.now() / 1000), op: 'create', entity: 'product' }],
   };
 }

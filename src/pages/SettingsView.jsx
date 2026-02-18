@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { exportProduct, readImportFile, saveProductImmediate } from '../lib/storage';
+import { exportProduct, readImportFile, saveProductImmediate, loadPreferences, savePreferences } from '../lib/storage';
 import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { downloadForecasterExport } from '../lib/exportForForecaster';
@@ -11,6 +11,13 @@ export default function SettingsView() {
   const { addRelease, addSprint } = useProductMutations(updateProduct);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importConfirm, setImportConfirm] = useState(null);
+  const [prefs, setPrefs] = useState(() => loadPreferences());
+
+  const updatePref = (key, value) => {
+    const next = { ...prefs, [key]: value };
+    setPrefs(next);
+    savePreferences(next);
+  };
 
   // Release drag-to-reorder state
   const [dragReleaseId, setDragReleaseId] = useState(null);
@@ -311,6 +318,33 @@ export default function SettingsView() {
             </div>
           ))}
           <button onClick={addSprint} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2">+ Add Sprint</button>
+        </div>
+      </Section>
+
+      {/* Export Attribution */}
+      <Section title="Export Attribution">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Identify yourself on exported files. These fields are included in JSON exports for traceability.
+        </p>
+        <div className="space-y-3">
+          <Field label="Name">
+            <input
+              type="text"
+              value={prefs.exportName || ''}
+              onChange={e => updatePref('exportName', e.target.value)}
+              placeholder="e.g., Jane Smith"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
+            />
+          </Field>
+          <Field label="Identifier">
+            <input
+              type="text"
+              value={prefs.exportId || ''}
+              onChange={e => updatePref('exportId', e.target.value)}
+              placeholder="e.g., student ID, email, or team name"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
+            />
+          </Field>
         </div>
       </Section>
 

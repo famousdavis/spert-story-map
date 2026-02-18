@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.12.0 (2026-02-18)
+
+### Added
+- **Export attribution** — New section in Settings for attaching name and identifier to JSON exports for team workflow traceability
+- **Workspace reconciliation tokens** — Exports include `_originRef` and `_storageRef` for cross-session data provenance tracking and localStorage hydration recovery
+- **Export pipeline diagnostics** — Products maintain a lightweight `_changeLog` of structural operations for client-side telemetry
+
+### Technical
+- New localStorage key `rp_workspace_id` for deterministic workspace binding
+- `_originRef` set at product creation, preserved across imports for data lineage
+- `_storageRef` injected at export time from workspace token
+- `appendChangeLogEntry()` utility with 500-entry cap
+- Audit trail logging in `useProductMutations` (add/delete operations)
+
 ## Version 0.11.3 (2026-02-16)
 
 ### Fixed

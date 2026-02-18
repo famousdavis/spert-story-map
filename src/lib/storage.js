@@ -1,4 +1,4 @@
-import { STORAGE_KEYS, SCHEMA_VERSION, DEFAULT_SIZE_MAPPING } from './constants';
+import { STORAGE_KEYS, SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from './constants';
 
 // Save error callback — subscribe to get notified when localStorage writes fail
 let _onSaveError = null;
@@ -170,6 +170,25 @@ export function savePreferences(prefs) {
   debouncedSave(STORAGE_KEYS.PREFERENCES, prefs, 200);
 }
 
+// Workspace identity — generated once per browser, persists across sessions
+export function getWorkspaceId() {
+  let id = localStorage.getItem(STORAGE_KEYS.WORKSPACE_ID);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(STORAGE_KEYS.WORKSPACE_ID, id);
+  }
+  return id;
+}
+
+// Append an entry to a product's _changeLog, capping at max size
+export function appendChangeLogEntry(product, entry) {
+  const log = product._changeLog || [];
+  const updated = [...log, { ...entry, t: Math.floor(Date.now() / 1000) }];
+  return updated.length > CHANGELOG_MAX_ENTRIES
+    ? updated.slice(updated.length - CHANGELOG_MAX_ENTRIES)
+    : updated;
+}
+
 // Create new product
 export function createNewProduct(name, description = '') {
   const now = new Date().toISOString();
@@ -185,6 +204,8 @@ export function createNewProduct(name, description = '') {
     sprints: [],
     sprintCadenceWeeks: 2,
     themes: [],
+    _originRef: getWorkspaceId(),
+    _changeLog: [{ t: Math.floor(Date.now() / 1000), op: 'create', entity: 'product' }],
   };
 }
 
@@ -252,12 +273,21 @@ export function duplicateProduct(product) {
     themes,
     releaseCardOrder: newCardOrder,
     sizingCardOrder: newSizingOrder,
+    _originRef: getWorkspaceId(),
+    _changeLog: [{ t: Math.floor(Date.now() / 1000), op: 'duplicate', entity: 'product', source: product.id }],
   };
 }
 
 // Export / Import
 export function exportProduct(product) {
-  const blob = new Blob([JSON.stringify(product, null, 2)], { type: 'application/json' });
+  const prefs = loadPreferences();
+  const exportData = {
+    ...product,
+    _storageRef: getWorkspaceId(),
+    ...(prefs.exportName ? { _exportedBy: prefs.exportName } : {}),
+    ...(prefs.exportId ? { _exportedById: prefs.exportId } : {}),
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -290,6 +320,24 @@ export function importProductFromJSON(jsonString) {
   if (!data.schemaVersion || data.schemaVersion < SCHEMA_VERSION) {
     data = migrateToV2(data);
   }
+
+  // Preserve _originRef from imported file; backfill if pre-feature
+  if (!data._originRef) {
+    data._originRef = getWorkspaceId();
+  }
+
+  // Append import event to changelog
+  data._changeLog = appendChangeLogEntry(data, {
+    op: 'import',
+    entity: 'product',
+    source: 'file',
+  });
+
+  // Strip export-time-only fields
+  delete data._storageRef;
+  delete data._exportedBy;
+  delete data._exportedById;
+
   return data;
 }
 
