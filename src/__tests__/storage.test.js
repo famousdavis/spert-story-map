@@ -3,8 +3,10 @@ import {
   createNewProduct,
   duplicateProduct,
   importProductFromJSON,
+  getWorkspaceId,
+  appendChangeLogEntry,
 } from '../lib/storage';
-import { SCHEMA_VERSION, DEFAULT_SIZE_MAPPING } from '../lib/constants';
+import { SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from '../lib/constants';
 
 // Mock crypto.randomUUID since we're in node environment
 let uuidCounter = 0;
@@ -12,8 +14,74 @@ vi.stubGlobal('crypto', {
   randomUUID: () => `uuid-${++uuidCounter}`,
 });
 
+// Mock localStorage for node environment
+const store = {};
+vi.stubGlobal('localStorage', {
+  getItem: (key) => store[key] ?? null,
+  setItem: (key, value) => { store[key] = String(value); },
+  removeItem: (key) => { delete store[key]; },
+  clear: () => { for (const key of Object.keys(store)) delete store[key]; },
+});
+
 beforeEach(() => {
   uuidCounter = 0;
+  localStorage.clear();
+});
+
+// --- getWorkspaceId ---
+describe('getWorkspaceId', () => {
+  it('generates and persists a UUID on first call', () => {
+    const id = getWorkspaceId();
+    expect(id).toBeTruthy();
+    expect(localStorage.getItem('rp_workspace_id')).toBe(id);
+  });
+
+  it('returns the same ID on subsequent calls', () => {
+    const id1 = getWorkspaceId();
+    const id2 = getWorkspaceId();
+    expect(id1).toBe(id2);
+  });
+
+  it('returns existing ID from localStorage', () => {
+    localStorage.setItem('rp_workspace_id', 'pre-existing-id');
+    expect(getWorkspaceId()).toBe('pre-existing-id');
+  });
+});
+
+// --- appendChangeLogEntry ---
+describe('appendChangeLogEntry', () => {
+  it('appends entry with timestamp', () => {
+    const product = { _changeLog: [] };
+    const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 'x' });
+    expect(result).toHaveLength(1);
+    expect(result[0].op).toBe('add');
+    expect(result[0].entity).toBe('theme');
+    expect(result[0].id).toBe('x');
+    expect(result[0].t).toBeGreaterThan(0);
+  });
+
+  it('handles missing _changeLog', () => {
+    const result = appendChangeLogEntry({}, { op: 'create', entity: 'product' });
+    expect(result).toHaveLength(1);
+  });
+
+  it('preserves existing entries', () => {
+    const product = { _changeLog: [{ t: 1000, op: 'create', entity: 'product' }] };
+    const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 't1' });
+    expect(result).toHaveLength(2);
+    expect(result[0].op).toBe('create');
+    expect(result[1].op).toBe('add');
+  });
+
+  it('caps at CHANGELOG_MAX_ENTRIES', () => {
+    const log = Array.from({ length: CHANGELOG_MAX_ENTRIES }, (_, i) => ({ t: i, op: 'add', entity: 'theme', id: `t${i}` }));
+    const product = { _changeLog: log };
+    const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 'new' });
+    expect(result).toHaveLength(CHANGELOG_MAX_ENTRIES);
+    expect(result[CHANGELOG_MAX_ENTRIES - 1].id).toBe('new');
+    // Oldest entry dropped
+    expect(result[0].id).toBe('t1');
+  });
 });
 
 // --- createNewProduct ---
@@ -41,6 +109,20 @@ describe('createNewProduct', () => {
     expect(product.createdAt).toBeTruthy();
     expect(product.updatedAt).toBeTruthy();
     expect(product.createdAt).toBe(product.updatedAt);
+  });
+
+  it('sets _originRef to current workspace ID', () => {
+    const product = createNewProduct('Test');
+    expect(product._originRef).toBeTruthy();
+    expect(product._originRef).toBe(getWorkspaceId());
+  });
+
+  it('initializes _changeLog with create event', () => {
+    const product = createNewProduct('Test');
+    expect(product._changeLog).toHaveLength(1);
+    expect(product._changeLog[0].op).toBe('create');
+    expect(product._changeLog[0].entity).toBe('product');
+    expect(product._changeLog[0].t).toBeGreaterThan(0);
   });
 });
 
@@ -75,6 +157,8 @@ describe('duplicateProduct', () => {
       }],
     }],
     releaseCardOrder: { 'rel-1': ['r1'], 'unassigned': [] },
+    _originRef: 'source-browser-id',
+    _changeLog: [{ t: 1000, op: 'create', entity: 'product' }],
   };
 
   it('creates a new product with different ID', () => {
@@ -207,6 +291,20 @@ describe('duplicateProduct', () => {
     expect(dup.sprints.length).toBe(1);
     expect(dup.id).not.toBe(empty.id);
   });
+
+  it('sets fresh _originRef to current workspace', () => {
+    const dup = duplicateProduct(original);
+    expect(dup._originRef).toBe(getWorkspaceId());
+    expect(dup._originRef).not.toBe(original._originRef);
+  });
+
+  it('initializes fresh _changeLog with duplicate event', () => {
+    const dup = duplicateProduct(original);
+    expect(dup._changeLog).toHaveLength(1);
+    expect(dup._changeLog[0].op).toBe('duplicate');
+    expect(dup._changeLog[0].entity).toBe('product');
+    expect(dup._changeLog[0].source).toBe('orig-id');
+  });
 });
 
 // --- importProductFromJSON ---
@@ -301,5 +399,55 @@ describe('importProductFromJSON', () => {
     });
     const result = importProductFromJSON(json);
     expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(1);
+  });
+
+  it('preserves _originRef from imported data', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', themes: [], schemaVersion: SCHEMA_VERSION,
+      _originRef: 'original-browser-uuid',
+    });
+    const result = importProductFromJSON(json);
+    expect(result._originRef).toBe('original-browser-uuid');
+  });
+
+  it('backfills _originRef if missing from imported data', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', themes: [], schemaVersion: SCHEMA_VERSION,
+    });
+    const result = importProductFromJSON(json);
+    expect(result._originRef).toBe(getWorkspaceId());
+  });
+
+  it('appends import event to _changeLog', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', themes: [], schemaVersion: SCHEMA_VERSION,
+      _changeLog: [{ t: 1000, op: 'create', entity: 'product' }],
+    });
+    const result = importProductFromJSON(json);
+    expect(result._changeLog).toHaveLength(2);
+    expect(result._changeLog[1].op).toBe('import');
+    expect(result._changeLog[1].source).toBe('file');
+  });
+
+  it('creates _changeLog with import event if none existed', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', themes: [], schemaVersion: SCHEMA_VERSION,
+    });
+    const result = importProductFromJSON(json);
+    expect(result._changeLog).toHaveLength(1);
+    expect(result._changeLog[0].op).toBe('import');
+  });
+
+  it('strips _storageRef and attribution fields on import', () => {
+    const json = JSON.stringify({
+      id: 'x', name: 'N', themes: [], schemaVersion: SCHEMA_VERSION,
+      _storageRef: 'some-ref',
+      _exportedBy: 'Alice',
+      _exportedById: '12345',
+    });
+    const result = importProductFromJSON(json);
+    expect(result._storageRef).toBeUndefined();
+    expect(result._exportedBy).toBeUndefined();
+    expect(result._exportedById).toBeUndefined();
   });
 });

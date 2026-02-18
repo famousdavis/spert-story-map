@@ -22,7 +22,7 @@ src/
 ├── lib/                              # Pure logic, no React
 │   ├── constants.js                  # Storage keys, schema version, size defaults
 │   ├── version.js                    # APP_VERSION constant (single source of truth)
-│   ├── storage.js                    # localStorage CRUD with debouncing
+│   ├── storage.js                    # localStorage CRUD with debouncing, workspace identity, export pipeline
 │   ├── sampleData.js                 # Sample "Billing System v2" product factory
 │   ├── calculations.js              # Pure computation functions (points, progress, stats)
 │   ├── progressMutations.js         # Shared progress tracking helpers (update, remove, comment)
@@ -106,6 +106,8 @@ Product
 ├── sprints: [{ id, name, order, endDate }]
 ├── releaseCardOrder: { [colId]: [ribId, ...] }
 ├── sizingCardOrder: { [sizeLabel|'unsized']: [ribId, ...] }
+├── _originRef                                      # Workspace reconciliation token (set at creation)
+├── _changeLog: [{ t, op, entity, id? }]            # Structural operation log (capped at 500)
 └── themes: [Theme]
     ├── color?                                      # Optional color key (blue, teal, violet, etc.)
     └── backboneItems: [Backbone]
@@ -113,6 +115,11 @@ Product
             ├── size, category (core/non-core)
             ├── releaseAllocations: [{ releaseId, percentage, memo }]
             └── progressHistory: [{ sprintId, releaseId, percentComplete, comment?, updatedAt? }]
+
+Export-time only fields (injected by exportProduct, not stored in localStorage):
+├── _storageRef                                     # Exporting browser's workspace token
+├── _exportedBy                                     # User name from Export Attribution preferences
+└── _exportedById                                   # User identifier from Export Attribution preferences
 ```
 
 ## Data Flow
@@ -125,7 +132,7 @@ localStorage ──load──> useProduct hook ──context──> Views
                               useProduct ──debounced save──> localStorage
 ```
 
-All state mutations flow through `updateProduct(prev => next)`. The `useProductMutations` hook provides convenience wrappers for common operations (update theme, backbone, rib; add items; reorder).
+All state mutations flow through `updateProduct(prev => next)`. The `useProductMutations` hook provides convenience wrappers for common operations (update theme, backbone, rib; add items; reorder). Structural mutations (add/delete) also append entries to the product's `_changeLog` for export pipeline diagnostics.
 
 ## Key Design Decisions
 
@@ -160,3 +167,5 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 15. **Forecaster export** — `exportForForecaster.js` transforms Story Map data into the SPERT Release Forecaster's import format. Releases map to milestones with incremental `backlogSize` (per-release allocated points, not cumulative). Sprint velocity (`doneValue`) is computed via delta-percent math: `Σ(ribPoints × (pctAsOf − pctPrev) / 100)` using `getRibItemPercentCompleteAsOf`. Zero-point releases are skipped. The export is a pure function with no side effects; `downloadForecasterExport` handles the browser download.
 
 16. **Collapsible group summaries** — Progress tab group headers display item count, total points, % done, and a mini progress bar. Groups are collapsible via a `collapsedGroups` Set (reset on groupBy or sprint change). Release groups use `getReleasePercentComplete` (allocation-weighted); backbone/theme groups compute a weighted average from visible group items. Release Planning column headers also show a progress bar via the same `ProgressBar` component.
+
+17. **Workspace reconciliation** — Each browser gets a persistent workspace token (`rp_workspace_id` in localStorage, generated once via `getWorkspaceId()`). Products carry `_originRef` (set at creation, preserved across imports) for data provenance tracking. `_storageRef` is injected at export time from the current workspace token for cross-session identification. `appendChangeLogEntry()` maintains a capped (500-entry) structural operation log (`_changeLog`) for export pipeline diagnostics. Export Attribution preferences (`exportName`, `exportId`) are stored in `rp_app_preferences` and injected as `_exportedBy`/`_exportedById` at export time for team workflow traceability.
