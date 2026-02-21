@@ -3,6 +3,7 @@ import {
   createNewProduct,
   duplicateProduct,
   importProductFromJSON,
+  exportProduct,
   getWorkspaceId,
   appendChangeLogEntry,
 } from '../lib/storage';
@@ -123,6 +124,16 @@ describe('createNewProduct', () => {
     expect(product._changeLog[0].op).toBe('create');
     expect(product._changeLog[0].entity).toBe('product');
     expect(product._changeLog[0].t).toBeGreaterThan(0);
+  });
+
+  it('uses workspaceIdOverride for _originRef when provided', () => {
+    const product = createNewProduct('Test', '', 'firebase-uid-123');
+    expect(product._originRef).toBe('firebase-uid-123');
+  });
+
+  it('falls back to getWorkspaceId() when workspaceIdOverride is not provided', () => {
+    const product = createNewProduct('Test', '');
+    expect(product._originRef).toBe(getWorkspaceId());
   });
 });
 
@@ -305,6 +316,16 @@ describe('duplicateProduct', () => {
     expect(dup._changeLog[0].entity).toBe('product');
     expect(dup._changeLog[0].source).toBe('orig-id');
   });
+
+  it('uses workspaceIdOverride for _originRef when provided', () => {
+    const dup = duplicateProduct(original, 'firebase-uid-456');
+    expect(dup._originRef).toBe('firebase-uid-456');
+  });
+
+  it('falls back to getWorkspaceId() when workspaceIdOverride is not provided', () => {
+    const dup = duplicateProduct(original);
+    expect(dup._originRef).toBe(getWorkspaceId());
+  });
 });
 
 // --- importProductFromJSON ---
@@ -449,5 +470,38 @@ describe('importProductFromJSON', () => {
     expect(result._storageRef).toBeUndefined();
     expect(result._exportedBy).toBeUndefined();
     expect(result._exportedById).toBeUndefined();
+  });
+});
+
+// --- exportProduct ---
+describe('exportProduct', () => {
+  let capturedBlob;
+
+  beforeEach(() => {
+    capturedBlob = null;
+    // Mock DOM APIs for export
+    vi.stubGlobal('URL', {
+      createObjectURL: (blob) => { capturedBlob = blob; return 'blob:mock'; },
+      revokeObjectURL: vi.fn(),
+    });
+    vi.stubGlobal('document', {
+      createElement: () => ({ click: vi.fn(), set href(_) {}, set download(_) {} }),
+    });
+  });
+
+  it('uses storageRefOverride for _storageRef when provided', async () => {
+    const product = { id: 'p1', name: 'Test', themes: [] };
+    exportProduct(product, 'firebase-uid-789');
+    const text = await capturedBlob.text();
+    const data = JSON.parse(text);
+    expect(data._storageRef).toBe('firebase-uid-789');
+  });
+
+  it('falls back to getWorkspaceId() when storageRefOverride is not provided', async () => {
+    const product = { id: 'p1', name: 'Test', themes: [] };
+    exportProduct(product);
+    const text = await capturedBlob.text();
+    const data = JSON.parse(text);
+    expect(data._storageRef).toBe(getWorkspaceId());
   });
 });

@@ -46,9 +46,14 @@ src/
 │   │   ├── ProgressBar.jsx           # Animated horizontal progress bar
 │   │   ├── CollapsibleSection.jsx    # Collapsible section with toggle
 │   │   ├── Tooltip.jsx               # Fast tooltip (200ms) via useTooltip hook
+│   │   ├── Section.jsx               # Reusable Section and Field layout components
 │   │   └── ThemeToggle.jsx           # Sun/moon dark mode toggle button
 │   ├── layout/
 │   │   └── ProductLayout.jsx         # Header, tab nav, footer, outlet context
+│   ├── settings/                     # Global and per-project settings components
+│   │   ├── AppSettingsModal.jsx      # Global settings modal (storage mode + export attribution)
+│   │   ├── StorageSection.jsx        # Storage mode toggle, auth UI, migration controls
+│   │   └── SharingSection.jsx        # Project sharing (cloud mode, owner only)
 │   ├── progress/
 │   │   ├── SprintSummaryCard.jsx     # Sprint summary stats card
 │   │   ├── BurnUpChart.jsx           # Burn-up progress chart

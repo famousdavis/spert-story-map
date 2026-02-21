@@ -59,7 +59,7 @@ export function saveProductIndex(index) {
 }
 
 // Schema migration: v1 → v2 (per-release progress)
-function migrateToV2(product) {
+export function migrateToV2(product) {
   if (!product || (product.schemaVersion || 1) >= 2) return product;
 
   for (const theme of product.themes) {
@@ -190,7 +190,7 @@ export function appendChangeLogEntry(product, entry) {
 }
 
 // Create new product
-export function createNewProduct(name, description = '') {
+export function createNewProduct(name, description = '', workspaceIdOverride) {
   const now = new Date().toISOString();
   return {
     id: crypto.randomUUID(),
@@ -204,13 +204,13 @@ export function createNewProduct(name, description = '') {
     sprints: [],
     sprintCadenceWeeks: 2,
     themes: [],
-    _originRef: getWorkspaceId(),
+    _originRef: workspaceIdOverride || getWorkspaceId(),
     _changeLog: [{ t: Math.floor(Date.now() / 1000), op: 'create', entity: 'product' }],
   };
 }
 
 // Duplicate product
-export function duplicateProduct(product) {
+export function duplicateProduct(product, workspaceIdOverride) {
   const now = new Date().toISOString();
   const idMap = new Map();
 
@@ -273,17 +273,17 @@ export function duplicateProduct(product) {
     themes,
     releaseCardOrder: newCardOrder,
     sizingCardOrder: newSizingOrder,
-    _originRef: getWorkspaceId(),
+    _originRef: workspaceIdOverride || getWorkspaceId(),
     _changeLog: [{ t: Math.floor(Date.now() / 1000), op: 'duplicate', entity: 'product', source: product.id }],
   };
 }
 
 // Export / Import
-export function exportProduct(product) {
+export function exportProduct(product, storageRefOverride) {
   const prefs = loadPreferences();
   const exportData = {
     ...product,
-    _storageRef: getWorkspaceId(),
+    _storageRef: storageRefOverride || getWorkspaceId(),
     ...(prefs.exportName ? { _exportedBy: prefs.exportName } : {}),
     ...(prefs.exportId ? { _exportedById: prefs.exportId } : {}),
   };
