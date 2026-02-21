@@ -3,6 +3,14 @@ import { useStorage } from '../lib/StorageProvider';
 
 const MAX_UNDO = 30;
 
+/** Convert Firestore Timestamp, ISO string, or Date to a JS Date. */
+function parseDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === 'function') return value.toDate();
+  return new Date(value);
+}
+
 export function useProduct(productId) {
   const { driver, mode, storageReady } = useStorage();
   const [state, setState] = useState({ product: null, lastSaved: null, loading: true });
@@ -22,7 +30,7 @@ export function useProduct(productId) {
       if (!cancelled) {
         setState({
           product: data,
-          lastSaved: data ? new Date(data.updatedAt) : null,
+          lastSaved: data ? parseDate(data.updatedAt) : null,
           loading: false,
         });
         undoStackRef.current = [];
@@ -40,7 +48,7 @@ export function useProduct(productId) {
       setState(prev => ({
         ...prev,
         product: remoteProduct,
-        lastSaved: new Date(remoteProduct.updatedAt),
+        lastSaved: parseDate(remoteProduct.updatedAt),
       }));
       // Don't clear undo stack — user may still want to undo local changes
     });
@@ -118,7 +126,7 @@ export function useProduct(productId) {
       driver.loadProduct(productId).then(data => {
         setState({
           product: data,
-          lastSaved: data ? new Date(data.updatedAt) : null,
+          lastSaved: data ? parseDate(data.updatedAt) : null,
           loading: false,
         });
         undoStackRef.current = [];
