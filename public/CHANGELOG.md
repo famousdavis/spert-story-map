@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.14.3 (2026-02-21)
+
+### Security
+- **Firestore rules**: Added field-level protection preventing editors from modifying `owner`/`members` fields (privilege escalation fix)
+- **Firestore rules**: Version-controlled `firestore.rules` and `firebase.json` added to repository
+- **Import validation**: Comprehensive schema validation on import — checks types, string lengths, numeric ranges, strips unknown fields, enforces size limits (5 MB max)
+- **Query filtering**: `loadProductIndex` and `migrateCloudToLocal` now use server-side `where()` filter instead of full collection scan
+- **Error handling**: Import errors shown inline in UI instead of `alert()` (prevents information disclosure)
+- **parseInt radix**: Fixed `parseInt` without radix in AllocationModal
+- **Dependencies**: Fixed moderate `ajv` vulnerability via `npm audit fix`
+
 ## Version 0.14.2 (2026-02-21)
 
 ### Added

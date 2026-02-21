@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isProjectMember(projectData) {
+      return request.auth.uid in projectData.members;
+    }
+
+    function isProjectOwner(projectData) {
+      return projectData.members[request.auth.uid] == 'owner';
+    }
+
+    function isProjectEditor(projectData) {
+      return projectData.members[request.auth.uid] in ['owner', 'editor'];
+    }
+
+    // ── Projects ──
+    match /spertstorymap_projects/{projectId} {
+      // List: The client uses where('members.<uid>', 'in', [...]) to filter
+      // server-side, but Firestore rules can't validate query constraints
+      // on dynamic map keys. The rule permits list for authenticated users;
+      // the where() clause ensures only member-of projects are returned.
+      allow list: if isAuth();
+
+      allow get: if isAuth() && isProjectMember(resource.data);
+
+      allow create: if isAuth()
+                    && request.resource.data.members[request.auth.uid] == 'owner';
+
+      // Update: editors can update, but only owners can change owner/members.
+      // This prevents privilege escalation by editors.
+      allow update: if isAuth()
+                    && isProjectEditor(resource.data)
+                    && (
+                      // No ownership fields changed — normal edit
+                      (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['owner', 'members']))
+                      // OR user is the owner — allowed to change sharing
+                      || isProjectOwner(resource.data)
+                    );
+
+      allow delete: if isAuth() && isProjectOwner(resource.data);
+    }
+
+    // ── User profiles ──
+    // Profiles must be readable by all authenticated users to support
+    // email-based member lookup in the sharing UI. This exposes displayName,
+    // email, and lastLogin to any signed-in user. A Cloud Function for
+    // email lookup would allow restricting this to owner-only reads.
+    match /spertstorymap_profiles/{userId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.auth.uid == userId;
+    }
+
+    // ── User settings ──
+    match /spertstorymap_settings/{userId} {
+      allow read, write: if isAuth() && request.auth.uid == userId;
+    }
+  }
+}

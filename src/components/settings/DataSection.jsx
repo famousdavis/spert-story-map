@@ -6,13 +6,16 @@ import { Section } from '../ui/Section';
 
 export default function DataSection({ product, driver }) {
   const [importConfirm, setImportConfirm] = useState(null);
+  const [importError, setImportError] = useState(null);
 
   const handleExport = () => exportProduct(product, driver.getWorkspaceId());
 
   const handleImport = () => {
-    readImportFile((imported) => {
-      setImportConfirm(imported);
-    });
+    setImportError(null);
+    readImportFile(
+      (imported) => setImportConfirm(imported),
+      (errorMsg) => setImportError(errorMsg),
+    );
   };
 
   const confirmImport = () => {
@@ -75,6 +78,9 @@ export default function DataSection({ product, driver }) {
           <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Project from JSON</button>
           <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
         </div>
+        {importError && (
+          <p className="text-sm text-red-600 dark:text-red-400 mt-3 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{importError}</p>
+        )}
       </Section>
 
       <ConfirmDialog

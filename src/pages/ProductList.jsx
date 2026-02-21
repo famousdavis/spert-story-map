@@ -30,6 +30,7 @@ export default function ProductList() {
   const [newDesc, setNewDesc] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importConfirm, setImportConfirm] = useState(null);
+  const [importError, setImportError] = useState(null);
   const [showWarning, setShowWarning] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const { user } = useAuth();
@@ -155,16 +156,20 @@ export default function ProductList() {
   };
 
   const handleImport = () => {
-    readImportFile(async (imported) => {
-      if (!driver) return;
-      const existing = await driver.loadProduct(imported.id);
-      if (existing) {
-        setImportConfirm({ product: imported, existingName: existing.name });
-      } else {
-        await driver.saveProductImmediate(imported);
-        refresh();
-      }
-    });
+    setImportError(null);
+    readImportFile(
+      async (imported) => {
+        if (!driver) return;
+        const existing = await driver.loadProduct(imported.id);
+        if (existing) {
+          setImportConfirm({ product: imported, existingName: existing.name });
+        } else {
+          await driver.saveProductImmediate(imported);
+          refresh();
+        }
+      },
+      (errorMsg) => setImportError(errorMsg),
+    );
   };
 
   const confirmImport = async () => {
@@ -230,6 +235,14 @@ export default function ProductList() {
             Load Sample Project
           </button>
         </div>
+
+        {/* Import error */}
+        {importError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 rounded-lg px-4 py-3 mb-6 flex items-start justify-between gap-3">
+            <p className="text-sm text-red-700 dark:text-red-300">{importError}</p>
+            <button onClick={() => setImportError(null)} className="text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300 flex-shrink-0">&times;</button>
+          </div>
+        )}
 
         {/* Data warning */}
         {showWarning && mode === 'local' && (

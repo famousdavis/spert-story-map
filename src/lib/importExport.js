@@ -1,5 +1,6 @@
 import { DEFAULT_SIZE_MAPPING, SCHEMA_VERSION } from './constants';
 import { loadPreferences, getWorkspaceId, migrateToV2, appendChangeLogEntry } from './storage';
+import { validateProduct } from './validateProduct';
 
 /**
  * Export a product as a downloadable JSON file.
@@ -23,27 +24,30 @@ export function exportProduct(product, storageRefOverride) {
 }
 
 /**
- * Parse and validate a JSON string into a product object.
+ * Max allowed JSON file size (5 MB). Prevents DoS via oversized imports.
+ */
+const MAX_IMPORT_SIZE = 5 * 1024 * 1024;
+
+/**
+ * Parse, validate, and sanitize a JSON string into a product object.
+ * Applies comprehensive schema validation to prevent state corruption.
  */
 export function importProductFromJSON(jsonString) {
+  if (typeof jsonString !== 'string' || jsonString.length > MAX_IMPORT_SIZE) {
+    throw new Error(`Import file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
+  }
+
   let data = JSON.parse(jsonString);
-  // Basic validation
-  if (!data.id || !data.name || !Array.isArray(data.themes)) {
-    throw new Error('Invalid product data: missing required fields');
-  }
-  for (const theme of data.themes) {
-    if (!theme.id || !Array.isArray(theme.backboneItems)) {
-      throw new Error('Invalid product data: theme missing id or backboneItems');
-    }
-    for (const bb of theme.backboneItems) {
-      if (!bb.id || !Array.isArray(bb.ribItems)) {
-        throw new Error('Invalid product data: backbone missing id or ribItems');
-      }
-    }
-  }
+
+  // Comprehensive schema validation — checks types, ranges, lengths,
+  // strips unknown fields, and clamps numeric values
+  data = validateProduct(data);
+
+  // Backfill defaults for optional arrays
   if (!data.sizeMapping) data.sizeMapping = [...DEFAULT_SIZE_MAPPING];
   if (!data.releases) data.releases = [];
   if (!data.sprints) data.sprints = [];
+
   // Migrate if needed
   if (!data.schemaVersion || data.schemaVersion < SCHEMA_VERSION) {
     data = migrateToV2(data);
@@ -69,8 +73,11 @@ export function importProductFromJSON(jsonString) {
   return data;
 }
 
-/** Open a file picker, read + parse the JSON, and call onParsed(product). */
-export function readImportFile(onParsed) {
+/**
+ * Open a file picker, read + parse the JSON, and call onParsed(product).
+ * If parsing/validation fails, calls onError(message) instead of alert().
+ */
+export function readImportFile(onParsed, onError) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
@@ -83,7 +90,13 @@ export function readImportFile(onParsed) {
         const product = importProductFromJSON(ev.target.result);
         onParsed(product);
       } catch (err) {
-        alert('Failed to import: ' + err.message);
+        const msg = 'Failed to import: ' + err.message;
+        if (onError) {
+          onError(msg);
+        } else {
+          // Fallback for callers that don't provide onError yet
+          alert(msg);
+        }
       }
     };
     reader.readAsText(file);

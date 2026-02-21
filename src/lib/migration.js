@@ -6,7 +6,8 @@
  */
 
 import {
-  doc, getDoc, setDoc, getDocs, collection, serverTimestamp,
+  doc, getDoc, setDoc, getDocs, collection, query, where,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
@@ -116,13 +117,17 @@ export async function migrateLocalToCloud(uid) {
  * @returns {{ ownedCount: number, sharedCount: number }}
  */
 export async function migrateCloudToLocal(uid) {
-  const snap = await getDocs(collection(db, PROJECTS_COL));
+  // Query only projects where user is a member (avoids full collection scan)
+  const q = query(
+    collection(db, PROJECTS_COL),
+    where(`members.${uid}`, 'in', ['owner', 'editor', 'viewer']),
+  );
+  const snap = await getDocs(q);
   let ownedCount = 0;
   let sharedCount = 0;
 
   snap.forEach(docSnap => {
     const data = docSnap.data();
-    if (!data.members || !data.members[uid]) return;
 
     if (data.owner === uid) {
       // Strip Firestore-only fields

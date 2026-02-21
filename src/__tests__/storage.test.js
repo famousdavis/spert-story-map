@@ -343,9 +343,9 @@ describe('importProductFromJSON', () => {
   });
 
   it('throws for missing required fields', () => {
-    expect(() => importProductFromJSON(JSON.stringify({}))).toThrow('missing required fields');
-    expect(() => importProductFromJSON(JSON.stringify({ id: 'x' }))).toThrow('missing required fields');
-    expect(() => importProductFromJSON(JSON.stringify({ id: 'x', name: 'N' }))).toThrow('missing required fields');
+    expect(() => importProductFromJSON(JSON.stringify({}))).toThrow('Product id');
+    expect(() => importProductFromJSON(JSON.stringify({ id: 'x' }))).toThrow('Product name');
+    expect(() => importProductFromJSON(JSON.stringify({ id: 'x', name: 'N' }))).toThrow('themes must be an array');
   });
 
   it('adds default sizeMapping if missing', () => {
@@ -380,7 +380,7 @@ describe('importProductFromJSON', () => {
       id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
       themes: [{ id: 't1' }],
     });
-    expect(() => importProductFromJSON(json)).toThrow('theme missing id or backboneItems');
+    expect(() => importProductFromJSON(json)).toThrow('backboneItems must be an array');
   });
 
   it('throws for theme missing id', () => {
@@ -388,7 +388,7 @@ describe('importProductFromJSON', () => {
       id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
       themes: [{ backboneItems: [] }],
     });
-    expect(() => importProductFromJSON(json)).toThrow('theme missing id or backboneItems');
+    expect(() => importProductFromJSON(json)).toThrow('Theme id must be a valid string');
   });
 
   it('throws for backbone missing ribItems', () => {
@@ -396,7 +396,7 @@ describe('importProductFromJSON', () => {
       id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
       themes: [{ id: 't1', backboneItems: [{ id: 'b1' }] }],
     });
-    expect(() => importProductFromJSON(json)).toThrow('backbone missing id or ribItems');
+    expect(() => importProductFromJSON(json)).toThrow('ribItems must be an array');
   });
 
   it('throws for backbone missing id', () => {
@@ -404,7 +404,7 @@ describe('importProductFromJSON', () => {
       id: 'x', name: 'N', schemaVersion: SCHEMA_VERSION,
       themes: [{ id: 't1', backboneItems: [{ ribItems: [] }] }],
     });
-    expect(() => importProductFromJSON(json)).toThrow('backbone missing id or ribItems');
+    expect(() => importProductFromJSON(json)).toThrow('Backbone id must be a valid string');
   });
 
   it('accepts valid nested structure', () => {

@@ -9,7 +9,8 @@
 
 import {
   doc, getDoc, setDoc, deleteDoc, getDocs,
-  collection, onSnapshot, serverTimestamp,
+  collection, query, where,
+  onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { migrateToV2 } from './storage';
@@ -80,19 +81,23 @@ export function createFirestoreDriver(uid) {
 
     /**
      * Load all projects the user has access to.
+     * Uses a server-side where() filter on the members map to avoid
+     * fetching every project in the collection (security + cost fix).
      * Returns full product data with _owner/_members metadata attached.
      */
     async loadProductIndex() {
-      const snap = await getDocs(collection(db, PROJECTS_COL));
+      const q = query(
+        collection(db, PROJECTS_COL),
+        where(`members.${uid}`, 'in', ['owner', 'editor', 'viewer']),
+      );
+      const snap = await getDocs(q);
       const products = [];
       snap.forEach(docSnap => {
         const data = docSnap.data();
-        if (data.members && data.members[uid]) {
-          const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
-          product._owner = data.owner;
-          product._members = data.members;
-          products.push(product);
-        }
+        const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
+        product._owner = data.owner;
+        product._members = data.members;
+        products.push(product);
       });
       return products;
     },

@@ -24,6 +24,7 @@ src/
 │   ├── version.js                    # APP_VERSION constant (single source of truth)
 │   ├── storage.js                    # localStorage CRUD with debouncing, workspace identity
 │   ├── importExport.js               # Export/import product JSON, file picker utility
+│   ├── validateProduct.js            # Comprehensive schema validation for imported products
 │   ├── sortByOrder.js                # Pure sort utility for persisted order arrays
 │   ├── progressViewHelpers.js        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.js                 # Sample "Billing System v2" product factory

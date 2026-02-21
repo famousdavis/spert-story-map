@@ -51,6 +51,8 @@ vi.mock('firebase/firestore', () => ({
     return { forEach: (fn) => docs.forEach(fn), docs, empty: docs.length === 0 };
   }),
   collection: vi.fn((_db, name) => ({ _name: name })),
+  query: vi.fn((...args) => args[0]),
+  where: vi.fn(() => null),
   serverTimestamp: vi.fn(() => 'SERVER_TS'),
 }));
 
