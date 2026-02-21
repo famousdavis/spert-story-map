@@ -1,89 +1,110 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { loadProductIndex, loadProduct, saveProductImmediate, deleteProduct, exportProduct, readImportFile, createNewProduct, duplicateProduct } from '../lib/storage';
+import { exportProduct, readImportFile, createNewProduct, duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
+import { useStorage } from '../lib/StorageProvider';
+import { useAuth } from '../lib/AuthProvider';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import { useDarkMode } from '../hooks/useDarkMode';
+import AppSettingsModal from '../components/settings/AppSettingsModal';
 import { Footer } from './ChangelogView';
 
-function loadProducts() {
-  const index = loadProductIndex();
-  return index.map(entry => {
-    const full = loadProduct(entry.id);
-    if (!full) return null;
-    const allRibs = getAllRibItems(full);
-    const totalPoints = getTotalProjectPoints(full);
-    const unsized = allRibs.filter(r => !r.size).length;
-    const pctComplete = getProjectPercentComplete(full);
-    return { ...entry, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
-  }).filter(Boolean);
+function enrichProduct(entry, full) {
+  const allRibs = getAllRibItems(full);
+  const totalPoints = getTotalProjectPoints(full);
+  const unsized = allRibs.filter(r => !r.size).length;
+  const pctComplete = getProjectPercentComplete(full);
+  return { ...entry, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
 }
 
 export default function ProductList() {
-  const [products, setProducts] = useState(loadProducts);
+  const { driver, mode, storageReady } = useStorage();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importConfirm, setImportConfirm] = useState(null);
   const [showWarning, setShowWarning] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useDarkMode();
 
-  const refresh = useCallback(() => setProducts(loadProducts()), []);
+  const refresh = useCallback(async () => {
+    if (!driver) return;
+    setLoading(true);
+    try {
+      const allProducts = await driver.loadProductIndex();
+      const detailed = allProducts.filter(Boolean).map(p => enrichProduct(p, p));
+      setProducts(detailed);
+    } finally {
+      setLoading(false);
+    }
+  }, [driver]);
 
-  const handleCreate = () => {
-    if (!newName.trim()) return;
-    const product = createNewProduct(newName.trim(), newDesc.trim());
-    saveProductImmediate(product);
+  useEffect(() => {
+    if (storageReady) refresh();
+  }, [storageReady, refresh]);
+
+  const handleCreate = async () => {
+    if (!newName.trim() || !driver) return;
+    const product = createNewProduct(newName.trim(), newDesc.trim(), driver.getWorkspaceId());
+    await driver.createProduct(product);
     setShowCreate(false);
     setNewName('');
     setNewDesc('');
     navigate(`/product/${product.id}/structure`);
   };
 
-  const handleLoadSample = () => {
+  const handleLoadSample = async () => {
+    if (!driver) return;
     const sample = createSampleProduct();
-    saveProductImmediate(sample);
+    await driver.createProduct(sample);
     refresh();
   };
 
-  const handleDuplicate = (id) => {
-    const original = loadProduct(id);
+  const handleDuplicate = async (id) => {
+    if (!driver) return;
+    const original = await driver.loadProduct(id);
     if (!original) return;
-    const dup = duplicateProduct(original);
-    saveProductImmediate(dup);
+    const dup = duplicateProduct(original, driver.getWorkspaceId());
+    await driver.createProduct(dup);
     refresh();
   };
 
-  const handleDelete = (id) => {
-    deleteProduct(id);
+  const handleDelete = async (id) => {
+    if (!driver) return;
+    await driver.deleteProduct(id);
     refresh();
   };
 
-  const handleExport = (id) => {
-    const product = loadProduct(id);
-    if (product) exportProduct(product);
+  const handleExport = async (id) => {
+    if (!driver) return;
+    const product = await driver.loadProduct(id);
+    if (product) exportProduct(product, driver.getWorkspaceId());
   };
 
   const handleImport = () => {
-    readImportFile((imported) => {
-      const existing = loadProduct(imported.id);
+    readImportFile(async (imported) => {
+      if (!driver) return;
+      const existing = await driver.loadProduct(imported.id);
       if (existing) {
         setImportConfirm({ product: imported, existingName: existing.name });
       } else {
-        saveProductImmediate(imported);
+        await driver.saveProductImmediate(imported);
         refresh();
       }
     });
   };
 
-  const confirmImport = () => {
-    if (importConfirm) {
-      saveProductImmediate(importConfirm.product);
+  const confirmImport = async () => {
+    if (importConfirm && driver) {
+      await driver.saveProductImmediate(importConfirm.product);
       setImportConfirm(null);
       refresh();
     }
@@ -99,10 +120,23 @@ export default function ProductList() {
               SPERT<sup className="text-[0.45em] text-gray-400 dark:text-gray-500 font-normal tracking-wide">®</sup> Story Map
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Plan and track agile project releases. Data is stored locally in your browser.
+              Plan and track agile project releases.{' '}
+              {mode === 'cloud'
+                ? 'Data is stored in your cloud account.'
+                : 'Data is stored locally in your browser.'}
             </p>
           </div>
           <div className="flex items-center gap-3 mt-1">
+            <button
+              onClick={() => setShowSettings(true)}
+              title="App Settings"
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <Link to="/about" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
               About
@@ -133,7 +167,7 @@ export default function ProductList() {
         </div>
 
         {/* Data warning */}
-        {showWarning && (
+        {showWarning && mode === 'local' && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg px-4 py-3 mb-6 flex items-start justify-between gap-3">
             <p className="text-xs text-amber-800 dark:text-amber-200">
               Your data is stored in this browser's localStorage. Export regularly to avoid data loss if browser data is cleared.
@@ -149,7 +183,11 @@ export default function ProductList() {
         )}
 
         {/* Product List */}
-        {products.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+            <p className="text-sm">Loading projects...</p>
+          </div>
+        ) : products.length === 0 ? (
           <div className="text-center py-16 text-gray-400 dark:text-gray-500">
             <p className="text-lg mb-2">No projects yet</p>
             <p className="text-sm">Create a new project or load the sample to get started.</p>
@@ -168,6 +206,11 @@ export default function ProductList() {
                   >
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {p.name}
+                      {p._owner && user && p._owner !== user.uid && (
+                        <span className="ml-2 inline-block text-[10px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full align-middle">
+                          Shared
+                        </span>
+                      )}
                     </h3>
                     <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                       <span>{p.totalItems} {p.totalItems === 1 ? 'item' : 'items'}</span>
@@ -270,6 +313,8 @@ export default function ProductList() {
         message={`Importing "${importConfirm?.product.name}" will overwrite the existing project "${importConfirm?.existingName}" because they share the same internal ID. This cannot be undone.`}
         confirmLabel="Overwrite"
       />
+
+      <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
 
       <div className="max-w-4xl mx-auto px-6">
         <Footer />

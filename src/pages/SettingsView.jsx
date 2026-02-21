@@ -1,23 +1,20 @@
 import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { exportProduct, readImportFile, saveProductImmediate, loadPreferences, savePreferences } from '../lib/storage';
+import { exportProduct, readImportFile } from '../lib/storage';
 import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
+import { useStorage } from '../lib/StorageProvider';
 import { downloadForecasterExport } from '../lib/exportForForecaster';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { Section, Field } from '../components/ui/Section';
+import SharingSection from '../components/settings/SharingSection';
 
 export default function SettingsView() {
   const { product, updateProduct } = useOutletContext();
   const { addRelease, addSprint } = useProductMutations(updateProduct);
+  const { driver } = useStorage();
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importConfirm, setImportConfirm] = useState(null);
-  const [prefs, setPrefs] = useState(() => loadPreferences());
-
-  const updatePref = (key, value) => {
-    const next = { ...prefs, [key]: value };
-    setPrefs(next);
-    savePreferences(next);
-  };
 
   // Release drag-to-reorder state
   const [dragReleaseId, setDragReleaseId] = useState(null);
@@ -126,7 +123,7 @@ export default function SettingsView() {
   };
 
   // Import/Export
-  const handleExport = () => exportProduct(product);
+  const handleExport = () => exportProduct(product, driver.getWorkspaceId());
 
   const handleImport = () => {
     readImportFile((imported) => {
@@ -137,7 +134,7 @@ export default function SettingsView() {
   const confirmImport = () => {
     if (importConfirm) {
       const merged = { ...importConfirm, id: product.id };
-      saveProductImmediate(merged);
+      driver.saveProductImmediate(merged);
       setImportConfirm(null);
       window.location.reload();
     }
@@ -321,32 +318,8 @@ export default function SettingsView() {
         </div>
       </Section>
 
-      {/* Export Attribution */}
-      <Section title="Export Attribution">
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Identify yourself on exported files. These fields are included in JSON exports for traceability.
-        </p>
-        <div className="space-y-3">
-          <Field label="Name">
-            <input
-              type="text"
-              value={prefs.exportName || ''}
-              onChange={e => updatePref('exportName', e.target.value)}
-              placeholder="e.g., Jane Smith"
-              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
-            />
-          </Field>
-          <Field label="Identifier">
-            <input
-              type="text"
-              value={prefs.exportId || ''}
-              onChange={e => updatePref('exportId', e.target.value)}
-              placeholder="e.g., student ID, email, or team name"
-              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
-            />
-          </Field>
-        </div>
-      </Section>
+      {/* Sharing (cloud mode only) */}
+      <SharingSection productId={product.id} />
 
       {/* Import/Export */}
       <Section title="Data">
@@ -379,24 +352,6 @@ export default function SettingsView() {
         message={`Importing "${importConfirm?.name}" will permanently replace all data in "${product.name}" — themes, backbones, rib items, releases, sprints, and progress history. This cannot be undone.`}
         confirmLabel="Replace All Data"
       />
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div className="mb-8">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
-      {children}
     </div>
   );
 }

@@ -1,20 +1,50 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { loadProduct, saveProduct, flushPendingSaves } from '../lib/storage';
+import { useStorage } from '../lib/StorageProvider';
 
 const MAX_UNDO = 30;
 
-function loadInitial(productId) {
-  if (!productId) return { product: null, lastSaved: null };
-  const data = loadProduct(productId);
-  return { product: data, lastSaved: data ? new Date(data.updatedAt) : null };
-}
-
 export function useProduct(productId) {
-  const [state, setState] = useState(() => loadInitial(productId));
-  const loading = false; // Data is loaded synchronously from localStorage
+  const { driver, mode, storageReady } = useStorage();
+  const [state, setState] = useState({ product: null, lastSaved: null, loading: true });
   const saveTimeoutRef = useRef(null);
   const undoStackRef = useRef([]);
   const redoStackRef = useRef([]);
+
+  // Load product when driver is ready or productId changes
+  useEffect(() => {
+    if (!storageReady || !driver || !productId) {
+      setState({ product: null, lastSaved: null, loading: !storageReady });
+      return;
+    }
+    let cancelled = false;
+    setState(prev => ({ ...prev, loading: true }));
+    driver.loadProduct(productId).then(data => {
+      if (!cancelled) {
+        setState({
+          product: data,
+          lastSaved: data ? new Date(data.updatedAt) : null,
+          loading: false,
+        });
+        undoStackRef.current = [];
+        redoStackRef.current = [];
+      }
+    });
+    return () => { cancelled = true; };
+  }, [productId, driver, storageReady]);
+
+  // Subscribe to remote changes (cloud mode only)
+  useEffect(() => {
+    if (!storageReady || !driver || !productId || mode !== 'cloud') return;
+    return driver.onProductChange(productId, (remoteProduct) => {
+      if (!remoteProduct) return;
+      setState(prev => ({
+        ...prev,
+        product: remoteProduct,
+        lastSaved: new Date(remoteProduct.updatedAt),
+      }));
+      // Don't clear undo stack — user may still want to undo local changes
+    });
+  }, [productId, driver, mode, storageReady]);
 
   // Stable updater that only touches product
   const setProduct = useCallback((updater) => {
@@ -27,10 +57,10 @@ export function useProduct(productId) {
   const scheduleSave = useCallback((next) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      saveProduct(next);
+      if (driver) driver.saveProduct(next);
       setState(prev => ({ ...prev, lastSaved: new Date() }));
     }, 500);
-  }, []);
+  }, [driver]);
 
   const updateProduct = useCallback((updater) => {
     setProduct(prev => {
@@ -78,18 +108,32 @@ export function useProduct(productId) {
 
   // Flush pending debounced saves before the tab closes
   useEffect(() => {
-    window.addEventListener('beforeunload', flushPendingSaves);
-    return () => window.removeEventListener('beforeunload', flushPendingSaves);
-  }, []);
+    const flush = () => { if (driver) driver.flushPendingSaves(); };
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
+  }, [driver]);
 
   const forceRefresh = useCallback(() => {
-    if (productId) {
-      const data = loadProduct(productId);
-      setState({ product: data, lastSaved: data ? new Date(data.updatedAt) : null });
-      undoStackRef.current = [];
-      redoStackRef.current = [];
+    if (productId && driver) {
+      driver.loadProduct(productId).then(data => {
+        setState({
+          product: data,
+          lastSaved: data ? new Date(data.updatedAt) : null,
+          loading: false,
+        });
+        undoStackRef.current = [];
+        redoStackRef.current = [];
+      });
     }
-  }, [productId]);
+  }, [productId, driver]);
 
-  return { product: state.product, loading, lastSaved: state.lastSaved, updateProduct, forceRefresh, undo, redo };
+  return {
+    product: state.product,
+    loading: state.loading,
+    lastSaved: state.lastSaved,
+    updateProduct,
+    forceRefresh,
+    undo,
+    redo,
+  };
 }

@@ -1,5 +1,56 @@
 # Changelog
 
+## Version 0.14.1 (2026-02-21)
+
+### Improved
+- **Global settings modal** — Storage mode and Export Attribution moved from per-project Settings to a global App Settings modal, accessible via gear icon on both the homepage and per-project header. These settings apply to all projects, not individual ones.
+- **Per-project Settings cleanup** — Settings tab now shows only per-project configuration (name, description, sizes, releases, sprints, sharing, data import/export). Global settings removed to avoid confusion.
+
+### Technical
+- New `AppSettingsModal.jsx` component wrapping `StorageSection` + Export Attribution in a `Modal`
+- Gear icon added to `ProductList.jsx` header and `ProductLayout.jsx` header
+- `SettingsView.jsx` cleaned up: removed `StorageSection`, Export Attribution section, and related `prefs` state/`useEffect`/`updatePref`
+
+## Version 0.14.0 (2026-02-21)
+
+### Added
+- **Firebase Cloud Integration** — Full Firestore cloud storage backend with real-time sync, replacing the skeleton driver from v0.13.0
+- **Data migration** — Bidirectional local↔cloud migration with collision detection (skip if user already has project, generate new ID if belongs to someone else)
+- **Project sharing** — Share cloud projects with other users by email; member management with owner/editor/viewer roles
+- **Shared project badge** — Purple "Shared" badge on ProductList for projects owned by other users
+
+### Fixed
+- **Migration changelog bug** — `appendChangeLogEntry` returns a `_changeLog` array, not a product object; migration now correctly applies the returned array back to the product
+
+### Technical
+- `createFirestoreDriver(uid)` fully implemented: CRUD via `setDoc`/`getDoc`/`deleteDoc`, debounced saves (500ms product, 200ms prefs), real-time sync via `onSnapshot` with `hasPendingWrites` echo prevention
+- Ownership safety: `saveProduct`/`saveProductImmediate` never include `owner`/`members`; new `createProduct` method sets ownership only during creation
+- `sanitizeForFirestore()` recursively strips `undefined` values before Firestore writes
+- New `migration.js` with `migrateLocalToCloud(uid)` and `migrateCloudToLocal(uid)` — collision-aware upload, owned-only download, changelog entries
+- New `SharingSection.jsx` — reads/writes Firestore directly for member management, profile lookup by email
+- `StorageSection` wired with real migration logic, progress indicators, result messages
+- Fingerprinting adaptations: `createNewProduct`, `duplicateProduct`, `exportProduct` accept optional workspace ID override for cloud mode (Firebase UID vs localStorage UUID)
+- Uniform `loadProductIndex` — both drivers return full product data, eliminating per-product `loadProduct` calls in ProductList
+- 5 new tests (migration), 6 new tests (storage optional params), 326 total across 15 files
+
+## Version 0.13.0 (2026-02-21)
+
+### Added
+- **Cloud storage architecture** — Storage abstraction layer with async driver interface supporting both localStorage and future Firestore backends
+- **Authentication provider** — Firebase Auth integration with Google and Microsoft SSO (activated when Firebase environment variables are configured)
+- **Storage provider** — Auth-aware storage context with mode switching (local/cloud), loading gate to prevent flash of stale data
+- **Storage settings** — New section in Settings for toggling storage mode, signing in, and viewing account info (hidden when Firebase is not configured)
+
+### Technical
+- New `storageDriver.js` with `createLocalStorageDriver()` (async wrapper over localStorage) and `createFirestoreDriver()` (skeleton for v0.14.0)
+- `AuthProvider` + `StorageProvider` context hierarchy wrapping the app
+- `useProduct` hook refactored from synchronous init to async loading via driver, with cloud sync subscription support
+- `ProductList` refactored to async loading via driver with mode-aware data warning
+- `ProductLayout` uses driver for save error subscription
+- `SettingsView` uses driver for preferences load/save and product import
+- Extracted reusable `Section` and `Field` components to `src/components/ui/Section.jsx`
+- 24 new tests for storage driver abstraction (321 total)
+
 ## Version 0.12.0 (2026-02-18)
 
 ### Added

@@ -1,0 +1,139 @@
+/**
+ * Data migration between localStorage and Firestore.
+ *
+ * migrateLocalToCloud(uid) — uploads local products to Firestore
+ * migrateCloudToLocal(uid) — downloads owned cloud products to localStorage
+ */
+
+import {
+  doc, getDoc, setDoc, getDocs, collection, serverTimestamp,
+} from 'firebase/firestore';
+import { db } from './firebase';
+import {
+  loadProductIndex, loadProduct, loadPreferences,
+  saveProductImmediate, savePreferences, appendChangeLogEntry,
+} from './storage';
+
+const PROJECTS_COL = 'spertstorymap_projects';
+const SETTINGS_COL = 'spertstorymap_settings';
+
+/**
+ * Recursively strip undefined values for Firestore.
+ * Duplicated from storageDriver.js to keep migration self-contained.
+ */
+function sanitize(obj) {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) return obj.map(sanitize);
+  if (typeof obj !== 'object') return obj;
+  const clean = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      clean[key] = sanitize(value);
+    }
+  }
+  return clean;
+}
+
+/**
+ * Upload all local products to Firestore.
+ *
+ * Collision handling:
+ * - If a doc with the same ID exists AND user is a member → skip
+ * - If a doc exists but user is NOT a member → generate new ID
+ * - If doc doesn't exist → proceed
+ *
+ * Local data is left in place as a backup.
+ *
+ * @returns {{ uploaded: number, skipped: number }}
+ */
+export async function migrateLocalToCloud(uid) {
+  const index = loadProductIndex();
+  let uploaded = 0;
+  let skipped = 0;
+
+  for (const entry of index) {
+    const product = loadProduct(entry.id);
+    if (!product) {
+      skipped++;
+      continue;
+    }
+
+    let targetId = product.id;
+
+    // Collision check
+    const existing = await getDoc(doc(db, PROJECTS_COL, targetId));
+    if (existing.exists()) {
+      const data = existing.data();
+      if (data.members && data.members[uid]) {
+        // User already has this project in cloud — skip
+        skipped++;
+        continue;
+      }
+      // Belongs to someone else — generate new ID
+      targetId = crypto.randomUUID();
+    }
+
+    // Append migration event to changelog
+    const updatedProduct = { ...product, id: targetId };
+    updatedProduct._changeLog = appendChangeLogEntry(updatedProduct, { op: 'cloud-migration', uid });
+
+    const { id, ...rest } = updatedProduct;
+    await setDoc(doc(db, PROJECTS_COL, id), {
+      ...sanitize(rest),
+      owner: uid,
+      members: { [uid]: 'owner' },
+      updatedAt: serverTimestamp(),
+    });
+
+    uploaded++;
+  }
+
+  // Migrate preferences
+  const prefs = loadPreferences();
+  if (prefs && Object.keys(prefs).length > 0) {
+    await setDoc(doc(db, SETTINGS_COL, uid), sanitize(prefs));
+  }
+
+  return { uploaded, skipped };
+}
+
+/**
+ * Download owned cloud products to localStorage.
+ *
+ * Only owned projects are downloaded — shared projects stay cloud-only.
+ *
+ * @returns {{ ownedCount: number, sharedCount: number }}
+ */
+export async function migrateCloudToLocal(uid) {
+  const snap = await getDocs(collection(db, PROJECTS_COL));
+  let ownedCount = 0;
+  let sharedCount = 0;
+
+  snap.forEach(docSnap => {
+    const data = docSnap.data();
+    if (!data.members || !data.members[uid]) return;
+
+    if (data.owner === uid) {
+      // Strip Firestore-only fields
+      const { owner, members, ...product } = data;
+      const withId = { id: docSnap.id, ...product };
+      withId._changeLog = appendChangeLogEntry(withId, { op: 'local-migration', uid });
+      saveProductImmediate(withId);
+      ownedCount++;
+    } else {
+      sharedCount++;
+    }
+  });
+
+  // Migrate preferences
+  try {
+    const prefsSnap = await getDoc(doc(db, SETTINGS_COL, uid));
+    if (prefsSnap.exists()) {
+      savePreferences(prefsSnap.data());
+    }
+  } catch (e) {
+    console.error('Failed to migrate cloud preferences:', e);
+  }
+
+  return { ownedCount, sharedCount };
+}
