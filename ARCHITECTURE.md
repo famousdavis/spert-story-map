@@ -22,7 +22,10 @@ src/
 ├── lib/                              # Pure logic, no React
 │   ├── constants.js                  # Storage keys, schema version, size defaults
 │   ├── version.js                    # APP_VERSION constant (single source of truth)
-│   ├── storage.js                    # localStorage CRUD with debouncing, workspace identity, export pipeline
+│   ├── storage.js                    # localStorage CRUD with debouncing, workspace identity
+│   ├── importExport.js               # Export/import product JSON, file picker utility
+│   ├── sortByOrder.js                # Pure sort utility for persisted order arrays
+│   ├── progressViewHelpers.js        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.js                 # Sample "Billing System v2" product factory
 │   ├── calculations.js              # Pure computation functions (points, progress, stats)
 │   ├── progressMutations.js         # Shared progress tracking helpers (update, remove, comment)
@@ -34,6 +37,7 @@ src/
 ├── hooks/
 │   ├── useProduct.js                 # Load/save product state with debounced persistence
 │   ├── useProductMutations.js        # Reusable CRUD for theme/backbone/rib hierarchy
+│   ├── useReleaseDrag.js             # DnD hook for release planning (card + column drag)
 │   └── useDarkMode.js                # Theme toggle hook (localStorage + system preference)
 │
 ├── components/
@@ -53,11 +57,15 @@ src/
 │   ├── settings/                     # Global and per-project settings components
 │   │   ├── AppSettingsModal.jsx      # Global settings modal (storage mode + export attribution)
 │   │   ├── StorageSection.jsx        # Storage mode toggle, auth UI, migration controls
-│   │   └── SharingSection.jsx        # Project sharing (cloud mode, owner only)
+│   │   ├── SharingSection.jsx        # Project sharing (cloud mode, owner only)
+│   │   ├── SizeMappingSection.jsx    # T-shirt size mapping editor
+│   │   └── DataSection.jsx           # Import/export buttons + confirm dialogs
 │   ├── progress/
+│   │   ├── ProgressHeader.jsx        # Sprint selector, group-by buttons, expand/collapse toggle
 │   │   ├── SprintSummaryCard.jsx     # Sprint summary stats card
 │   │   ├── BurnUpChart.jsx           # Burn-up progress chart
 │   │   ├── ProgressRow.jsx           # Individual progress table row
+│   │   ├── GroupSummaryHeader.jsx    # Collapsible group header with summary stats
 │   │   └── CommentPanel.jsx          # Assessment note panel for progress rows
 │   ├── structure/                    # Structure view sub-components
 │   │   ├── BackboneSection.jsx       # Backbone header + rib table grid

@@ -1,9 +1,9 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { getAllRibItems, getPointsForRelease, getCoreNonCorePointsForRelease, getTotalProjectPoints, getCoreNonCorePoints, getReleasePercentComplete } from '../lib/calculations';
 import { deleteReleaseFromProduct } from '../lib/settingsMutations';
-import { transferAllocation } from '../components/storymap/mapMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
+import { useReleaseDrag } from '../hooks/useReleaseDrag';
 import ReleaseColumn from '../components/releases/ReleaseColumn';
 import AllocationModal from '../components/releases/AllocationModal';
 
@@ -22,17 +22,6 @@ export default function ReleasePlanningView() {
   const [filter, setFilter] = useState('all');
   const [allocModal, setAllocModal] = useState(null);
 
-  // Card drag state
-  const [dragRibId, setDragRibId] = useState(null);
-  const [dragFromCol, setDragFromCol] = useState(null); // releaseId or 'unassigned'
-  const [dropTarget, setDropTarget] = useState(null); // { col, beforeRibId }
-  const dropTargetRef = useRef(null); // Ref to avoid stale closure in handleDrop
-
-  // Column (release) drag state
-  const [dragColId, setDragColId] = useState(null);
-  const [dropBeforeColId, setDropBeforeColId] = useState(null);
-  const dropBeforeColRef = useRef(null);
-
   const allRibs = useMemo(() => getAllRibItems(product), [product]);
   const totalPoints = useMemo(() => getTotalProjectPoints(product), [product]);
   const { core: totalCore, nonCore: totalNonCore } = useMemo(() => getCoreNonCorePoints(product), [product]);
@@ -48,7 +37,6 @@ export default function ReleasePlanningView() {
   const getSortedRibs = useCallback((colId, ribs) => {
     const order = cardOrder?.[colId];
     if (!order || order.length === 0) return ribs;
-    // Sort by position in order array; items not in order go to end
     const sorted = [...ribs].sort((a, b) => {
       const ai = order.indexOf(a.id);
       const bi = order.indexOf(b.id);
@@ -86,169 +74,13 @@ export default function ReleasePlanningView() {
     }));
   }, [updateProduct]);
 
-  // Drag handlers — declared before handleDrop so they're available
-  const setDropTargetBoth = useCallback((val) => {
-    setDropTarget(val);
-    dropTargetRef.current = val;
-  }, []);
-
-  const handleDragStart = useCallback((ribId, fromCol) => {
-    setDragRibId(ribId);
-    setDragFromCol(fromCol);
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    setDragRibId(null);
-    setDragFromCol(null);
-    setDropTargetBoth(null);
-  }, [setDropTargetBoth]);
-
-  // Full drop handler: move between columns + reorder
-  // Does everything in a single updateProduct call to avoid race conditions
-  const handleDrop = useCallback((targetCol) => {
-    if (!dragRibId) return;
-
-    const rib = allRibs.find(r => r.id === dragRibId);
-    if (!rib) { handleDragEnd(); return; }
-
-    const sameColumn = dragFromCol === targetCol;
-
-    // Read the drop target from ref (guaranteed latest)
-    const currentDropTarget = dropTargetRef.current;
-    const beforeRibId = currentDropTarget?.col === targetCol ? currentDropTarget.beforeRibId : undefined;
-
-    // Compute the new ordering for the target column
-    let targetRibs;
-    if (targetCol === 'unassigned') {
-      targetRibs = sameColumn ? unassigned : [...unassigned.filter(r => r.id !== dragRibId), rib];
-    } else {
-      targetRibs = sameColumn ? ribsForRelease(targetCol) : [...ribsForRelease(targetCol).filter(r => r.id !== dragRibId), rib];
-    }
-    const currentIds = targetRibs.map(r => r.id);
-
-    let newOrder;
-    if (beforeRibId && beforeRibId !== dragRibId) {
-      const withoutDragged = currentIds.filter(id => id !== dragRibId);
-      const insertIdx = withoutDragged.indexOf(beforeRibId);
-      if (insertIdx >= 0) {
-        newOrder = [...withoutDragged.slice(0, insertIdx), dragRibId, ...withoutDragged.slice(insertIdx)];
-      } else {
-        newOrder = [...withoutDragged, dragRibId];
-      }
-    } else {
-      const withoutDragged = currentIds.filter(id => id !== dragRibId);
-      newOrder = [...withoutDragged, dragRibId];
-    }
-
-    // Single atomic updateProduct call for both allocation + order changes
-    updateProduct(prev => {
-      let next = { ...prev };
-
-      // 1. Handle allocation change for cross-column moves
-      if (!sameColumn) {
-        const fromId = dragFromCol === 'unassigned' ? null : dragFromCol;
-        const toId = targetCol === 'unassigned' ? null : targetCol;
-        next = {
-          ...next,
-          themes: next.themes.map(t => ({
-            ...t,
-            backboneItems: t.backboneItems.map(b => ({
-              ...b,
-              ribItems: b.ribItems.map(r => {
-                if (r.id !== dragRibId) return r;
-                const newAlloc = transferAllocation(r, fromId, toId);
-                return newAlloc !== null ? { ...r, releaseAllocations: newAlloc } : r;
-              }),
-            })),
-          })),
-        };
-      }
-
-      // 2. Update card order — save new order for target column, clean source column
-      const prevCardOrder = { ...(next.releaseCardOrder || {}) };
-      prevCardOrder[targetCol] = newOrder;
-
-      if (!sameColumn) {
-        // Remove dragged card from source column order
-        const srcOrder = prevCardOrder[dragFromCol] || [];
-        if (srcOrder.includes(dragRibId)) {
-          prevCardOrder[dragFromCol] = srcOrder.filter(id => id !== dragRibId);
-        }
-      }
-
-      next.releaseCardOrder = prevCardOrder;
-      return next;
-    });
-
-    handleDragEnd();
-  }, [dragRibId, dragFromCol, allRibs, unassigned, ribsForRelease, updateProduct, handleDragEnd]);
-
-  const handleColumnDragOver = (e, col) => {
-    e.preventDefault();
-    // Only set column-level target if not already on a specific card
-    if (!dropTargetRef.current || dropTargetRef.current.col !== col) {
-      setDropTargetBoth({ col });
-    }
-  };
-
-  const handleCardDragOver = (e, col, ribId) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (ribId === dragRibId) return; // Don't target yourself
-    if (dropTargetRef.current?.col !== col || dropTargetRef.current?.beforeRibId !== ribId) {
-      setDropTargetBoth({ col, beforeRibId: ribId });
-    }
-  };
-
-  // Column drag handlers
-  const handleColDragStart = (e, releaseId) => {
-    e.dataTransfer.effectAllowed = 'move';
-    setDragColId(releaseId);
-  };
-
-  const handleColDragEnd = () => {
-    setDragColId(null);
-    setDropBeforeColId(null);
-    dropBeforeColRef.current = null;
-  };
-
-  const handleColDragOver = (e, releaseId) => {
-    if (!dragColId || dragColId === releaseId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (dropBeforeColRef.current !== releaseId) {
-      dropBeforeColRef.current = releaseId;
-      setDropBeforeColId(releaseId);
-    }
-  };
-
-  const handleColDrop = (e) => {
-    e.preventDefault();
-    if (!dragColId) return;
-    const beforeId = dropBeforeColRef.current;
-
-    updateProduct(prev => {
-      const releases = [...prev.releases];
-      const dragIdx = releases.findIndex(r => r.id === dragColId);
-      if (dragIdx < 0) return prev;
-      const [dragged] = releases.splice(dragIdx, 1);
-
-      if (beforeId) {
-        const beforeIdx = releases.findIndex(r => r.id === beforeId);
-        if (beforeIdx >= 0) {
-          releases.splice(beforeIdx, 0, dragged);
-        } else {
-          releases.push(dragged);
-        }
-      } else {
-        releases.push(dragged);
-      }
-
-      return { ...prev, releases: releases.map((r, i) => ({ ...r, order: i + 1 })) };
-    });
-
-    handleColDragEnd();
-  };
+  const {
+    dragRibId, dropTarget,
+    handleDragStart, handleDragEnd, handleDrop,
+    handleColumnDragOver, handleCardDragOver,
+    dragColId, dropBeforeColId,
+    handleColDragStart, handleColDragEnd, handleColDragOver, handleColDrop,
+  } = useReleaseDrag(updateProduct, allRibs, unassigned, ribsForRelease);
 
   return (
     <div>
@@ -354,4 +186,3 @@ export default function ReleasePlanningView() {
     </div>
   );
 }
-

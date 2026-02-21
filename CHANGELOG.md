@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 0.14.2 (2026-02-21)
+
+### Added
+- **Drag-to-reorder projects** — Reorder projects on the homepage by dragging the grip handle (⠿). Order persists in preferences across sessions and syncs to cloud.
+
+### Improved
+- **Codebase refactoring** — Decomposed 5 large files into smaller, focused modules for better maintainability and token efficiency:
+  - `ProgressTrackingView.jsx` (415→339 lines): Extracted `progressViewHelpers.js` (pure helper functions) and `ProgressHeader.jsx` (header bar component)
+  - `SettingsView.jsx` (357→210 lines): Extracted `SizeMappingSection.jsx` and `DataSection.jsx`
+  - `ReleasePlanningView.jsx` (356→176 lines): Extracted `useReleaseDrag.js` hook (all DnD state and handlers)
+  - `storage.js` (365→282 lines): Extracted `importExport.js` (export/import/readImportFile)
+  - `storageDriver.js` (327→96 lines): Extracted `firestoreDriver.js` (Firestore driver + helpers)
+- **New test coverage** — Added 19 tests for `progressViewHelpers` and 8 tests for `sortByOrder` (353 total tests)
+- **Cleanup** — Deleted 5 duplicate macOS Finder files, removed trailing blank lines
+
 ## Version 0.14.1 (2026-02-21)
 
 ### Improved

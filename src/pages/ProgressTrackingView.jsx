@@ -1,15 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-  getAllRibItems, getRibItemPercentComplete,
-  getReleasePercentComplete, getProgressOverTime,
-  getRibReleaseProgressForSprint, getRibReleaseProgress, getSprintSummary,
+  getAllRibItems, getReleasePercentComplete, getProgressOverTime, getSprintSummary,
 } from '../lib/calculations';
 import {
   updateProgress as doUpdateProgress,
   removeProgress as doRemoveProgress,
   updateComment as doUpdateComment,
 } from '../lib/progressMutations';
+import {
+  getCommentCount, getCommentHistory,
+  getSprintPct, getCurrentPct, getDelta,
+} from '../lib/progressViewHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
 import ProgressBar from '../components/ui/ProgressBar';
 import CollapsibleSection from '../components/ui/CollapsibleSection';
@@ -17,6 +19,7 @@ import SprintSummaryCard from '../components/progress/SprintSummaryCard';
 import BurnUpChart from '../components/progress/BurnUpChart';
 import ProgressRow from '../components/progress/ProgressRow';
 import GroupSummaryHeader from '../components/progress/GroupSummaryHeader';
+import ProgressHeader from '../components/progress/ProgressHeader';
 
 export default function ProgressTrackingView() {
   const { product, updateProduct } = useOutletContext();
@@ -98,29 +101,19 @@ export default function ProgressTrackingView() {
     doUpdateComment(updateProduct, ribId, releaseId, selectedSprint, comment);
   };
 
-  // Count non-empty comments for a rib+release
-  const getCommentCount = (rib, releaseId) => {
-    if (!rib.progressHistory) return 0;
-    if (releaseId) {
-      return rib.progressHistory.filter(p => p.releaseId === releaseId && p.comment).length;
-    }
-    return rib.progressHistory.filter(p => p.comment).length;
-  };
-
-  // Get comment history for a rib+release, sorted newest-first by sprint order
-  const getCommentHistory = (rib, releaseId) => {
-    if (!rib.progressHistory) return [];
-    const entries = releaseId
-      ? rib.progressHistory.filter(p => p.releaseId === releaseId && p.comment)
-      : rib.progressHistory.filter(p => p.comment);
-    return entries
-      .map(e => ({
-        ...e,
-        sprintName: sprintNameMap[e.sprintId] || 'Unknown',
-        order: sprintOrder[e.sprintId] ?? 0,
-      }))
-      .sort((a, b) => b.order - a.order);
-  };
+  // Bind pure helpers to component-level lookup maps
+  const boundGetCommentHistory = useCallback(
+    (rib, releaseId) => getCommentHistory(rib, releaseId, sprintNameMap, sprintOrder),
+    [sprintNameMap, sprintOrder]
+  );
+  const boundGetSprintPct = useCallback(
+    (rib, releaseId) => getSprintPct(rib, releaseId, selectedSprint),
+    [selectedSprint]
+  );
+  const boundGetDelta = useCallback(
+    (rib, releaseId) => getDelta(rib, releaseId, sprint, prevSprint, selectedSprint),
+    [sprint, prevSprint, selectedSprint]
+  );
 
   // Build rows
   const grouped = useMemo(() => {
@@ -196,90 +189,20 @@ export default function ProgressTrackingView() {
     }
   };
 
-  const getSprintPct = (rib, releaseId) => {
-    if (!selectedSprint) return null;
-    if (releaseId) {
-      return getRibReleaseProgressForSprint(rib, releaseId, selectedSprint);
-    }
-    const entries = (rib.progressHistory?.filter(p => p.sprintId === selectedSprint) || [])
-      .filter(e => e.percentComplete !== null);
-    return entries.length > 0 ? Math.min(100, entries.reduce((s, e) => s + e.percentComplete, 0)) : null;
-  };
-
-  const getCurrentPct = (rib, releaseId) => {
-    if (releaseId) return getRibReleaseProgress(rib, releaseId);
-    return getRibItemPercentComplete(rib);
-  };
-
-  const getDelta = (rib, releaseId) => {
-    if (!sprint || !prevSprint) return null;
-    const current = getSprintPct(rib, releaseId);
-    if (current === null) return null;
-    let prev;
-    if (releaseId) {
-      prev = getRibReleaseProgressForSprint(rib, releaseId, prevSprint.id);
-    } else {
-      const entries = (rib.progressHistory?.filter(p => p.sprintId === prevSprint.id) || [])
-        .filter(e => e.percentComplete !== null);
-      prev = entries.length > 0 ? entries.reduce((s, e) => s + e.percentComplete, 0) : null;
-    }
-    return current - (prev || 0);
-  };
-
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Progress Tracking</h2>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Project: <span className="font-medium text-gray-700 dark:text-gray-300">{Math.round(sprintSummary?.percentComplete ?? 0)}%</span> complete
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Sprint:</span>
-            <select
-              value={selectedSprint || ''}
-              onChange={e => setSelectedSprint(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
-            >
-              {product.sprints.length === 0 && <option value="">No sprints defined</option>}
-              {product.sprints.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => addSprint(setSelectedSprint)}
-              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 text-lg leading-none px-1"
-              title="Add sprint"
-            >
-              +
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Group:</span>
-            {['release', 'backbone', 'theme'].map(g => (
-              <button
-                key={g}
-                onClick={() => setGroupBy(g)}
-                className={`px-2 py-1 text-xs rounded ${groupBy === g ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'}`}
-              >
-                {g.charAt(0).toUpperCase() + g.slice(1)}
-              </button>
-            ))}
-          </div>
-          {assignedRibs.length > 0 && (
-            <button
-              onClick={toggleExpandAll}
-              className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-              title={allExpanded ? 'Collapse all notes' : 'Expand all notes'}
-            >
-              {allExpanded ? 'Collapse All' : 'Expand All'}
-            </button>
-          )}
-        </div>
-      </div>
+      <ProgressHeader
+        selectedSprint={selectedSprint}
+        setSelectedSprint={setSelectedSprint}
+        sprints={product.sprints}
+        addSprint={addSprint}
+        groupBy={groupBy}
+        setGroupBy={setGroupBy}
+        allExpanded={allExpanded}
+        toggleExpandAll={toggleExpandAll}
+        hasAssignedRibs={assignedRibs.length > 0}
+        percentComplete={sprintSummary?.percentComplete ?? 0}
+      />
 
       {/* Progress bars: Total, Core, Non-core */}
       <div className="mb-6 space-y-2">
@@ -390,11 +313,11 @@ export default function ProgressTrackingView() {
                             setCommentDrafts={setCommentDrafts}
                             progressDrafts={progressDrafts}
                             setProgressDrafts={setProgressDrafts}
-                            getSprintPct={getSprintPct}
+                            getSprintPct={boundGetSprintPct}
                             getCurrentPct={getCurrentPct}
-                            getDelta={getDelta}
+                            getDelta={boundGetDelta}
                             getCommentCount={getCommentCount}
-                            getCommentHistory={getCommentHistory}
+                            getCommentHistory={boundGetCommentHistory}
                             updateProgress={updateProgress}
                             removeProgress={removeProgress}
                             updateComment={updateComment}
@@ -413,6 +336,3 @@ export default function ProgressTrackingView() {
     </div>
   );
 }
-
-
-

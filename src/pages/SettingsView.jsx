@@ -1,58 +1,24 @@
 import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { exportProduct, readImportFile } from '../lib/storage';
 import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { useStorage } from '../lib/StorageProvider';
-import { downloadForecasterExport } from '../lib/exportForForecaster';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { Section, Field } from '../components/ui/Section';
 import SharingSection from '../components/settings/SharingSection';
+import SizeMappingSection from '../components/settings/SizeMappingSection';
+import DataSection from '../components/settings/DataSection';
 
 export default function SettingsView() {
   const { product, updateProduct } = useOutletContext();
   const { addRelease, addSprint } = useProductMutations(updateProduct);
   const { driver } = useStorage();
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [importConfirm, setImportConfirm] = useState(null);
 
   // Release drag-to-reorder state
   const [dragReleaseId, setDragReleaseId] = useState(null);
   const [dropBeforeReleaseId, setDropBeforeReleaseId] = useState(null);
   const dropBeforeReleaseRef = useRef(null);
-
-  // Size mapping
-  const updateSizeMapping = (index, field, value) => {
-    updateProduct(prev => ({
-      ...prev,
-      sizeMapping: prev.sizeMapping.map((m, i) =>
-        i === index ? { ...m, [field]: value } : m
-      ),
-    }));
-  };
-
-  const commitSizePoints = (index) => {
-    updateProduct(prev => ({
-      ...prev,
-      sizeMapping: prev.sizeMapping.map((m, i) =>
-        i === index ? { ...m, points: parseInt(m.points, 10) || 0 } : m
-      ),
-    }));
-  };
-
-  const addSize = () => {
-    updateProduct(prev => ({
-      ...prev,
-      sizeMapping: [...prev.sizeMapping, { label: 'New', points: 0 }],
-    }));
-  };
-
-  const removeSize = (index) => {
-    updateProduct(prev => ({
-      ...prev,
-      sizeMapping: prev.sizeMapping.filter((_, i) => i !== index),
-    }));
-  };
 
   // Releases
   const updateRelease = (id, updates) => {
@@ -122,65 +88,6 @@ export default function SettingsView() {
     updateProduct(prev => deleteSprintFromProduct(prev, id));
   };
 
-  // Import/Export
-  const handleExport = () => exportProduct(product, driver.getWorkspaceId());
-
-  const handleImport = () => {
-    readImportFile((imported) => {
-      setImportConfirm(imported);
-    });
-  };
-
-  const confirmImport = () => {
-    if (importConfirm) {
-      const merged = { ...importConfirm, id: product.id };
-      driver.saveProductImmediate(merged);
-      setImportConfirm(null);
-      window.location.reload();
-    }
-  };
-
-  const handleDownloadTemplate = () => {
-    const template = {
-      id: 'example-id',
-      name: 'Example Project',
-      description: '',
-      schemaVersion: 2,
-      sizeMapping: product.sizeMapping,
-      releases: [{ id: 'release-1', name: 'Release 1', order: 1, description: '', targetDate: null }],
-      sprints: [{ id: 'sprint-1', name: 'Sprint 1', order: 1, endDate: null }],
-      sprintCadenceWeeks: 2,
-      themes: [{
-        id: 'theme-1',
-        name: 'Example Theme',
-        order: 1,
-        backboneItems: [{
-          id: 'backbone-1',
-          name: 'Example Backbone',
-          description: '',
-          order: 1,
-          ribItems: [{
-            id: 'rib-1',
-            name: 'Example Rib Item',
-            description: '',
-            order: 1,
-            size: 'M',
-            category: 'core',
-            releaseAllocations: [{ releaseId: 'release-1', percentage: 100, memo: '' }],
-            progressHistory: [{ sprintId: 'sprint-1', releaseId: 'release-1', percentComplete: 50, comment: 'Initial implementation started', updatedAt: new Date().toISOString() }],
-          }],
-        }],
-      }],
-    };
-    const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'release-planner-template.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="max-w-3xl">
       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Settings</h2>
@@ -207,33 +114,7 @@ export default function SettingsView() {
         </div>
       </Section>
 
-      {/* Size Mapping */}
-      <Section title="T-Shirt Size Mapping">
-        <div className="space-y-2">
-          {product.sizeMapping.map((m, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <input
-                type="text"
-                value={m.label}
-                onChange={e => updateSizeMapping(i, 'label', e.target.value)}
-                className="w-24 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm text-center"
-                placeholder="Label"
-              />
-              <input
-                type="number"
-                value={m.points}
-                onChange={e => updateSizeMapping(i, 'points', e.target.value)}
-                onBlur={() => commitSizePoints(i)}
-                className="w-24 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm text-center"
-                placeholder="Points"
-              />
-              <span className="text-xs text-gray-400 dark:text-gray-500">pts</span>
-              <button onClick={() => removeSize(i)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm ml-auto">Remove</button>
-            </div>
-          ))}
-          <button onClick={addSize} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2">+ Add Size</button>
-        </div>
-      </Section>
+      <SizeMappingSection sizeMapping={product.sizeMapping} updateProduct={updateProduct} />
 
       {/* Releases */}
       <Section title="Releases">
@@ -318,21 +199,11 @@ export default function SettingsView() {
         </div>
       </Section>
 
-      {/* Sharing (cloud mode only) */}
       <SharingSection productId={product.id} />
 
-      {/* Import/Export */}
-      <Section title="Data">
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Export and import this project's data.</p>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={handleExport} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Export as JSON</button>
-          <button onClick={() => downloadForecasterExport(product)} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Export for SPERT Forecaster</button>
-          <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Project from JSON</button>
-          <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
-        </div>
-      </Section>
+      <DataSection product={product} driver={driver} />
 
-      {/* Delete confirm */}
+      {/* Delete confirm (release with allocations) */}
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
@@ -341,16 +212,6 @@ export default function SettingsView() {
         }}
         title="Confirm Delete"
         message={deleteTarget?.message || ''}
-      />
-
-      {/* Import confirm */}
-      <ConfirmDialog
-        open={!!importConfirm}
-        onClose={() => setImportConfirm(null)}
-        onConfirm={confirmImport}
-        title="Replace Project Data"
-        message={`Importing "${importConfirm?.name}" will permanently replace all data in "${product.name}" — themes, backbones, rib items, releases, sprints, and progress history. This cannot be undone.`}
-        confirmLabel="Replace All Data"
       />
     </div>
   );

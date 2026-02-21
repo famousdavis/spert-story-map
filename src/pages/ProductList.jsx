@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { exportProduct, readImportFile, createNewProduct, duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
+import { sortByOrder } from '../lib/sortByOrder';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
 import Modal from '../components/ui/Modal';
@@ -35,6 +36,17 @@ export default function ProductList() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useDarkMode();
 
+  // Drag-to-reorder state
+  const [projectOrder, setProjectOrder] = useState(null);
+  const [dragId, setDragId] = useState(null);
+  const [dropBeforeId, setDropBeforeId] = useState(null);
+  const dropBeforeRef = useRef(null);
+
+  const sortedProducts = useMemo(
+    () => sortByOrder(products, projectOrder),
+    [products, projectOrder]
+  );
+
   const refresh = useCallback(async () => {
     if (!driver) return;
     setLoading(true);
@@ -50,6 +62,59 @@ export default function ProductList() {
   useEffect(() => {
     if (storageReady) refresh();
   }, [storageReady, refresh]);
+
+  // Load persisted project order from preferences
+  useEffect(() => {
+    if (!driver) return;
+    driver.loadPreferences().then(prefs => {
+      if (prefs?.projectOrder) setProjectOrder(prefs.projectOrder);
+    });
+  }, [driver]);
+
+  // Drag-to-reorder handlers
+  const handleProjectDragStart = (e, id) => {
+    e.dataTransfer.effectAllowed = 'move';
+    setDragId(id);
+  };
+
+  const handleProjectDragOver = (e, id) => {
+    e.preventDefault();
+    if (id === dragId) return;
+    if (dropBeforeRef.current !== id) {
+      dropBeforeRef.current = id;
+      setDropBeforeId(id);
+    }
+  };
+
+  const handleProjectDrop = (e) => {
+    e.preventDefault();
+    if (!dragId) return;
+    const beforeId = dropBeforeRef.current;
+    const ids = sortedProducts.map(p => p.id);
+    const dragIdx = ids.indexOf(dragId);
+    if (dragIdx < 0) return;
+    ids.splice(dragIdx, 1);
+    if (beforeId) {
+      const beforeIdx = ids.indexOf(beforeId);
+      ids.splice(beforeIdx >= 0 ? beforeIdx : ids.length, 0, dragId);
+    } else {
+      ids.push(dragId);
+    }
+    setProjectOrder(ids);
+    // Persist to preferences
+    if (driver) {
+      driver.loadPreferences().then(prefs => {
+        driver.savePreferences({ ...prefs, projectOrder: ids });
+      });
+    }
+    handleProjectDragEnd();
+  };
+
+  const handleProjectDragEnd = () => {
+    setDragId(null);
+    setDropBeforeId(null);
+    dropBeforeRef.current = null;
+  };
 
   const handleCreate = async () => {
     if (!newName.trim() || !driver) return;
@@ -194,12 +259,27 @@ export default function ProductList() {
           </div>
         ) : (
           <div className="space-y-3">
-            {products.map(p => (
+            {sortedProducts.map(p => (
               <div
                 key={p.id}
-                className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 hover:border-gray-300 dark:hover:border-gray-600 transition-colors group"
+                draggable
+                onDragStart={e => handleProjectDragStart(e, p.id)}
+                onDragOver={e => handleProjectDragOver(e, p.id)}
+                onDrop={handleProjectDrop}
+                onDragEnd={handleProjectDragEnd}
+                className={`bg-white dark:bg-gray-900 border rounded-xl p-5 transition-colors group ${
+                  dragId === p.id
+                    ? 'opacity-40 border-gray-300 dark:border-gray-600'
+                    : dropBeforeId === p.id
+                      ? 'border-blue-400 dark:border-blue-500 border-t-2'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
               >
                 <div className="flex items-start justify-between">
+                  <span
+                    className="flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 mr-3 mt-0.5 select-none"
+                    title="Drag to reorder"
+                  >⠿</span>
                   <button
                     onClick={() => navigate(`/product/${p.id}/structure`)}
                     className="text-left flex-1"
