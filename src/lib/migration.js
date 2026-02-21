@@ -60,16 +60,27 @@ export async function migrateLocalToCloud(uid) {
 
     let targetId = product.id;
 
-    // Collision check
-    const existing = await getDoc(doc(db, PROJECTS_COL, targetId));
-    if (existing.exists()) {
-      const data = existing.data();
-      if (data.members && data.members[uid]) {
-        // User already has this project in cloud — skip
-        skipped++;
-        continue;
+    // Collision check: try to read the doc to see if it already exists.
+    // Firestore `get` rules reference `resource.data.members`, which fails
+    // with PERMISSION_DENIED for both non-existent docs (resource.data is
+    // null) and docs the user isn't a member of. We treat PERMISSION_DENIED
+    // as "safe to create with a new ID" to handle both cases.
+    try {
+      const existing = await getDoc(doc(db, PROJECTS_COL, targetId));
+      if (existing.exists()) {
+        const data = existing.data();
+        if (data.members && data.members[uid]) {
+          // User already has this project in cloud — skip
+          skipped++;
+          continue;
+        }
+        // Belongs to someone else — generate new ID
+        targetId = crypto.randomUUID();
       }
-      // Belongs to someone else — generate new ID
+    } catch (collisionErr) {
+      // PERMISSION_DENIED means doc exists but user isn't a member,
+      // or doc doesn't exist (rule can't evaluate resource.data).
+      // Generate a new ID to avoid collision.
       targetId = crypto.randomUUID();
     }
 
