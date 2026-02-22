@@ -1,53 +1,103 @@
 import { useState } from 'react';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
-import { migrateLocalToCloud, migrateCloudToLocal } from '../../lib/migration';
-import { loadProductIndex } from '../../lib/storage';
+import { migrateLocalToCloud } from '../../lib/migration';
+import { loadProductIndex, clearAllLocalProducts, loadPreferences, savePreferences } from '../../lib/storage';
+import { exportAllProducts } from '../../lib/importExport';
 import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
 export default function StorageSection() {
   const { user, firebaseAvailable, signInWithGoogle, signInWithMicrosoft, signOut } = useAuth();
-  const { mode, switchMode, isCloudAvailable } = useStorage();
-  const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
-  const [pendingMode, setPendingMode] = useState(null);
+  const { driver, mode, switchMode, isCloudAvailable } = useStorage();
+  const [showUploadConfirm, setShowUploadConfirm] = useState(false);
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [migrating, setMigrating] = useState(false);
   const [migrateResult, setMigrateResult] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   // Don't render if Firebase is not configured
   if (!isCloudAvailable || !firebaseAvailable) return null;
 
+  const localCount = mode === 'local' ? loadProductIndex().length : 0;
+  const prefs = loadPreferences();
+  const hasUploadedBefore = !!prefs._hasUploadedToCloud;
+
   const handleModeSwitch = (newMode) => {
     if (newMode === mode) return;
-    if (newMode === 'cloud' && !user) return;
-    setPendingMode(newMode);
-    setShowMigrateConfirm(true);
+
+    if (newMode === 'local') {
+      // Cloud → Local: simple mode switch, no migration
+      switchMode('local');
+      return;
+    }
+
+    // Local → Cloud
+    if (!user) return;
+
+    if (localCount > 0) {
+      // Has local products — ask to upload
+      setShowUploadConfirm(true);
+    } else {
+      // No local products — switch directly
+      switchMode('cloud');
+      if (!hasUploadedBefore) {
+        savePreferences({ ...prefs, _hasUploadedToCloud: true });
+      }
+    }
   };
 
-  const confirmSwitch = async () => {
-    if (!pendingMode) return;
-    setShowMigrateConfirm(false);
+  const confirmUpload = async () => {
+    setShowUploadConfirm(false);
     setMigrating(true);
     setMigrateResult(null);
 
     try {
-      if (pendingMode === 'cloud') {
-        const result = await migrateLocalToCloud(user.uid);
-        switchMode('cloud');
-        setMigrateResult(`Uploaded ${result.uploaded} project${result.uploaded !== 1 ? 's' : ''} to cloud${result.skipped ? ` (${result.skipped} skipped)` : ''}.`);
-      } else {
-        const result = await migrateCloudToLocal(user.uid);
-        switchMode('local');
-        await signOut();
-        setMigrateResult(`Downloaded ${result.ownedCount} project${result.ownedCount !== 1 ? 's' : ''}.${result.sharedCount ? ` ${result.sharedCount} shared project${result.sharedCount !== 1 ? 's' : ''} remain in cloud.` : ''}`);
+      const result = await migrateLocalToCloud(user.uid);
+      switchMode('cloud');
+      savePreferences({ ...loadPreferences(), _hasUploadedToCloud: true });
+
+      const msg = `Uploaded ${result.uploaded} project${result.uploaded !== 1 ? 's' : ''} to cloud${result.skipped ? ` (${result.skipped} already in cloud)` : ''}.`;
+      setMigrateResult(msg);
+
+      // Offer to clear local data after successful upload
+      if (result.uploaded > 0 || result.skipped > 0) {
+        setShowCleanupConfirm(true);
       }
     } catch (e) {
       console.error('Migration failed:', e);
-      setMigrateResult('Migration failed. Please try again.');
+      setMigrateResult('Upload failed. Please try again.');
     } finally {
       setMigrating(false);
-      setPendingMode(null);
+    }
+  };
+
+  const skipUpload = () => {
+    // User chose not to upload — just switch to cloud
+    setShowUploadConfirm(false);
+    switchMode('cloud');
+    if (!hasUploadedBefore) {
+      savePreferences({ ...prefs, _hasUploadedToCloud: true });
+    }
+  };
+
+  const confirmCleanup = () => {
+    clearAllLocalProducts();
+    setShowCleanupConfirm(false);
+    setMigrateResult(prev => prev + ' Local data cleared.');
+  };
+
+  const handleDownloadAll = async () => {
+    setExporting(true);
+    try {
+      const result = await exportAllProducts(driver, user?.uid);
+      setMigrateResult(`Downloaded ${result.exported} project${result.exported !== 1 ? 's' : ''} as JSON.`);
+    } catch (e) {
+      console.error('Export failed:', e);
+      setMigrateResult('Export failed. Please try again.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -73,12 +123,6 @@ export default function StorageSection() {
       switchMode('local');
     }
   };
-
-  const localCount = mode === 'local' ? loadProductIndex().length : 0;
-
-  const migrateMessage = pendingMode === 'cloud'
-    ? `Upload ${localCount} local project${localCount !== 1 ? 's' : ''} to cloud? Your local data will remain as a backup.`
-    : 'Download your owned cloud projects to this browser? Shared projects will only be accessible in Cloud mode.';
 
   return (
     <Section title="Storage">
@@ -112,7 +156,7 @@ export default function StorageSection() {
 
       {/* Migrating indicator */}
       {migrating && (
-        <p className="text-sm text-blue-600 dark:text-blue-400 mb-3">Migrating data...</p>
+        <p className="text-sm text-blue-600 dark:text-blue-400 mb-3">Uploading data...</p>
       )}
 
       {/* Migration result */}
@@ -161,15 +205,44 @@ export default function StorageSection() {
         </div>
       )}
 
-      {/* Migration confirmation */}
+      {/* Download all projects (cloud mode only) */}
+      {mode === 'cloud' && user && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={handleDownloadAll}
+            disabled={exporting}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            {exporting ? 'Downloading...' : 'Download All Projects as JSON'}
+          </button>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Export all your cloud projects as individual JSON files.
+          </p>
+        </div>
+      )}
+
+      {/* Upload confirmation */}
       <ConfirmDialog
-        open={showMigrateConfirm}
-        onClose={() => { setShowMigrateConfirm(false); setPendingMode(null); }}
-        onConfirm={confirmSwitch}
-        title={pendingMode === 'cloud' ? 'Switch to Cloud Storage' : 'Switch to Local Storage'}
-        message={migrateMessage}
-        confirmLabel={pendingMode === 'cloud' ? 'Upload' : 'Download'}
+        open={showUploadConfirm}
+        onClose={() => setShowUploadConfirm(false)}
+        onConfirm={confirmUpload}
+        title="Upload Local Projects"
+        message={`You have ${localCount} local project${localCount !== 1 ? 's' : ''}. Upload them to cloud?${hasUploadedBefore ? ' Projects already in cloud will be skipped.' : ''}`}
+        confirmLabel="Upload"
+        cancelLabel="Skip"
+        onCancel={skipUpload}
         danger={false}
+      />
+
+      {/* Cleanup confirmation */}
+      <ConfirmDialog
+        open={showCleanupConfirm}
+        onClose={() => setShowCleanupConfirm(false)}
+        onConfirm={confirmCleanup}
+        title="Clear Local Data"
+        message="Your projects are now in the cloud. Clear local copies to prevent duplicates on future sign-ins?"
+        confirmLabel="Clear Local Data"
+        danger={true}
       />
     </Section>
   );

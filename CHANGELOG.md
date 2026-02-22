@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.15.0 (2026-02-21)
+
+### Changed
+- **Cloud as source of truth** — Eliminated bidirectional migration to prevent data duplication. Cloud-to-local migration (`migrateCloudToLocal`) removed entirely. Switching from cloud to local is now a simple mode toggle with no data transfer.
+- **Smart re-upload detection** — On re-sign-in, existing Firestore collision check skips products already in cloud (existence-based dedup). `_hasUploadedToCloud` boolean flag tracks whether user has uploaded before.
+- **Post-upload cleanup** — After uploading local projects to cloud, users are offered the option to clear local copies to prevent stale data on future sign-ins.
+
+### Added
+- **Download All Projects as JSON** — New button in Storage settings (cloud mode) exports all cloud projects as individual JSON files for data portability.
+- **`clearAllLocalProducts()`** — New storage helper that removes all local product data and index.
+- **`exportAllProducts(driver)`** — Batch export all projects via the storage driver with staggered downloads.
+- **ConfirmDialog enhancements** — Added `cancelLabel` and `onCancel` props for custom cancel button behavior.
+
 ## Version 0.14.3 (2026-02-21)
 
 ### Security

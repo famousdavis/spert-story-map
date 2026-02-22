@@ -1,18 +1,19 @@
 /**
  * Data migration between localStorage and Firestore.
  *
- * migrateLocalToCloud(uid) — uploads local products to Firestore
- * migrateCloudToLocal(uid) — downloads owned cloud products to localStorage
+ * migrateLocalToCloud(uid) — uploads local products to Firestore.
+ * Cloud-to-local migration was removed in v0.15.0 (cloud is source of truth).
+ * Use "Download All as JSON" for data portability instead.
  */
 
 import {
-  doc, getDoc, setDoc, getDocs, collection, query, where,
+  doc, getDoc, setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   loadProductIndex, loadProduct, loadPreferences,
-  saveProductImmediate, savePreferences, appendChangeLogEntry,
+  appendChangeLogEntry,
 } from './storage';
 
 const PROJECTS_COL = 'spertstorymap_projects';
@@ -109,47 +110,3 @@ export async function migrateLocalToCloud(uid) {
   return { uploaded, skipped };
 }
 
-/**
- * Download owned cloud products to localStorage.
- *
- * Only owned projects are downloaded — shared projects stay cloud-only.
- *
- * @returns {{ ownedCount: number, sharedCount: number }}
- */
-export async function migrateCloudToLocal(uid) {
-  // Query only projects where user is a member (avoids full collection scan)
-  const q = query(
-    collection(db, PROJECTS_COL),
-    where(`members.${uid}`, 'in', ['owner', 'editor', 'viewer']),
-  );
-  const snap = await getDocs(q);
-  let ownedCount = 0;
-  let sharedCount = 0;
-
-  snap.forEach(docSnap => {
-    const data = docSnap.data();
-
-    if (data.owner === uid) {
-      // Strip Firestore-only fields
-      const { owner, members, ...product } = data;
-      const withId = { id: docSnap.id, ...product };
-      withId._changeLog = appendChangeLogEntry(withId, { op: 'local-migration', uid });
-      saveProductImmediate(withId);
-      ownedCount++;
-    } else {
-      sharedCount++;
-    }
-  });
-
-  // Migrate preferences
-  try {
-    const prefsSnap = await getDoc(doc(db, SETTINGS_COL, uid));
-    if (prefsSnap.exists()) {
-      savePreferences(prefsSnap.data());
-    }
-  } catch (e) {
-    console.error('Failed to migrate cloud preferences:', e);
-  }
-
-  return { ownedCount, sharedCount };
-}

@@ -161,6 +161,15 @@ export function deleteProduct(id) {
   }
 }
 
+/** Remove all local products and clear the product index. */
+export function clearAllLocalProducts() {
+  const index = loadProductIndex();
+  for (const entry of index) {
+    localStorage.removeItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${entry.id}`);
+  }
+  localStorage.removeItem(STORAGE_KEYS.PRODUCTS_INDEX);
+}
+
 // Preferences
 export function loadPreferences() {
   return immediatelyLoad(STORAGE_KEYS.PREFERENCES) || {};
@@ -279,4 +288,4 @@ export function duplicateProduct(product, workspaceIdOverride) {
 }
 
 // Re-export import/export functions from dedicated module
-export { exportProduct, importProductFromJSON, readImportFile } from './importExport';
+export { exportProduct, exportAllProducts, importProductFromJSON, readImportFile } from './importExport';

@@ -6,6 +6,10 @@ import {
   exportProduct,
   getWorkspaceId,
   appendChangeLogEntry,
+  clearAllLocalProducts,
+  saveProductImmediate,
+  loadProductIndex,
+  loadProduct,
 } from '../lib/storage';
 import { SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from '../lib/constants';
 
@@ -470,6 +474,31 @@ describe('importProductFromJSON', () => {
     expect(result._storageRef).toBeUndefined();
     expect(result._exportedBy).toBeUndefined();
     expect(result._exportedById).toBeUndefined();
+  });
+});
+
+// --- clearAllLocalProducts ---
+describe('clearAllLocalProducts', () => {
+  it('removes all products and the index', () => {
+    const p1 = createNewProduct('Product 1');
+    const p2 = createNewProduct('Product 2');
+    saveProductImmediate(p1);
+    saveProductImmediate(p2);
+
+    expect(loadProductIndex()).toHaveLength(2);
+    expect(loadProduct(p1.id)).toBeTruthy();
+    expect(loadProduct(p2.id)).toBeTruthy();
+
+    clearAllLocalProducts();
+
+    expect(loadProductIndex()).toEqual([]);
+    expect(loadProduct(p1.id)).toBeNull();
+    expect(loadProduct(p2.id)).toBeNull();
+  });
+
+  it('is safe to call with no products', () => {
+    expect(() => clearAllLocalProducts()).not.toThrow();
+    expect(loadProductIndex()).toEqual([]);
   });
 });
 

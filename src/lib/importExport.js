@@ -74,6 +74,37 @@ export function importProductFromJSON(jsonString) {
 }
 
 /**
+ * Export all products as individual JSON file downloads.
+ * Uses the storage driver to load products (works for both local and cloud).
+ *
+ * @param {object} driver - Storage driver from useStorage()
+ * @param {string} [storageRefOverride] - Optional workspace ID override (cloud mode)
+ */
+export async function exportAllProducts(driver, storageRefOverride) {
+  const products = await driver.loadProductIndex();
+  let exported = 0;
+
+  for (const product of products) {
+    // loadProductIndex returns full product data in cloud mode,
+    // but only index entries in local mode — load full product if needed
+    const full = product.themes
+      ? product
+      : await driver.loadProduct(product.id);
+    if (!full) continue;
+
+    exportProduct(full, storageRefOverride);
+    exported++;
+
+    // Small delay between downloads so browsers don't block them
+    if (exported < products.length) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  return { exported };
+}
+
+/**
  * Open a file picker, read + parse the JSON, and call onParsed(product).
  * If parsing/validation fails, calls onError(message) instead of alert().
  */

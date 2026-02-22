@@ -56,7 +56,7 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(() => 'SERVER_TS'),
 }));
 
-import { migrateLocalToCloud, migrateCloudToLocal } from '../lib/migration';
+import { migrateLocalToCloud } from '../lib/migration';
 import { setDoc, getDoc } from 'firebase/firestore';
 
 beforeEach(() => {
@@ -176,72 +176,5 @@ describe('migrateLocalToCloud', () => {
   });
 });
 
-// ── migrateCloudToLocal ─────────────────────────────────────────
-
-describe('migrateCloudToLocal', () => {
-  it('downloads owned projects to localStorage', async () => {
-    mockDocs.set('spertstorymap_projects/proj-1', {
-      name: 'Cloud Project',
-      schemaVersion: 2,
-      themes: [],
-      releases: [],
-      sprints: [],
-      sizeMapping: [],
-      _changeLog: [],
-      owner: 'user-1',
-      members: { 'user-1': 'owner' },
-    });
-
-    const result = await migrateCloudToLocal('user-1');
-
-    expect(result.ownedCount).toBe(1);
-    expect(result.sharedCount).toBe(0);
-    // Should be saved to localStorage
-    const saved = JSON.parse(localStorage.getItem('rp_product_proj-1'));
-    expect(saved.name).toBe('Cloud Project');
-    // Should not contain Firestore fields
-    expect(saved.owner).toBeUndefined();
-    expect(saved.members).toBeUndefined();
-  });
-
-  it('skips shared projects (counts them but does not download)', async () => {
-    mockDocs.set('spertstorymap_projects/proj-shared', {
-      name: 'Shared Project',
-      schemaVersion: 2,
-      themes: [],
-      releases: [],
-      sprints: [],
-      sizeMapping: [],
-      _changeLog: [],
-      owner: 'other-user',
-      members: { 'other-user': 'owner', 'user-1': 'editor' },
-    });
-
-    const result = await migrateCloudToLocal('user-1');
-
-    expect(result.ownedCount).toBe(0);
-    expect(result.sharedCount).toBe(1);
-    expect(localStorage.getItem('rp_product_proj-shared')).toBeNull();
-  });
-
-  it('appends local-migration to changelog', async () => {
-    mockDocs.set('spertstorymap_projects/proj-1', {
-      name: 'Project',
-      schemaVersion: 2,
-      themes: [],
-      releases: [],
-      sprints: [],
-      sizeMapping: [],
-      _changeLog: [{ t: 1000, op: 'create', entity: 'product' }],
-      owner: 'user-1',
-      members: { 'user-1': 'owner' },
-    });
-
-    await migrateCloudToLocal('user-1');
-
-    const saved = JSON.parse(localStorage.getItem('rp_product_proj-1'));
-    const log = saved._changeLog;
-    expect(log.length).toBe(2);
-    expect(log[1].op).toBe('local-migration');
-  });
-});
+// ── migrateCloudToLocal removed (v0.15.0) ──────────────────────
+// Cloud is now source of truth. Use "Download All as JSON" for data portability.
