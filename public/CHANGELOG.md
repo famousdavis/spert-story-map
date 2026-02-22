@@ -1,5 +1,22 @@
 # Changelog
 
+## Version 0.15.2 (2026-02-22)
+
+### Security
+- **Import race condition fix** — `saveProductImmediate` is now awaited before page reload in DataSection, preventing potential data loss
+- **Email enumeration prevention** — Member lookup error message changed to a generic response that doesn't reveal whether an email exists in the system
+- **Dangling reference cleanup** — Import validation now strips release allocations and progress history entries that reference non-existent releases or sprints, instead of silently allowing them
+
+## Version 0.15.1 (2026-02-22)
+
+### Improved
+- **Codebase refactoring** — Decomposed `ProductList.jsx` (418→321 lines) by extracting `CreateProjectModal` and `ProjectCard` components
+- **Shared utilities** — Moved `formatRelativeTime` from `ProductLayout.jsx` to `formatDate.js` for reuse; consolidated duplicate `sanitize` function in `migration.js` with `sanitizeForFirestore` from `firestoreDriver.js`
+- **New test coverage** — Added 8 tests for `parseDate` and `formatRelativeTime` (392 total tests)
+
+### Fixed
+- **Firestore date display** — All Firestore-sourced dates now use `formatDate()` helper (fixed `ReleaseColumn` and `ReleaseDetailPanel` showing raw ISO strings or "Invalid Date")
+
 ## Version 0.15.0 (2026-02-21)
 
 ### Changed
