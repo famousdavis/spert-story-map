@@ -3,15 +3,15 @@ import { useNavigate, Link } from 'react-router-dom';
 import { exportProduct, readImportFile, createNewProduct, duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
-import { parseDate } from '../lib/formatDate';
 import { sortByOrder } from '../lib/sortByOrder';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
-import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import { useDarkMode } from '../hooks/useDarkMode';
 import AppSettingsModal from '../components/settings/AppSettingsModal';
+import CreateProjectModal from '../components/product/CreateProjectModal';
+import ProjectCard from '../components/product/ProjectCard';
 import { Footer } from './ChangelogView';
 
 function enrichProduct(entry, full) {
@@ -27,8 +27,6 @@ export default function ProductList() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importConfirm, setImportConfirm] = useState(null);
   const [importError, setImportError] = useState(null);
@@ -118,13 +116,11 @@ export default function ProductList() {
     dropBeforeRef.current = null;
   };
 
-  const handleCreate = async () => {
-    if (!newName.trim() || !driver) return;
-    const product = createNewProduct(newName.trim(), newDesc.trim(), driver.getWorkspaceId());
+  const handleCreate = async (name, desc) => {
+    if (!driver) return;
+    const product = createNewProduct(name, desc, driver.getWorkspaceId());
     await driver.createProduct(product);
     setShowCreate(false);
-    setNewName('');
-    setNewDesc('');
     navigate(`/product/${product.id}/structure`);
   };
 
@@ -274,120 +270,27 @@ export default function ProductList() {
         ) : (
           <div className="space-y-3">
             {sortedProducts.map(p => (
-              <div
+              <ProjectCard
                 key={p.id}
-                draggable
+                product={p}
+                isShared={!!(p._owner && user && p._owner !== user.uid)}
+                isDragging={dragId === p.id}
+                isDropTarget={dropBeforeId === p.id}
+                onNavigate={() => navigate(`/product/${p.id}/structure`)}
+                onExport={() => handleExport(p.id)}
+                onDuplicate={() => handleDuplicate(p.id)}
+                onDelete={() => setDeleteTarget(p)}
                 onDragStart={e => handleProjectDragStart(e, p.id)}
                 onDragOver={e => handleProjectDragOver(e, p.id)}
                 onDrop={handleProjectDrop}
                 onDragEnd={handleProjectDragEnd}
-                className={`bg-white dark:bg-gray-900 border rounded-xl p-5 transition-colors group ${
-                  dragId === p.id
-                    ? 'opacity-40 border-gray-300 dark:border-gray-600'
-                    : dropBeforeId === p.id
-                      ? 'border-blue-400 dark:border-blue-500 border-t-2'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <span
-                    className="flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 mr-3 mt-0.5 select-none"
-                    title="Drag to reorder"
-                  >⠿</span>
-                  <button
-                    onClick={() => navigate(`/product/${p.id}/structure`)}
-                    className="text-left flex-1"
-                  >
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {p.name}
-                      {p._owner && user && p._owner !== user.uid && (
-                        <span className="ml-2 inline-block text-[10px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full align-middle">
-                          Shared
-                        </span>
-                      )}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                      <span>{p.totalItems} {p.totalItems === 1 ? 'item' : 'items'}</span>
-                      <span>{p.totalPoints} pts</span>
-                      {p.unsized > 0 && (
-                        <span className="text-amber-600 dark:text-amber-400">{p.unsized} unsized</span>
-                      )}
-                      <span>{Math.round(p.pctComplete)}% complete</span>
-                      <span>Updated {(parseDate(p.updatedAt) || new Date()).toLocaleDateString()}</span>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleExport(p.id)}
-                      className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-                      title="Export as JSON"
-                    >
-                      Export
-                    </button>
-                    <button
-                      onClick={() => handleDuplicate(p.id)}
-                      className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-                      title="Duplicate"
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(p)}
-                      className="px-2 py-1 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                      title="Delete"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* Create Product Modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create New Project">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project Name</label>
-            <input
-              type="text"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              placeholder="e.g., Billing System v2"
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
-              autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
-            <textarea
-              value={newDesc}
-              onChange={e => setNewDesc(e.target.value)}
-              placeholder="Brief description of the project"
-              rows={2}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none resize-none"
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              onClick={() => setShowCreate(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={!newName.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
-            >
-              Create
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <CreateProjectModal open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
 
       {/* Delete Confirm */}
       <ConfirmDialog

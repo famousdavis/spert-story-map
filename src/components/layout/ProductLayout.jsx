@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useParams, Outlet } from 'react-router-dom';
 import { useProduct } from '../../hooks/useProduct';
 import { useStorage } from '../../lib/StorageProvider';
+import { formatRelativeTime } from '../../lib/formatDate';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import ThemeToggle from '../ui/ThemeToggle';
 import AppSettingsModal from '../settings/AppSettingsModal';
@@ -123,13 +124,4 @@ export default function ProductLayout() {
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
-}
-
-function formatRelativeTime(date) {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 10) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return date.toLocaleTimeString();
 }

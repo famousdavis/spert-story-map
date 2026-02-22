@@ -15,26 +15,10 @@ import {
   loadProductIndex, loadProduct, loadPreferences,
   appendChangeLogEntry,
 } from './storage';
+import { sanitizeForFirestore } from './firestoreDriver';
 
 const PROJECTS_COL = 'spertstorymap_projects';
 const SETTINGS_COL = 'spertstorymap_settings';
-
-/**
- * Recursively strip undefined values for Firestore.
- * Duplicated from storageDriver.js to keep migration self-contained.
- */
-function sanitize(obj) {
-  if (obj === null || obj === undefined) return null;
-  if (Array.isArray(obj)) return obj.map(sanitize);
-  if (typeof obj !== 'object') return obj;
-  const clean = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
-      clean[key] = sanitize(value);
-    }
-  }
-  return clean;
-}
 
 /**
  * Upload all local products to Firestore.
@@ -92,7 +76,7 @@ export async function migrateLocalToCloud(uid) {
 
     const { id, ...rest } = updatedProduct;
     await setDoc(doc(db, PROJECTS_COL, id), {
-      ...sanitize(rest),
+      ...sanitizeForFirestore(rest),
       owner: uid,
       members: { [uid]: 'owner' },
       updatedAt: serverTimestamp(),
@@ -104,7 +88,7 @@ export async function migrateLocalToCloud(uid) {
   // Migrate preferences
   const prefs = loadPreferences();
   if (prefs && Object.keys(prefs).length > 0) {
-    await setDoc(doc(db, SETTINGS_COL, uid), sanitize(prefs));
+    await setDoc(doc(db, SETTINGS_COL, uid), sanitizeForFirestore(prefs));
   }
 
   return { uploaded, skipped };

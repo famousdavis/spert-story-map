@@ -6,6 +6,16 @@ export function parseDate(value) {
   return new Date(value);
 }
 
+/** Format a Date as a human-readable relative time string (e.g. "just now", "5m ago"). */
+export function formatRelativeTime(date) {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return date.toLocaleTimeString();
+}
+
 /** Format an ISO date string to a human-readable US date. */
 export function formatDate(iso) {
   if (!iso) return '';
