@@ -4,6 +4,7 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import ProgressBar from '../ui/ProgressBar';
 import { useTooltip } from '../ui/Tooltip';
 import useInlineEdit from '../storymap/useInlineEdit';
+import { formatDate } from '../../lib/formatDate';
 
 /**
  * A single column in the release planning board.
@@ -164,7 +165,7 @@ export default function ReleaseColumn({
               </div>
             )}
             {release.targetDate && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Target: {new Date(release.targetDate).toLocaleDateString()}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Target: {formatDate(release.targetDate)}</p>
             )}
           </div>
           <div className="p-2 min-h-[60px] max-h-[calc(100vh-280px)] overflow-y-auto">

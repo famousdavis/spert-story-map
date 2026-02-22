@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { getPointsForRelease, getReleasePercentComplete, getCoreNonCorePointsForRelease } from '../../lib/calculations';
+import { formatDate } from '../../lib/formatDate';
 import useInlineEdit from './useInlineEdit';
 
 export default function ReleaseDetailPanel({ releaseId, product, onClose, onRename, onDelete }) {
@@ -124,7 +125,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
             <div className="space-y-3">
               <DetailRow label="Order" value={`#${release.order}`} />
               {release.targetDate && (
-                <DetailRow label="Target Date" value={release.targetDate} />
+                <DetailRow label="Target Date" value={formatDate(release.targetDate)} />
               )}
             </div>
           </div>
