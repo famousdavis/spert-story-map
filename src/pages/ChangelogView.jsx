@@ -21,7 +21,7 @@ export default function ChangelogView() {
         </div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Changelog</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-          Version history for Release Planner. Current version: <strong>v{APP_VERSION}</strong>
+          Version history for SPERT® Story Map. Current version: <strong>v{APP_VERSION}</strong>
         </p>
         {loading ? (
           <p className="text-gray-400 dark:text-gray-500">Loading...</p>
