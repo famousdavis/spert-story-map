@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { exportProduct, readImportFile, createNewProduct, duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
+import { parseDate } from '../lib/formatDate';
 import { sortByOrder } from '../lib/sortByOrder';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
@@ -312,7 +313,7 @@ export default function ProductList() {
                         <span className="text-amber-600 dark:text-amber-400">{p.unsized} unsized</span>
                       )}
                       <span>{Math.round(p.pctComplete)}% complete</span>
-                      <span>Updated {new Date(p.updatedAt).toLocaleDateString()}</span>
+                      <span>Updated {(parseDate(p.updatedAt) || new Date()).toLocaleDateString()}</span>
                     </div>
                   </button>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

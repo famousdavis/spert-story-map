@@ -1,15 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useStorage } from '../lib/StorageProvider';
+import { parseDate } from '../lib/formatDate';
 
 const MAX_UNDO = 30;
-
-/** Convert Firestore Timestamp, ISO string, or Date to a JS Date. */
-function parseDate(value) {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value.toDate === 'function') return value.toDate();
-  return new Date(value);
-}
 
 export function useProduct(productId) {
   const { driver, mode, storageReady } = useStorage();
