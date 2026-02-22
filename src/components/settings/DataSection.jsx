@@ -18,10 +18,10 @@ export default function DataSection({ product, driver }) {
     );
   };
 
-  const confirmImport = () => {
+  const confirmImport = async () => {
     if (importConfirm) {
       const merged = { ...importConfirm, id: product.id };
-      driver.saveProductImmediate(merged);
+      await driver.saveProductImmediate(merged);
       setImportConfirm(null);
       window.location.reload();
     }

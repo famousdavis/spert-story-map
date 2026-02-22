@@ -60,7 +60,7 @@ export default function SharingSection({ productId }) {
       const snap = await getDocs(q);
 
       if (snap.empty) {
-        setError('User not found. They need to sign in to SPERT Story Map at least once.');
+        setError('Unable to add member. Please verify the email address and ensure they have signed in at least once.');
         setAdding(false);
         return;
       }

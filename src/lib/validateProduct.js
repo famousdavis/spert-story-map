@@ -174,13 +174,16 @@ export function validateProduct(data) {
 
         // Release allocations
         if (Array.isArray(rib.releaseAllocations)) {
+          // Strip allocations referencing non-existent releases
+          if (releaseIds.size > 0) {
+            rib.releaseAllocations = rib.releaseAllocations.filter(
+              alloc => isValidId(alloc.releaseId) && releaseIds.has(alloc.releaseId)
+            );
+          }
           assert(rib.releaseAllocations.length <= MAX_ALLOCATIONS,
             `Too many allocations on rib "${rib.name || rib.id}"`);
           for (const alloc of rib.releaseAllocations) {
             assert(isValidId(alloc.releaseId), 'Allocation releaseId must be a valid string');
-            if (releaseIds.size > 0 && !releaseIds.has(alloc.releaseId)) {
-              // Dangling reference — warn but don't crash. The app handles this gracefully.
-            }
             if (alloc.percentage !== undefined) {
               assert(isNum(alloc.percentage), 'Allocation percentage must be a number');
               alloc.percentage = clamp(alloc.percentage, 0, 100);
@@ -194,13 +197,19 @@ export function validateProduct(data) {
 
         // Progress history
         if (Array.isArray(rib.progressHistory)) {
+          // Strip entries referencing non-existent sprints or releases
+          rib.progressHistory = rib.progressHistory.filter(p => {
+            if (!isValidId(p.sprintId)) return false;
+            if (sprintIds.size > 0 && !sprintIds.has(p.sprintId)) return false;
+            if (p.releaseId !== undefined) {
+              if (!isValidId(p.releaseId)) return false;
+              if (releaseIds.size > 0 && !releaseIds.has(p.releaseId)) return false;
+            }
+            return true;
+          });
           assert(rib.progressHistory.length <= MAX_PROGRESS,
             `Too many progress entries on rib "${rib.name || rib.id}"`);
           for (const p of rib.progressHistory) {
-            assert(isValidId(p.sprintId), 'Progress sprintId must be a valid string');
-            if (p.releaseId !== undefined) {
-              assert(isValidId(p.releaseId), 'Progress releaseId must be a valid string');
-            }
             if (p.percentComplete !== undefined) {
               assert(isNum(p.percentComplete), 'Progress percentComplete must be a number');
               p.percentComplete = clamp(p.percentComplete, 0, 100);
