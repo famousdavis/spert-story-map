@@ -9,6 +9,7 @@
 - **Full-bleed canvas views** — Map and Sizing tabs now use the full browser width on large monitors instead of being capped at 1600px. Other tabs retain the constrained layout for readability
 
 ### Improved
+- **Editable rib detail panel** — Click a rib card on the Map to toggle category (Core / Non-core) and change t-shirt size directly from the slide-out panel, without switching to Structure view
 - **Release label wrapping** — Long release names on the story map now wrap to multiple lines instead of truncating with an ellipsis
 
 ### Fixed

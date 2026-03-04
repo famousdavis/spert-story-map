@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
-import { SIZE_COLORS } from '../ui/SizePicker';
+import SizePicker, { SIZE_COLORS } from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 
-export default function RibDetailPanel({ rib, product, onClose, onRename }) {
+export default function RibDetailPanel({ rib, product, onClose, onRename, onUpdate }) {
   const sizeColor = rib.size ? (SIZE_COLORS[rib.size] || 'bg-gray-100 text-gray-800') : '';
   const pctComplete = getRibItemPercentComplete(rib);
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
@@ -72,18 +72,34 @@ export default function RibDetailPanel({ rib, product, onClose, onRename }) {
             <DetailRow label="Backbone" value={rib.backboneName} />
             <DetailRow label="Theme" value={rib.themeName} />
             <DetailRow label="Category">
-              <span className={`text-sm font-medium ${rib.category === 'core' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                {rib.category === 'core' ? 'Core' : 'Non-core'}
-              </span>
+              <div className="flex gap-1">
+                {['core', 'non-core'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => onUpdate?.(rib.themeId, rib.backboneId, rib.id, { category: cat })}
+                    className={`text-xs font-medium px-2 py-0.5 rounded transition-colors ${
+                      rib.category === cat
+                        ? cat === 'core'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                        : 'bg-gray-50 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {cat === 'core' ? 'Core' : 'Non-core'}
+                  </button>
+                ))}
+              </div>
             </DetailRow>
-            {rib.size && (
-              <DetailRow label="Size">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded ${sizeColor}`}>
-                  {rib.size}
-                </span>
-                {rib.points > 0 && <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">{rib.points} pts</span>}
-              </DetailRow>
-            )}
+            <DetailRow label="Size">
+              <div className="flex items-center gap-2">
+                <SizePicker
+                  value={rib.size || null}
+                  sizeMapping={product.sizeMapping}
+                  onChange={(size) => onUpdate?.(rib.themeId, rib.backboneId, rib.id, { size: size || '' })}
+                />
+                {rib.points > 0 && <span className="text-sm text-gray-500 dark:text-gray-400">{rib.points} pts</span>}
+              </div>
+            </DetailRow>
             <DetailRow label="Progress">
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-24">

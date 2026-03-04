@@ -177,6 +177,7 @@ export default function StoryMapView() {
           product={product}
           onClose={handleCloseDetail}
           onRename={handleRenameRib}
+          onUpdate={(tid, bid, rid, updates) => mutations.updateRib(tid, bid, rid, updates)}
         />
       )}
 
