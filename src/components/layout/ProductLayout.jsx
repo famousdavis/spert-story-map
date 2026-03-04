@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useParams, Outlet } from 'react-router-dom';
+import { NavLink, useParams, useLocation, Outlet } from 'react-router-dom';
 import { useProduct } from '../../hooks/useProduct';
 import { useStorage } from '../../lib/StorageProvider';
 import { formatRelativeTime } from '../../lib/formatDate';
@@ -25,6 +25,8 @@ export default function ProductLayout() {
   const [saveError, setSaveError] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const { theme, toggleTheme } = useDarkMode();
+  const location = useLocation();
+  const isCanvasView = /\/(storymap|sizing)(\/|$)/.test(location.pathname);
 
   useEffect(() => {
     if (!driver) return;
@@ -113,13 +115,15 @@ export default function ProductLayout() {
       )}
 
       {/* Content */}
-      <main className="flex-1 max-w-[1600px] mx-auto w-full px-6 py-6">
+      <main className={`flex-1 w-full px-6 py-6 ${isCanvasView ? '' : 'max-w-[1600px] mx-auto'}`}>
         <Outlet context={{ product, updateProduct, undo, redo }} />
       </main>
 
-      <div className="max-w-[1600px] mx-auto w-full px-6">
-        <Footer />
-      </div>
+      {!isCanvasView && (
+        <div className="max-w-[1600px] mx-auto w-full px-6">
+          <Footer />
+        </div>
+      )}
 
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
     </div>

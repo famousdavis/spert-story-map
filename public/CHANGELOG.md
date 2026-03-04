@@ -6,6 +6,7 @@
 - **Incremental map rendering** — Story map now shows each element as soon as it's created. Themes appear immediately (even with no backbones), with inline `+ Backbone` buttons. Backbones appear with `+ Rib` buttons. Users can build the entire Theme → Backbone → Rib hierarchy directly from the Map tab without switching to Structure view
 - **Empty theme placeholders** — Themes with no backbones render as placeholder slots in the layout, reserving space and displaying a `+ Backbone` button inside the theme's column area
 - **Always-visible unassigned lane** — The unassigned lane and its `+ Release` button now render even when no rib items exist, so users can create releases directly from the Map tab during incremental map building
+- **Full-bleed canvas views** — Map and Sizing tabs now use the full browser width on large monitors instead of being capped at 1600px. Other tabs retain the constrained layout for readability
 
 ### Fixed
 - **Invisible backbone headers** — Fixed `+ Rib` button overlapping backbone header text when a backbone had no rib items, making the backbone name unreadable
@@ -15,6 +16,7 @@
 - Rib placement loops changed from index-based iteration to `for (const col of columns)` to skip placeholder slots
 - `MapContent` empty state guard changed from `themeSpans.length === 0` to `!themes?.length` so themes are visible immediately after creation
 - `unassignedLane` is now always emitted by `computeLayout()` (not just when unassigned ribs exist), ensuring the `+ Release` button is always accessible
+- `ProductLayout` conditionally removes `max-w-[1600px]` and hides footer for canvas views (Map, Sizing) via `isCanvasView` route detection
 - 5 new tests for empty theme and always-present unassigned lane scenarios (397 total tests across 18 files)
 
 ## Version 0.15.2 (2026-02-22)
