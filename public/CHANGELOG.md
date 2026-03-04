@@ -8,6 +8,9 @@
 - **Always-visible unassigned lane** — The unassigned lane and its `+ Release` button now render even when no rib items exist, so users can create releases directly from the Map tab during incremental map building
 - **Full-bleed canvas views** — Map and Sizing tabs now use the full browser width on large monitors instead of being capped at 1600px. Other tabs retain the constrained layout for readability
 
+### Improved
+- **Release label wrapping** — Long release names on the story map now wrap to multiple lines instead of truncating with an ellipsis
+
 ### Fixed
 - **Invisible backbone headers** — Fixed `+ Rib` button overlapping backbone header text when a backbone had no rib items, making the backbone name unreadable
 

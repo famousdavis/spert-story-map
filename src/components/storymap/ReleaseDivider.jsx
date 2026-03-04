@@ -71,7 +71,7 @@ export default function ReleaseDivider({ lane, totalWidth, isFirst, isDropTarget
           />
         ) : (
           <span
-            className={`pointer-events-auto text-xs font-semibold px-2 py-1 rounded truncate max-w-full cursor-pointer ${
+            className={`pointer-events-auto text-xs font-semibold px-2 py-1 rounded break-words max-w-full cursor-pointer ${
               isDropTarget
                 ? 'text-blue-700 bg-blue-200 dark:text-blue-200 dark:bg-blue-800'
                 : 'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 dark:hover:bg-blue-900/60'
