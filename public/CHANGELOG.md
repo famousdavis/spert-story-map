@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 0.16.0 (2026-03-04)
+
+### Added
+- **Incremental map rendering** — Story map now shows each element as soon as it's created. Themes appear immediately (even with no backbones), with inline `+ Backbone` buttons. Backbones appear with `+ Rib` buttons. Users can build the entire Theme → Backbone → Rib hierarchy directly from the Map tab without switching to Structure view
+- **Empty theme placeholders** — Themes with no backbones render as placeholder slots in the layout, reserving space and displaying a `+ Backbone` button inside the theme's column area
+
+### Fixed
+- **Invisible backbone headers** — Fixed `+ Rib` button overlapping backbone header text when a backbone had no rib items, making the backbone name unreadable
+
+### Technical
+- `computeLayout()` now emits placeholder `themeSpan` entries with `isEmpty: true` for themes with no backbones, advancing `colIdx` to preserve correct positioning of subsequent themes
+- Rib placement loops changed from index-based iteration to `for (const col of columns)` to skip placeholder slots
+- `MapContent` empty state guard changed from `themeSpans.length === 0` to `!themes?.length` so themes are visible immediately after creation
+- 3 new tests for empty theme layout scenarios (395 total tests across 18 files)
+
 ## Version 0.15.2 (2026-02-22)
 
 ### Security

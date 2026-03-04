@@ -43,7 +43,7 @@ export default function MapContent({
   const highlightBackboneId = isRibDrag ? dragState.targetBackboneId : undefined;
   const highlightThemeId = isBackboneDrag ? dragState.targetThemeId : undefined;
 
-  if (themeSpans.length === 0) {
+  if (!themes?.length) {
     return (
       <div className="relative" style={{ width: mapWidth, height: mapHeight }} data-map-bg="">
         <p className="absolute left-32 top-16 text-gray-400 text-sm">No themes yet — add one to get started.</p>
@@ -92,6 +92,18 @@ export default function MapContent({
           isDragging={isBackboneDrag && dragState.backboneId === col.backboneId}
           onDragStart={onBackboneDragStart}
         />
+      ))}
+
+      {/* + Backbone buttons for empty themes (no backbones yet) */}
+      {onAddBackbone && themeSpans.filter(ts => ts.isEmpty).map(ts => (
+        <button
+          key={`add-bb-${ts.themeId}`}
+          className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-xs font-medium rounded px-2 py-1 whitespace-nowrap transition-colors dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 dark:hover:text-blue-300"
+          style={{ left: ts.x, top: THEME_HEIGHT + 2, height: 28, width: ts.width }}
+          onClick={() => onAddBackbone(ts.themeId)}
+        >
+          + Backbone
+        </button>
       ))}
 
       {/* Release divider lines and labels */}
@@ -189,12 +201,12 @@ export default function MapContent({
 
       {/* + Rib buttons (bottom of each backbone column) */}
       {onAddRib && columns.map(col => {
-        const bottomY = totalHeight - 4;
+        const ribBtnTop = Math.max(totalHeight - 24, THEME_HEIGHT + BACKBONE_HEIGHT + 2);
         return (
           <button
             key={`add-rib-${col.backboneId}`}
             className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-[10px] rounded px-1 py-0.5 transition-colors"
-            style={{ left: col.x + 4, bottom: undefined, top: bottomY - 20, width: col.width - 8 }}
+            style={{ left: col.x + 4, top: ribBtnTop, width: col.width - 8 }}
             onClick={() => onAddRib(col.themeId, col.backboneId)}
             title="Add rib item"
           >

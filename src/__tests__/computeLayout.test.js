@@ -238,7 +238,7 @@ describe('computeLayout', () => {
     expect(cell.backboneName).toBe('Backbone b1');
   });
 
-  it('skips themes with no backbones', () => {
+  it('includes themes with no backbones as empty placeholders', () => {
     const product = makeProduct({
       themes: [
         makeTheme('t1', []), // Empty theme
@@ -248,7 +248,76 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     expect(result.columns).toHaveLength(1);
+    expect(result.columns[0].backboneId).toBe('b1');
+    expect(result.themeSpans).toHaveLength(2);
+
+    // Empty theme gets a placeholder span
+    const ts1 = result.themeSpans[0];
+    expect(ts1.themeId).toBe('t1');
+    expect(ts1.colCount).toBe(0);
+    expect(ts1.isEmpty).toBe(true);
+    expect(ts1.width).toBe(COL_WIDTH);
+
+    // Second theme follows after the placeholder
+    const ts2 = result.themeSpans[1];
+    expect(ts2.themeId).toBe('t2');
+    expect(ts2.colCount).toBe(1);
+    expect(ts2.x).toBe(LANE_LABEL_WIDTH + COL_WIDTH + COL_GAP);
+  });
+
+  it('renders layout for a single empty theme', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [])],
+    });
+
+    const result = computeLayout(product);
+    expect(result.columns).toHaveLength(0);
     expect(result.themeSpans).toHaveLength(1);
-    expect(result.themeSpans[0].themeId).toBe('t2');
+    expect(result.themeSpans[0].themeId).toBe('t1');
+    expect(result.themeSpans[0].isEmpty).toBe(true);
+    expect(result.themeSpans[0].width).toBe(COL_WIDTH);
+    expect(result.totalWidth).toBe(LANE_LABEL_WIDTH + COL_WIDTH);
+  });
+
+  it('positions multiple empty themes correctly', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', []), makeTheme('t2', [])],
+    });
+
+    const result = computeLayout(product);
+    expect(result.columns).toHaveLength(0);
+    expect(result.themeSpans).toHaveLength(2);
+    expect(result.themeSpans[0].x).toBe(LANE_LABEL_WIDTH);
+    expect(result.themeSpans[1].x).toBe(LANE_LABEL_WIDTH + COL_WIDTH + COL_GAP);
+  });
+
+  it('correctly positions mixed empty and populated themes with cells', () => {
+    const rib = makeRib('r1', []);
+    const product = makeProduct({
+      themes: [
+        makeTheme('t1', [makeBackbone('b1')]),
+        makeTheme('t2', []),  // empty
+        makeTheme('t3', [makeBackbone('b3', [rib])]),
+      ],
+    });
+
+    const result = computeLayout(product);
+    expect(result.columns).toHaveLength(2);
+    expect(result.themeSpans).toHaveLength(3);
+
+    // t1 spans 1 column
+    expect(result.themeSpans[0].colCount).toBe(1);
+
+    // t2 is empty placeholder at slot 1
+    expect(result.themeSpans[1].isEmpty).toBe(true);
+    expect(result.themeSpans[1].x).toBe(LANE_LABEL_WIDTH + (COL_WIDTH + COL_GAP));
+
+    // t3 follows at slot 2
+    expect(result.themeSpans[2].colCount).toBe(1);
+    expect(result.themeSpans[2].x).toBe(LANE_LABEL_WIDTH + 2 * (COL_WIDTH + COL_GAP));
+
+    // Rib cell still placed correctly for b3
+    expect(result.cells).toHaveLength(1);
+    expect(result.cells[0].backboneId).toBe('b3');
   });
 });

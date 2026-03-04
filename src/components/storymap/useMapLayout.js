@@ -55,6 +55,18 @@ export function computeLayout(product) {
         colStart: startCol,
         colCount: spanCols,
       });
+    } else {
+      // Empty theme — reserve a placeholder slot for visibility
+      themeSpans.push({
+        themeId: theme.id,
+        themeName: theme.name,
+        x: LANE_LABEL_WIDTH + startCol * (COL_WIDTH + COL_GAP),
+        width: COL_WIDTH,
+        colStart: startCol,
+        colCount: 0,
+        isEmpty: true,
+      });
+      colIdx++;
     }
   }
 
@@ -166,11 +178,10 @@ export function computeLayout(product) {
   };
 
   for (const lane of releaseLanes) {
-    for (let ci = 0; ci < totalColumns; ci++) {
-      const key = `${lane.releaseId}:${ci}`;
+    for (const col of columns) {
+      const key = `${lane.releaseId}:${col.colIdx}`;
       const ribs = ribsByRelCol[key];
       if (!ribs) continue;
-      const col = columns[ci];
       const sorted = sortByCardOrder(ribs, lane.releaseId);
       sorted.forEach((rib, i) => {
         cells.push({
@@ -186,10 +197,9 @@ export function computeLayout(product) {
 
   // Unassigned cells
   if (unassignedLane) {
-    for (let ci = 0; ci < totalColumns; ci++) {
-      const ribs = unassignedByCol[ci];
+    for (const col of columns) {
+      const ribs = unassignedByCol[col.colIdx];
       if (!ribs) continue;
-      const col = columns[ci];
       const sorted = sortByCardOrder(ribs, 'unassigned');
       sorted.forEach((rib, i) => {
         cells.push({
