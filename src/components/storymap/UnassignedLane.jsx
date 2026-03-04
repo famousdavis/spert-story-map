@@ -39,13 +39,13 @@ export default function UnassignedLane({ lane, totalWidth, isDropTarget, onAddRe
           Unassigned
         </span>
       </div>
-      {/* + Release button at right end of divider line */}
+      {/* Prominent + Release button in the lane label area */}
       {onAddRelease && (
         <button
-          className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
-          style={{ left: totalWidth + 8, top: lane.y - 8 }}
+          className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200 text-xs font-medium rounded px-2 py-1 transition-colors whitespace-nowrap"
+          style={{ left: 8, top: lane.y + 32 }}
           onClick={() => onAddRelease(null)}
-          title="Add release here"
+          title="Add a new release"
         >
           + Release
         </button>

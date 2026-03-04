@@ -172,7 +172,7 @@ describe('computeLayout', () => {
     expect(result.cells[0].releaseId).toBeNull();
   });
 
-  it('returns null unassigned lane when all ribs are assigned', () => {
+  it('always includes unassigned lane when themes exist even if all ribs are assigned', () => {
     const rib = makeRib('r1', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]);
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
@@ -180,7 +180,29 @@ describe('computeLayout', () => {
     });
 
     const result = computeLayout(product);
-    expect(result.unassignedLane).toBeNull();
+    expect(result.unassignedLane).not.toBeNull();
+    expect(result.unassignedLane.height).toBe(MIN_LANE_HEIGHT);
+  });
+
+  it('includes unassigned lane even when no ribs exist', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [])])],
+    });
+
+    const result = computeLayout(product);
+    expect(result.unassignedLane).not.toBeNull();
+    expect(result.unassignedLane.height).toBe(MIN_LANE_HEIGHT);
+    expect(result.unassignedLane.y).toBe(THEME_HEIGHT + BACKBONE_HEIGHT);
+  });
+
+  it('includes unassigned lane height in totalHeight even with no unassigned ribs', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [])])],
+      releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
+    });
+
+    const result = computeLayout(product);
+    expect(result.totalHeight).toBe(THEME_HEIGHT + BACKBONE_HEIGHT + MIN_LANE_HEIGHT + MIN_LANE_HEIGHT);
   });
 
   it('expands lane height when column has many ribs', () => {

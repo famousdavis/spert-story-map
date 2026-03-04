@@ -142,21 +142,17 @@ export function computeLayout(product) {
     currentY += height;
   }
 
-  // 5. Unassigned lane
+  // 5. Unassigned lane (always present so + Release button is always visible)
   let maxUnassigned = 0;
   for (let ci = 0; ci < totalColumns; ci++) {
     const count = unassignedByCol[ci]?.length || 0;
     if (count > maxUnassigned) maxUnassigned = count;
   }
-  const hasUnassigned = maxUnassigned > 0;
-  const unassignedLane = hasUnassigned ? {
+  const unassignedLane = {
     y: currentY,
     height: Math.max(maxUnassigned * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2, MIN_LANE_HEIGHT),
-  } : null;
-
-  if (unassignedLane) {
-    currentY += unassignedLane.height;
-  }
+  };
+  currentY += unassignedLane.height;
 
   const totalHeight = currentY;
 
