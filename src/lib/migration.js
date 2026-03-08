@@ -21,6 +21,19 @@ const PROJECTS_COL = 'spertstorymap_projects';
 const SETTINGS_COL = 'spertstorymap_settings';
 
 /**
+ * Test Firestore connectivity by reading the user's settings doc.
+ * Returns true if reachable, false otherwise.
+ */
+export async function testCloudConnection(uid) {
+  try {
+    await getDoc(doc(db, SETTINGS_COL, uid));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Upload all local products to Firestore.
  *
  * Collision handling:

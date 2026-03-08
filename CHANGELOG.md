@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.16.1 (2026-03-08)
+
+### Fixed
+- **Cloud sync data guard** — Switching to cloud mode no longer silently hides local projects when the cloud account is empty. A warning banner now tells users to upload their local projects or switch back to local mode
+- **Unsafe cloud mode switch** — Removed the "Skip" button that let users switch to cloud without uploading data, which stranded them with an empty project list. Cancel now stays in local mode
+- **Cloud connectivity check** — Switching to cloud mode with no local projects now verifies Firestore is reachable before completing the switch, preventing users from being stranded in cloud mode when offline
+
 ## Version 0.16.0 (2026-03-04)
 
 ### Added

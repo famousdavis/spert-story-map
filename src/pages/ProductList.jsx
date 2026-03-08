@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { exportProduct, readImportFile, createNewProduct, duplicateProduct } from '../lib/storage';
+import { exportProduct, readImportFile, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
 import { sortByOrder } from '../lib/sortByOrder';
@@ -32,6 +32,7 @@ export default function ProductList() {
   const [importError, setImportError] = useState(null);
   const [showWarning, setShowWarning] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [localOrphanCount, setLocalOrphanCount] = useState(0);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useDarkMode();
@@ -54,6 +55,12 @@ export default function ProductList() {
       const allProducts = await driver.loadProductIndex();
       const detailed = allProducts.filter(Boolean).map(p => enrichProduct(p, p));
       setProducts(detailed);
+      // In cloud mode, detect local projects that weren't migrated
+      if (mode === 'cloud' && detailed.length === 0) {
+        setLocalOrphanCount(loadLocalIndex().length);
+      } else {
+        setLocalOrphanCount(0);
+      }
     } finally {
       setLoading(false);
     }
@@ -254,6 +261,16 @@ export default function ProductList() {
             >
               &times;
             </button>
+          </div>
+        )}
+
+        {/* Cloud orphan warning */}
+        {localOrphanCount > 0 && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg px-4 py-3 mb-6">
+            <p className="text-xs text-blue-800 dark:text-blue-200">
+              Your cloud account has no projects, but you have {localOrphanCount} project{localOrphanCount !== 1 ? 's' : ''} stored locally.
+              Go to App Settings → Storage to upload them, or switch back to Local mode.
+            </p>
           </div>
         )}
 

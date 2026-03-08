@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
-import { migrateLocalToCloud } from '../../lib/migration';
+import { migrateLocalToCloud, testCloudConnection } from '../../lib/migration';
 import { loadProductIndex, clearAllLocalProducts, loadPreferences, savePreferences } from '../../lib/storage';
 import { exportAllProducts } from '../../lib/importExport';
 import { Section } from '../ui/Section';
@@ -24,7 +24,7 @@ export default function StorageSection() {
   const prefs = loadPreferences();
   const hasUploadedBefore = !!prefs._hasUploadedToCloud;
 
-  const handleModeSwitch = (newMode) => {
+  const handleModeSwitch = async (newMode) => {
     if (newMode === mode) return;
 
     if (newMode === 'local') {
@@ -40,10 +40,21 @@ export default function StorageSection() {
       // Has local products — ask to upload
       setShowUploadConfirm(true);
     } else {
-      // No local products — switch directly
-      switchMode('cloud');
-      if (!hasUploadedBefore) {
-        savePreferences({ ...prefs, _hasUploadedToCloud: true });
+      // No local products — verify cloud is reachable before switching
+      setMigrating(true);
+      setMigrateResult(null);
+      try {
+        const reachable = await testCloudConnection(user.uid);
+        if (!reachable) {
+          setMigrateResult('Could not connect to cloud storage. Please check your internet connection and try again.');
+          return;
+        }
+        switchMode('cloud');
+        if (!hasUploadedBefore) {
+          savePreferences({ ...prefs, _hasUploadedToCloud: true });
+        }
+      } finally {
+        setMigrating(false);
       }
     }
   };
@@ -70,15 +81,6 @@ export default function StorageSection() {
       setMigrateResult('Upload failed. Please try again.');
     } finally {
       setMigrating(false);
-    }
-  };
-
-  const skipUpload = () => {
-    // User chose not to upload — just switch to cloud
-    setShowUploadConfirm(false);
-    switchMode('cloud');
-    if (!hasUploadedBefore) {
-      savePreferences({ ...prefs, _hasUploadedToCloud: true });
     }
   };
 
@@ -229,8 +231,6 @@ export default function StorageSection() {
         title="Upload Local Projects"
         message={`You have ${localCount} local project${localCount !== 1 ? 's' : ''}. Upload them to cloud?${hasUploadedBefore ? ' Projects already in cloud will be skipped.' : ''}`}
         confirmLabel="Upload"
-        cancelLabel="Skip"
-        onCancel={skipUpload}
         danger={false}
       />
 
