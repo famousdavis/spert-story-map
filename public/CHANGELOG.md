@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.16.2 (2026-03-09)
+
+### Added
+- **Quick Reference Guide** — Downloadable PDF overview of SPERT Story Map's features and workflow, available on the About page
+
 ## Version 0.16.1 (2026-03-08)
 
 ### Fixed

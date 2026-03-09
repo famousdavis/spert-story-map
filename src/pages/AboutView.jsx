@@ -32,6 +32,22 @@ export default function AboutView() {
           </p>
         </Section>
 
+        {/* Quick Reference Guide */}
+        <Section title="Quick Reference Guide">
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-3">
+            Download the quick reference guide for a printable overview of
+            SPERT<R /> Story Map's features and workflow.
+          </p>
+          <a
+            href="/SPERTStoryMap_Quick_Reference_Guide.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Download PDF
+          </a>
+        </Section>
+
         {/* Your Data & Security */}
         <Section title="Your Data & Security">
           <ul className="ml-6 list-disc text-sm text-gray-600 dark:text-gray-400 leading-relaxed space-y-1">
