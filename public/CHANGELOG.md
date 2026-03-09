@@ -7,6 +7,7 @@
 
 ### Improved
 - **About page — Your Data & Security** — Updated to describe both local and cloud storage modes, replacing the previous local-only description
+- **Theme toggle** — Icon now shows the current mode (sun = light, moon = dark, monitor = system) instead of the mode it would switch to. Adds a third "system default" option that follows the OS preference
 
 ## Version 0.16.1 (2026-03-08)
 

@@ -1,15 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = 'spert-theme';
 
-function getInitialTheme() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === 'light' || stored === 'dark') return stored;
+function getSystemPreference() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function getInitialTheme() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  return 'system';
+}
+
 function applyTheme(theme) {
-  if (theme === 'dark') {
+  const effective = theme === 'system' ? getSystemPreference() : theme;
+  if (effective === 'dark') {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');
@@ -24,7 +29,21 @@ export function useDarkMode() {
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  // Listen for system preference changes when in 'system' mode
+  useEffect(() => {
+    if (theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => applyTheme('system');
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
 
-  return { theme, toggleTheme, isDark: theme === 'dark' };
+  // Cycle: light → dark → system → light
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'light' ? 'dark' : prev === 'dark' ? 'system' : 'light');
+  }, []);
+
+  const effective = theme === 'system' ? getSystemPreference() : theme;
+
+  return { theme, toggleTheme, isDark: effective === 'dark' };
 }
