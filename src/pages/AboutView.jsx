@@ -50,22 +50,34 @@ export default function AboutView() {
 
         {/* Your Data & Security */}
         <Section title="Your Data & Security">
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-2">
+            SPERT Story Map offers two storage modes, configurable in App Settings:
+          </p>
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-3 mb-1">Local storage (default)</p>
           <ul className="ml-6 list-disc text-sm text-gray-600 dark:text-gray-400 leading-relaxed space-y-1">
-            <li>Stored locally in your <strong>browser</strong> (not in any cloud database)</li>
-            <li><strong>Your data never leaves your device</strong></li>
-            <li>No external database servers, no third-party access, no data governance concerns</li>
-            <li>Safe for corporate/organizational data — all data stays within your network</li>
-            <li>Use <strong>Export</strong> to back up your data to your file system anytime</li>
+            <li>Data is stored in your <strong>browser's localStorage</strong> and never leaves your device</li>
+            <li>No external servers, no third-party access, no data governance concerns</li>
+            <li>Ideal for corporate or organizational environments where data must stay in-house</li>
+            <li><strong>Note:</strong> Clearing your browser cache/data will delete all stored projects unless you've exported a backup</li>
+          </ul>
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-3 mb-1">Cloud storage (optional)</p>
+          <ul className="ml-6 list-disc text-sm text-gray-600 dark:text-gray-400 leading-relaxed space-y-1">
+            <li>Sign in with <strong>Google</strong> or <strong>Microsoft</strong> to sync projects across devices</li>
+            <li>Share projects with collaborators (owner, editor, and viewer roles)</li>
+            <li>Data is stored in Firebase/Firestore — ideal for users who want cross-device access and collaboration</li>
+          </ul>
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-3 mb-1">Import & Export</p>
+          <ul className="ml-6 list-disc text-sm text-gray-600 dark:text-gray-400 leading-relaxed space-y-1">
+            <li>Use <strong>Export</strong> to back up your data as JSON files anytime</li>
             <li>Use <strong>Import</strong> to restore from a backup or share with colleagues</li>
-            <li><strong>Note:</strong> If you clear your browser cache/data, you will lose all stored projects unless you've exported a backup</li>
           </ul>
         </Section>
 
         {/* Version Updates */}
         <Section title="Version Updates">
           <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-            When new versions are released, your data remains safe in localStorage. We recommend
-            exporting a backup before major updates as a precaution. Current version: <Link to="/changelog" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">v{APP_VERSION}</Link>
+            When new versions are released, your data remains safe — whether stored locally or in the cloud.
+            We recommend exporting a backup before major updates as a precaution. Current version: <Link to="/changelog" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">v{APP_VERSION}</Link>
           </p>
         </Section>
 

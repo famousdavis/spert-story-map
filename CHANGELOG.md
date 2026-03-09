@@ -5,6 +5,9 @@
 ### Added
 - **Quick Reference Guide** — Downloadable PDF overview of SPERT Story Map's features and workflow, available on the About page
 
+### Improved
+- **About page — Your Data & Security** — Updated to describe both local and cloud storage modes, replacing the previous local-only description
+
 ## Version 0.16.1 (2026-03-08)
 
 ### Fixed
