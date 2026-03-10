@@ -161,7 +161,7 @@ export default function StructureView() {
   }, { totalItems: 0, totalPoints: 0, unsized: 0 }), [product]);
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       {/* Top bar */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
