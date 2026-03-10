@@ -5,6 +5,9 @@
 ### Fixed
 - **Structure view text overflow** — Long rib item names no longer bleed into adjacent columns (Size, Points, etc.) in the Structure table. Names now truncate properly within the Name column.
 
+### Improved
+- **Structure view width** — Widened from 768px to 1024px max width, giving the Name column ~256px more space to display long rib item names before truncation
+
 ## Version 0.16.3 (2026-03-09)
 
 ### Fixed
