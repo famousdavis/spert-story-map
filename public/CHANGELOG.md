@@ -3,12 +3,15 @@
 ## Version 0.16.3 (2026-03-09)
 
 ### Fixed
+- **Cloud import silently fails** — Importing a project in cloud mode failed silently because Firestore security rules deny `getDoc` on non-existent documents (`resource.data` is null, so `isProjectMember` check fails). The collision check now catches this error and generates a new ID, matching the pattern used by the migration flow
 - **Cloud import overwrites stale fields** — Importing a project over an existing cloud project now performs a full document overwrite instead of a merge, preventing stale fields (e.g., old `releaseCardOrder` or `sizingCardOrder`) from surviving the import and referencing deleted entities
 - **Cloud import missing ownership** — Importing a new project (no collision) in cloud mode now correctly sets `owner` and `members` fields, preventing the imported project from being invisible in the project list
+- **Stale debounced save after import** — `replaceProduct` now cancels any pending debounced save before writing, preventing a queued save of the old product data from overwriting the import
 - **Preferences overwrite on re-migration** — Uploading local projects to cloud on re-sign-in no longer overwrites existing cloud preferences (e.g., `projectOrder`); local and cloud preferences are now merged
 
 ### Technical
-- Added `replaceProduct(product)` to both storage drivers — reads existing `owner`/`members`, then writes a full `setDoc` (no `merge: true`) to eliminate stale field retention on import
+- Added `replaceProduct(product)` to both storage drivers — cancels pending debounce, reads existing `owner`/`members`, then writes a full `setDoc` (no `merge: true`) to eliminate stale field retention on import
+- `ProductList.handleImport` collision check wrapped in try/catch — on permission error (non-existent or inaccessible doc), generates a new UUID and creates the product, mirroring `migrateLocalToCloud` collision handling
 - Changed `ProductList.handleImport` (no-collision path) from `saveProductImmediate` to `createProduct` to set ownership fields
 - Changed `ProductList.confirmImport` and `DataSection.confirmImport` from `saveProductImmediate` to `replaceProduct`
 - Changed `migrateLocalToCloud` preferences write from `setDoc` to `setDoc` with `merge: true`

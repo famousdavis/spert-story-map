@@ -160,6 +160,11 @@ export function createFirestoreDriver(uid) {
      * fields from the old document are not retained.
      */
     async replaceProduct(product) {
+      if (productTimer) {
+        clearTimeout(productTimer);
+        productTimer = null;
+        productPending = null;
+      }
       try {
         const ref = doc(db, PROJECTS_COL, product.id);
         const snap = await getDoc(ref);

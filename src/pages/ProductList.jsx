@@ -164,11 +164,20 @@ export default function ProductList() {
     readImportFile(
       async (imported) => {
         if (!driver) return;
-        const existing = await driver.loadProduct(imported.id);
+        let existing = null;
+        let targetId = imported.id;
+        try {
+          existing = await driver.loadProduct(imported.id);
+        } catch {
+          // Cloud mode: Firestore get rules fail for non-existent docs
+          // (resource.data is null → isProjectMember check fails).
+          // Generate a new ID to avoid collision with inaccessible docs.
+          targetId = crypto.randomUUID();
+        }
         if (existing) {
           setImportConfirm({ product: imported, existingName: existing.name });
         } else {
-          await driver.createProduct(imported);
+          await driver.createProduct({ ...imported, id: targetId });
           refresh();
         }
       },
