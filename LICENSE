@@ -679,10 +679,12 @@ the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
 
---- ADDITIONAL TERMS (Section 7 of GPL v3) ---
-
-In accordance with Section 7 of the GNU General Public License v3.0,
-the following additional terms apply to this software:
+ADDITIONAL TERMS (per GNU GPL v3, Section 7(b) — Non-Permissive Additional Terms)
+-----------------------------------------------------------------------------------
+As permitted under Section 7(b) of the GNU General Public License v3.0,
+the following terms are NON-PERMISSIVE ADDITIONAL RESTRICTIONS and may
+NOT be removed by downstream recipients when conveying this software or
+modified versions thereof:
 
 1. Attribution Preservation
    All copies or substantial portions of this software must retain the
