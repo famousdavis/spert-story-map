@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.16.3 (2026-03-09)
+
+### Fixed
+- **Cloud import overwrites stale fields** — Importing a project over an existing cloud project now performs a full document overwrite instead of a merge, preventing stale fields (e.g., old `releaseCardOrder` or `sizingCardOrder`) from surviving the import and referencing deleted entities
+- **Cloud import missing ownership** — Importing a new project (no collision) in cloud mode now correctly sets `owner` and `members` fields, preventing the imported project from being invisible in the project list
+- **Preferences overwrite on re-migration** — Uploading local projects to cloud on re-sign-in no longer overwrites existing cloud preferences (e.g., `projectOrder`); local and cloud preferences are now merged
+
+### Technical
+- Added `replaceProduct(product)` to both storage drivers — reads existing `owner`/`members`, then writes a full `setDoc` (no `merge: true`) to eliminate stale field retention on import
+- Changed `ProductList.handleImport` (no-collision path) from `saveProductImmediate` to `createProduct` to set ownership fields
+- Changed `ProductList.confirmImport` and `DataSection.confirmImport` from `saveProductImmediate` to `replaceProduct`
+- Changed `migrateLocalToCloud` preferences write from `setDoc` to `setDoc` with `merge: true`
+
 ## Version 0.16.2 (2026-03-09)
 
 ### Added

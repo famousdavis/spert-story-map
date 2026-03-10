@@ -154,6 +154,29 @@ export function createFirestoreDriver(uid) {
       await doSaveProduct(product);
     },
 
+    /**
+     * Full overwrite for imports. Reads existing owner/members first,
+     * then writes the entire document without merge: true so stale
+     * fields from the old document are not retained.
+     */
+    async replaceProduct(product) {
+      try {
+        const ref = doc(db, PROJECTS_COL, product.id);
+        const snap = await getDoc(ref);
+        const existing = snap.exists() ? snap.data() : {};
+        const { id, ...rest } = product;
+        const data = sanitizeForFirestore(rest);
+        await setDoc(ref, {
+          ...data,
+          owner: existing.owner || uid,
+          members: existing.members || { [uid]: 'owner' },
+          updatedAt: serverTimestamp(),
+        });
+      } catch (e) {
+        handleWriteError(e);
+      }
+    },
+
     async deleteProduct(id) {
       try {
         await deleteDoc(doc(db, PROJECTS_COL, id));

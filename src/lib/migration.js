@@ -101,7 +101,7 @@ export async function migrateLocalToCloud(uid) {
   // Migrate preferences
   const prefs = loadPreferences();
   if (prefs && Object.keys(prefs).length > 0) {
-    await setDoc(doc(db, SETTINGS_COL, uid), sanitizeForFirestore(prefs));
+    await setDoc(doc(db, SETTINGS_COL, uid), sanitizeForFirestore(prefs), { merge: true });
   }
 
   return { uploaded, skipped };

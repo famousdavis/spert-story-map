@@ -168,7 +168,7 @@ export default function ProductList() {
         if (existing) {
           setImportConfirm({ product: imported, existingName: existing.name });
         } else {
-          await driver.saveProductImmediate(imported);
+          await driver.createProduct(imported);
           refresh();
         }
       },
@@ -178,7 +178,7 @@ export default function ProductList() {
 
   const confirmImport = async () => {
     if (importConfirm && driver) {
-      await driver.saveProductImmediate(importConfirm.product);
+      await driver.replaceProduct(importConfirm.product);
       setImportConfirm(null);
       refresh();
     }

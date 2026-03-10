@@ -64,6 +64,12 @@ export function createLocalStorageDriver() {
       return Promise.resolve();
     },
 
+    /** Full overwrite for imports. In local mode, same as saveProductImmediate. */
+    replaceProduct(product) {
+      saveProductImmediate(product);
+      return Promise.resolve();
+    },
+
     deleteProduct(id) {
       deleteProduct(id);
       return Promise.resolve();

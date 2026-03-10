@@ -21,7 +21,7 @@ export default function DataSection({ product, driver }) {
   const confirmImport = async () => {
     if (importConfirm) {
       const merged = { ...importConfirm, id: product.id };
-      await driver.saveProductImmediate(merged);
+      await driver.replaceProduct(merged);
       setImportConfirm(null);
       window.location.reload();
     }
