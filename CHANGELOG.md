@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.16.5 (2026-03-09)
+
+### Added
+- **Copyright headers** — All source files now include a copyright and license notice header (96 files across `src/`, plus root config files and `index.html`)
+- **LICENSE file** — Added GPL v3 license with author attribution block and Section 7 additional terms (attribution preservation and UI notice preservation)
+
 ## Version 0.16.4 (2026-03-09)
 
 ### Fixed

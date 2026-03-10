@@ -1,3 +1,7 @@
+// Copyright (C) 2026 William W. Davis, MSPM, PMP. All rights reserved.
+// Licensed under the GNU General Public License v3.0.
+// See LICENSE file in the project root for full license text.
+
 import { describe, it, expect } from 'vitest';
 import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, reorderTheme, moveRib2D, moveRibs2D, transferAllocation } from '../components/storymap/mapMutations';
 import { computeLayout, CELL_HEIGHT, CELL_GAP, CELL_PAD } from '../components/storymap/useMapLayout';

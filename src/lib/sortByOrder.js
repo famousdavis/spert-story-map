@@ -1,3 +1,7 @@
+// Copyright (C) 2026 William W. Davis, MSPM, PMP. All rights reserved.
+// Licensed under the GNU General Public License v3.0.
+// See LICENSE file in the project root for full license text.
+
 /**
  * Sort items by a persisted order array.
  * Items in the order array appear first (in order); items not in the array appear after, preserving their original relative order.

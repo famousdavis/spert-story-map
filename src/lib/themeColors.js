@@ -1,3 +1,7 @@
+// Copyright (C) 2026 William W. Davis, MSPM, PMP. All rights reserved.
+// Licensed under the GNU General Public License v3.0.
+// See LICENSE file in the project root for full license text.
+
 /**
  * Centralized theme color definitions.
  * Each option maps a key to Tailwind classes for different contexts.
