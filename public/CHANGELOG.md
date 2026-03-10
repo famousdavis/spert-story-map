@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.16.4 (2026-03-09)
+
+### Fixed
+- **Structure view text overflow** — Long rib item names no longer bleed into adjacent columns (Size, Points, etc.) in the Structure table. Names now truncate properly within the Name column.
+
 ## Version 0.16.3 (2026-03-09)
 
 ### Fixed

@@ -36,7 +36,7 @@ export default function RibRow({
         </div>
 
         {/* Name */}
-        <div className="min-w-0 pr-2">
+        <div className="min-w-0 pr-2 overflow-hidden">
           <InlineEdit
             value={rib.name}
             onSave={name => onRename(themeId, backboneId, rib.id, { name })}
