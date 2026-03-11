@@ -5,10 +5,10 @@
 | Layer | Technology | Version |
 |-------|-----------|---------|
 | Framework | React | 19.2.4 |
-| Routing | React Router DOM | 7.13.0 |
+| Routing | React Router DOM | 7.13.1 |
 | Build | Vite | 7.3.1 |
-| Styling | Tailwind CSS | 4.1.18 |
-| Charts | Recharts | 3.7.0 |
+| Styling | Tailwind CSS | 4.2.1 |
+| Charts | Recharts | 3.8.0 |
 | Persistence | Browser localStorage | — |
 
 ## Directory Structure
