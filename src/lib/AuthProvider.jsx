@@ -71,6 +71,11 @@ export function AuthProvider({ children }) {
             }
           } catch (e) {
             console.error('Failed to check ToS acceptance:', e);
+            // Cannot verify ToS — sign out to prevent bypass
+            clearTosAcceptance();
+            await firebaseSignOut(auth);
+            setUser(null);
+            return;
           }
         }
       }

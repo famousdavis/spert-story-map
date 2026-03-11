@@ -256,7 +256,25 @@ describe('validateProduct', () => {
   it('rejects changelog entry with non-numeric timestamp', () => {
     expect(() => validateProduct(minimal({
       _changeLog: [{ t: 'not-a-number', op: 'create' }],
-    }))).toThrow('timestamp must be a number');
+    }))).toThrow('timestamp');
+  });
+
+  it('rejects changelog entry with zero timestamp', () => {
+    expect(() => validateProduct(minimal({
+      _changeLog: [{ t: 0, op: 'create' }],
+    }))).toThrow('valid Unix timestamp');
+  });
+
+  it('rejects changelog entry with negative timestamp', () => {
+    expect(() => validateProduct(minimal({
+      _changeLog: [{ t: -100, op: 'create' }],
+    }))).toThrow('valid Unix timestamp');
+  });
+
+  it('rejects changelog entry with far-future timestamp', () => {
+    expect(() => validateProduct(minimal({
+      _changeLog: [{ t: 5000000000, op: 'create' }],
+    }))).toThrow('valid Unix timestamp');
   });
 
   // --- File size limit (tested at importProductFromJSON level) ---
@@ -274,5 +292,123 @@ describe('validateProduct', () => {
 
   it('rejects zero sprintCadenceWeeks', () => {
     expect(() => validateProduct(minimal({ sprintCadenceWeeks: 0 }))).toThrow('positive number');
+  });
+
+  it('clamps sprintCadenceWeeks to max 52', () => {
+    const result = validateProduct(minimal({ sprintCadenceWeeks: 100 }));
+    expect(result.sprintCadenceWeeks).toBe(52);
+  });
+
+  it('clamps sprintCadenceWeeks to min 1', () => {
+    const result = validateProduct(minimal({ sprintCadenceWeeks: 0.5 }));
+    expect(result.sprintCadenceWeeks).toBe(1);
+  });
+
+  // --- Category enum validation ---
+  it('accepts valid rib category "core"', () => {
+    const data = minimal({
+      themes: [{
+        id: 't1', backboneItems: [{
+          id: 'b1', ribItems: [{
+            id: 'r1', category: 'core',
+            releaseAllocations: [], progressHistory: [],
+          }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    expect(result.themes[0].backboneItems[0].ribItems[0].category).toBe('core');
+  });
+
+  it('accepts valid rib category "non-core"', () => {
+    const data = minimal({
+      themes: [{
+        id: 't1', backboneItems: [{
+          id: 'b1', ribItems: [{
+            id: 'r1', category: 'non-core',
+            releaseAllocations: [], progressHistory: [],
+          }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    expect(result.themes[0].backboneItems[0].ribItems[0].category).toBe('non-core');
+  });
+
+  it('rejects invalid rib category', () => {
+    expect(() => validateProduct(minimal({
+      themes: [{
+        id: 't1', backboneItems: [{
+          id: 'b1', ribItems: [{
+            id: 'r1', category: 'injected',
+            releaseAllocations: [], progressHistory: [],
+          }],
+        }],
+      }],
+    }))).toThrow('must be "core" or "non-core"');
+  });
+
+  // --- Release/sprint order clamping ---
+  it('clamps release order to 0-10000', () => {
+    const data = minimal({
+      releases: [
+        { id: 'r1', name: 'R1', order: -5 },
+        { id: 'r2', name: 'R2', order: 99999 },
+        { id: 'r3', name: 'R3', order: 3.7 },
+      ],
+    });
+    const result = validateProduct(data);
+    expect(result.releases[0].order).toBe(0);
+    expect(result.releases[1].order).toBe(10000);
+    expect(result.releases[2].order).toBe(3);
+  });
+
+  it('clamps sprint order to 0-10000', () => {
+    const data = minimal({
+      sprints: [
+        { id: 's1', name: 'S1', order: -1 },
+        { id: 's2', name: 'S2', order: 50000 },
+      ],
+    });
+    const result = validateProduct(data);
+    expect(result.sprints[0].order).toBe(0);
+    expect(result.sprints[1].order).toBe(10000);
+  });
+
+  // --- Prototype key stripping from card orders ---
+  // JSON.parse creates __proto__ as an own property (unlike object literals)
+  it('strips dangerous keys from releaseCardOrder', () => {
+    const cardOrder = JSON.parse('{"rel1":["id1"],"__proto__":["hack"],"constructor":["hack2"],"prototype":["hack3"]}');
+    const data = minimal({ releaseCardOrder: cardOrder });
+    const result = validateProduct(data);
+    expect(result.releaseCardOrder['rel1']).toEqual(['id1']);
+    expect(Object.prototype.hasOwnProperty.call(result.releaseCardOrder, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result.releaseCardOrder, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result.releaseCardOrder, 'prototype')).toBe(false);
+  });
+
+  it('strips dangerous keys from sizingCardOrder', () => {
+    const cardOrder = JSON.parse('{"unsized":["id1"],"__proto__":["hack"],"constructor":["hack2"]}');
+    const data = minimal({ sizingCardOrder: cardOrder });
+    const result = validateProduct(data);
+    expect(result.sizingCardOrder['unsized']).toEqual(['id1']);
+    expect(Object.prototype.hasOwnProperty.call(result.sizingCardOrder, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result.sizingCardOrder, 'constructor')).toBe(false);
+  });
+
+  // --- Import error message sanitization ---
+  it('gives generic error for malformed JSON on import', async () => {
+    const { importProductFromJSON } = await import('../lib/importExport');
+    expect(() => importProductFromJSON('{ bad json }')).toThrow('Invalid JSON file');
+  });
+
+  it('does not leak JSON content in error messages', async () => {
+    const { importProductFromJSON } = await import('../lib/importExport');
+    const secret = 'SENSITIVE_DATA_12345';
+    try {
+      importProductFromJSON(`{ "key": "${secret}" bad }`);
+    } catch (e) {
+      expect(e.message).not.toContain(secret);
+    }
   });
 });
