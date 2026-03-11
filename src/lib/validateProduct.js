@@ -90,6 +90,7 @@ export function validateProduct(data) {
     // Sanitize numeric fields
     if (r.order !== undefined) {
       assert(isNum(r.order), 'Release order must be a number');
+      r.order = clamp(Math.floor(r.order), 0, 10000);
     }
   }
 
@@ -102,6 +103,7 @@ export function validateProduct(data) {
     sprintIds.add(s.id);
     if (s.order !== undefined) {
       assert(isNum(s.order), 'Sprint order must be a number');
+      s.order = clamp(Math.floor(s.order), 0, 10000);
     }
   }
 
@@ -169,7 +171,8 @@ export function validateProduct(data) {
 
         // Category
         if (rib.category !== undefined) {
-          assert(typeof rib.category === 'string', 'Rib category must be a string');
+          assert(rib.category === 'core' || rib.category === 'non-core',
+            'Rib category must be "core" or "non-core"');
         }
 
         // Release allocations
@@ -227,7 +230,8 @@ export function validateProduct(data) {
   // --- releaseCardOrder ---
   if (data.releaseCardOrder && typeof data.releaseCardOrder === 'object') {
     for (const [key, val] of Object.entries(data.releaseCardOrder)) {
-      if (!Array.isArray(val)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype'
+          || !Array.isArray(val)) {
         delete data.releaseCardOrder[key];
         continue;
       }
@@ -239,7 +243,8 @@ export function validateProduct(data) {
   // --- sizingCardOrder ---
   if (data.sizingCardOrder && typeof data.sizingCardOrder === 'object') {
     for (const [key, val] of Object.entries(data.sizingCardOrder)) {
-      if (!Array.isArray(val)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype'
+          || !Array.isArray(val)) {
         delete data.sizingCardOrder[key];
         continue;
       }
@@ -253,7 +258,8 @@ export function validateProduct(data) {
       `Changelog too long (max ${MAX_CHANGELOG} entries)`);
     for (const entry of data._changeLog) {
       assert(typeof entry === 'object' && entry !== null, 'Changelog entry must be an object');
-      assert(isNum(entry.t), 'Changelog entry timestamp must be a number');
+      assert(isNum(entry.t) && entry.t > 0 && entry.t < 4102444800,
+        'Changelog entry timestamp must be a valid Unix timestamp');
     }
   }
 
@@ -261,6 +267,7 @@ export function validateProduct(data) {
   if (data.sprintCadenceWeeks !== undefined) {
     assert(isNum(data.sprintCadenceWeeks) && data.sprintCadenceWeeks > 0,
       'sprintCadenceWeeks must be a positive number');
+    data.sprintCadenceWeeks = clamp(data.sprintCadenceWeeks, 1, 52);
   }
 
   // --- Strip unknown top-level fields ---

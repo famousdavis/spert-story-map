@@ -41,7 +41,12 @@ export function importProductFromJSON(jsonString) {
     throw new Error(`Import file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
 
-  let data = JSON.parse(jsonString);
+  let data;
+  try {
+    data = JSON.parse(jsonString);
+  } catch {
+    throw new Error('Invalid JSON file — please check the file format.');
+  }
 
   // Comprehensive schema validation — checks types, ranges, lengths,
   // strips unknown fields, and clamps numeric values

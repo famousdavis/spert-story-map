@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.17.2 (2026-03-11)
+
+### Fixed
+- **AuthProvider ToS bypass** — Firestore error during returning-user ToS verification now correctly signs the user out instead of falling through and granting access without verified ToS acceptance
+- **Import error message sanitization** — JSON parse errors no longer leak raw file content snippets to the UI; replaced with a generic format error message
+
+### Hardened
+- **Import validation** — Strengthened `validateProduct.js` schema validation:
+  - Rib item `category` field now validates against enum (`"core"` | `"non-core"`) instead of accepting any string
+  - Release and sprint `order` fields are clamped to 0–10,000 and floored to integers
+  - `sprintCadenceWeeks` upper-bounded to 52 (was unbounded)
+  - Changelog entry timestamps validated to positive range (0 < t < year 2100)
+  - `releaseCardOrder` and `sizingCardOrder` strip `__proto__`, `constructor`, and `prototype` keys to prevent prototype pollution via crafted imports
+
 ## Version 0.17.1 (2026-03-11)
 
 ### Improved
