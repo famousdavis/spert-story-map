@@ -101,7 +101,7 @@ export function Footer() {
       <span>&copy; {new Date().getFullYear()} William W. Davis, MSPM, PMP</span>
       {' | '}
       <Link to="/changelog" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
-        v{APP_VERSION}
+        Version {APP_VERSION}
       </Link>
       {' | '}
       <span>Licensed under GNU GPL v3</span>
