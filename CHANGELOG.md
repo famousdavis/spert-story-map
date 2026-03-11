@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.17.1 (2026-03-11)
+
+### Improved
+- **Dependency updates** — Updated 9 packages to latest stable minor/patch versions within existing semver ranges
+  - `react-router-dom` 7.13.0 → 7.13.1 (double-slash normalization fix)
+  - `recharts` 3.7.0 → 3.8.0 (new axis scale hooks)
+  - `firebase` 12.9.0 → 12.10.0 (bug fixes)
+  - `tailwindcss` 4.1.18 → 4.2.1 (Oxide scanner performance improvements)
+  - `@tailwindcss/vite` 4.1.18 → 4.2.1
+  - `eslint` 9.39.3 → 9.39.4, `@eslint/js` 9.39.3 → 9.39.4
+  - `eslint-plugin-react-refresh` 0.5.0 → 0.5.2
+  - `globals` 17.3.0 → 17.4.0
+
 ## Version 0.17.0 (2026-03-11)
 
 ### Added
