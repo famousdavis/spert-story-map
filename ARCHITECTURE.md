@@ -33,7 +33,9 @@ src/
 │   ├── settingsMutations.js         # Pure cascade deletion (release, sprint) + releaseHasAllocations
 │   ├── ribHelpers.js                # forEachRib / reduceRibs traversal utilities
 │   ├── themeColors.js               # Centralized 8-color palette for themes (solid, light, dot, swatch)
-│   └── exportForForecaster.js       # Pure transformation: Story Map → SPERT Release Forecaster import format
+│   ├── exportForForecaster.js       # Pure transformation: Story Map → SPERT Release Forecaster import format
+│   ├── tosConstants.js              # ToS version, URLs, localStorage keys, app ID
+│   └── tosHelpers.js                # ToS acceptance state management (localStorage + Firestore)
 │
 ├── hooks/
 │   ├── useProduct.js                 # Load/save product state with debounced persistence
@@ -52,13 +54,15 @@ src/
 │   │   ├── CollapsibleSection.jsx    # Collapsible section with toggle
 │   │   ├── Tooltip.jsx               # Fast tooltip (200ms) via useTooltip hook
 │   │   ├── Section.jsx               # Reusable Section and Field layout components
-│   │   └── ThemeToggle.jsx           # Sun/moon dark mode toggle button
+│   │   ├── ThemeToggle.jsx           # Sun/moon dark mode toggle button
+│   │   └── FirstRunBanner.jsx       # Dismissible first-run ToS informational banner
 │   ├── layout/
 │   │   └── ProductLayout.jsx         # Header, tab nav, footer, outlet context
 │   ├── settings/                     # Global and per-project settings components
 │   │   ├── AppSettingsModal.jsx      # Global settings modal (storage mode + export attribution)
 │   │   ├── StorageSection.jsx        # Storage mode toggle, auth UI, migration controls
 │   │   ├── SharingSection.jsx        # Project sharing (cloud mode, owner only)
+│   │   ├── TosConsentModal.jsx       # Clickwrap ToS/Privacy consent modal for cloud sign-in
 │   │   ├── SizeMappingSection.jsx    # T-shirt size mapping editor
 │   │   └── DataSection.jsx           # Import/export buttons + confirm dialogs
 │   ├── progress/
@@ -108,6 +112,10 @@ src/
     ├── SettingsView.jsx              # Product configuration
     ├── ChangelogView.jsx             # Version history (reads CHANGELOG.md)
     └── AboutView.jsx                 # About page (purpose, data security, license)
+
+legal/
+├── TOS.pdf                           # Reference copy of Terms of Service
+└── PRIVACY.pdf                       # Reference copy of Privacy Policy
 ```
 
 ## Data Model
@@ -182,4 +190,6 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 16. **Collapsible group summaries** — Progress tab group headers display item count, total points, % done, and a mini progress bar. Groups are collapsible via a `collapsedGroups` Set (reset on groupBy or sprint change). Release groups use `getReleasePercentComplete` (allocation-weighted); backbone/theme groups compute a weighted average from visible group items. Release Planning column headers also show a progress bar via the same `ProgressBar` component.
 
-17. **Workspace reconciliation** — Each browser gets a persistent workspace token (`rp_workspace_id` in localStorage, generated once via `getWorkspaceId()`). Products carry `_originRef` (set at creation, preserved across imports) for data provenance tracking. `_storageRef` is injected at export time from the current workspace token for cross-session identification. `appendChangeLogEntry()` maintains a capped (500-entry) structural operation log (`_changeLog`) for export pipeline diagnostics. Export Attribution preferences (`exportName`, `exportId`) are stored in `rp_app_preferences` and injected as `_exportedBy`/`_exportedById` at export time for team workflow traceability.
+17. **ToS & Privacy Policy acceptance (v0.17.0)** — Browsewrap footer links (ToS + Privacy Policy) render on all pages via the shared `Footer` component. A first-run banner (dismissed via `spert_firstRun_seen` localStorage key) informs new visitors that Cloud Storage requires agreement. A clickwrap consent modal (`TosConsentModal`) gates Cloud Storage sign-in — users must check a checkbox and click "Enable Cloud Storage" before Firebase Auth fires. Post-auth, `AuthProvider` writes acceptance to Firestore at `users/{uid}` with version, timestamp, auth provider, and originating app ID. Returning users are verified on app load: if the stored ToS version doesn't match the current version, the user is signed out and must re-accept. `tosHelpers.js` provides pure async functions for localStorage caching and Firestore read/write; `tosConstants.js` centralizes version strings and keys.
+
+18. **Workspace reconciliation** — Each browser gets a persistent workspace token (`rp_workspace_id` in localStorage, generated once via `getWorkspaceId()`). Products carry `_originRef` (set at creation, preserved across imports) for data provenance tracking. `_storageRef` is injected at export time from the current workspace token for cross-session identification. `appendChangeLogEntry()` maintains a capped (500-entry) structural operation log (`_changeLog`) for export pipeline diagnostics. Export Attribution preferences (`exportName`, `exportId`) are stored in `rp_app_preferences` and injected as `_exportedBy`/`_exportedById` at export time for team workflow traceability.
