@@ -16,6 +16,7 @@ export function useProduct(productId) {
   const redoStackRef = useRef([]);
 
   // Load product when driver is ready or productId changes
+  /* eslint-disable react-hooks/set-state-in-effect -- loading async data requires setState in effect */
   useEffect(() => {
     if (!storageReady || !driver || !productId) {
       setState({ product: null, lastSaved: null, loading: !storageReady });
@@ -36,6 +37,7 @@ export function useProduct(productId) {
     });
     return () => { cancelled = true; };
   }, [productId, driver, storageReady]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Subscribe to remote changes (cloud mode only)
   useEffect(() => {

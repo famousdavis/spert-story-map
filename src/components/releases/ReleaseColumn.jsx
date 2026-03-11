@@ -39,12 +39,21 @@ export default function ReleaseColumn({
   onRenameRelease,
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const nameEdit = useInlineEdit(
+  const {
+    editing: nameEditing, draft: nameDraft, setDraft: setNameDraft,
+    inputRef: nameInputRef, startEditing: startNameEdit,
+    commit: commitNameEdit, handleKeyDown: nameKeyDown,
+  } = useInlineEdit(
     release?.name || '',
     (newName) => onRenameRelease?.(release.id, newName),
   );
   const hasItems = ribs.length > 0;
-  const deleteTooltip = useTooltip(
+  const {
+    triggerRef: deleteTriggerRef,
+    onMouseEnter: deleteMouseEnter,
+    onMouseLeave: deleteMouseLeave,
+    tooltipEl: deleteTooltipEl,
+  } = useTooltip(
     hasItems ? 'Move all items out first' : release ? `Delete ${release.name}` : null
   );
   const isOver = dropTarget?.col === colId && dragRibId;
@@ -116,24 +125,24 @@ export default function ReleaseColumn({
           isOver ? 'border-blue-400 ring-2 ring-blue-200 dark:border-blue-500 dark:ring-blue-700' : 'border-gray-200 dark:border-gray-700'
         }`}>
           <div
-            draggable={!nameEdit.editing}
-            onDragStart={e => { if (nameEdit.editing) { e.preventDefault(); return; } onColDragStart(e, release.id); }}
+            draggable={!nameEditing}
+            onDragStart={e => { if (nameEditing) { e.preventDefault(); return; } onColDragStart(e, release.id); }}
             onDragEnd={onColDragEnd}
-            className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 ${nameEdit.editing ? '' : 'cursor-grab active:cursor-grabbing'}`}
+            className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 ${nameEditing ? '' : 'cursor-grab active:cursor-grabbing'}`}
           >
             <div className="flex items-center justify-between">
-              {nameEdit.editing ? (
+              {nameEditing ? (
                 <input
-                  ref={nameEdit.inputRef}
-                  value={nameEdit.draft}
-                  onChange={e => nameEdit.setDraft(e.target.value)}
-                  onBlur={nameEdit.commit}
-                  onKeyDown={nameEdit.handleKeyDown}
+                  ref={nameInputRef}
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  onBlur={commitNameEdit}
+                  onKeyDown={nameKeyDown}
                   className="text-sm font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 border border-blue-400 dark:border-blue-500 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-48"
                 />
               ) : (
                 <h3
-                  onDoubleClick={nameEdit.startEditing}
+                  onDoubleClick={startNameEdit}
                   className="text-sm font-semibold text-gray-900 dark:text-gray-100 cursor-text"
                   title="Double-click to rename"
                 >{release.name}</h3>
@@ -141,9 +150,9 @@ export default function ReleaseColumn({
               {onDeleteRelease && (
                 <>
                   <button
-                    ref={deleteTooltip.triggerRef}
-                    onMouseEnter={deleteTooltip.onMouseEnter}
-                    onMouseLeave={deleteTooltip.onMouseLeave}
+                    ref={deleteTriggerRef}
+                    onMouseEnter={deleteMouseEnter}
+                    onMouseLeave={deleteMouseLeave}
                     onClick={e => { e.stopPropagation(); if (!hasItems) setConfirmDelete(true); }}
                     className={`text-xs px-1 py-0.5 rounded transition-colors ${
                       hasItems
@@ -153,7 +162,7 @@ export default function ReleaseColumn({
                   >
                     Delete
                   </button>
-                  {deleteTooltip.tooltipEl}
+                  {deleteTooltipEl}
                 </>
               )}
             </div>

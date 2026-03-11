@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 0.17.0 (2026-03-11)
+
+### Added
+- **Terms of Service & Privacy Policy compliance** — Legal framework for Cloud Storage users
+  - Persistent footer with Terms of Service and Privacy Policy links on all pages (browsewrap notice)
+  - First-run informational banner for new visitors explaining that no account is required and Cloud Storage requires agreement
+  - Clickwrap consent modal that intercepts Cloud Storage sign-in — users must agree to ToS and Privacy Policy before Firebase Authentication fires
+  - Post-authentication Firestore write records acceptance with version, timestamp, auth provider, and originating app ID
+  - Returning user verification on app load checks acceptance version; signs out users with outdated or missing acceptance
+  - Firestore security rule for `users/{uid}` ToS acceptance records
+  - Reference copies of legal documents in `/legal` directory
+  - Updated README with legal document links
+
+### Fixed
+- **Pre-existing lint errors** — Resolved all ESLint warnings and errors across the codebase
+  - Removed unused imports and variables in migration tests, ProgressRow, RibDetailPanel, MapContent, validateProduct
+  - Fixed refs-during-render errors in ReleaseColumn by destructuring `useInlineEdit` and `useTooltip` return values
+  - Prefixed unused destructured variables in firestoreDriver, removed unused params in storageDriver and useSizingDrag
+  - Added missing `mode` dependency in ProductList useCallback
+  - Suppressed unavoidable `set-state-in-effect` warnings in useProduct and StorageProvider (async data loading pattern)
+
 ## Version 0.16.5 (2026-03-09)
 
 ### Added

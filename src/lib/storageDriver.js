@@ -101,7 +101,7 @@ export function createLocalStorageDriver() {
     },
 
     /** No-op for local mode — no remote changes to subscribe to. */
-    onProductChange(_id, _cb) {
+    onProductChange() {
       return () => {};
     },
   };

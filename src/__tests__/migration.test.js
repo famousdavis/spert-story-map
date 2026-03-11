@@ -61,7 +61,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import { migrateLocalToCloud } from '../lib/migration';
-import { setDoc, getDoc } from 'firebase/firestore';
+import { setDoc } from 'firebase/firestore';
 
 beforeEach(() => {
   uuidCounter = 0;

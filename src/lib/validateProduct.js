@@ -41,10 +41,6 @@ function isNum(v) {
   return typeof v === 'number' && Number.isFinite(v);
 }
 
-/** Return true if value is a non-negative integer. */
-function isNonNegInt(v) {
-  return Number.isInteger(v) && v >= 0;
-}
 
 /** Clamp a number to [min, max]. */
 function clamp(v, min, max) {

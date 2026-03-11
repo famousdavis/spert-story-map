@@ -11,7 +11,7 @@ const DRAG_THRESHOLD = 8;
  * Pointer-event drag hook for the sizing board.
  * Only handles rib drags between size columns / unsized zone.
  */
-export default function useSizingDrag({ layout, zoom, pan, mutations, updateProduct }) {
+export default function useSizingDrag({ layout, zoom, pan, updateProduct }) {
   const [dragState, setDragState] = useState(null);
   const dragRef = useRef(null);
 

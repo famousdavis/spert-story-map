@@ -10,6 +10,8 @@ import { loadProductIndex, clearAllLocalProducts, loadPreferences, savePreferenc
 import { exportAllProducts } from '../../lib/importExport';
 import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import TosConsentModal from './TosConsentModal';
+import { isTosAcceptedLocally, cacheTosAcceptance } from '../../lib/tosHelpers';
 
 export default function StorageSection() {
   const { user, firebaseAvailable, signInWithGoogle, signInWithMicrosoft, signOut } = useAuth();
@@ -20,6 +22,8 @@ export default function StorageSection() {
   const [migrating, setMigrating] = useState(false);
   const [migrateResult, setMigrateResult] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [showTosConsent, setShowTosConsent] = useState(false);
+  const [pendingProvider, setPendingProvider] = useState(null);
 
   // Don't render if Firebase is not configured
   if (!isCloudAvailable || !firebaseAvailable) return null;
@@ -107,8 +111,17 @@ export default function StorageSection() {
     }
   };
 
-  const handleSignIn = async (provider) => {
+  const handleSignIn = (provider) => {
     setAuthError(null);
+    if (!isTosAcceptedLocally()) {
+      setPendingProvider(provider);
+      setShowTosConsent(true);
+      return;
+    }
+    executeSignIn(provider);
+  };
+
+  const executeSignIn = async (provider) => {
     try {
       if (provider === 'google') {
         await signInWithGoogle();
@@ -120,6 +133,15 @@ export default function StorageSection() {
       setAuthError(e.code === 'auth/popup-closed-by-user'
         ? 'Sign-in was cancelled.'
         : 'Sign-in failed. Please try again.');
+    }
+  };
+
+  const handleTosAccepted = () => {
+    setShowTosConsent(false);
+    cacheTosAcceptance();
+    if (pendingProvider) {
+      executeSignIn(pendingProvider);
+      setPendingProvider(null);
     }
   };
 
@@ -248,6 +270,15 @@ export default function StorageSection() {
         confirmLabel="Clear Local Data"
         danger={true}
       />
+
+      {/* ToS consent modal — key forces remount to reset checkbox */}
+      {showTosConsent && (
+        <TosConsentModal
+          open
+          onClose={() => { setShowTosConsent(false); setPendingProvider(null); }}
+          onAccept={handleTosAccepted}
+        />
+      )}
     </Section>
   );
 }

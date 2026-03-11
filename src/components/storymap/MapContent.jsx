@@ -71,7 +71,7 @@ export default function MapContent({
       data-map-bg=""
     >
       {/* Theme headers */}
-      {themeSpans.map((ts, i) => (
+      {themeSpans.map((ts) => (
         <ThemeHeader
           key={ts.themeId}
           themeSpan={ts}

@@ -4,11 +4,10 @@
 
 import { useEffect } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
-import SizePicker, { SIZE_COLORS } from '../ui/SizePicker';
+import SizePicker from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 
 export default function RibDetailPanel({ rib, product, onClose, onRename, onUpdate }) {
-  const sizeColor = rib.size ? (SIZE_COLORS[rib.size] || 'bg-gray-100 text-gray-800') : '';
   const pctComplete = getRibItemPercentComplete(rib);
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(rib.name, (name) => onRename?.(rib.themeId, rib.backboneId, rib.id, name));

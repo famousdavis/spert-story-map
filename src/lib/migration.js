@@ -80,7 +80,7 @@ export async function migrateLocalToCloud(uid) {
         // Belongs to someone else — generate new ID
         targetId = crypto.randomUUID();
       }
-    } catch (collisionErr) {
+    } catch {
       // PERMISSION_DENIED means doc exists but user isn't a member,
       // or doc doesn't exist (rule can't evaluate resource.data).
       // Generate a new ID to avoid collision.

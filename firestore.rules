@@ -59,5 +59,10 @@ service cloud.firestore {
     match /spertstorymap_settings/{userId} {
       allow read, write: if isAuth() && request.auth.uid == userId;
     }
+
+    // ── ToS acceptance records ──
+    match /users/{uid} {
+      allow read, write: if isAuth() && request.auth.uid == uid;
+    }
   }
 }

@@ -42,7 +42,7 @@ export function sanitizeForFirestore(obj) {
 /** Remove Firestore-only fields from product data. */
 export function stripFirestoreFields(data) {
   if (!data) return data;
-  const { owner, members, ...product } = data;
+  const { owner: _owner, members: _members, ...product } = data;
   return product;
 }
 
@@ -61,7 +61,7 @@ export function createFirestoreDriver(uid) {
   async function doSaveProduct(product) {
     try {
       const ref = doc(db, PROJECTS_COL, product.id);
-      const { id, ...rest } = product;
+      const { id: _id, ...rest } = product;
       const data = sanitizeForFirestore(rest);
       // Never include owner/members in regular saves — prevents editors
       // from overwriting ownership. merge: true preserves them.
@@ -122,7 +122,7 @@ export function createFirestoreDriver(uid) {
     async createProduct(product) {
       try {
         const ref = doc(db, PROJECTS_COL, product.id);
-        const { id, ...rest } = product;
+        const { id: _id, ...rest } = product;
         const data = sanitizeForFirestore(rest);
         await setDoc(ref, {
           ...data,
@@ -173,7 +173,7 @@ export function createFirestoreDriver(uid) {
         const ref = doc(db, PROJECTS_COL, product.id);
         const snap = await getDoc(ref);
         const existing = snap.exists() ? snap.data() : {};
-        const { id, ...rest } = product;
+        const { id: _id, ...rest } = product;
         const data = sanitizeForFirestore(rest);
         await setDoc(ref, {
           ...data,

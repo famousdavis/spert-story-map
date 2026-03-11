@@ -12,6 +12,13 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseAvailable } from './firebase';
+import {
+  isTosAcceptedLocally,
+  isTosAcceptedInFirestore,
+  writeTosAcceptance,
+  cacheTosAcceptance,
+  clearTosAcceptance,
+} from './tosHelpers';
 
 const AuthContext = createContext(null);
 
@@ -22,10 +29,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
       setLoading(false);
-      // Upsert profile on sign-in
+
       if (firebaseUser && db) {
+        // Upsert profile on sign-in
         try {
           await setDoc(
             doc(db, 'spertstorymap_profiles', firebaseUser.uid),
@@ -39,7 +46,36 @@ export function AuthProvider({ children }) {
         } catch (e) {
           console.error('Failed to upsert profile:', e);
         }
+
+        // Post-auth: write ToS acceptance to Firestore if locally accepted
+        if (isTosAcceptedLocally()) {
+          try {
+            const providerData = firebaseUser.providerData?.[0];
+            const authProvider = providerData?.providerId || 'unknown';
+            await writeTosAcceptance(firebaseUser.uid, authProvider);
+          } catch (e) {
+            console.error('Failed to write ToS acceptance:', e);
+          }
+        } else {
+          // Returning user check: verify ToS acceptance in Firestore
+          try {
+            const accepted = await isTosAcceptedInFirestore(firebaseUser.uid);
+            if (accepted) {
+              cacheTosAcceptance();
+            } else {
+              // ToS outdated or missing — sign out
+              clearTosAcceptance();
+              await firebaseSignOut(auth);
+              setUser(null);
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to check ToS acceptance:', e);
+          }
+        }
       }
+
+      setUser(firebaseUser);
     });
   }, []);
 
@@ -75,6 +111,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located hook for provider
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');

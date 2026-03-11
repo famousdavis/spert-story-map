@@ -68,7 +68,7 @@ export default function ProductList() {
     } finally {
       setLoading(false);
     }
-  }, [driver]);
+  }, [driver, mode]);
 
   useEffect(() => {
     if (storageReady) refresh();

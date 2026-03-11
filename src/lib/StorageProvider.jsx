@@ -39,6 +39,7 @@ export function StorageProvider({ children }) {
   const effectiveMode = (isFirebaseAvailable && user && persistedMode === 'cloud') ? 'cloud' : 'local';
 
   // Update driver when auth resolves or mode changes
+  /* eslint-disable react-hooks/set-state-in-effect -- driver must be created after auth resolves */
   useEffect(() => {
     if (authLoading && persistedMode === 'cloud' && isFirebaseAvailable) {
       return; // Still waiting for auth
@@ -49,7 +50,8 @@ export function StorageProvider({ children }) {
     } else {
       setDriver(createLocalStorageDriver());
     }
-  }, [authLoading, effectiveMode, user?.uid, persistedMode]);
+  }, [authLoading, effectiveMode, user?.uid, persistedMode]); // eslint-disable-line react-hooks/exhaustive-deps -- user?.uid captures the needed dependency
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const switchMode = useCallback((newMode) => {
     localStorage.setItem(STORAGE_MODE_KEY, newMode);
@@ -69,6 +71,7 @@ export function StorageProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located hook pattern
 export function useStorage() {
   const ctx = useContext(StorageContext);
   if (!ctx) throw new Error('useStorage must be used within StorageProvider');

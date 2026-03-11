@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
+import { TOS_URL, PRIVACY_POLICY_URL } from '../lib/tosConstants';
 
 export default function ChangelogView() {
   const [content, setContent] = useState('');
@@ -104,6 +105,14 @@ export function Footer() {
       </Link>
       {' | '}
       <span>Licensed under GNU GPL v3</span>
+      {' | '}
+      <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
+        Terms of Service
+      </a>
+      {' | '}
+      <a href={PRIVACY_POLICY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
+        Privacy Policy
+      </a>
     </footer>
   );
 }
