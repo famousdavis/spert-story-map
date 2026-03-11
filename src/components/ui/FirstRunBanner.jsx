@@ -27,10 +27,9 @@ export default function FirstRunBanner() {
         </p>
         <button
           onClick={dismiss}
-          className="text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-sm leading-none flex-shrink-0 mt-0.5"
-          aria-label="Dismiss"
+          className="text-xs text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 rounded px-2.5 py-1 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors flex-shrink-0"
         >
-          &times;
+          Got it
         </button>
       </div>
     </div>
