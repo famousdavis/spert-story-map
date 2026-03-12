@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.17.3 (2026-03-11)
+
+### Changed
+- **Node 22 LTS pinning** — Added `engines` field (`>=22.12.0`) to `package.json` and `.nvmrc` for Vercel deployment targeting ahead of Node 20 EOL (April 30, 2026)
+
 ## Version 0.17.2 (2026-03-11)
 
 ### Fixed
