@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.17.4 (2026-03-16)
+
+### Changed
+- **First-run banner** — Updated notification text to clarify browsewrap agreement on app use and added linked Terms of Service and Privacy Policy references
+
 ## Version 0.17.3 (2026-03-11)
 
 ### Changed
