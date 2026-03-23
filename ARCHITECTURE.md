@@ -4,6 +4,7 @@
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
+| Language | TypeScript | 5.x (strict mode) |
 | Framework | React | 19.2.4 |
 | Routing | React Router DOM | 7.13.1 |
 | Build | Vite | 7.3.1 |
@@ -15,103 +16,106 @@
 
 ```
 src/
-├── main.jsx                          # Entry point, mounts BrowserRouter + App
-├── App.jsx                           # Route definitions
+├── main.tsx                          # Entry point, mounts BrowserRouter + App
+├── App.tsx                           # Route definitions
 ├── index.css                         # Tailwind imports + dark mode variant + scrollbar styles
 │
+├── types/
+│   └── index.ts                      # Core domain interfaces (Product, Theme, Backbone, RibItem, etc.)
+│
 ├── lib/                              # Pure logic, no React
-│   ├── constants.js                  # Storage keys, schema version, size defaults
-│   ├── version.js                    # APP_VERSION constant (single source of truth)
-│   ├── storage.js                    # localStorage CRUD with debouncing, workspace identity
-│   ├── importExport.js               # Export/import product JSON, file picker utility
-│   ├── validateProduct.js            # Comprehensive schema validation for imported products
-│   ├── sortByOrder.js                # Pure sort utility for persisted order arrays
-│   ├── progressViewHelpers.js        # Pure helpers for progress view (pct, delta, comments)
-│   ├── sampleData.js                 # Sample "Billing System v2" product factory
-│   ├── calculations.js              # Pure computation functions (points, progress, stats)
-│   ├── progressMutations.js         # Shared progress tracking helpers (update, remove, comment)
-│   ├── settingsMutations.js         # Pure cascade deletion (release, sprint) + releaseHasAllocations
-│   ├── ribHelpers.js                # forEachRib / reduceRibs traversal utilities
-│   ├── themeColors.js               # Centralized 8-color palette for themes (solid, light, dot, swatch)
-│   ├── exportForForecaster.js       # Pure transformation: Story Map → SPERT Release Forecaster import format
-│   ├── tosConstants.js              # ToS version, URLs, localStorage keys, app ID
-│   └── tosHelpers.js                # ToS acceptance state management (localStorage + Firestore)
+│   ├── constants.ts                  # Storage keys, schema version, size defaults
+│   ├── version.ts                    # APP_VERSION constant (single source of truth)
+│   ├── storage.ts                    # localStorage CRUD with debouncing, workspace identity
+│   ├── importExport.ts               # Export/import product JSON, file picker utility
+│   ├── validateProduct.ts            # Comprehensive schema validation for imported products
+│   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
+│   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
+│   ├── sampleData.ts                 # Sample "Billing System v2" product factory
+│   ├── calculations.ts              # Pure computation functions (points, progress, stats)
+│   ├── progressMutations.ts         # Shared progress tracking helpers (update, remove, comment)
+│   ├── settingsMutations.ts         # Pure cascade deletion (release, sprint) + releaseHasAllocations
+│   ├── ribHelpers.ts                # forEachRib / reduceRibs traversal utilities
+│   ├── themeColors.ts               # Centralized 8-color palette for themes (solid, light, dot, swatch)
+│   ├── exportForForecaster.ts       # Pure transformation: Story Map → SPERT Release Forecaster import format
+│   ├── tosConstants.ts              # ToS version, URLs, localStorage keys, app ID
+│   └── tosHelpers.ts                # ToS acceptance state management (localStorage + Firestore)
 │
 ├── hooks/
-│   ├── useProduct.js                 # Load/save product state with debounced persistence
-│   ├── useProductMutations.js        # Reusable CRUD for theme/backbone/rib hierarchy
-│   ├── useReleaseDrag.js             # DnD hook for release planning (card + column drag)
-│   └── useDarkMode.js                # Theme toggle hook (localStorage + system preference)
+│   ├── useProduct.ts                 # Load/save product state with debounced persistence
+│   ├── useProductMutations.ts        # Reusable CRUD for theme/backbone/rib hierarchy
+│   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag)
+│   └── useDarkMode.ts                # Theme toggle hook (localStorage + system preference)
 │
 ├── components/
 │   ├── ui/                           # Generic, reusable UI primitives
-│   │   ├── CategoryBadge.jsx         # Core/non-core toggle button
-│   │   ├── InlineEdit.jsx            # Click-to-edit text field
-│   │   ├── SizePicker.jsx            # T-shirt size dropdown with color coding
-│   │   ├── Modal.jsx                 # Overlay dialog with Escape/backdrop close
-│   │   ├── ConfirmDialog.jsx         # Confirm/cancel dialog (wraps Modal)
-│   │   ├── ProgressBar.jsx           # Animated horizontal progress bar
-│   │   ├── CollapsibleSection.jsx    # Collapsible section with toggle
-│   │   ├── Tooltip.jsx               # Fast tooltip (200ms) via useTooltip hook
-│   │   ├── Section.jsx               # Reusable Section and Field layout components
-│   │   ├── ThemeToggle.jsx           # Sun/moon dark mode toggle button
-│   │   └── FirstRunBanner.jsx       # Dismissible first-run ToS informational banner
+│   │   ├── CategoryBadge.tsx         # Core/non-core toggle button
+│   │   ├── InlineEdit.tsx            # Click-to-edit text field
+│   │   ├── SizePicker.tsx            # T-shirt size dropdown with color coding
+│   │   ├── Modal.tsx                 # Overlay dialog with Escape/backdrop close
+│   │   ├── ConfirmDialog.tsx         # Confirm/cancel dialog (wraps Modal)
+│   │   ├── ProgressBar.tsx           # Animated horizontal progress bar
+│   │   ├── CollapsibleSection.tsx    # Collapsible section with toggle
+│   │   ├── Tooltip.tsx               # Fast tooltip (200ms) via useTooltip hook
+│   │   ├── Section.tsx               # Reusable Section and Field layout components
+│   │   ├── ThemeToggle.tsx           # Sun/moon dark mode toggle button
+│   │   └── FirstRunBanner.tsx       # Dismissible first-run ToS informational banner
 │   ├── layout/
-│   │   └── ProductLayout.jsx         # Header, tab nav, footer, outlet context
+│   │   └── ProductLayout.tsx         # Header, tab nav, footer, outlet context
 │   ├── settings/                     # Global and per-project settings components
-│   │   ├── AppSettingsModal.jsx      # Global settings modal (storage mode + export attribution)
-│   │   ├── StorageSection.jsx        # Storage mode toggle, auth UI, migration controls
-│   │   ├── SharingSection.jsx        # Project sharing (cloud mode, owner only)
-│   │   ├── TosConsentModal.jsx       # Clickwrap ToS/Privacy consent modal for cloud sign-in
-│   │   ├── SizeMappingSection.jsx    # T-shirt size mapping editor
-│   │   └── DataSection.jsx           # Import/export buttons + confirm dialogs
+│   │   ├── AppSettingsModal.tsx      # Global settings modal (storage mode + export attribution)
+│   │   ├── StorageSection.tsx        # Storage mode toggle, auth UI, migration controls
+│   │   ├── SharingSection.tsx        # Project sharing (cloud mode, owner only)
+│   │   ├── TosConsentModal.tsx       # Clickwrap ToS/Privacy consent modal for cloud sign-in
+│   │   ├── SizeMappingSection.tsx    # T-shirt size mapping editor
+│   │   └── DataSection.tsx           # Import/export buttons + confirm dialogs
 │   ├── progress/
-│   │   ├── ProgressHeader.jsx        # Sprint selector, group-by buttons, expand/collapse toggle
-│   │   ├── SprintSummaryCard.jsx     # Sprint summary stats card
-│   │   ├── BurnUpChart.jsx           # Burn-up progress chart
-│   │   ├── ProgressRow.jsx           # Individual progress table row
-│   │   ├── GroupSummaryHeader.jsx    # Collapsible group header with summary stats
-│   │   └── CommentPanel.jsx          # Assessment note panel for progress rows
+│   │   ├── ProgressHeader.tsx        # Sprint selector, group-by buttons, expand/collapse toggle
+│   │   ├── SprintSummaryCard.tsx     # Sprint summary stats card
+│   │   ├── BurnUpChart.tsx           # Burn-up progress chart
+│   │   ├── ProgressRow.tsx           # Individual progress table row
+│   │   ├── GroupSummaryHeader.tsx    # Collapsible group header with summary stats
+│   │   └── CommentPanel.tsx          # Assessment note panel for progress rows
 │   ├── structure/                    # Structure view sub-components
-│   │   ├── BackboneSection.jsx       # Backbone header + rib table grid
-│   │   └── RibRow.jsx                # Individual rib item row with drag, edit, stats
+│   │   ├── BackboneSection.tsx       # Backbone header + rib table grid
+│   │   └── RibRow.tsx                # Individual rib item row with drag, edit, stats
 │   ├── releases/
-│   │   ├── RibCard.jsx               # Draggable card for release kanban
-│   │   └── AllocationModal.jsx       # Split-allocation editor modal
+│   │   ├── RibCard.tsx               # Draggable card for release kanban
+│   │   └── AllocationModal.tsx       # Split-allocation editor modal
 │   ├── sizing/                       # Sizing view components
-│   │   ├── SizingContent.jsx         # Sizing board renderer (unsized zone, size columns, cells)
-│   │   ├── useSizingLayout.js        # Layout computation + constants for sizing board
-│   │   └── useSizingDrag.js          # Pointer-event drag hook for sizing (rib drags only)
+│   │   ├── SizingContent.tsx         # Sizing board renderer (unsized zone, size columns, cells)
+│   │   ├── useSizingLayout.ts        # Layout computation + constants for sizing board
+│   │   └── useSizingDrag.ts          # Pointer-event drag hook for sizing (rib drags only)
 │   └── storymap/                     # Interactive story map components
-│       ├── MapCanvas.jsx             # Pan/zoom container with pointer events
-│       ├── MapContent.jsx            # Map rendering (headers, lanes, cells, add buttons)
-│       ├── ThemeHeader.jsx           # Theme label with inline rename, drag handle, delete
-│       ├── BackboneHeader.jsx        # Backbone label with inline rename, drag handle, delete
-│       ├── RibCell.jsx               # Rib card on the map with drag grip and delete
-│       ├── ReleaseDivider.jsx        # Release lane divider with clickable label
-│       ├── UnassignedLane.jsx        # Unassigned lane at bottom of map
-│       ├── DropHighlight.jsx         # Visual drop target indicator
-│       ├── InsertionIndicator.jsx    # Blue line showing drop position (rib/backbone/theme)
-│       ├── DragGhost.jsx             # Card-stack preview following cursor during drags
-│       ├── RibDetailPanel.jsx        # Slide-out panel for rib details
-│       ├── ReleaseDetailPanel.jsx    # Slide-out panel for release details
-│       ├── useMapLayout.js           # Layout computation + constants (columns, lanes, cells)
-│       ├── useMapDrag.js             # Pointer-event drag hook (rib/backbone/theme drags)
-│       ├── useInlineEdit.js          # Shared inline-edit hook for map headers
-│       ├── mapMutations.js           # Pure mutation helpers (move rib/backbone/theme)
-│       └── mapDragHelpers.js         # Drag commit logic (dispatches to mapMutations)
+│       ├── MapCanvas.tsx             # Pan/zoom container with pointer events
+│       ├── MapContent.tsx            # Map rendering (headers, lanes, cells, add buttons)
+│       ├── ThemeHeader.tsx           # Theme label with inline rename, drag handle, delete
+│       ├── BackboneHeader.tsx        # Backbone label with inline rename, drag handle, delete
+│       ├── RibCell.tsx               # Rib card on the map with drag grip and delete
+│       ├── ReleaseDivider.tsx        # Release lane divider with clickable label
+│       ├── UnassignedLane.tsx        # Unassigned lane at bottom of map
+│       ├── DropHighlight.tsx         # Visual drop target indicator
+│       ├── InsertionIndicator.tsx    # Blue line showing drop position (rib/backbone/theme)
+│       ├── DragGhost.tsx             # Card-stack preview following cursor during drags
+│       ├── RibDetailPanel.tsx        # Slide-out panel for rib details
+│       ├── ReleaseDetailPanel.tsx    # Slide-out panel for release details
+│       ├── useMapLayout.ts           # Layout computation + constants (columns, lanes, cells)
+│       ├── useMapDrag.ts             # Pointer-event drag hook (rib/backbone/theme drags)
+│       ├── useInlineEdit.ts          # Shared inline-edit hook for map headers
+│       ├── mapMutations.ts           # Pure mutation helpers (move rib/backbone/theme)
+│       └── mapDragHelpers.ts         # Drag commit logic (dispatches to mapMutations)
 │
 └── pages/                            # Route-level views
-    ├── ProductList.jsx               # Home — product listing with CRUD
-    ├── StructureView.jsx             # Story map editor (themes/backbones/ribs)
-    ├── StoryMapView.jsx              # Interactive visual story map
-    ├── SizingView.jsx                # Drag-and-drop t-shirt sizing board
-    ├── ReleasePlanningView.jsx       # Kanban release board
-    ├── ProgressTrackingView.jsx      # Sprint progress tracking
-    ├── InsightsView.jsx              # Analytics dashboard
-    ├── SettingsView.jsx              # Product configuration
-    ├── ChangelogView.jsx             # Version history (reads CHANGELOG.md)
-    └── AboutView.jsx                 # About page (purpose, data security, license)
+    ├── ProductList.tsx               # Home — product listing with CRUD
+    ├── StructureView.tsx             # Story map editor (themes/backbones/ribs)
+    ├── StoryMapView.tsx              # Interactive visual story map
+    ├── SizingView.tsx                # Drag-and-drop t-shirt sizing board
+    ├── ReleasePlanningView.tsx       # Kanban release board
+    ├── ProgressTrackingView.tsx      # Sprint progress tracking
+    ├── InsightsView.tsx              # Analytics dashboard
+    ├── SettingsView.tsx              # Product configuration
+    ├── ChangelogView.tsx             # Version history (reads CHANGELOG.md)
+    └── AboutView.tsx                 # About page (purpose, data security, license)
 
 legal/
 ├── TOS.pdf                           # Reference copy of Terms of Service

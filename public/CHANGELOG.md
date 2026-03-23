@@ -1,5 +1,32 @@
 # Changelog
 
+## Version 0.18.0 (2026-03-22)
+
+### Changed
+- **Full TypeScript migration** — Migrated entire codebase from JavaScript/JSX to TypeScript/TSX. All 104 source files (85 source + 18 tests + 1 new types module) are now strictly typed with zero `any` workarounds that lack justification. Brings SPERT Story Map into consistency with the other five apps in the Statistical PERT Suite.
+- **TypeScript infrastructure** — Added `tsconfig.json` (project references), `tsconfig.app.json` (strict mode, ES2020, react-jsx, bundler resolution), and `tsconfig.node.json`. Renamed `vite.config.js` → `vite.config.ts` and `eslint.config.js` → `eslint.config.ts`.
+- **Centralized domain types** — New `src/types/index.ts` with 28 type/interface definitions covering the full data model: `Product`, `Theme`, `Backbone`, `RibItem`, `Release`, `Sprint`, `SizeMapping`, `ProgressEntry`, `ReleaseAllocation`, `ChangeLogEntry`, `StorageDriver`, `OutletContextValue`, and more.
+- **ESLint TypeScript integration** — Switched to unified `typescript-eslint` package with `tseslint.config()`. Removed redundant individual `@typescript-eslint/parser` and `@typescript-eslint/eslint-plugin` packages.
+- **Entry point** — Updated `index.html` script src from `main.jsx` to `main.tsx`.
+
+### Added
+- `typescript`, `typescript-eslint`, `@types/node` dev dependencies
+- `src/types/index.ts` — centralized domain type definitions
+- `OutletContextValue` type shared between `ProductLayout` and all page views via `useOutletContext<OutletContextValue>()`
+- Drag state interfaces (`RibDragState`, `BackboneDragState`, `ThemeDragState`, `LayoutCell`, `Column`, `ThemeSpan`) in `mapDragHelpers.ts`
+- `UpdateProduct` type alias used consistently across hooks and mutation files
+- Props interfaces for all 44 React components
+
+### Hardened
+- **Console error sanitization** — All 17 `console.error` call sites now sanitize error objects to `e.message` instead of logging raw Firebase/system error objects that could expose internal details
+- **Import file type validation** — `readImportFile()` now checks `.json` file extension before reading, in addition to the existing UI-level `accept=".json"` filter
+- **Closed `any` types** — Replaced migration-pragmatic `any` with proper types where clean replacements exist: `UserSettings` for preferences, `StorageDriver` for export driver, `Record<string, unknown>` for generic constraints, `unknown` for raw JSON parse returns
+- **Intentional `any` documented** — All remaining `any` types have inline `--` comments explaining why they are necessary (Firestore heterogeneous data, complex layout/drag state objects)
+
+### Removed
+- All `.js` and `.jsx` source files (replaced by `.ts`/`.tsx`)
+- `allowJs: true` and `checkJs: false` from `tsconfig.app.json` (migration complete)
+
 ## Version 0.17.4 (2026-03-16)
 
 ### Changed
