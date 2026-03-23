@@ -19,7 +19,7 @@ vi.stubGlobal('localStorage', {
   clear: () => { for (const key of Object.keys(store)) delete store[key]; },
 });
 
-// Mock firebase.js
+// Mock firebase.ts
 vi.mock('../lib/firebase', () => ({
   db: { type: 'mock-firestore' },
   auth: null,

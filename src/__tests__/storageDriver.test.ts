@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createLocalStorageDriver } from '../lib/storageDriver';
 
-// Mock storage.js — each function is a vi.fn()
+// Mock storage.ts — each function is a vi.fn()
 vi.mock('../lib/storage', () => ({
   loadProductIndex: vi.fn(() => [{ id: 'p1', name: 'Test', updatedAt: '2025-01-01' }]),
   loadProduct: vi.fn((id) => ({ id, name: 'Loaded Product' })),
@@ -20,7 +20,7 @@ vi.mock('../lib/storage', () => ({
   migrateToV2: vi.fn((p) => p),
 }));
 
-// Mock firebase.js — prevent real Firebase initialization
+// Mock firebase.ts — prevent real Firebase initialization
 vi.mock('../lib/firebase', () => ({
   db: null,
   auth: null,

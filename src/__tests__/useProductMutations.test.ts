@@ -11,7 +11,7 @@ vi.stubGlobal('crypto', {
 });
 
 // We test the mutation logic extracted from useProductMutations by simulating
-// the updateProduct callback pattern — same approach as mapMutations.test.js.
+// the updateProduct callback pattern — same approach as mapMutations.test.ts.
 // The hook itself just wraps these patterns in useCallback, so testing the
 // updater functions directly covers the core logic.
 
