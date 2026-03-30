@@ -75,9 +75,11 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div className="absolute top-0 right-0 z-50 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-lg overflow-y-auto">
-        <div className="p-5 space-y-5">
+      {/* Panel — flex column so Notes fills remaining height */}
+      <div className="absolute top-0 right-0 z-50 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-lg flex flex-col overflow-hidden">
+
+        {/* Top section: metadata + allocations, scrollable, capped at 60% of panel height */}
+        <div className="p-5 space-y-5 overflow-y-auto shrink-0 max-h-[60%]">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             {editing ? (
@@ -180,22 +182,21 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
               </div>
             )}
           </div>
+        </div>
 
-          {/* Notes */}
-          <div>
-            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Notes</h4>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              onBlur={handleNotesBlur}
-              maxLength={NOTES_MAX}
-              rows={4}
-              placeholder="Add notes, requirements, or reference text…"
-              className="w-full text-sm resize-none rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 placeholder-gray-400 dark:placeholder-gray-600"
-            />
-            <div className={`text-xs text-right mt-1 tabular-nums ${counterColor}`}>
-              {notesLen} / {NOTES_MAX}
-            </div>
+        {/* Notes — grows to fill all remaining panel height */}
+        <div className="flex flex-col flex-1 min-h-0 px-5 pb-5 border-t border-gray-100 dark:border-gray-800">
+          <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mt-5 mb-2 shrink-0">Notes</h4>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            onBlur={handleNotesBlur}
+            maxLength={NOTES_MAX}
+            placeholder="Add notes, requirements, or reference text…"
+            className="flex-1 min-h-0 w-full text-sm resize-none rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 placeholder-gray-400 dark:placeholder-gray-600"
+          />
+          <div className={`text-xs text-right mt-1 tabular-nums shrink-0 ${counterColor}`}>
+            {notesLen} / {NOTES_MAX}
           </div>
         </div>
       </div>
