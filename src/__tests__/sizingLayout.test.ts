@@ -4,31 +4,74 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeSizingLayout, CELL_HEIGHT, CELL_GAP, CELL_PAD } from '../components/sizing/useSizingLayout';
+import type { SizingFilter } from '../components/sizing/useSizingLayout';
+
+interface RibInput {
+  id: string;
+  name?: string;
+  size?: string | null;
+  progressHistory?: Array<{ sprintId: string; releaseId: string; percentComplete: number }>;
+}
+
+interface ThemeInput {
+  id: string;
+  name: string;
+  backbones: Array<{
+    id: string;
+    name: string;
+    ribs: RibInput[];
+  }>;
+}
 
 /** Minimal product builder for sizing tests */
-function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {} } = {}) {
+function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, themes = null }: {
+  ribs?: RibInput[];
+  sizeMapping?: Array<{ label: string; points: number }> | null;
+  sizingCardOrder?: Record<string, string[]>;
+  themes?: ThemeInput[] | null;
+} = {}) {
   const defaultMapping = [
     { label: 'S', points: 1 },
     { label: 'M', points: 3 },
     { label: 'L', points: 5 },
   ];
-  return {
-    themes: [{
-      id: 't1',
-      name: 'Theme 1',
-      backboneItems: [{
-        id: 'b1',
-        name: 'Backbone 1',
-        ribItems: ribs.map(r => ({
-          id: r.id,
-          name: r.name || r.id,
-          size: r.size || null,
-          category: 'core',
-          releaseAllocations: [],
-          progressHistory: [],
+
+  const buildThemes = themes
+    ? themes.map(t => ({
+        id: t.id,
+        name: t.name,
+        backboneItems: t.backbones.map(b => ({
+          id: b.id,
+          name: b.name,
+          ribItems: b.ribs.map(r => ({
+            id: r.id,
+            name: r.name || r.id,
+            size: r.size || null,
+            category: 'core' as const,
+            releaseAllocations: [],
+            progressHistory: r.progressHistory || [],
+          })),
         })),
-      }],
-    }],
+      }))
+    : [{
+        id: 't1',
+        name: 'Theme 1',
+        backboneItems: [{
+          id: 'b1',
+          name: 'Backbone 1',
+          ribItems: ribs.map(r => ({
+            id: r.id,
+            name: r.name || r.id,
+            size: r.size || null,
+            category: 'core' as const,
+            releaseAllocations: [],
+            progressHistory: r.progressHistory || [],
+          })),
+        }],
+      }];
+
+  return {
+    themes: buildThemes,
     sizeMapping: sizeMapping ?? defaultMapping,
     sizingCardOrder,
   };
@@ -138,5 +181,153 @@ describe('computeSizingLayout cell positions', () => {
       expect(unsized[0].y).toBe(unsized[1].y);
       expect(unsized[1].x).toBeGreaterThan(unsized[0].x);
     }
+  });
+});
+
+describe('computeSizingLayout filtering', () => {
+  const twoThemeProduct = () => makeProduct({
+    themes: [
+      { id: 't1', name: 'Theme 1', backbones: [
+        { id: 'b1', name: 'Backbone 1', ribs: [
+          { id: 'r1', name: 'Rib 1' },
+          { id: 'r2', name: 'Rib 2' },
+        ] },
+      ] },
+      { id: 't2', name: 'Theme 2', backbones: [
+        { id: 'b2', name: 'Backbone 2', ribs: [
+          { id: 'r3', name: 'Rib 3' },
+          { id: 'r4', name: 'Rib 4' },
+        ] },
+      ] },
+    ],
+  });
+
+  it('themeIds [] shows all ribs (default behavior)', () => {
+    const filter: SizingFilter = { themeIds: [], hideLocked: false };
+    const layout = computeSizingLayout(twoThemeProduct(), filter);
+    expect(layout.cells).toHaveLength(4);
+  });
+
+  it('themeIds filters to single theme', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'Backbone 1', ribs: [
+            { id: 'r1', name: 'Rib 1' },
+            { id: 'r2', name: 'Rib 2' },
+          ] },
+        ] },
+        { id: 't2', name: 'Theme 2', backbones: [
+          { id: 'b2', name: 'Backbone 2', ribs: [
+            { id: 'r3', name: 'Rib 3' },
+          ] },
+        ] },
+      ],
+    });
+    const filter: SizingFilter = { themeIds: ['t1'], hideLocked: false };
+    const layout = computeSizingLayout(product, filter);
+    expect(layout.cells).toHaveLength(2);
+    expect(layout.cells.every(c => c.themeId === 't1')).toBe(true);
+  });
+
+  it('themeIds filters to multiple themes', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'B1', ribs: [{ id: 'r1' }] },
+        ] },
+        { id: 't2', name: 'Theme 2', backbones: [
+          { id: 'b2', name: 'B2', ribs: [{ id: 'r2' }] },
+        ] },
+        { id: 't3', name: 'Theme 3', backbones: [
+          { id: 'b3', name: 'B3', ribs: [{ id: 'r3' }] },
+        ] },
+      ],
+    });
+    const filter: SizingFilter = { themeIds: ['t1', 't3'], hideLocked: false };
+    const layout = computeSizingLayout(product, filter);
+    expect(layout.cells).toHaveLength(2);
+    expect(layout.cells.some(c => c.themeId === 't2')).toBe(false);
+  });
+
+  it('themeIds with non-existent ID shows no ribs from that ID', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'B1', ribs: [{ id: 'r1' }, { id: 'r2' }] },
+        ] },
+      ],
+    });
+    const filter: SizingFilter = { themeIds: ['nonexistent'], hideLocked: false };
+    const layout = computeSizingLayout(product, filter);
+    expect(layout.cells).toHaveLength(0);
+  });
+
+  it('hideLocked true excludes ribs with progress', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'B1', ribs: [
+            { id: 'r1', name: 'No progress' },
+            { id: 'r2', name: 'Has progress', progressHistory: [
+              { sprintId: 's1', releaseId: 'rel1', percentComplete: 50 },
+            ] },
+            { id: 'r3', name: 'Also no progress' },
+          ] },
+        ] },
+      ],
+    });
+    const filter: SizingFilter = { themeIds: [], hideLocked: true };
+    const layout = computeSizingLayout(product, filter);
+    expect(layout.cells).toHaveLength(2);
+    expect(layout.cells.map(c => c.id)).toEqual(['r1', 'r3']);
+  });
+
+  it('hideLocked false includes all ribs', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'B1', ribs: [
+            { id: 'r1', name: 'No progress' },
+            { id: 'r2', name: 'Has progress', progressHistory: [
+              { sprintId: 's1', releaseId: 'rel1', percentComplete: 50 },
+            ] },
+            { id: 'r3', name: 'Also no progress' },
+          ] },
+        ] },
+      ],
+    });
+    const filter: SizingFilter = { themeIds: [], hideLocked: false };
+    const layout = computeSizingLayout(product, filter);
+    expect(layout.cells).toHaveLength(3);
+  });
+
+  it('combined theme + hideLocked filter', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'B1', ribs: [
+            { id: 'r1', name: 'T1 with progress', progressHistory: [
+              { sprintId: 's1', releaseId: 'rel1', percentComplete: 50 },
+            ] },
+            { id: 'r2', name: 'T1 no progress' },
+          ] },
+        ] },
+        { id: 't2', name: 'Theme 2', backbones: [
+          { id: 'b2', name: 'B2', ribs: [
+            { id: 'r3', name: 'T2 no progress' },
+          ] },
+        ] },
+      ],
+    });
+    const filter: SizingFilter = { themeIds: ['t1'], hideLocked: true };
+    const layout = computeSizingLayout(product, filter);
+    expect(layout.cells).toHaveLength(1);
+    expect(layout.cells[0].id).toBe('r2');
+  });
+
+  it('default parameter (no filter arg) returns all ribs', () => {
+    const layout = computeSizingLayout(twoThemeProduct());
+    expect(layout.cells).toHaveLength(4);
   });
 });

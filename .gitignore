@@ -27,3 +27,4 @@ CLAUDE.md
 *.sln
 *.sw?
 * 2.*
+.vercel
