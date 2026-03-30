@@ -8,14 +8,18 @@ import { useProductMutations } from '../hooks/useProductMutations';
 import MapCanvas from '../components/storymap/MapCanvas';
 import DragGhost from '../components/storymap/DragGhost';
 import useSizingLayout from '../components/sizing/useSizingLayout';
+import { DEFAULT_SIZING_FILTER } from '../components/sizing/useSizingLayout';
+import type { SizingFilter } from '../components/sizing/useSizingLayout';
 import useSizingDrag from '../components/sizing/useSizingDrag';
 import SizingContent from '../components/sizing/SizingContent';
+import SizingFilterPanel from '../components/sizing/SizingFilterPanel';
 import type { OutletContextValue } from '../types';
 
 export default function SizingView() {
   const { product, updateProduct, undo, redo } = useOutletContext<OutletContextValue>();
   const mutations = useProductMutations(updateProduct);
-  const layout = useSizingLayout(product);
+  const [filter, setFilter] = useState<SizingFilter>(DEFAULT_SIZING_FILTER);
+  const layout = useSizingLayout(product, filter);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const mapSizeRef = useRef({ width: 0, height: 0 });
@@ -50,6 +54,16 @@ export default function SizingView() {
     const fitZoom = Math.min(scaleX, scaleY, 2) * 0.95;
     setZoom(Math.max(0.2, fitZoom));
     setPan({ x: 0, y: 0 });
+  }, []);
+
+  const themes = useMemo(() =>
+    product.themes.map(t => ({ id: t.id, name: t.name, color: t.color })),
+    [product.themes]
+  );
+
+  const handleFilterChange = useCallback((next: SizingFilter) => {
+    didAutoFit.current = false;
+    setFilter(next);
   }, []);
 
   // Undo/redo + Escape keyboard shortcuts
@@ -95,6 +109,13 @@ export default function SizingView() {
         dragState={dragState}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
+        overlayControls={
+          <SizingFilterPanel
+            themes={themes}
+            filter={filter}
+            onFilterChange={handleFilterChange}
+          />
+        }
       >
         <SizingContent
           layout={layout}

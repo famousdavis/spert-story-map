@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.20.0 (2026-03-30)
+
+### Added
+- **Sizing filter panel** — Filter the sizing board by theme and/or completion status. A collapsible filter panel sits below the zoom controls with two controls: theme chips (multi-select; all unselected = show all) and a "Hide completed" toggle that excludes ribs with progress > 0%. The view auto-fits to the filtered card set when filters change. Filter state is ephemeral (not persisted).
+- **MapCanvas overlay slot** — `MapCanvas` now accepts an optional `overlayControls` prop for view-specific controls that stack below the zoom bar via flexbox. Used by the sizing filter panel; available to any view that shares `MapCanvas`.
+
 ## Version 0.19.0 (2026-03-30)
 
 ### Added

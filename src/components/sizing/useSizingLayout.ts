@@ -19,12 +19,22 @@ export const ZONE_GAP = 16;
 
 const CELL_WIDTH = COL_WIDTH - CELL_PAD * 2;
 
+export interface SizingFilter {
+  themeIds: string[];   // [] = all themes shown
+  hideLocked: boolean;  // true = exclude percentComplete > 0
+}
+
+export const DEFAULT_SIZING_FILTER: SizingFilter = {
+  themeIds: [],
+  hideLocked: false,
+};
+
 /**
  * Pure layout computation for the sizing board.
  * Unsized zone (multi-column grid) on top, size columns below.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- layout return type is complex and frequently evolving; explicit interface would be over-engineering
-export function computeSizingLayout(product: Product): any {
+export function computeSizingLayout(product: Product, filter: SizingFilter = DEFAULT_SIZING_FILTER): any {
   const sizeMapping = product.sizeMapping || [];
   const sizeLabels = new Set(sizeMapping.map(m => m.label));
 
@@ -48,7 +58,14 @@ export function computeSizingLayout(product: Product): any {
   sizeMapping.forEach(m => sizedByLabel.set(m.label, []));
 
   forEachRib(product, (rib, { theme, backbone }) => {
+    // Theme filter (cheap check first)
+    if (filter.themeIds.length > 0 && !filter.themeIds.includes(theme.id)) return;
+
     const pctComplete = getRibItemPercentComplete(rib);
+
+    // Locked filter
+    if (filter.hideLocked && pctComplete > 0) return;
+
     const enriched = {
       id: rib.id,
       name: rib.name,
@@ -159,6 +176,6 @@ export function computeSizingLayout(product: Product): any {
   };
 }
 
-export default function useSizingLayout(product: Product) {
-  return useMemo(() => computeSizingLayout(product), [product]);
+export default function useSizingLayout(product: Product, filter: SizingFilter = DEFAULT_SIZING_FILTER) {
+  return useMemo(() => computeSizingLayout(product, filter), [product, filter]);
 }
