@@ -103,7 +103,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
           />
         ) : (
           <span
-            className="text-xs text-gray-800 dark:text-gray-200 leading-tight truncate flex-1 font-medium"
+            className="text-xs text-gray-800 dark:text-gray-200 leading-tight line-clamp-2 flex-1 min-w-0 font-medium"
             onDoubleClick={startEditing}
           >
             {cell.name}

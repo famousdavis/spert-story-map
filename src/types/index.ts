@@ -79,6 +79,7 @@ export interface RibItem {
   category: Category;
   releaseAllocations: ReleaseAllocation[];
   progressHistory: ProgressEntry[];
+  notes?: string;
 }
 
 export interface Backbone {

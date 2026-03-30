@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import React from 'react';
-import { THEME_HEIGHT } from './useMapLayout';
+import { THEME_HEIGHT, BACKBONE_HEIGHT } from './useMapLayout';
 import useInlineEdit from './useInlineEdit';
 import { THEME_COLOR_OPTIONS } from '../../lib/themeColors';
 
@@ -39,7 +39,7 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
         left: column.x,
         top: THEME_HEIGHT,
         width: column.width,
-        height: 28,
+        height: BACKBONE_HEIGHT - 4,
         zIndex: isDragging ? 50 : undefined,
       }}
       data-backbone-id={column.backboneId}
@@ -66,7 +66,7 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
         />
       ) : (
         <span
-          className="text-xs font-medium truncate cursor-pointer hover:bg-white/30 rounded px-1 py-0.5 transition-colors"
+          className="text-xs font-medium line-clamp-2 min-w-0 flex-1 cursor-pointer hover:bg-white/30 rounded px-1 py-0.5 transition-colors"
           onDoubleClick={startEditing}
           title="Double-click to rename"
         >

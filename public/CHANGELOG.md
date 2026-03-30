@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.19.0 (2026-03-30)
+
+### Added
+- **Rib item notes** — Free-form notes field (up to 2,000 characters) on rib items. Click any rib card on the Story Map to open the detail panel; a Notes section at the bottom supports multi-line text for requirements, acceptance criteria, reference content, or any other per-item context. Notes save automatically on blur. Character counter turns amber at 1,800 and red at 2,000 characters.
+
+### Improved
+- **Rib card text wrapping** — Rib item names on the Story Map now wrap up to 2 lines (ellipsis after line 2) instead of truncating at 1 line. Card height increased from 52px to 60px. All cards remain a fixed height so columns stay visually aligned regardless of name length.
+- **Backbone header text wrapping** — Backbone names now wrap up to 2 lines (ellipsis after line 2) instead of truncating at 1 line. Header height increased from 28px to 40px.
+
 ## Version 0.18.0 (2026-03-22)
 
 ### Changed

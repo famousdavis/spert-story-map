@@ -2,12 +2,14 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
 import SizePicker from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 import type { RibItem, Product, Category, Size } from '../../types';
+
+const NOTES_MAX = 2000;
 
 interface DetailRib extends RibItem {
   themeId: string;
@@ -23,7 +25,7 @@ interface RibDetailPanelProps {
   product: Product;
   onClose: () => void;
   onRename?: (themeId: string, backboneId: string, ribId: string, name: string) => void;
-  onUpdate?: (themeId: string, backboneId: string, ribId: string, updates: { category?: Category; size?: Size | string }) => void;
+  onUpdate?: (themeId: string, backboneId: string, ribId: string, updates: { category?: Category; size?: Size | string; notes?: string }) => void;
 }
 
 export default function RibDetailPanel({ rib, product, onClose, onRename, onUpdate }: RibDetailPanelProps) {
@@ -31,18 +33,39 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(rib.name, (name) => onRename?.(rib.themeId, rib.backboneId, rib.id, name));
 
+  const [notes, setNotes] = useState(rib.notes ?? '');
+
+  // Reset notes when switching to a different rib
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setNotes(rib.notes ?? '');
+  }, [rib.id, rib.notes]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   // Find release names for allocations
   const releaseMap = {};
   product.releases.forEach(r => { releaseMap[r.id] = r.name; });
 
-  // Close on Escape (but not while editing)
+  // Close on Escape (but not while editing an input or textarea)
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'Escape' && e.target.tagName !== 'INPUT') onClose();
+      if (e.key === 'Escape' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') onClose();
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
+
+  const handleNotesBlur = () => {
+    if (notes !== (rib.notes ?? '')) {
+      onUpdate?.(rib.themeId, rib.backboneId, rib.id, { notes });
+    }
+  };
+
+  const notesLen = notes.length;
+  const counterColor =
+    notesLen >= NOTES_MAX ? 'text-red-500 dark:text-red-400' :
+    notesLen >= 1800 ? 'text-amber-500 dark:text-amber-400' :
+    'text-gray-400 dark:text-gray-500';
 
   return (
     <>
@@ -156,6 +179,23 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Notes</h4>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              onBlur={handleNotesBlur}
+              maxLength={NOTES_MAX}
+              rows={4}
+              placeholder="Add notes, requirements, or reference text…"
+              className="w-full text-sm resize-none rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 placeholder-gray-400 dark:placeholder-gray-600"
+            />
+            <div className={`text-xs text-right mt-1 tabular-nums ${counterColor}`}>
+              {notesLen} / {NOTES_MAX}
+            </div>
           </div>
         </div>
       </div>
