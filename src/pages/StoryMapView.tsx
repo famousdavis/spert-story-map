@@ -26,6 +26,7 @@ export default function StoryMapView() {
   const [selectedRibId, setSelectedRibId] = useState(null);
   const [selectedReleaseId, setSelectedReleaseId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [isNewRib, setIsNewRib] = useState(false);
 
   // Derive selectedRib from layout so it stays in sync with product changes (e.g. renames)
   const selectedRib = useMemo(() => {
@@ -78,6 +79,7 @@ export default function StoryMapView() {
       setSelectedIds(new Set());
       setSelectedReleaseId(null);
       setSelectedRibId(ribData.id);
+      setIsNewRib(false);
     }
   }, []);
 
@@ -91,6 +93,7 @@ export default function StoryMapView() {
   const handleCloseDetail = useCallback(() => {
     setSelectedRibId(null);
     setSelectedReleaseId(null);
+    setIsNewRib(false);
   }, []);
 
   // Auto-fit on first render once map dimensions are known
@@ -127,6 +130,13 @@ export default function StoryMapView() {
   });
 
   // CRUD handlers (rename, delete, add) + drag label
+  const handleRibAdded = useCallback((id: string) => {
+    setSelectedIds(new Set());
+    setSelectedReleaseId(null);
+    setSelectedRibId(id);
+    setIsNewRib(true);
+  }, []);
+
   const {
     handleRenameTheme, handleRenameBackbone, handleRenameRib, handleRenameRelease,
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
@@ -135,7 +145,7 @@ export default function StoryMapView() {
     dragLabel,
   } = useMapHandlers({
     product, updateProduct, mutations,
-    setSelectedReleaseId, layout, dragState,
+    setSelectedReleaseId, onRibAdded: handleRibAdded, layout, dragState,
   });
 
   return (
@@ -183,6 +193,7 @@ export default function StoryMapView() {
           onClose={handleCloseDetail}
           onRename={handleRenameRib}
           onUpdate={(tid, bid, rid, updates) => mutations.updateRib(tid, bid, rid, updates)}
+          autoEdit={isNewRib}
         />
       )}
 

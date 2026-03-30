@@ -102,8 +102,8 @@ export function useProductMutations(updateProduct: UpdateProduct) {
   }, [updateProduct]);
 
   const addRib = useCallback((themeId: string, backboneId: string) => {
+    const id = crypto.randomUUID();
     updateProduct(prev => {
-      const id = crypto.randomUUID();
       const next = {
         ...prev,
         themes: prev.themes.map(t =>
@@ -121,6 +121,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
       };
       return { ...next, _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'rib', id }) };
     });
+    return id;
   }, [updateProduct]);
 
   const addRelease = useCallback(() => {

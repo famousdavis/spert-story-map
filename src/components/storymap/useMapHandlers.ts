@@ -13,11 +13,12 @@ type UpdateProduct = (updater: (prev: Product) => Product) => void;
  * Extracted from StoryMapView to reduce its size.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- mutations and layout objects have complex hook-derived shapes */
-export default function useMapHandlers({ product, updateProduct, mutations, setSelectedReleaseId, layout, dragState }: {
+export default function useMapHandlers({ product, updateProduct, mutations, setSelectedReleaseId, onRibAdded, layout, dragState }: {
   product: Product;
   updateProduct: UpdateProduct;
   mutations: any;
   setSelectedReleaseId: (id: string | null) => void;
+  onRibAdded: (id: string) => void;
   layout: any;
   dragState: any;
 }) {
@@ -98,8 +99,9 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
   }, [mutations]);
 
   const handleAddRib = useCallback((themeId: string, backboneId: string) => {
-    mutations.addRib(themeId, backboneId);
-  }, [mutations]);
+    const id = mutations.addRib(themeId, backboneId);
+    onRibAdded(id);
+  }, [mutations, onRibAdded]);
 
   const handleAddRelease = useCallback((beforeReleaseId: string | null) => {
     if (!beforeReleaseId) {
