@@ -26,21 +26,26 @@ interface RibDetailPanelProps {
   onClose: () => void;
   onRename?: (themeId: string, backboneId: string, ribId: string, name: string) => void;
   onUpdate?: (themeId: string, backboneId: string, ribId: string, updates: { category?: Category; size?: Size | string; notes?: string }) => void;
+  autoEdit?: boolean;
 }
 
-export default function RibDetailPanel({ rib, product, onClose, onRename, onUpdate }: RibDetailPanelProps) {
+export default function RibDetailPanel({ rib, product, onClose, onRename, onUpdate, autoEdit }: RibDetailPanelProps) {
   const pctComplete = getRibItemPercentComplete(rib);
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(rib.name, (name) => onRename?.(rib.themeId, rib.backboneId, rib.id, name));
 
   const [notes, setNotes] = useState(rib.notes ?? '');
 
+  // Auto-start name editing when panel opens for a newly added rib
+  useEffect(() => {
+    if (autoEdit) startEditing();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Reset notes when switching to a different rib
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setNotes(rib.notes ?? '');
   }, [rib.id, rib.notes]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Find release names for allocations
   const releaseMap = {};
@@ -90,6 +95,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
                 onChange={e => setDraft(e.target.value)}
                 onBlur={commit}
                 onKeyDown={handleKeyDown}
+                onFocus={e => e.target.select()}
                 className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-tight bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 flex-1 min-w-0"
               />
             ) : (
