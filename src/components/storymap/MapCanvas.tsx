@@ -2,11 +2,12 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 0.1;
+const HINT_KEY = 'spert_map_hint_dismissed';
 
 interface Pan {
   x: number;
@@ -31,6 +32,16 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
   const containerRef = useRef(null);
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
+  const panDistanceRef = useRef(0);
+
+  // Reactive state for cursor and hint dismissal
+  const [isPanning, setIsPanning] = useState(false);
+  const [showHint, setShowHint] = useState(() => !localStorage.getItem(HINT_KEY));
+
+  const dismissHint = useCallback(() => {
+    localStorage.setItem(HINT_KEY, '1');
+    setShowHint(false);
+  }, []);
 
   // Wheel zoom (needs passive: false to preventDefault)
   useEffect(() => {
@@ -66,6 +77,8 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
 
   // Pointer pan (disabled when dragging a rib)
   const handlePointerDown = useCallback((e) => {
+    // Only left-click pans — ignore right-click, middle-click, etc.
+    if (e.button !== 0) return;
     // Don't start panning if a drag is in progress
     if (dragState) return;
     // Don't pan when clicking interactive elements (cards, headers, labels, inputs)
@@ -73,7 +86,9 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
     if (interactive) return;
     isPanningRef.current = true;
     panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    panDistanceRef.current = 0;
     containerRef.current.setPointerCapture(e.pointerId);
+    setIsPanning(true);
   }, [pan, dragState]);
 
   const handlePointerMove = useCallback((e) => {
@@ -83,11 +98,11 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
       return;
     }
     if (!isPanningRef.current) return;
-    setPan({
-      x: e.clientX - panStartRef.current.x,
-      y: e.clientY - panStartRef.current.y,
-    });
-  }, [setPan, dragState, onDragMove]);
+    const newX = e.clientX - panStartRef.current.x;
+    const newY = e.clientY - panStartRef.current.y;
+    panDistanceRef.current += Math.abs(newX - pan.x) + Math.abs(newY - pan.y);
+    setPan({ x: newX, y: newY });
+  }, [setPan, pan, dragState, onDragMove]);
 
   const handlePointerUp = useCallback((e) => {
     // If a rib drag is active, forward to drag handler
@@ -95,8 +110,12 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
       if (onDragEnd) onDragEnd(e);
       return;
     }
+    if (isPanningRef.current && panDistanceRef.current >= 8) {
+      dismissHint();
+    }
     isPanningRef.current = false;
-  }, [dragState, onDragEnd]);
+    setIsPanning(false);
+  }, [dragState, onDragEnd, dismissHint]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -125,11 +144,12 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
       {/* Pannable/zoomable area */}
       <div
         ref={containerRef}
-        className="w-full h-full"
-        style={{ cursor: dragState?.isDragging ? 'grabbing' : 'grab' }}
+        className="w-full h-full select-none"
+        style={{ cursor: (dragState?.isDragging || isPanning) ? 'grabbing' : 'grab' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onContextMenu={e => e.preventDefault()}
         data-map-bg=""
         data-map-container=""
       >
@@ -172,6 +192,22 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
           Fit
         </button>
       </div>
+
+      {/* Pan/zoom discoverability hint — shown until first pan or dismissed */}
+      {showHint && (
+        <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 shadow-sm pointer-events-auto">
+          <span className="text-xs text-gray-500 dark:text-gray-400 select-none">
+            Drag to pan · Scroll to zoom
+          </span>
+          <button
+            onClick={dismissHint}
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm leading-none"
+            title="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
