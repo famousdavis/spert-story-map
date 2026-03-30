@@ -97,7 +97,7 @@ src/
 │       ├── DropHighlight.tsx         # Visual drop target indicator
 │       ├── InsertionIndicator.tsx    # Blue line showing drop position (rib/backbone/theme)
 │       ├── DragGhost.tsx             # Card-stack preview following cursor during drags
-│       ├── RibDetailPanel.tsx        # Slide-out panel for rib details
+│       ├── RibDetailPanel.tsx        # Slide-out panel for rib details (rename, category, size, notes)
 │       ├── ReleaseDetailPanel.tsx    # Slide-out panel for release details
 │       ├── useMapLayout.ts           # Layout computation + constants (columns, lanes, cells)
 │       ├── useMapDrag.ts             # Pointer-event drag hook (rib/backbone/theme drags)
@@ -139,6 +139,7 @@ Product
     └── backboneItems: [Backbone]
         └── ribItems: [RibItem]
             ├── size, category (core/non-core)
+            ├── notes?                                  # Free-form notes (max 2,000 chars)
             ├── releaseAllocations: [{ releaseId, percentage, memo }]
             └── progressHistory: [{ sprintId, releaseId, percentComplete, comment?, updatedAt? }]
 

@@ -166,6 +166,11 @@ export function validateProduct(data: unknown): Product {
             'Rib item description too long');
         }
 
+        if (rib.notes !== undefined) {
+          assert(typeof rib.notes === 'string' && rib.notes.length <= MAX_MEMO,
+            'Rib item notes too long (max 2000 chars)');
+        }
+
         // Size validation
         if (rib.size && validSizeLabels) {
           if (!validSizeLabels.has(rib.size)) {
