@@ -9,7 +9,7 @@ import { getRibItemPoints, getAllocationTotal } from '../../lib/calculations';
 // Layout constants (pixels in logical/unzoomed space)
 const COL_WIDTH = 200;
 const COL_GAP = 4;
-const CELL_HEIGHT = 60;
+const CELL_HEIGHT = 68;
 const CELL_GAP = 6;
 const CELL_PAD = 6;
 const THEME_HEIGHT = 40;
