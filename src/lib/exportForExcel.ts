@@ -125,6 +125,14 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
 
   // ── Sheet 2: Release Summary ──────────────────────────────────────────────
   const ws2 = workbook.addWorksheet('Release Summary');
+  ws2.columns = [
+    { width: 25 },  // Release
+    { width: 14 },  // Total Points
+    { width: 14 },  // % Complete
+    { width: 14 },  // Core Points
+    { width: 16 },  // Non-Core Points
+    { width: 14 },  // Target Date
+  ];
 
   const relHeader = ws2.addRow([
     'Release', 'Total Points', '% Complete', 'Core Points', 'Non-Core Points', 'Target Date',
