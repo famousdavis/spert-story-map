@@ -103,7 +103,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
       rib.category,
       rib.size ?? '',
       points,
-      pct,
+      pct / 100,
       releaseStr,
       rib.notes ?? '',
     ]);
@@ -113,9 +113,10 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     const notesCell: any = dataRow.getCell(9);
     notesCell.alignment = { wrapText: true, vertical: 'top' };
 
-    // % Complete cell fill (column index 7, 1-based)
+    // % Complete cell: percentage format + conditional fill (column 7)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pctCell: any = dataRow.getCell(7);
+    pctCell.numFmt = '0%';
     if (pct === 100) {
       pctCell.fill = argbFill('FFD1FAE5'); // light green
     } else if (pct > 0) {
@@ -147,14 +148,15 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     const totalPoints = getPointsForRelease(product, release.id);
     const pctComplete = getReleasePercentComplete(product, release.id);
     const { core, nonCore } = getCoreNonCorePointsForRelease(product, release.id);
-    ws2.addRow([
+    const relRow = ws2.addRow([
       release.name,
       totalPoints,
-      pctComplete,
+      pctComplete / 100,
       core,
       nonCore,
       release.targetDate ?? '',
     ]);
+    relRow.getCell(3).numFmt = '0%';
   }
 
   return workbook;

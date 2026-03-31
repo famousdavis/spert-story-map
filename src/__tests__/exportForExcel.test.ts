@@ -159,7 +159,8 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
     const ws = wb.getWorksheet('Rib Items');
     // rib1 has progressHistory entry of 100% — row 3, col 7
     const cell = ws.getRow(3).getCell(7);
-    expect(cell.value).toBe(100);
+    expect(cell.value).toBe(1);
+    expect(cell.numFmt).toBe('0%');
     expect(cell.fill?.fgColor?.argb).toBe('FFD1FAE5');
   });
 
@@ -168,7 +169,7 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
     const ws = wb.getWorksheet('Rib Items');
     // rib3 (Theme Beta) has 40% — row 6, col 7
     const cell = ws.getRow(6).getCell(7);
-    expect(cell.value).toBe(40);
+    expect(cell.value).toBe(0.4);
     expect(cell.fill?.fgColor?.argb).toBe('FFFEF3C7');
   });
 
