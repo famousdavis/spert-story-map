@@ -47,13 +47,20 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     { width: 80 },
   ];
 
+  // Row 1: project name title
+  const ws1Title = ws1.addRow([product.name]);
+  ws1Title.font = { bold: true, size: 16 };
+  // Row 2: blank spacer
+  ws1.addRow([]);
+
+  // Row 3: column headers
   const headerRow = ws1.addRow([
     'Theme', 'Backbone', 'Rib Item', 'Category', 'Size', 'Points', '% Complete', 'Release(s)', 'Notes',
   ]);
   headerRow.font = { bold: true };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   headerRow.eachCell((cell: any) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
-  ws1.views = [{ state: 'frozen', ySplit: 1 }];
+  ws1.views = [{ state: 'frozen', ySplit: 3 }];
 
   // Build release lookup: id → { name, order }
   const releaseMap = new Map<string, { name: string; order: number }>(
@@ -135,13 +142,20 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     { width: 14 },  // Target Date
   ];
 
+  // Row 1: project name title
+  const ws2Title = ws2.addRow([product.name]);
+  ws2Title.font = { bold: true, size: 16 };
+  // Row 2: blank spacer
+  ws2.addRow([]);
+
+  // Row 3: column headers
   const relHeader = ws2.addRow([
     'Release', 'Total Points', '% Complete', 'Core Points', 'Non-Core Points', 'Target Date',
   ]);
   relHeader.font = { bold: true };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   relHeader.eachCell((cell: any) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
-  ws2.views = [{ state: 'frozen', ySplit: 1 }];
+  ws2.views = [{ state: 'frozen', ySplit: 3 }];
 
   const sortedReleases = product.releases.slice().sort((a, b) => a.order - b.order);
   for (const release of sortedReleases) {

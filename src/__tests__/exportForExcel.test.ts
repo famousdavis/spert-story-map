@@ -95,11 +95,17 @@ async function getWorkbook(product = BASE_PRODUCT): Promise<any> {
 }
 
 describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
-  it('1. header row is frozen, bold, and has 9 correct column labels', async () => {
+  it('1. Row 1 has project name (large bold), Row 3 is frozen header with 9 column labels', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
-    const header = ws.getRow(1);
+    // Row 1: project title
+    const titleCell = ws.getRow(1).getCell(1);
+    expect(titleCell.value).toBe('Test Product');
+    expect(titleCell.font?.bold).toBe(true);
+    expect(titleCell.font?.size).toBe(16);
+    // Row 3: column headers (frozen)
+    expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 3 });
+    const header = ws.getRow(3);
     expect(header.getCell(1).font?.bold).toBe(true);
     const labels = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((c: number) => header.getCell(c).value);
     expect(labels).toEqual([
@@ -110,8 +116,8 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('2. theme group header has correct value and merges all 9 columns', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // Row 2 is the first theme group header (after header row)
-    const cell = ws.getCell(2, 1);
+    // Row 4 is the first theme group header (rows 1-2 title/spacer, row 3 header)
+    const cell = ws.getCell(4, 1);
     expect(cell.value).toBe('Theme Alpha');
     // ExcelJS represents merged cells via master cell or isMerged
     expect(cell.isMerged).toBe(true);
@@ -120,15 +126,15 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('3. theme group header fill matches theme color key', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    const cell = ws.getCell(2, 1);
+    const cell = ws.getCell(4, 1);
     expect(cell.fill?.fgColor?.argb).toBe('FFDBEAFE'); // blue
   });
 
   it('4. theme group header uses DEFAULT_FILL_COLOR when theme has no color', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // Theme Beta (no color) group header: row 1 header + row 2 theme1 header + row 3 rib1 + row 4 rib2 = row 5
-    const cell = ws.getCell(5, 1);
+    // Theme Beta (no color) group header: row 3 header + row 4 theme1 header + row 5 rib1 + row 6 rib2 = row 7
+    const cell = ws.getCell(7, 1);
     expect(cell.value).toBe('Theme Beta');
     expect(cell.fill?.fgColor?.argb).toBe('FFF3F4F6');
   });
@@ -136,8 +142,8 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('5. rib item row has correct Theme / Backbone / Name / Category / Size values', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // Row 3 is the first rib data row (row 1 = header, row 2 = theme1 header)
-    const row = ws.getRow(3);
+    // Row 5 is the first rib data row (row 3 = header, row 4 = theme1 header)
+    const row = ws.getRow(5);
     expect(row.getCell(1).value).toBe('Theme Alpha');
     expect(row.getCell(2).value).toBe('Backbone One');
     expect(row.getCell(3).value).toBe('Rib Item One');
@@ -148,17 +154,17 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('6. rib item row has correct Points value from sizeMapping', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib1 is size M = 5 points
-    expect(ws.getRow(3).getCell(6).value).toBe(5);
-    // rib2 is size S = 2 points (row 4)
-    expect(ws.getRow(4).getCell(6).value).toBe(2);
+    // rib1 is size M = 5 points (row 5)
+    expect(ws.getRow(5).getCell(6).value).toBe(5);
+    // rib2 is size S = 2 points (row 6)
+    expect(ws.getRow(6).getCell(6).value).toBe(2);
   });
 
   it('7. % Complete cell has green fill when 100%', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib1 has progressHistory entry of 100% — row 3, col 7
-    const cell = ws.getRow(3).getCell(7);
+    // rib1 has progressHistory entry of 100% — row 5, col 7
+    const cell = ws.getRow(5).getCell(7);
     expect(cell.value).toBe(1);
     expect(cell.numFmt).toBe('0%');
     expect(cell.fill?.fgColor?.argb).toBe('FFD1FAE5');
@@ -167,8 +173,8 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('8. % Complete cell has yellow fill when partial (> 0 and < 100)', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib3 (Theme Beta) has 40% — row 6, col 7
-    const cell = ws.getRow(6).getCell(7);
+    // rib3 (Theme Beta) has 40% — row 8, col 7
+    const cell = ws.getRow(8).getCell(7);
     expect(cell.value).toBe(0.4);
     expect(cell.fill?.fgColor?.argb).toBe('FFFEF3C7');
   });
@@ -176,8 +182,8 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('9. % Complete cell has no fill when 0%', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib2 has no progress — row 4, col 7
-    const cell = ws.getRow(4).getCell(7);
+    // rib2 has no progress — row 6, col 7
+    const cell = ws.getRow(6).getCell(7);
     expect(cell.value).toBe(0);
     // No fill set — pattern should be null/none/undefined or fgColor absent
     const fillType = cell.fill?.pattern;
@@ -187,22 +193,22 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('10. Release(s) column: single allocation renders as "Release Name (XX%)"', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib3 (row 6) has one allocation: r1 = 50%
-    expect(ws.getRow(6).getCell(8).value).toBe('Release 1 (50%)');
+    // rib3 (row 8) has one allocation: r1 = 50%
+    expect(ws.getRow(8).getCell(8).value).toBe('Release 1 (50%)');
   });
 
   it('11. Release(s) column: multiple allocations render comma-separated sorted by release order', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib1 (row 3) has r1 (order 1) at 75% and r2 (order 2) at 25%
-    expect(ws.getRow(3).getCell(8).value).toBe('Release 1 (75%), Release 2 (25%)');
+    // rib1 (row 5) has r1 (order 1) at 75% and r2 (order 2) at 25%
+    expect(ws.getRow(5).getCell(8).value).toBe('Release 1 (75%), Release 2 (25%)');
   });
 
   it('12. Release(s) column: no allocations renders as "Unassigned"', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib2 (row 4) has no allocations
-    expect(ws.getRow(4).getCell(8).value).toBe('Unassigned');
+    // rib2 (row 6) has no allocations
+    expect(ws.getRow(6).getCell(8).value).toBe('Unassigned');
   });
 });
 
@@ -210,16 +216,16 @@ describe('buildExcelWorkbook — Sheet 2 (Release Summary)', () => {
   it('13. correct row count, Points / % Complete / Target Date values', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Release Summary');
-    expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
-    // Row 2 = Release 1
-    const row2 = ws.getRow(2);
-    expect(row2.getCell(1).value).toBe('Release 1');
-    expect(typeof row2.getCell(2).value).toBe('number'); // Total Points
-    expect(row2.getCell(6).value).toBe('2026-06-01');
-    // Row 3 = Release 2 (no targetDate)
-    const row3 = ws.getRow(3);
-    expect(row3.getCell(1).value).toBe('Release 2');
-    expect(row3.getCell(6).value).toBe('');
+    expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 3 });
+    // Row 4 = Release 1
+    const row4 = ws.getRow(4);
+    expect(row4.getCell(1).value).toBe('Release 1');
+    expect(typeof row4.getCell(2).value).toBe('number'); // Total Points
+    expect(row4.getCell(6).value).toBe('2026-06-01');
+    // Row 5 = Release 2 (no targetDate)
+    const row5 = ws.getRow(5);
+    expect(row5.getCell(1).value).toBe('Release 2');
+    expect(row5.getCell(6).value).toBe('');
   });
 
   it('14. release with zero allocated points still appears as a row', async () => {
@@ -258,10 +264,10 @@ describe('buildExcelWorkbook — Sheet 2 (Release Summary)', () => {
     };
     const wb = await getWorkbook(product as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     const ws = wb.getWorksheet('Release Summary');
-    // Header + 2 release rows = 3 rows total
+    // Title + spacer + header + 2 release rows = 5 rows total
     const rows: string[] = [];
     ws.eachRow((_row: any, rowNum: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (rowNum > 1) rows.push(ws.getRow(rowNum).getCell(1).value as string);
+      if (rowNum > 3) rows.push(ws.getRow(rowNum).getCell(1).value as string);
     });
     expect(rows).toContain('Empty Release');
   });
