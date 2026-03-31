@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.21.0 (2026-03-30)
+
+### Added
+- **Excel export** — Export any project to a formatted `.xlsx` file from Settings → Data. Generates a two-sheet workbook: **Rib Items** (Theme, Backbone, Rib Item, Category, Size, Points, % Complete, Release(s), Notes — one row per rib item, preceded by a color-coded theme group header row) and **Release Summary** (Release, Total Points, % Complete, Core Points, Non-Core Points, Target Date — one row per release sorted by order). % Complete cells are conditionally filled: light green at 100%, light yellow for partial progress. Theme group header rows are filled with the theme's color tint. Both header rows are frozen. Notes column (width 80) uses wrap text with top alignment. ExcelJS is loaded via dynamic import so it does not affect initial bundle size.
+
 ## Version 0.20.0 (2026-03-30)
 
 ### Added
