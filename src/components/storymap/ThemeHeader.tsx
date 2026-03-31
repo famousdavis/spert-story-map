@@ -12,13 +12,14 @@ interface ThemeHeaderProps {
   colorClasses: { solid: string; light: string; dot: string; swatch: string } | undefined;
   onRename: (themeId: string, name: string) => void;
   onDelete?: (themeId: string) => void;
+  onAddBackbone?: (themeId: string) => void;
   isDropTarget: boolean;
   isDragging: boolean;
   onDragStart?: (e: React.PointerEvent, themeSpan: any) => void;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelete, isDropTarget, isDragging, onDragStart }: ThemeHeaderProps) {
+export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelete, onAddBackbone, isDropTarget, isDragging, onDragStart }: ThemeHeaderProps) {
   const color = colorClasses?.solid || THEME_COLOR_OPTIONS[0].solid;
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(themeSpan.themeName, (name) => onRename(themeSpan.themeId, name));
@@ -71,9 +72,18 @@ export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelet
           {themeSpan.themeName}
         </span>
       )}
-      {onDelete && (
+      {onAddBackbone && (
         <button
           className="text-xs leading-none text-white/30 hover:text-white/90 flex-shrink-0 ml-auto transition-opacity"
+          onClick={(e) => { e.stopPropagation(); onAddBackbone(themeSpan.themeId); }}
+          title="Add backbone"
+        >
+          +
+        </button>
+      )}
+      {onDelete && (
+        <button
+          className={`text-xs leading-none text-white/30 hover:text-white/90 flex-shrink-0 ${onAddBackbone ? '' : 'ml-auto'} transition-opacity`}
           onClick={(e) => { e.stopPropagation(); onDelete(themeSpan.themeId); }}
           title="Delete theme"
         >
