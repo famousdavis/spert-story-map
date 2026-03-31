@@ -21,7 +21,7 @@ export default function TosConsentModal({ open, onClose, onAccept }: TosConsentM
         <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
           Cloud Storage stores your agile planning data (estimates, story points,
           sprint metadata) in Firebase/Firestore on Google Cloud. Use is governed
-          by the Statistical PERT® Terms of Service and Privacy Policy.
+          by the Terms of Service and Privacy Policy for SPERT® Suite web apps.
         </p>
 
         <div className="flex gap-4 text-sm">

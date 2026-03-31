@@ -1,6 +1,6 @@
 # SPERT® Story Map
 
-A browser-based agile release planning tool that replaces spreadsheet-driven story mapping workflows. Part of the Statistical PERT® suite of project management tools.
+A browser-based agile release planning tool that replaces spreadsheet-driven story mapping workflows. Part of the SPERT® Suite of project management tools.
 
 ## Getting Started
 
@@ -16,8 +16,8 @@ npm run lint      # ESLint
 
 Reference copies of the Terms of Service and Privacy Policy are in `/legal`.
 The canonical versions used by the app at runtime are hosted at:
-- https://spert-landing.vercel.app/TOS.pdf
-- https://spert-landing.vercel.app/PRIVACY.pdf
+- https://spertsuite.com/TOS.pdf
+- https://spertsuite.com/PRIVACY.pdf
 
 ## License
 
