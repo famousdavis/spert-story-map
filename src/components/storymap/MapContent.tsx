@@ -105,6 +105,7 @@ export default function MapContent({
           colorClasses={themeColorMap[ts.themeId]}
           onRename={onRenameTheme}
           onDelete={onDeleteTheme}
+          onAddBackbone={onAddBackbone}
           isDropTarget={highlightThemeId === ts.themeId && ts.themeId !== dragState?.themeId}
           isDragging={isThemeDrag && dragState.themeId === ts.themeId}
           onDragStart={onThemeDragStart}

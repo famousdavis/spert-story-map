@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.22.0 (2026-03-31)
+
+### Improved
+- **Per-theme "Add Backbone" button on Story Map** — Each theme header now has a `+` button that adds a new backbone directly to that theme. Previously, the only way to add a backbone was via the global `+ Backbone` button at the far right of the map (which always targets the last theme), requiring a drag to reposition it under the correct theme. The global button is still available as a shortcut.
+
 ## Version 0.21.1 (2026-03-31)
 
 ### Maintenance
