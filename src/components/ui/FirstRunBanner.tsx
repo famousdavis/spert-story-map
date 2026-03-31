@@ -21,7 +21,7 @@ export default function FirstRunBanner() {
     <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700/50 px-4 py-3">
       <div className="max-w-4xl mx-auto flex items-start justify-between gap-3">
         <p className="text-xs text-blue-800 dark:text-blue-200">
-          Statistical PERT® apps are free. No account is required to use them.
+          SPERT® Suite web apps are free. No account is required to use them.
           By accessing or using this app, you agree to our{' '}
           <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-300">Terms of Service</a>
           {' '}and{' '}

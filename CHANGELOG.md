@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.21.1 (2026-03-31)
+
+### Maintenance
+- Updated Terms of Service and Privacy Policy to v03-31-2026
+- Updated canonical legal document URLs to spertsuite.com
+- Updated consent UI text to SPERT® Suite branding
+
 ## Version 0.21.0 (2026-03-30)
 
 ### Added
