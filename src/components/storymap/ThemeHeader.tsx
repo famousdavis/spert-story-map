@@ -74,11 +74,11 @@ export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelet
       )}
       {onAddBackbone && (
         <button
-          className="text-xs leading-none text-white/30 hover:text-white/90 flex-shrink-0 ml-auto transition-opacity"
+          className="text-[10px] leading-none text-white/40 hover:text-white/90 flex-shrink-0 ml-auto whitespace-nowrap transition-opacity"
           onClick={(e) => { e.stopPropagation(); onAddBackbone(themeSpan.themeId); }}
           title="Add backbone"
         >
-          +
+          + Backbone
         </button>
       )}
       {onDelete && (
