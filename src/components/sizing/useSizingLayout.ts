@@ -10,7 +10,7 @@ import { getRibItemPoints, getRibItemPercentComplete } from '../../lib/calculati
 // Layout constants (pixels in logical/unzoomed space)
 export const COL_WIDTH = 200;
 export const COL_GAP = 8;
-export const CELL_HEIGHT = 52;
+export const CELL_HEIGHT = 68;
 export const CELL_GAP = 6;
 export const CELL_PAD = 6;
 export const HEADER_HEIGHT = 40;

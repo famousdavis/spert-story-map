@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.22.1 (2026-04-01)
+
+### Improved
+- **Two-line rib names on Sizing tab** — Sizing cards now display up to two lines of the rib item name (matching the Map tab), replacing single-line truncation. Card height increased from 52px to 68px to accommodate the extra line.
+
 ## Version 0.22.0 (2026-03-31)
 
 ### Improved
