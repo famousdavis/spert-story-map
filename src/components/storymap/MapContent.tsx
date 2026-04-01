@@ -34,6 +34,7 @@ interface MapContentProps {
   onAddTheme?: () => void;
   onAddBackbone?: (themeId: string) => void;
   onAddRib?: (themeId: string, backboneId: string) => void;
+  onAddRibToRelease?: (themeId: string, backboneId: string, releaseId: string) => void;
   onAddReleaseAfter?: (releaseId: string) => void;
   dragState: any;
   onDragStart: (e: React.PointerEvent, cell: any) => void;
@@ -48,11 +49,11 @@ export default function MapContent({
   layout, themes, product, onRibClick, onReleaseClick, mapSizeRef,
   onRenameTheme, onRenameBackbone, onRenameRib, onRenameRelease,
   onDeleteTheme, onDeleteBackbone, onDeleteRib, onDeleteRelease,
-  onAddTheme, onAddBackbone, onAddRib, onAddReleaseAfter,
+  onAddTheme, onAddBackbone, onAddRib, onAddRibToRelease, onAddReleaseAfter,
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
   selectedIds,
 }: MapContentProps) {
-  const { columns, themeSpans, releaseLanes, cells, unassignedLane, totalWidth, totalHeight } = layout;
+  const { columns, themeSpans, releaseLanes, cells, unassignedLane, gapButtons, totalWidth, totalHeight } = layout;
 
   // Extra width for the "+ Theme" / "+ Backbone" buttons beyond the right label column
   const addBtnWidth = 100;
@@ -225,6 +226,22 @@ export default function MapContent({
           />
         );
       })}
+
+      {/* Hover + Rib buttons in gap zones below last card in each column×lane */}
+      {!dragState?.isDragging && gapButtons?.map(gb => (
+        <div
+          key={`gap-${gb.backboneId}-${gb.releaseId || 'unassigned'}`}
+          className="absolute opacity-0 hover:opacity-100 transition-opacity duration-150"
+          style={{ left: gb.x, top: gb.y, width: gb.width, height: 22 }}
+        >
+          <button
+            className="w-full h-full bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-[10px] rounded px-1 transition-colors dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 dark:hover:text-blue-300"
+            onClick={() => gb.releaseId ? onAddRibToRelease?.(gb.themeId, gb.backboneId, gb.releaseId) : onAddRib?.(gb.themeId, gb.backboneId)}
+          >
+            + Rib
+          </button>
+        </div>
+      ))}
 
       {/* + Theme button (after last theme) */}
       {onAddTheme && (

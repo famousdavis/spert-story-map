@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.23.1 (2026-04-01)
+
+### Added
+- **Contextual hover "+ Rib" buttons on Story Map** — An invisible `+ Rib` button appears on hover below the last rib card in each column×release lane, wherever there is gap space. Clicking it in a release lane creates a new rib with 100% allocation to that release. In the Unassigned lane, creates an unallocated rib. Buttons only appear when there is visual room below the last card (not in the tallest column), and never in empty cells. Hidden during drag operations.
+
 ## Version 0.23.0 (2026-04-01)
 
 ### Added
