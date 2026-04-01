@@ -61,6 +61,11 @@ export default function SizingView() {
     [product.themes]
   );
 
+  const releases = useMemo(() =>
+    (product.releases || []).map(r => ({ id: r.id, name: r.name })),
+    [product.releases]
+  );
+
   const handleFilterChange = useCallback((next: SizingFilter) => {
     didAutoFit.current = false;
     setFilter(next);
@@ -112,6 +117,7 @@ export default function SizingView() {
         overlayControls={
           <SizingFilterPanel
             themes={themes}
+            releases={releases}
             filter={filter}
             onFilterChange={handleFilterChange}
           />
