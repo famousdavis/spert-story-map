@@ -7,4 +7,5 @@ export const TOS_URL = 'https://spertsuite.com/TOS.pdf';
 export const PRIVACY_POLICY_URL = 'https://spertsuite.com/PRIVACY.pdf';
 export const TOS_ACCEPTED_VERSION_KEY = 'spert_tos_accepted_version';
 export const FIRST_RUN_SEEN_KEY = 'spert_firstRun_seen';
+export const LICENSE_URL = 'https://github.com/famousdavis/spert-story-map/blob/main/LICENSE';
 export const TOS_APP_ID = 'spert-story-map';
