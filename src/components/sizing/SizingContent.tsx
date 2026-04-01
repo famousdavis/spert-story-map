@@ -211,7 +211,12 @@ function SizingRibCell({ cell, onDragStart, isDragging }: SizingRibCellProps) {
           : locked
             ? 'border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/50'
             : 'border-gray-200 bg-white hover:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500'
-      } px-2 py-1.5 overflow-hidden`}
+      } ${locked ? '' : 'cursor-grab active:cursor-grabbing'} px-2 py-1.5 overflow-hidden`}
+      onPointerDown={locked ? undefined : (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onDragStart(e, cell);
+      }}
       style={{
         left: cell.x,
         top: cell.y,
@@ -222,21 +227,9 @@ function SizingRibCell({ cell, onDragStart, isDragging }: SizingRibCellProps) {
       data-rib-id={cell.id}
     >
       <div className="flex items-start justify-between gap-1">
-        {locked ? (
+        {locked && (
           <span className="text-sm leading-none text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5 px-0.5 select-none" title={`${cell.percentComplete}% complete`}>
             {cell.percentComplete >= 100 ? '✓' : `${cell.percentComplete}%`}
-          </span>
-        ) : (
-          <span
-            className="text-sm leading-none text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 px-0.5 select-none"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onDragStart(e, cell);
-            }}
-            title="Drag to size"
-          >
-            ⠿
           </span>
         )}
         <span className={`text-xs leading-tight line-clamp-2 flex-1 font-medium ${locked ? 'text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>

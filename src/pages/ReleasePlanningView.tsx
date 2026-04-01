@@ -10,7 +10,7 @@ import { useProductMutations } from '../hooks/useProductMutations';
 import { useReleaseDrag } from '../hooks/useReleaseDrag';
 import ReleaseColumn from '../components/releases/ReleaseColumn';
 import AllocationModal from '../components/releases/AllocationModal';
-import type { OutletContextValue } from '../types';
+import type { OutletContextValue, Category } from '../types';
 
 export default function ReleasePlanningView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
@@ -73,6 +73,21 @@ export default function ReleasePlanningView() {
           ...b,
           ribItems: b.ribItems.map(r =>
             r.id === ribId ? { ...r, releaseAllocations: allocations } : r
+          ),
+        })),
+      })),
+    }));
+  }, [updateProduct]);
+
+  const updateRibCategory = useCallback((ribId: string, category: Category) => {
+    updateProduct(prev => ({
+      ...prev,
+      themes: prev.themes.map(t => ({
+        ...t,
+        backboneItems: t.backboneItems.map(b => ({
+          ...b,
+          ribItems: b.ribItems.map(r =>
+            r.id === ribId ? { ...r, category } : r
           ),
         })),
       })),
@@ -181,6 +196,7 @@ export default function ReleasePlanningView() {
         <AllocationModal
           rib={allocModal}
           product={product}
+          onUpdateCategory={updateRibCategory}
           onSave={(allocations) => {
             updateRibAllocation(allocModal.id, allocations);
             setAllocModal(null);
