@@ -28,6 +28,10 @@ export default function InsertionIndicator({ dragState, layout }: InsertionIndic
     return <BackboneInsertionLine dragState={dragState} layout={layout} />;
   }
 
+  if (dragState.dragType === 'release') {
+    return <ReleaseInsertionLine dragState={dragState} layout={layout} />;
+  }
+
   if (dragState.dragType === 'rib') {
     return <RibInsertionLine dragState={dragState} layout={layout} />;
   }
@@ -167,6 +171,45 @@ function BackboneInsertionLine({ dragState, layout }: { dragState: any; layout: 
     >
       <div className="absolute -left-1 -top-1 w-2 h-2 bg-blue-500 rounded-full" />
       <div className="absolute -left-1 -bottom-1 w-2 h-2 bg-blue-500 rounded-full" />
+    </div>
+  );
+}
+
+function ReleaseInsertionLine({ dragState, layout }: { dragState: any; layout: any }) {
+  const { releaseId, insertIndex } = dragState;
+  const { releaseLanes, totalWidth } = layout;
+
+  // Get lanes excluding the dragged release
+  const otherLanes = releaseLanes
+    .filter(l => l.releaseId !== releaseId)
+    .sort((a, b) => a.y - b.y);
+
+  // Compute Y position of the horizontal insertion line
+  let lineY;
+  if (otherLanes.length === 0 || insertIndex === 0) {
+    const firstLane = otherLanes[0] || releaseLanes.find(l => l.releaseId === releaseId);
+    if (!firstLane) return null;
+    lineY = firstLane.y;
+  } else if (insertIndex >= otherLanes.length) {
+    const lastLane = otherLanes[otherLanes.length - 1];
+    lineY = lastLane.y + lastLane.height;
+  } else {
+    lineY = otherLanes[insertIndex].y;
+  }
+
+  return (
+    <div
+      className="absolute bg-blue-500 rounded-full pointer-events-none"
+      style={{
+        left: 0,
+        top: lineY,
+        width: totalWidth,
+        height: 3,
+        zIndex: 40,
+      }}
+    >
+      <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full" />
+      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" />
     </div>
   );
 }

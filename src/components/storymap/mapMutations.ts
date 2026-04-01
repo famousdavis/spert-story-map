@@ -294,6 +294,27 @@ export function reorderTheme(updateProduct: UpdateProduct, themeId: string, inse
 }
 
 /**
+ * Reorder a release within the product.releases array.
+ * Removes the release from its current position and inserts at insertIndex.
+ */
+export function reorderRelease(updateProduct: UpdateProduct, releaseId: string, insertIndex: number | null): void {
+  updateProduct(prev => {
+    const sorted = [...prev.releases].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex(r => r.id === releaseId);
+    if (idx === -1) return prev;
+    const release = sorted[idx];
+    const without = sorted.filter(r => r.id !== releaseId);
+    const pos = insertIndex != null && insertIndex >= 0 && insertIndex <= without.length
+      ? insertIndex : without.length;
+    without.splice(pos, 0, release);
+    return {
+      ...prev,
+      releases: without.map((r, i) => ({ ...r, order: i + 1 })),
+    };
+  });
+}
+
+/**
  * Move a single rib in both axes simultaneously (backbone + release).
  * Combines moveRibToBackbone and moveRibToRelease into one atomic update.
  */

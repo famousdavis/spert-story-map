@@ -118,12 +118,17 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
     }
   }, [product.releases, mutations]);
 
+  const handleAddReleaseAfter = useCallback((releaseId: string) => {
+    mutations.addReleaseAfter(releaseId);
+  }, [mutations]);
+
   // --- Drag indicator label ---
 
   const dragLabel = useMemo(() => {
     if (!dragState?.isDragging) return null;
     if (dragState.dragType === 'theme') return '↔ Reordering theme';
     if (dragState.dragType === 'backbone') return '↔ Moving backbone';
+    if (dragState.dragType === 'release') return '↕ Reordering release';
 
     const backboneChanged = dragState.targetBackboneId && dragState.targetBackboneId !== dragState.backboneId;
     const releaseChanged = dragState.targetReleaseId !== undefined && dragState.targetReleaseId !== dragState.releaseId;
@@ -145,7 +150,7 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
     handleRenameTheme, handleRenameBackbone, handleRenameRib, handleRenameRelease,
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
     handleConfirmDelete, deleteTarget, setDeleteTarget,
-    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRelease,
+    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRelease, handleAddReleaseAfter,
     dragLabel,
   };
 }

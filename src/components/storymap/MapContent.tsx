@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { COL_WIDTH, COL_GAP, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH } from './useMapLayout';
 import ThemeHeader from './ThemeHeader';
 import BackboneHeader from './BackboneHeader';
@@ -12,12 +12,14 @@ import UnassignedLane from './UnassignedLane';
 import DropHighlight from './DropHighlight';
 import InsertionIndicator from './InsertionIndicator';
 import { getThemeColorClasses } from '../../lib/themeColors';
-import type { Theme } from '../../types';
+import { releaseHasAllocations } from '../../lib/settingsMutations';
+import type { Theme, Product } from '../../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
 interface MapContentProps {
   layout: any;
   themes: Theme[];
+  product: Product;
   onRibClick: (cell: any, e: React.MouseEvent) => void;
   onReleaseClick: (releaseId: string) => void;
   mapSizeRef: React.MutableRefObject<{ width: number; height: number }> | null;
@@ -28,29 +30,31 @@ interface MapContentProps {
   onDeleteTheme?: (themeId: string) => void;
   onDeleteBackbone?: (themeId: string, backboneId: string) => void;
   onDeleteRib?: (themeId: string, backboneId: string, ribId: string) => void;
+  onDeleteRelease?: (releaseId: string) => void;
   onAddTheme?: () => void;
   onAddBackbone?: (themeId: string) => void;
   onAddRib?: (themeId: string, backboneId: string) => void;
-  onAddRelease?: (afterReleaseId: string | null) => void;
+  onAddReleaseAfter?: (releaseId: string) => void;
   dragState: any;
   onDragStart: (e: React.PointerEvent, cell: any) => void;
   onBackboneDragStart: (e: React.PointerEvent, column: any) => void;
   onThemeDragStart: (e: React.PointerEvent, themeSpan: any) => void;
+  onReleaseDragStart?: (e: React.PointerEvent, lane: any) => void;
   selectedIds?: Set<string>;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export default function MapContent({
-  layout, themes, onRibClick, onReleaseClick, mapSizeRef,
+  layout, themes, product, onRibClick, onReleaseClick, mapSizeRef,
   onRenameTheme, onRenameBackbone, onRenameRib, onRenameRelease,
-  onDeleteTheme, onDeleteBackbone, onDeleteRib,
-  onAddTheme, onAddBackbone, onAddRib, onAddRelease,
-  dragState, onDragStart, onBackboneDragStart, onThemeDragStart,
+  onDeleteTheme, onDeleteBackbone, onDeleteRib, onDeleteRelease,
+  onAddTheme, onAddBackbone, onAddRib, onAddReleaseAfter,
+  dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
   selectedIds,
 }: MapContentProps) {
   const { columns, themeSpans, releaseLanes, cells, unassignedLane, totalWidth, totalHeight } = layout;
 
-  // Extra width for the "+ Theme" button
+  // Extra width for the "+ Theme" / "+ Backbone" buttons beyond the right label column
   const addBtnWidth = 100;
   const mapWidth = themeSpans.length > 0 ? totalWidth + COL_GAP + addBtnWidth : addBtnWidth + LANE_LABEL_WIDTH;
   const mapHeight = Math.max(totalHeight, THEME_HEIGHT + BACKBONE_HEIGHT + 72);
@@ -66,10 +70,20 @@ export default function MapContent({
   const themeColorMap = {};
   (themes || []).forEach((t, i) => { themeColorMap[t.id] = getThemeColorClasses(t, i); });
 
+  // Precompute which releases have allocations (for delete button state)
+  const allocMap = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const r of product.releases || []) {
+      map[r.id] = releaseHasAllocations(product, r.id);
+    }
+    return map;
+  }, [product]);
+
   // Determine highlighted drop zones from drag state
   const isRibDrag = dragState?.isDragging && dragState.dragType === 'rib';
   const isBackboneDrag = dragState?.isDragging && dragState.dragType === 'backbone';
   const isThemeDrag = dragState?.isDragging && dragState.dragType === 'theme';
+  const isReleaseDrag = dragState?.isDragging && dragState.dragType === 'release';
   const highlightReleaseId = isRibDrag ? dragState.targetReleaseId : undefined;
   const highlightBackboneId = isRibDrag ? dragState.targetBackboneId : undefined;
   const highlightThemeId = isBackboneDrag ? dragState.targetThemeId : undefined;
@@ -146,9 +160,13 @@ export default function MapContent({
           totalWidth={totalWidth}
           isFirst={i === 0}
           isDropTarget={highlightReleaseId === lane.releaseId}
+          isDragging={isReleaseDrag && dragState.releaseId === lane.releaseId}
           onRename={onRenameRelease}
-          onAddRelease={onAddRelease}
+          onAddReleaseAfter={onAddReleaseAfter}
+          onDeleteRelease={onDeleteRelease}
+          hasAllocations={allocMap[lane.releaseId] || false}
           onClick={onReleaseClick}
+          onReleaseDragStart={onReleaseDragStart}
         />
       ))}
 
@@ -158,7 +176,6 @@ export default function MapContent({
           lane={unassignedLane}
           totalWidth={totalWidth}
           isDropTarget={highlightReleaseId === null && isRibDrag}
-          onAddRelease={onAddRelease}
         />
       )}
 
