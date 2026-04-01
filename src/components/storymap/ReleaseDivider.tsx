@@ -2,9 +2,10 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useRef } from 'react';
-import { LANE_LABEL_WIDTH } from './useMapLayout';
+import React, { useRef } from 'react';
+import { LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH } from './useMapLayout';
 import useInlineEdit from './useInlineEdit';
+import { useTooltip } from '../ui/Tooltip';
 
 interface ReleaseLane {
   releaseId: string;
@@ -18,103 +19,233 @@ interface ReleaseDividerProps {
   totalWidth: number;
   isFirst: boolean;
   isDropTarget: boolean;
+  isDragging: boolean;
   onRename: (releaseId: string, name: string) => void;
-  onAddRelease?: (afterReleaseId: string | null) => void;
+  onAddReleaseAfter?: (releaseId: string) => void;
+  onDeleteRelease?: (releaseId: string) => void;
+  hasAllocations: boolean;
   onClick?: (releaseId: string) => void;
+  onReleaseDragStart?: (e: React.PointerEvent, lane: ReleaseLane) => void;
 }
 
-export default function ReleaseDivider({ lane, totalWidth, isFirst, isDropTarget, onRename, onAddRelease, onClick }: ReleaseDividerProps) {
-  const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
-    useInlineEdit(lane.releaseName, (name) => onRename(lane.releaseId, name));
+export default function ReleaseDivider({
+  lane, totalWidth, isFirst, isDropTarget, isDragging,
+  onRename, onAddReleaseAfter, onDeleteRelease, hasAllocations,
+  onClick, onReleaseDragStart,
+}: ReleaseDividerProps) {
+  // Left label inline edit
+  const leftEdit = useInlineEdit(lane.releaseName, (name) => onRename(lane.releaseId, name));
+  // Right label inline edit (shares the same rename callback)
+  const rightEdit = useInlineEdit(lane.releaseName, (name) => onRename(lane.releaseId, name));
 
-  // Click/double-click disambiguation: single-click opens detail panel, double-click edits
-  const clickTimer = useRef(null);
-  const handleClick = (e) => {
+  // Delete tooltip
+  const deleteTooltipText = hasAllocations ? 'Remove all items first' : `Delete ${lane.releaseName}`;
+  const leftDeleteTooltip = useTooltip(deleteTooltipText);
+  const rightDeleteTooltip = useTooltip(deleteTooltipText);
+
+  // Click/double-click disambiguation for left label
+  const leftClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleLeftClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (clickTimer.current) return; // already waiting for dblclick
-    clickTimer.current = setTimeout(() => {
-      clickTimer.current = null;
+    if (leftClickTimer.current) return;
+    leftClickTimer.current = setTimeout(() => {
+      leftClickTimer.current = null;
       if (onClick) onClick(lane.releaseId);
     }, 200);
   };
-  const handleDoubleClick = (e) => {
+  const handleLeftDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (clickTimer.current) {
-      clearTimeout(clickTimer.current);
-      clickTimer.current = null;
-    }
-    startEditing();
+    if (leftClickTimer.current) { clearTimeout(leftClickTimer.current); leftClickTimer.current = null; }
+    leftEdit.startEditing();
   };
+
+  // Click/double-click disambiguation for right label
+  const rightClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleRightClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (rightClickTimer.current) return;
+    rightClickTimer.current = setTimeout(() => {
+      rightClickTimer.current = null;
+      if (onClick) onClick(lane.releaseId);
+    }, 200);
+  };
+  const handleRightDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (rightClickTimer.current) { clearTimeout(rightClickTimer.current); rightClickTimer.current = null; }
+    rightEdit.startEditing();
+  };
+
+  // Drag grip handler
+  const handleGripPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onReleaseDragStart) onReleaseDragStart(e, lane);
+  };
+
+  const rightLabelX = totalWidth - RIGHT_LABEL_WIDTH;
+  const bottomBtnY = lane.y + lane.height - 24;
+
+  const labelClasses = isDropTarget
+    ? 'text-blue-700 bg-blue-200 dark:text-blue-200 dark:bg-blue-800'
+    : 'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 dark:hover:bg-blue-900/60';
 
   return (
     <>
-      {/* Lane background — highlight when drop target */}
+      {/* Lane background — highlight when drop target, dim when dragging */}
       <div
-        className={`absolute left-0 transition-colors ${isDropTarget ? 'bg-blue-100/60' : ''}`}
-        style={{
-          top: lane.y,
-          width: totalWidth,
-          height: lane.height,
-        }}
+        className={`absolute left-0 transition-colors ${
+          isDragging ? 'opacity-50 bg-blue-50/40 dark:bg-blue-900/20' :
+          isDropTarget ? 'bg-blue-100/60' : ''
+        }`}
+        style={{ top: lane.y, width: totalWidth, height: lane.height }}
       />
+
       {/* Horizontal divider line at top of lane */}
       <div
         className={`absolute left-0 ${
-          isDropTarget
-            ? 'h-0.5 bg-blue-400'
-            : isFirst ? 'h-px bg-blue-300' : 'h-px bg-blue-200'
+          isDropTarget ? 'h-0.5 bg-blue-400' :
+          isFirst ? 'h-px bg-blue-300' : 'h-px bg-blue-200'
         }`}
-        style={{
-          top: lane.y,
-          width: totalWidth,
-        }}
+        style={{ top: lane.y, width: totalWidth }}
       />
-      {/* Release label on left */}
+
+      {/* ===== LEFT SIDE ===== */}
+
+      {/* Left label area */}
       <div
         className="absolute flex items-start pt-2 px-2 pointer-events-none"
-        style={{
-          top: lane.y,
-          left: 0,
-          width: LANE_LABEL_WIDTH,
-          height: lane.height,
-        }}
+        style={{ top: lane.y, left: 0, width: LANE_LABEL_WIDTH, height: lane.height }}
       >
-        {editing ? (
+        {leftEdit.editing ? (
           <input
-            ref={inputRef}
+            ref={leftEdit.inputRef}
             type="text"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={handleKeyDown}
+            value={leftEdit.draft}
+            onChange={e => leftEdit.setDraft(e.target.value)}
+            onBlur={leftEdit.commit}
+            onKeyDown={leftEdit.handleKeyDown}
             onClick={e => e.stopPropagation()}
             className="pointer-events-auto text-xs font-semibold text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-gray-800/80 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-full border-0"
           />
         ) : (
           <span
-            className={`pointer-events-auto text-xs font-semibold px-2 py-1 rounded break-words max-w-full cursor-pointer ${
-              isDropTarget
-                ? 'text-blue-700 bg-blue-200 dark:text-blue-200 dark:bg-blue-800'
-                : 'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 dark:hover:bg-blue-900/60'
-            }`}
+            className={`pointer-events-auto text-xs font-semibold px-2 py-1 rounded break-words max-w-full cursor-pointer ${labelClasses}`}
             data-release-id={lane.releaseId}
-            onClick={handleClick}
-            onDoubleClick={handleDoubleClick}
+            onClick={handleLeftClick}
+            onDoubleClick={handleLeftDoubleClick}
             title="Click for details · Double-click to rename"
           >
             {lane.releaseName}
           </span>
         )}
+        {/* Drag grip */}
+        {onReleaseDragStart && !leftEdit.editing && (
+          <span
+            className="pointer-events-auto text-sm leading-none text-blue-300 hover:text-blue-500 dark:text-blue-600 dark:hover:text-blue-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 ml-1 select-none"
+            onPointerDown={handleGripPointerDown}
+            title="Drag to reorder"
+          >
+            ⠿
+          </span>
+        )}
       </div>
-      {/* + Release button at right end of divider line */}
-      {onAddRelease && (
+
+      {/* Left bottom buttons: + Release and × */}
+      {onAddReleaseAfter && (
         <button
           className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
-          style={{ left: totalWidth + 8, top: lane.y - 8 }}
-          onClick={() => onAddRelease(lane.releaseId)}
-          title="Add release here"
+          style={{ left: 8, top: bottomBtnY }}
+          onClick={() => onAddReleaseAfter(lane.releaseId)}
+          title="Add release after this one"
         >
           + Release
+        </button>
+      )}
+      {onDeleteRelease && (
+        <button
+          ref={leftDeleteTooltip.triggerRef}
+          onMouseEnter={leftDeleteTooltip.onMouseEnter}
+          onMouseLeave={leftDeleteTooltip.onMouseLeave}
+          className={`absolute text-[10px] font-medium rounded px-1 py-0.5 transition-colors ${
+            hasAllocations
+              ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+              : 'text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 cursor-pointer'
+          }`}
+          style={{ left: 72, top: bottomBtnY }}
+          onClick={(e) => { e.stopPropagation(); if (!hasAllocations) onDeleteRelease(lane.releaseId); }}
+        >
+          ×
+          {leftDeleteTooltip.tooltipEl}
+        </button>
+      )}
+
+      {/* ===== RIGHT SIDE ===== */}
+
+      {/* Right label area */}
+      <div
+        className="absolute flex items-start pt-2 px-2 pointer-events-none"
+        style={{ top: lane.y, left: rightLabelX, width: RIGHT_LABEL_WIDTH, height: lane.height }}
+      >
+        {rightEdit.editing ? (
+          <input
+            ref={rightEdit.inputRef}
+            type="text"
+            value={rightEdit.draft}
+            onChange={e => rightEdit.setDraft(e.target.value)}
+            onBlur={rightEdit.commit}
+            onKeyDown={rightEdit.handleKeyDown}
+            onClick={e => e.stopPropagation()}
+            className="pointer-events-auto text-xs font-semibold text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-gray-800/80 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-full border-0"
+          />
+        ) : (
+          <span
+            className={`pointer-events-auto text-xs font-semibold px-2 py-1 rounded break-words max-w-full cursor-pointer ${labelClasses}`}
+            data-release-id={lane.releaseId}
+            onClick={handleRightClick}
+            onDoubleClick={handleRightDoubleClick}
+            title="Click for details · Double-click to rename"
+          >
+            {lane.releaseName}
+          </span>
+        )}
+        {/* Drag grip */}
+        {onReleaseDragStart && !rightEdit.editing && (
+          <span
+            className="pointer-events-auto text-sm leading-none text-blue-300 hover:text-blue-500 dark:text-blue-600 dark:hover:text-blue-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 ml-1 select-none"
+            onPointerDown={handleGripPointerDown}
+            title="Drag to reorder"
+          >
+            ⠿
+          </span>
+        )}
+      </div>
+
+      {/* Right bottom buttons: + Release and × */}
+      {onAddReleaseAfter && (
+        <button
+          className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
+          style={{ left: rightLabelX + 8, top: bottomBtnY }}
+          onClick={() => onAddReleaseAfter(lane.releaseId)}
+          title="Add release after this one"
+        >
+          + Release
+        </button>
+      )}
+      {onDeleteRelease && (
+        <button
+          ref={rightDeleteTooltip.triggerRef}
+          onMouseEnter={rightDeleteTooltip.onMouseEnter}
+          onMouseLeave={rightDeleteTooltip.onMouseLeave}
+          className={`absolute text-[10px] font-medium rounded px-1 py-0.5 transition-colors ${
+            hasAllocations
+              ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+              : 'text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 cursor-pointer'
+          }`}
+          style={{ left: rightLabelX + 72, top: bottomBtnY }}
+          onClick={(e) => { e.stopPropagation(); if (!hasAllocations) onDeleteRelease(lane.releaseId); }}
+        >
+          ×
+          {rightDeleteTooltip.tooltipEl}
         </button>
       )}
     </>

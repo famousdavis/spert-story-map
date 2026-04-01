@@ -37,7 +37,7 @@ export default function StoryMapView() {
   const containerRef = useRef(null);
   const didAutoFit = useRef(false);
 
-  const { dragState, handleDragStart, handleBackboneDragStart, handleThemeDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({
+  const { dragState, handleDragStart, handleBackboneDragStart, handleThemeDragStart, handleReleaseDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({
     layout,
     zoom,
     pan,
@@ -141,7 +141,7 @@ export default function StoryMapView() {
     handleRenameTheme, handleRenameBackbone, handleRenameRib, handleRenameRelease,
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
     handleConfirmDelete, deleteTarget, setDeleteTarget,
-    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRelease,
+    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRelease, handleAddReleaseAfter,
     dragLabel,
   } = useMapHandlers({
     product, updateProduct, mutations,
@@ -164,6 +164,7 @@ export default function StoryMapView() {
         <MapContent
           layout={layout}
           themes={product.themes}
+          product={product}
           onRibClick={handleRibClick}
           onReleaseClick={handleReleaseClick}
           mapSizeRef={mapSizeRef}
@@ -174,14 +175,16 @@ export default function StoryMapView() {
           onDeleteTheme={handleDeleteTheme}
           onDeleteBackbone={handleDeleteBackbone}
           onDeleteRib={handleDeleteRib}
+          onDeleteRelease={handleDeleteRelease}
           onAddTheme={handleAddTheme}
           onAddBackbone={handleAddBackbone}
           onAddRib={handleAddRib}
-          onAddRelease={handleAddRelease}
+          onAddReleaseAfter={handleAddReleaseAfter}
           dragState={dragState}
           onDragStart={handleDragStart}
           onBackboneDragStart={handleBackboneDragStart}
           onThemeDragStart={handleThemeDragStart}
+          onReleaseDragStart={handleReleaseDragStart}
           selectedIds={selectedIds}
         />
       </MapCanvas>

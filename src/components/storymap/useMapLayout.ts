@@ -15,9 +15,10 @@ const CELL_PAD = 6;
 const THEME_HEIGHT = 40;
 const BACKBONE_HEIGHT = 44;
 const LANE_LABEL_WIDTH = 160;
+const RIGHT_LABEL_WIDTH = LANE_LABEL_WIDTH;
 const MIN_LANE_HEIGHT = 72;
 
-export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, MIN_LANE_HEIGHT };
+export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT };
 
 export default function useMapLayout(product: Product) {
   return useMemo(() => computeLayout(product), [product]);
@@ -78,7 +79,7 @@ export function computeLayout(product: Product): any {
 
   const totalColumns = colIdx;
   const contentWidth = totalColumns * (COL_WIDTH + COL_GAP) - COL_GAP;
-  const totalWidth = LANE_LABEL_WIDTH + contentWidth;
+  const totalWidth = LANE_LABEL_WIDTH + contentWidth + RIGHT_LABEL_WIDTH;
 
   // 2. Build a lookup: backboneId -> column
   const colByBackbone = {};

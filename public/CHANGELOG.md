@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.23.0 (2026-04-01)
+
+### Added
+- **Mirrored release labels on Story Map** — Release names now appear on both the left and right edges of the map, so you never lose lane context when scrolling a wide map. Both labels are editable via double-click.
+- **Release add/delete on Story Map** — `+ Release` and `×` delete buttons at the bottom of each release lane on both sides. `+ Release` inserts after that release. Delete is blocked (with tooltip) when the release has rib items allocated to it.
+- **Drag-to-reorder releases on Story Map** — Grab handle (`⠿`) next to each release label on both sides. Drag vertically to reorder release lanes with a blue insertion line showing the drop position. The Unassigned lane stays anchored at the bottom.
+
+### Removed
+- Removed the `+ Release` button from the Unassigned lane (redundant now that each release has its own `+ Release` at the bottom).
+- Removed the far-right `+ Release` buttons on release divider lines (replaced by the per-lane bottom buttons).
+
 ## Version 0.22.2 (2026-04-01)
 
 ### Added

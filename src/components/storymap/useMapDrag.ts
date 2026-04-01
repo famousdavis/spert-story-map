@@ -5,8 +5,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Product } from '../../types';
 import {
-  buildRibMoveState, buildBackboneMoveState, buildThemeMoveState,
-  commitRibDrag, commitBackboneDrag, commitThemeDrag,
+  buildRibMoveState, buildBackboneMoveState, buildThemeMoveState, buildReleaseMoveState,
+  commitRibDrag, commitBackboneDrag, commitThemeDrag, commitReleaseDrag,
 } from './mapDragHelpers';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
@@ -162,6 +162,30 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     setDragState(state);
   }, [screenToMap, getContainerRect]);
 
+  // --- Release drag start ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- lane objects from computeLayout have complex inferred shape
+  const handleReleaseDragStart = useCallback((e: React.PointerEvent, lane: any) => {
+    const rect = getContainerRect(e);
+    if (!rect) return;
+    const mapPos = screenToMap(e.clientX, e.clientY, rect);
+
+    const state = {
+      dragType: 'release',
+      releaseId: lane.releaseId,
+      startScreenX: e.clientX,
+      startScreenY: e.clientY,
+      startMapX: mapPos.x,
+      startMapY: mapPos.y,
+      currentMapX: mapPos.x,
+      currentMapY: mapPos.y,
+      insertIndex: null,
+      isDragging: false,
+      mapContainerRect: rect,
+    };
+    dragRef.current = state;
+    setDragState(state);
+  }, [screenToMap, getContainerRect]);
+
   // --- Shared move handler ---
   const handleDragMove = useCallback((e: PointerEvent) => {
     const prev = dragRef.current;
@@ -181,6 +205,8 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
       state = buildRibMoveState(prev, mapPos, e.clientX, e.clientY, findReleaseLane, findColumn, layout.cells);
     } else if (prev.dragType === 'backbone') {
       state = buildBackboneMoveState(prev, mapPos, findThemeSpan, layout.columns);
+    } else if (prev.dragType === 'release') {
+      state = buildReleaseMoveState(prev, mapPos, layout.releaseLanes);
     } else {
       state = buildThemeMoveState(prev, mapPos, layout.themeSpans);
     }
@@ -202,6 +228,8 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
       commitRibDrag(state, updateProduct, layout.cells);
     } else if (state.dragType === 'backbone') {
       commitBackboneDrag(state, updateProduct);
+    } else if (state.dragType === 'release') {
+      commitReleaseDrag(state, updateProduct);
     } else if (state.dragType === 'theme') {
       commitThemeDrag(state, updateProduct);
     }
@@ -220,6 +248,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     handleDragStart,
     handleBackboneDragStart,
     handleThemeDragStart,
+    handleReleaseDragStart,
     handleDragMove,
     handleDragEnd,
     cancelDrag,

@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product } from '../../types';
-import { moveRib2D, moveRibs2D, reorderRibInRelease, moveBackboneToTheme, reorderTheme } from './mapMutations';
+import { moveRib2D, moveRibs2D, reorderRibInRelease, moveBackboneToTheme, reorderTheme, reorderRelease } from './mapMutations';
 import { CELL_HEIGHT, COL_WIDTH } from './useMapLayout';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
@@ -261,4 +261,55 @@ export function commitThemeDrag(state: ThemeDragState, updateProduct: UpdateProd
   const { themeId, insertIndex } = state;
   if (insertIndex == null) return;
   reorderTheme(updateProduct, themeId, insertIndex);
+}
+
+// --- Release drag (Y-axis reorder) ---
+
+interface ReleaseLane {
+  releaseId: string;
+  releaseName: string;
+  y: number;
+  height: number;
+}
+
+interface ReleaseDragState {
+  dragType: 'release';
+  releaseId: string;
+  startScreenX: number;
+  startScreenY: number;
+  currentMapX: number;
+  currentMapY: number;
+  insertIndex: number | null;
+  isDragging: boolean;
+  mapContainerRect: DOMRect;
+}
+
+export function buildReleaseMoveState(prev: ReleaseDragState, mapPos: MapPoint, releaseLanes: ReleaseLane[]): ReleaseDragState {
+  // Compute insertion index among releases (excluding the dragged release)
+  const otherLanes = releaseLanes
+    .filter(l => l.releaseId !== prev.releaseId)
+    .sort((a, b) => a.y - b.y);
+
+  let insertIndex = otherLanes.length; // default: append at end
+  for (let i = 0; i < otherLanes.length; i++) {
+    const laneMid = otherLanes[i].y + otherLanes[i].height / 2;
+    if (mapPos.y < laneMid) {
+      insertIndex = i;
+      break;
+    }
+  }
+
+  return {
+    ...prev,
+    currentMapX: mapPos.x,
+    currentMapY: mapPos.y,
+    insertIndex,
+    isDragging: true,
+  };
+}
+
+export function commitReleaseDrag(state: ReleaseDragState, updateProduct: UpdateProduct): void {
+  const { releaseId, insertIndex } = state;
+  if (insertIndex == null) return;
+  reorderRelease(updateProduct, releaseId, insertIndex);
 }
