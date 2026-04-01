@@ -20,12 +20,14 @@ export const ZONE_GAP = 16;
 const CELL_WIDTH = COL_WIDTH - CELL_PAD * 2;
 
 export interface SizingFilter {
-  themeIds: string[];   // [] = all themes shown
-  hideLocked: boolean;  // true = exclude percentComplete > 0
+  themeIds: string[];    // [] = all themes shown
+  releaseIds: string[];  // [] = all releases shown; non-empty = only ribs allocated to these releases
+  hideLocked: boolean;   // true = exclude percentComplete > 0
 }
 
 export const DEFAULT_SIZING_FILTER: SizingFilter = {
   themeIds: [],
+  releaseIds: [],
   hideLocked: false,
 };
 
@@ -60,6 +62,12 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
   forEachRib(product, (rib, { theme, backbone }) => {
     // Theme filter (cheap check first)
     if (filter.themeIds.length > 0 && !filter.themeIds.includes(theme.id)) return;
+
+    // Release filter — show only ribs allocated to selected releases
+    if (filter.releaseIds.length > 0) {
+      const allocated = rib.releaseAllocations?.some(a => filter.releaseIds.includes(a.releaseId));
+      if (!allocated) return;
+    }
 
     const pctComplete = getRibItemPercentComplete(rib);
 

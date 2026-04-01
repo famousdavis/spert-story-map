@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.22.2 (2026-04-01)
+
+### Added
+- **Release filter on Sizing tab** — The sizing filter panel now includes release chips alongside the existing theme filter. Select one or more releases to show only ribs allocated to those releases. Unallocated ribs are hidden when any release filter is active. Filter badge count reflects all active filters (themes + releases + hide completed).
+
 ## Version 0.22.1 (2026-04-01)
 
 ### Improved

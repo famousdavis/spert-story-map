@@ -12,16 +12,22 @@ interface ThemeInfo {
   color?: string;
 }
 
+interface ReleaseInfo {
+  id: string;
+  name: string;
+}
+
 interface SizingFilterPanelProps {
   themes: ThemeInfo[];
+  releases: ReleaseInfo[];
   filter: SizingFilter;
   onFilterChange: (filter: SizingFilter) => void;
 }
 
-export default function SizingFilterPanel({ themes, filter, onFilterChange }: SizingFilterPanelProps) {
+export default function SizingFilterPanel({ themes, releases, filter, onFilterChange }: SizingFilterPanelProps) {
   const [open, setOpen] = useState(false);
 
-  const activeCount = filter.themeIds.length + (filter.hideLocked ? 1 : 0);
+  const activeCount = filter.themeIds.length + filter.releaseIds.length + (filter.hideLocked ? 1 : 0);
   const hasActiveFilter = activeCount > 0;
 
   const toggleTheme = (themeId: string) => {
@@ -29,6 +35,13 @@ export default function SizingFilterPanel({ themes, filter, onFilterChange }: Si
       ? filter.themeIds.filter(id => id !== themeId)
       : [...filter.themeIds, themeId];
     onFilterChange({ ...filter, themeIds: next });
+  };
+
+  const toggleRelease = (releaseId: string) => {
+    const next = filter.releaseIds.includes(releaseId)
+      ? filter.releaseIds.filter(id => id !== releaseId)
+      : [...filter.releaseIds, releaseId];
+    onFilterChange({ ...filter, releaseIds: next });
   };
 
   const toggleHideLocked = () => {
@@ -85,6 +98,33 @@ export default function SizingFilterPanel({ themes, filter, onFilterChange }: Si
                         }`}
                       >
                         {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Release chips */}
+            {releases.length > 0 && (
+              <div className="mb-3">
+                <div className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">
+                  Releases
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {releases.map(r => {
+                    const isSelected = filter.releaseIds.includes(r.id);
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => toggleRelease(r.id)}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          isSelected
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {r.name}
                       </button>
                     );
                   })}
