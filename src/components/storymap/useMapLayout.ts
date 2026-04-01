@@ -216,12 +216,46 @@ export function computeLayout(product: Product): any {
     }
   }
 
+  // 7. Compute gap buttons (hover "+ Rib" zones below last card in each column×lane)
+  const MIN_GAP_HEIGHT = 24;
+  const gapButtons = [];
+
+  for (const lane of releaseLanes) {
+    for (const col of columns) {
+      const key = `${lane.releaseId}:${col.colIdx}`;
+      const ribCount = ribsByRelCol[key]?.length || 0;
+      if (ribCount === 0) continue; // no button in empty cells
+      const lastCardBottom = lane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
+      const availableGap = (lane.y + lane.height) - lastCardBottom - CELL_PAD;
+      if (availableGap < MIN_GAP_HEIGHT) continue; // no room
+      gapButtons.push({
+        themeId: col.themeId, backboneId: col.backboneId, releaseId: lane.releaseId,
+        x: col.x + CELL_PAD, y: lastCardBottom + 2, width: COL_WIDTH - CELL_PAD * 2,
+      });
+    }
+  }
+
+  if (unassignedLane) {
+    for (const col of columns) {
+      const ribCount = unassignedByCol[col.colIdx]?.length || 0;
+      if (ribCount === 0) continue;
+      const lastCardBottom = unassignedLane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
+      const availableGap = (unassignedLane.y + unassignedLane.height) - lastCardBottom - CELL_PAD;
+      if (availableGap < MIN_GAP_HEIGHT) continue;
+      gapButtons.push({
+        themeId: col.themeId, backboneId: col.backboneId, releaseId: null,
+        x: col.x + CELL_PAD, y: lastCardBottom + 2, width: COL_WIDTH - CELL_PAD * 2,
+      });
+    }
+  }
+
   return {
     columns,
     themeSpans,
     releaseLanes,
     cells,
     unassignedLane,
+    gapButtons,
     totalWidth,
     totalHeight,
   };

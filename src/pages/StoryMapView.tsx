@@ -141,7 +141,7 @@ export default function StoryMapView() {
     handleRenameTheme, handleRenameBackbone, handleRenameRib, handleRenameRelease,
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
     handleConfirmDelete, deleteTarget, setDeleteTarget,
-    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRelease, handleAddReleaseAfter,
+    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRibToRelease, handleAddRelease, handleAddReleaseAfter,
     dragLabel,
   } = useMapHandlers({
     product, updateProduct, mutations,
@@ -179,6 +179,7 @@ export default function StoryMapView() {
           onAddTheme={handleAddTheme}
           onAddBackbone={handleAddBackbone}
           onAddRib={handleAddRib}
+          onAddRibToRelease={handleAddRibToRelease}
           onAddReleaseAfter={handleAddReleaseAfter}
           dragState={dragState}
           onDragStart={handleDragStart}

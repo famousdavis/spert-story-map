@@ -124,6 +124,29 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     return id;
   }, [updateProduct]);
 
+  const addRibToRelease = useCallback((themeId: string, backboneId: string, releaseId: string) => {
+    const id = crypto.randomUUID();
+    updateProduct(prev => {
+      const next = {
+        ...prev,
+        themes: prev.themes.map(t =>
+          t.id === themeId
+            ? {
+              ...t,
+              backboneItems: t.backboneItems.map(b =>
+                b.id === backboneId
+                  ? { ...b, ribItems: [...b.ribItems, { id, name: 'New Rib Item', description: '', order: b.ribItems.length + 1, size: null, category: 'core', releaseAllocations: [{ releaseId, percentage: 100 }], progressHistory: [] }] }
+                  : b
+              ),
+            }
+            : t
+        ),
+      };
+      return { ...next, _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'rib', id }) };
+    });
+    return id;
+  }, [updateProduct]);
+
   const addRelease = useCallback(() => {
     updateProduct(prev => {
       const id = crypto.randomUUID();
@@ -275,6 +298,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     addTheme,
     addBackbone,
     addRib,
+    addRibToRelease,
     addRelease,
     addReleaseAfter,
     addSprint,
