@@ -5,16 +5,17 @@
 import { useState } from 'react';
 import { getRibItemPoints } from '../../lib/calculations';
 import Modal from '../ui/Modal';
-import type { RibItem, Product, ReleaseAllocation } from '../../types';
+import type { RibItem, Product, ReleaseAllocation, Category } from '../../types';
 
 interface AllocationModalProps {
   rib: RibItem;
   product: Product;
   onSave: (allocations: ReleaseAllocation[]) => void;
+  onUpdateCategory?: (ribId: string, category: Category) => void;
   onClose: () => void;
 }
 
-export default function AllocationModal({ rib, product, onSave, onClose }: AllocationModalProps) {
+export default function AllocationModal({ rib, product, onSave, onUpdateCategory, onClose }: AllocationModalProps) {
   const [allocations, setAllocations] = useState(
     rib.releaseAllocations.map(a => ({ ...a }))
   );
@@ -55,7 +56,23 @@ export default function AllocationModal({ rib, product, onSave, onClose }: Alloc
         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
           {rib.size && <span>Size: <strong>{rib.size}</strong></span>}
           {pts > 0 && <span>Points: <strong>{pts}</strong></span>}
-          <span>Category: <strong>{rib.category}</strong></span>
+          <span className="flex items-center gap-1.5">Category:
+            {(['core', 'non-core'] as const).map(cat => (
+              <button
+                key={cat}
+                onClick={() => onUpdateCategory?.(rib.id, cat)}
+                className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                  rib.category === cat
+                    ? cat === 'core'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                      : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                    : 'bg-gray-50 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700'
+                }`}
+              >
+                {cat === 'core' ? 'Core' : 'Non-core'}
+              </button>
+            ))}
+          </span>
         </div>
 
         <div className="space-y-3">

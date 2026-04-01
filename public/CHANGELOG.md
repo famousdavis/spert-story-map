@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.23.2 (2026-04-01)
+
+### Improved
+- **Whole-card drag on Sizing tab** — Sizing cards can now be grabbed and dragged from anywhere on the card, not just the small grip handle. The grip icon is removed; unlocked cards show a grab cursor on hover. Locked cards remain non-draggable.
+- **Core/Non-core toggle in Allocation Modal** — The category (Core / Non-core) can now be changed directly in the allocation modal on the Release Planning tab. Previously it was display-only in that modal.
+
 ## Version 0.23.1 (2026-04-01)
 
 ### Added
