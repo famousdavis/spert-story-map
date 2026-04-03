@@ -218,6 +218,7 @@ export interface UserSettings {
   exportId?: string;
   projectOrder?: string[];
   _hasUploadedToCloud?: boolean;
+  suppressLocalStorageWarning?: boolean;
   [key: string]: unknown;
 }
 

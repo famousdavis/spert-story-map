@@ -34,7 +34,7 @@ export default function ProductList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importConfirm, setImportConfirm] = useState(null);
   const [importError, setImportError] = useState(null);
-  const [showWarning, setShowWarning] = useState(true);
+  const [showWarning, setShowWarning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
   const { user } = useAuth();
@@ -79,8 +79,11 @@ export default function ProductList() {
     if (!driver) return;
     driver.loadPreferences().then(prefs => {
       if (prefs?.projectOrder) setProjectOrder(prefs.projectOrder);
+      if (mode === 'local' && !prefs?.suppressLocalStorageWarning) {
+        setShowWarning(true);
+      }
     });
-  }, [driver]);
+  }, [driver, mode]);
 
   // Drag-to-reorder handlers
   const handleProjectDragStart = (e: React.DragEvent, id: string) => {
@@ -265,7 +268,8 @@ export default function ProductList() {
         {showWarning && mode === 'local' && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg px-4 py-3 mb-6 flex items-start justify-between gap-3">
             <p className="text-xs text-amber-800 dark:text-amber-200">
-              Your data is stored in this browser's localStorage. Export regularly to avoid data loss if browser data is cleared.
+              <strong>Your data exists only in this browser</strong> and can be lost
+              without warning. Export at the end of every session to protect your work.
             </p>
             <button
               onClick={() => setShowWarning(false)}
