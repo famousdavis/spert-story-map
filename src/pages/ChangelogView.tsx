@@ -108,6 +108,10 @@ export function Footer() {
         <span>Licensed under GNU GPL v3</span>
       </div>
       <div className="mt-1">
+        <a href="https://spertsuite.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
+          SPERT® Suite
+        </a>
+        {' | '}
         <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
           Terms of Service
         </a>
