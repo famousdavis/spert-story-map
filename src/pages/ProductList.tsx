@@ -281,10 +281,9 @@ export default function ProductList() {
             </p>
             <button
               onClick={() => setShowWarning(false)}
-              className="text-amber-400 hover:text-amber-600 dark:text-amber-500 dark:hover:text-amber-300 text-sm leading-none flex-shrink-0 mt-0.5"
-              aria-label="Dismiss warning"
+              className="text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 flex-shrink-0"
             >
-              &times;
+              Got it
             </button>
           </div>
         )}
