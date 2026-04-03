@@ -2,9 +2,13 @@
 
 ## Version 0.23.3 (2026-04-02)
 
+### Added
+- **Export All Projects button** — New "Export All Projects" button on the home page (between Import and Load Sample) downloads every project as a single bundled JSON file named `spert-story-map-<datetime>.json`. Disabled when no projects exist.
+
 ### Improved
 - **localStorage warning banner revamp** — The startup caution banner for local-storage users now reads: "**Your data exists only in this browser** and can be lost without warning. Export at the end of every session to protect your work." Banner initializes hidden and appears only after preferences load, preventing a flash for users who have suppressed it.
 - **Suppress warning toggle in App Settings** — New "Notifications" section in App Settings with a "Warn me on startup when using local storage" toggle. Default: on. Toggling it off persists `suppressLocalStorageWarning` in preferences so the banner stays hidden across sessions. The session-dismiss (× button) behavior is unchanged.
+- **Standardized export filenames** — All JSON exports now use the `spert-story-map-<project-name>-<datetime>.json` naming convention for consistency and easier identification.
 
 ## Version 0.23.2 (2026-04-01)
 
