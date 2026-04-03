@@ -22,8 +22,9 @@ export function exportProduct(product: Product, storageRefOverride?: string): vo
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const safeName = product.name.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
   a.href = url;
-  a.download = `${product.name.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.json`;
+  a.download = `spert-story-map-${safeName}-${timestamp}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -113,6 +114,41 @@ export async function exportAllProducts(driver: StorageDriver, storageRefOverrid
   }
 
   return { exported };
+}
+
+/**
+ * Export all products as a single bundled JSON file.
+ * Each product is stamped with _storageRef and export attribution.
+ */
+export async function exportAllProductsBundled(driver: StorageDriver, storageRefOverride?: string) {
+  const prefs = loadPreferences();
+  const products = await driver.loadProductIndex();
+  const bundle: Product[] = [];
+
+  for (const product of products) {
+    const full = product.themes
+      ? product
+      : await driver.loadProduct(product.id);
+    if (!full) continue;
+
+    bundle.push({
+      ...full,
+      _storageRef: storageRefOverride || getWorkspaceId(),
+      ...(prefs.exportName ? { _exportedBy: prefs.exportName } : {}),
+      ...(prefs.exportId ? { _exportedById: prefs.exportId } : {}),
+    });
+  }
+
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  a.href = url;
+  a.download = `spert-story-map-${timestamp}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  return { exported: bundle.length };
 }
 
 /**

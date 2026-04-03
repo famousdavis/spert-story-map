@@ -5,6 +5,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { exportProduct, readImportFile, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
+import { exportAllProductsBundled } from '../lib/importExport';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
 import { sortByOrder } from '../lib/sortByOrder';
@@ -247,6 +248,13 @@ export default function ProductList() {
             className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             Import Project
+          </button>
+          <button
+            onClick={() => driver && exportAllProductsBundled(driver, driver.getWorkspaceId())}
+            disabled={products.length === 0}
+            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Export All Projects
           </button>
           <button
             onClick={handleLoadSample}
