@@ -7,6 +7,7 @@ import Modal from '../ui/Modal';
 import { Section, Field } from '../ui/Section';
 import StorageSection from './StorageSection';
 import { useStorage } from '../../lib/StorageProvider';
+import type { UserSettings } from '../../types';
 
 interface AppSettingsModalProps {
   open: boolean;
@@ -15,7 +16,7 @@ interface AppSettingsModalProps {
 
 export default function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
   const { driver } = useStorage();
-  const [prefs, setPrefs] = useState({});
+  const [prefs, setPrefs] = useState<UserSettings>({});
 
   useEffect(() => {
     if (open && driver) driver.loadPreferences().then(setPrefs);
@@ -54,6 +55,35 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
             />
           </Field>
+        </div>
+      </Section>
+
+      <Section title="Notifications">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Warn me on startup when using local storage
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Shows a caution banner each time the app opens while your data is stored locally in this browser.
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={!prefs?.suppressLocalStorageWarning}
+            onClick={() => updatePref('suppressLocalStorageWarning', !prefs?.suppressLocalStorageWarning)}
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              !prefs?.suppressLocalStorageWarning
+                ? 'bg-blue-600'
+                : 'bg-gray-200 dark:bg-gray-600'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                !prefs?.suppressLocalStorageWarning ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
         </div>
       </Section>
     </Modal>
