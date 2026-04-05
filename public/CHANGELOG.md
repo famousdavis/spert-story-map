@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.23.5 (2026-04-05)
+
+### Improved
+- **Standardized auth chip (Option C split pill)** — Replaced the colored storage status pill with a split pill design matching the SPERT Suite standard. Signed-in cloud mode shows a 26px avatar circle with first initial (white on `#0070f3`) + first name, a vertical divider, and a cloud icon button that opens Settings. Local/signed-out mode shows a lock icon + "Local only" with a "Sign in" action in the right segment. Uses `#0070f3` suite-standard blue across all states. Dark mode supported.
+
 ## Version 0.23.4 (2026-04-05)
 
 ### Added
