@@ -219,7 +219,6 @@ export default function ProductList() {
             </p>
           </div>
           <div className="flex items-center gap-3 mt-1">
-            <StorageStatusPill onClick={() => setShowSettings(true)} />
             <button
               onClick={() => setShowSettings(true)}
               title="App Settings"
@@ -234,6 +233,7 @@ export default function ProductList() {
             <Link to="/about" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
               About
             </Link>
+            <StorageStatusPill onClick={() => setShowSettings(true)} />
           </div>
         </div>
 
