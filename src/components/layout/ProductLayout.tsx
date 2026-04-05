@@ -75,7 +75,6 @@ export default function ProductLayout() {
                   Saved {formatRelativeTime(lastSaved)}
                 </span>
               )}
-              <StorageStatusPill onClick={() => setShowSettings(true)} />
               <button
                 onClick={() => setShowSettings(true)}
                 title="App Settings"
@@ -87,6 +86,7 @@ export default function ProductLayout() {
                 </svg>
               </button>
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              <StorageStatusPill onClick={() => setShowSettings(true)} />
             </div>
           </div>
           {/* Tab navigation */}
