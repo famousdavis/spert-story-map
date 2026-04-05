@@ -34,7 +34,11 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
   const { mode } = useStorage();
 
   const isCloudSignedIn = mode === 'cloud' && !!user;
-  const firstName = user?.displayName?.split(' ')[0] ?? user?.email ?? '';
+  const displayName = user?.displayName ?? '';
+  // Handle "Last, First" (Microsoft) and "First Last" (Google) formats
+  const firstName = displayName.includes(',')
+    ? (displayName.split(',')[1]?.trim().split(' ')[0] || user?.email || '')
+    : (displayName.split(' ')[0] || user?.email || '');
   const initial = firstName.charAt(0).toUpperCase();
 
   return (
