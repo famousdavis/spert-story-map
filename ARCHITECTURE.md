@@ -60,6 +60,7 @@ src/
 │   │   ├── Tooltip.tsx               # Fast tooltip (200ms) via useTooltip hook
 │   │   ├── Section.tsx               # Reusable Section and Field layout components
 │   │   ├── ThemeToggle.tsx           # Sun/moon dark mode toggle button
+│   │   ├── StorageStatusPill.tsx    # 3-state pill showing local/cloud/sign-in status
 │   │   └── FirstRunBanner.tsx       # Dismissible first-run ToS informational banner
 │   ├── layout/
 │   │   └── ProductLayout.tsx         # Header, tab nav, footer, outlet context
