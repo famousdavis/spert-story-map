@@ -5,32 +5,24 @@
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
 
-function DatabaseIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0">
-      <path d="M10 2C6.686 2 4 3.343 4 5s2.686 3 6 3 6-1.343 6-3-2.686-3-6-3z" />
-      <path d="M4 7v2c0 1.657 2.686 3 6 3s6-1.343 6-3V7c0 1.657-2.686 3-6 3S4 8.657 4 7z" />
-      <path d="M4 11v2c0 1.657 2.686 3 6 3s6-1.343 6-3v-2c0 1.657-2.686 3-6 3s-6-1.343-6-3z" />
-    </svg>
-  );
-}
-
 function CloudIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0">
-      <path d="M1 12.5A4.5 4.5 0 005.5 17H15a3 3 0 001.5-5.605 4.5 4.5 0 00-7.925-3.698A3.5 3.5 0 001 12.5z" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"
+        fill="#0070f3"
+      />
     </svg>
   );
 }
 
-function getDisplayName(user: { displayName?: string | null; email?: string | null }): string {
-  if (user.displayName) return user.displayName;
-  if (user.email) return user.email.split('@')[0];
-  return '?';
-}
-
-function truncate(str: string, max: number): string {
-  return str.length > max ? str.slice(0, max) + '\u2026' : str;
+function LockIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="11" width="18" height="11" rx="2" stroke="#9CA3AF" strokeWidth="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 interface StorageStatusPillProps {
@@ -41,51 +33,69 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
   const { user } = useAuth();
   const { mode } = useStorage();
 
-  if (mode === 'local') {
-    return (
-      <button
-        onClick={onClick}
-        title="Using local storage — click to manage in Settings"
-        className="flex items-center gap-1.5 rounded-full border border-zinc-300 bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-      >
-        <DatabaseIcon />
-        Local
-      </button>
-    );
-  }
+  const isCloudSignedIn = mode === 'cloud' && !!user;
+  const firstName = user?.displayName?.split(' ')[0] ?? user?.email ?? '';
+  const initial = firstName.charAt(0).toUpperCase();
 
-  // Cloud mode, signed in
-  if (user) {
-    const name = getDisplayName(user);
-    const initial = name[0]?.toUpperCase() ?? '?';
-    const label = truncate(name, 16);
-    return (
-      <button
-        onClick={onClick}
-        title={`Signed in as ${user.email ?? name} — click to manage in Settings`}
-        className="flex items-center gap-1.5 rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-600 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
-      >
-        <span
-          aria-hidden="true"
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white dark:bg-blue-500"
-        >
-          {initial}
-        </span>
-        <span className="max-w-[8rem] truncate">{label}</span>
-        <CloudIcon />
-      </button>
-    );
-  }
-
-  // Cloud mode, signed out
   return (
-    <button
-      onClick={onClick}
-      title="Cloud storage selected but not signed in — click to sign in"
-      className="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+    <div
+      className="flex items-center rounded-full"
+      style={{ border: '0.5px solid #D1D5DB' }}
     >
-      <CloudIcon />
-      Sign in
-    </button>
+      {isCloudSignedIn ? (
+        <>
+          {/* Left segment: avatar + first name */}
+          <div className="flex items-center gap-1.5 py-1 pl-1 pr-2.5">
+            <div
+              className="flex items-center justify-center rounded-full text-white shrink-0"
+              style={{
+                width: 26,
+                height: 26,
+                backgroundColor: '#0070f3',
+                fontSize: 11,
+                fontWeight: 500,
+              }}
+            >
+              {initial}
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-gray-100">
+              {firstName}
+            </span>
+          </div>
+          {/* Vertical divider */}
+          <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
+          {/* Right segment: cloud icon → Settings */}
+          <button
+            onClick={onClick}
+            className="flex items-center justify-center px-2.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-full"
+            aria-label="Open settings"
+          >
+            <CloudIcon />
+          </button>
+        </>
+      ) : (
+        <>
+          {/* Left segment: lock icon + "Local only" */}
+          <div className="flex items-center gap-1.5 py-1 pl-2.5 pr-2.5">
+            <LockIcon />
+            <span style={{ fontSize: 13 }} className="text-gray-400">
+              Local only
+            </span>
+          </div>
+          {/* Vertical divider */}
+          <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
+          {/* Right segment: "Sign in" → Settings */}
+          <button
+            onClick={onClick}
+            className="flex items-center justify-center px-2.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-r-full"
+            aria-label="Sign in"
+          >
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#0070f3' }}>
+              Sign in
+            </span>
+          </button>
+        </>
+      )}
+    </div>
   );
 }
