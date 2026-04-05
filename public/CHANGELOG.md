@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.23.4 (2026-04-05)
+
+### Added
+- **Storage status pill in header** — A pill-shaped indicator now appears in the upper-right corner of both the home page and per-project headers showing the current storage mode and sign-in state. Local mode shows a gray "Local" pill with a database icon. Cloud mode shows a blue pill with the user's initial, display name, and cloud icon. Cloud mode without sign-in shows an amber "Sign in" pill. Clicking the pill opens App Settings. Matches the pattern used in GanttApp, MyScrumBudget, and SPERT Forecaster.
+
 ## Version 0.23.3 (2026-04-02)
 
 ### Added

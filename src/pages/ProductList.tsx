@@ -13,6 +13,7 @@ import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import ThemeToggle from '../components/ui/ThemeToggle';
+import StorageStatusPill from '../components/ui/StorageStatusPill';
 import { useDarkMode } from '../hooks/useDarkMode';
 import AppSettingsModal from '../components/settings/AppSettingsModal';
 import CreateProjectModal from '../components/product/CreateProjectModal';
@@ -218,6 +219,7 @@ export default function ProductList() {
             </p>
           </div>
           <div className="flex items-center gap-3 mt-1">
+            <StorageStatusPill onClick={() => setShowSettings(true)} />
             <button
               onClick={() => setShowSettings(true)}
               title="App Settings"

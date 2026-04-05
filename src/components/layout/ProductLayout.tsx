@@ -9,6 +9,7 @@ import { useStorage } from '../../lib/StorageProvider';
 import { formatRelativeTime } from '../../lib/formatDate';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import ThemeToggle from '../ui/ThemeToggle';
+import StorageStatusPill from '../ui/StorageStatusPill';
 import AppSettingsModal from '../settings/AppSettingsModal';
 import { Footer } from '../../pages/ChangelogView';
 
@@ -74,6 +75,7 @@ export default function ProductLayout() {
                   Saved {formatRelativeTime(lastSaved)}
                 </span>
               )}
+              <StorageStatusPill onClick={() => setShowSettings(true)} />
               <button
                 onClick={() => setShowSettings(true)}
                 title="App Settings"
