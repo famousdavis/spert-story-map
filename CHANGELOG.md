@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.23.7 (2026-04-09)
+
+### Improved
+- **Unified click-to-logout auth chip** — The entire storage status pill is now a single clickable button. When signed into cloud storage, clicking anywhere on the chip (avatar, first name, or cloud icon) opens a lightweight Account modal showing the user's display name and email with a Sign Out button. Sign Out signs out of Firebase and switches back to local mode in place — no page reload, no detour through the Settings tab. The button shows "Signing out…" and is disabled during the await to prevent double-fire. When signed out, clicking the chip continues to open App Settings (unchanged).
+
 ## Version 0.23.6 (2026-04-05)
 
 ### Legal
