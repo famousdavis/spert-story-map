@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.23.9 (2026-04-10)
+
+### Improved
+- **Sign-in buttons in App Settings** now show Google and Microsoft brand icons with solid blue styling.
+
 ## Version 0.23.8 (2026-04-10)
 
 ### Fixed
