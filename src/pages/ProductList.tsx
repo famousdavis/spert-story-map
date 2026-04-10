@@ -205,7 +205,6 @@ export default function ProductList() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <FirstRunBanner />
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
@@ -238,6 +237,8 @@ export default function ProductList() {
             <StorageStatusPill onClick={() => setShowSettings(true)} />
           </div>
         </div>
+
+        <FirstRunBanner />
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3 mb-8">
