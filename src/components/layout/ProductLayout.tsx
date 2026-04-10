@@ -11,6 +11,7 @@ import { useDarkMode } from '../../hooks/useDarkMode';
 import ThemeToggle from '../ui/ThemeToggle';
 import StorageStatusPill from '../ui/StorageStatusPill';
 import AppSettingsModal from '../settings/AppSettingsModal';
+import FirstRunBanner from '../ui/FirstRunBanner';
 import { Footer } from '../../pages/ChangelogView';
 
 const tabs = [
@@ -110,6 +111,8 @@ export default function ProductLayout() {
           </nav>
         </div>
       </header>
+
+      <FirstRunBanner />
 
       {/* Save error banner */}
       {saveError && (
