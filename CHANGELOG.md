@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.23.8 (2026-04-10)
+
+### Fixed
+- **First-run banner placement** — The ToS/Privacy Policy first-run banner now appears below the app header instead of above it, on both the home page and product views.
+
 ## Version 0.23.7 (2026-04-09)
 
 ### Improved
