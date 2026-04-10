@@ -238,7 +238,7 @@ export default function ProductList() {
           </div>
         </div>
 
-        <div className="[&:not(:empty)]:mb-8"><FirstRunBanner /></div>
+        <FirstRunBanner />
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3 mb-8">

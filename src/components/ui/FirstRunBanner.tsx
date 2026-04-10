@@ -18,7 +18,7 @@ export default function FirstRunBanner() {
   };
 
   return (
-    <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700/50 px-4 py-3">
+    <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700/50 px-4 py-3 mb-6">
       <div className="max-w-4xl mx-auto flex items-start justify-between gap-3">
         <p className="text-xs text-blue-800 dark:text-blue-200">
           SPERT® Suite web apps are free to use. No account is required to use them.
