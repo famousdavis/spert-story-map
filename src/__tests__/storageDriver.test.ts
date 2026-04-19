@@ -16,6 +16,7 @@ vi.mock('../lib/storage', () => ({
   savePreferences: vi.fn(),
   getWorkspaceId: vi.fn(() => 'ws-uuid-123'),
   flushPendingSaves: vi.fn(),
+  cancelPendingSaves: vi.fn(),
   onSaveError: vi.fn(),
   migrateToV2: vi.fn((p) => p),
 }));
@@ -127,6 +128,12 @@ describe('createLocalStorageDriver', () => {
     const driver = createLocalStorageDriver();
     driver.flushPendingSaves();
     expect(storage.flushPendingSaves).toHaveBeenCalledOnce();
+  });
+
+  it('cancelPendingSaves delegates', () => {
+    const driver = createLocalStorageDriver();
+    driver.cancelPendingSaves();
+    expect(storage.cancelPendingSaves).toHaveBeenCalledOnce();
   });
 
   it('onSaveError delegates', () => {

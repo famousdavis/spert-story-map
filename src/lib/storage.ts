@@ -44,6 +44,19 @@ export function flushPendingSaves(): void {
   pendingSaves = {};
 }
 
+/**
+ * Cancel all pending debounced saves WITHOUT writing.
+ * Used by sign-out cleanup — we do not want trailing writes to
+ * land after the user has asked to be signed out.
+ */
+export function cancelPendingSaves(): void {
+  for (const key of Object.keys(saveTimers)) {
+    clearTimeout(saveTimers[key]);
+  }
+  saveTimers = {};
+  pendingSaves = {};
+}
+
 function immediatelyLoad(key: string): unknown {
   try {
     const raw = localStorage.getItem(key);
