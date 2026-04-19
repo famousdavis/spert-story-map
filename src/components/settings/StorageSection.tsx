@@ -3,11 +3,13 @@
 // See LICENSE file in the project root for full license text.
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
 import { migrateLocalToCloud, testCloudConnection } from '../../lib/migration';
 import { loadProductIndex, clearAllLocalProducts, loadPreferences, savePreferences } from '../../lib/storage';
 import { exportAllProducts } from '../../lib/importExport';
+import { signOutCleanup } from '../../lib/signOutCleanup';
 import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import TosConsentModal from './TosConsentModal';
@@ -39,8 +41,9 @@ function MicrosoftIcon() {
 type AuthProvider = 'google' | 'microsoft';
 
 export default function StorageSection() {
-  const { user, firebaseAvailable, signInWithGoogle, signInWithMicrosoft, signOut } = useAuth();
+  const { user, firebaseAvailable, signInWithGoogle, signInWithMicrosoft } = useAuth();
   const { driver, mode, switchMode, isCloudAvailable } = useStorage();
+  const navigate = useNavigate();
   const [showUploadConfirm, setShowUploadConfirm] = useState(false);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -61,8 +64,12 @@ export default function StorageSection() {
     if (newMode === mode) return;
 
     if (newMode === 'local') {
-      // Cloud → Local: simple mode switch, no migration
+      // Cloud → Local: simple mode switch, no migration.
+      // Navigate to / so that any currently-open cloud product page
+      // does not become a "Project not found" dead end after the
+      // driver swaps to local.
       switchMode('local');
+      navigate('/');
       return;
     }
 
@@ -155,9 +162,18 @@ export default function StorageSection() {
       }
     } catch (e) {
       console.error('Sign-in failed:', e instanceof Error ? e.message : 'Unknown error');
-      setAuthError(e.code === 'auth/popup-closed-by-user'
-        ? 'Sign-in was cancelled.'
-        : 'Sign-in failed. Please try again.');
+      const code = (e && typeof e === 'object' && 'code' in e && typeof (e as { code: unknown }).code === 'string')
+        ? (e as { code: string }).code
+        : '';
+      if (code === 'auth/popup-blocked') {
+        setAuthError('Your browser blocked the sign-in popup. Please allow popups for this site and try again.');
+      } else if (code === 'auth/cancelled-popup-request') {
+        setAuthError('Your browser blocked the sign-in popup. Please allow popups for this site and try again.');
+      } else if (code === 'auth/popup-closed-by-user') {
+        setAuthError('Sign-in was cancelled.');
+      } else {
+        setAuthError('Sign-in failed. Please try again.');
+      }
     }
   };
 
@@ -171,10 +187,7 @@ export default function StorageSection() {
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    if (mode === 'cloud') {
-      switchMode('local');
-    }
+    await signOutCleanup(driver, switchMode);
   };
 
   return (

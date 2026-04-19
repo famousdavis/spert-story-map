@@ -25,6 +25,7 @@ import {
   savePreferences as _savePreferences,
   getWorkspaceId as _getWorkspaceId,
   flushPendingSaves as _flushPendingSaves,
+  cancelPendingSaves as _cancelPendingSaves,
   onSaveError as _onSaveError,
 } from './storage';
 
@@ -96,6 +97,10 @@ export function createLocalStorageDriver(): StorageDriver {
 
     flushPendingSaves() {
       _flushPendingSaves();
+    },
+
+    cancelPendingSaves() {
+      _cancelPendingSaves();
     },
 
     onSaveError(cb: (error: Error) => void) {

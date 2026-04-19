@@ -7,12 +7,12 @@ import type { User } from 'firebase/auth';
 import {
   onAuthStateChanged,
   signInWithPopup,
-  signOut as firebaseSignOut,
   GoogleAuthProvider,
   OAuthProvider,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseAvailable } from './firebase';
+import { signOutCleanup } from './signOutCleanup';
 import {
   isTosAcceptedLocally,
   isTosAcceptedInFirestore,
@@ -75,16 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               // ToS outdated or missing — sign out
               clearTosAcceptance();
-              await firebaseSignOut(auth);
-              setUser(null);
+              await signOutCleanup(null);
               return;
             }
           } catch (e) {
             console.error('Failed to check ToS acceptance:', e instanceof Error ? e.message : 'Unknown error');
             // Cannot verify ToS — sign out to prevent bypass
             clearTosAcceptance();
-            await firebaseSignOut(auth);
-            setUser(null);
+            await signOutCleanup(null);
             return;
           }
         }
@@ -109,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     if (!auth) return;
-    await firebaseSignOut(auth);
+    await signOutCleanup(null);
   };
 
   return (

@@ -2,9 +2,11 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
+import { signOutCleanup } from '../../lib/signOutCleanup';
+import AccountPopoverLocal from './AccountPopoverLocal';
 import Modal from './Modal';
 
 function CloudIcon() {
@@ -32,12 +34,15 @@ interface StorageStatusPillProps {
 }
 
 export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
-  const { user, signOut } = useAuth();
-  const { mode, switchMode } = useStorage();
+  const { user } = useAuth();
+  const { driver, mode, switchMode } = useStorage();
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [localPopoverOpen, setLocalPopoverOpen] = useState(false);
 
   const isCloudSignedIn = mode === 'cloud' && !!user;
+  const isSignedInLocal = !!user && mode === 'local';
   const displayName = user?.displayName ?? '';
   // Handle "Last, First" (Microsoft) and "First Last" (Google) formats
   const firstName = displayName.includes(',')
@@ -48,6 +53,8 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
   const handlePillClick = () => {
     if (isCloudSignedIn) {
       setLogoutOpen(true);
+    } else if (isSignedInLocal) {
+      setLocalPopoverOpen(prev => !prev);
     } else {
       onClick();
     }
@@ -56,74 +63,125 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
   const handleSignOut = async () => {
     setSigningOut(true);
     try {
-      await signOut();
-      await switchMode('local');
+      await signOutCleanup(driver, switchMode);
       setLogoutOpen(false);
     } finally {
       setSigningOut(false);
     }
   };
 
+  const handleLocalPopoverSignOut = async () => {
+    await signOutCleanup(driver, switchMode);
+  };
+
+  const handleSwitchToCloud = () => {
+    // AppSettingsModal has no tab system — StorageSection is the first
+    // child of the modal body, so opening App Settings lands the user
+    // on the storage toggle directly.
+    onClick();
+  };
+
   return (
     <>
-      <button
-        type="button"
-        onClick={handlePillClick}
-        className="flex items-center rounded-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-        style={{ border: '0.5px solid #D1D5DB' }}
-        aria-label={
-          isCloudSignedIn
-            ? `Signed in as ${firstName} — click to sign out`
-            : 'Sign in'
-        }
-      >
-        {isCloudSignedIn ? (
-          <>
-            {/* Left segment: avatar + first name */}
-            <div className="flex items-center gap-1.5 py-1 pl-1 pr-2.5">
-              <div
-                className="flex items-center justify-center rounded-full text-white shrink-0"
-                style={{
-                  width: 26,
-                  height: 26,
-                  backgroundColor: '#0070f3',
-                  fontSize: 11,
-                  fontWeight: 500,
-                }}
-              >
-                {initial}
+      <div className="relative">
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handlePillClick}
+          className="flex items-center rounded-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+          style={{ border: '0.5px solid #D1D5DB' }}
+          aria-label={
+            isCloudSignedIn
+              ? `Signed in as ${firstName} — click to sign out`
+              : isSignedInLocal
+                ? `Signed in as ${firstName} — local storage — click for account options`
+                : 'Sign in'
+          }
+        >
+          {isCloudSignedIn ? (
+            <>
+              {/* Left segment: avatar + first name */}
+              <div className="flex items-center gap-1.5 py-1 pl-1 pr-2.5">
+                <div
+                  className="flex items-center justify-center rounded-full text-white shrink-0"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    backgroundColor: '#0070f3',
+                    fontSize: 11,
+                    fontWeight: 500,
+                  }}
+                >
+                  {initial}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-gray-100">
+                  {firstName}
+                </span>
               </div>
-              <span style={{ fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-gray-100">
-                {firstName}
-              </span>
-            </div>
-            {/* Vertical divider */}
-            <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
-            {/* Right segment: cloud icon (visual only) */}
-            <div className="flex items-center justify-center px-2.5 py-1">
-              <CloudIcon />
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Left segment: lock icon + "Local only" */}
-            <div className="flex items-center gap-1.5 py-1 pl-2.5 pr-2.5">
-              <LockIcon />
-              <span style={{ fontSize: 13 }} className="text-gray-400">
-                Local only
-              </span>
-            </div>
-            {/* Vertical divider */}
-            <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
-            {/* Right segment: "Sign in" label (visual only) */}
-            <div className="flex items-center justify-center px-2.5 py-1">
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#0070f3' }}>
-                Sign in
-              </span>
-            </div>
-          </>
+              {/* Vertical divider */}
+              <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
+              {/* Right segment: cloud icon (visual only) */}
+              <div className="flex items-center justify-center px-2.5 py-1">
+                <CloudIcon />
+              </div>
+            </>
+          ) : isSignedInLocal ? (
+            <>
+              {/* Left segment: avatar + first name */}
+              <div className="flex items-center gap-1.5 py-1 pl-1 pr-2.5">
+                <div
+                  className="flex items-center justify-center rounded-full text-white shrink-0"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    backgroundColor: '#0070f3',
+                    fontSize: 11,
+                    fontWeight: 500,
+                  }}
+                >
+                  {initial}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-gray-100">
+                  {firstName}
+                </span>
+              </div>
+              {/* Vertical divider */}
+              <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
+              {/* Right segment: lock icon (visual only) */}
+              <div className="flex items-center justify-center px-2.5 py-1">
+                <LockIcon />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Left segment: lock icon + "Local only" */}
+              <div className="flex items-center gap-1.5 py-1 pl-2.5 pr-2.5">
+                <LockIcon />
+                <span style={{ fontSize: 13 }} className="text-gray-400">
+                  Local only
+                </span>
+              </div>
+              {/* Vertical divider */}
+              <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
+              {/* Right segment: "Sign in" label (visual only) */}
+              <div className="flex items-center justify-center px-2.5 py-1">
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#0070f3' }}>
+                  Sign in
+                </span>
+              </div>
+            </>
+          )}
+        </button>
+        {isSignedInLocal && localPopoverOpen && user && (
+          <AccountPopoverLocal
+            user={user}
+            onSignOut={handleLocalPopoverSignOut}
+            onSwitchToCloud={handleSwitchToCloud}
+            onClose={() => setLocalPopoverOpen(false)}
+            anchorRef={buttonRef}
+          />
         )}
-      </button>
+      </div>
 
       <Modal
         open={logoutOpen}

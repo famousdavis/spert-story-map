@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useState, useEffect } from 'react';
-import { NavLink, useParams, useLocation, Outlet } from 'react-router-dom';
+import { NavLink, useParams, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useProduct } from '../../hooks/useProduct';
 import { useStorage } from '../../lib/StorageProvider';
 import { formatRelativeTime } from '../../lib/formatDate';
@@ -27,7 +27,8 @@ const tabs = [
 export default function ProductLayout() {
   const { productId } = useParams();
   const { product, loading, lastSaved, updateProduct, undo, redo } = useProduct(productId);
-  const { driver } = useStorage();
+  const { driver, mode } = useStorage();
+  const navigate = useNavigate();
   const [saveError, setSaveError] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const { theme, toggleTheme } = useDarkMode();
@@ -39,6 +40,16 @@ export default function ProductLayout() {
     driver.onSaveError(() => setSaveError(true));
     return () => driver.onSaveError(null);
   }, [driver]);
+
+  // Safety net: if we end up in local mode with no loaded product
+  // (e.g. because the driver swapped after a mode switch or sign-out
+  // and the cloud-only product is no longer reachable), go home
+  // instead of showing "Project not found".
+  useEffect(() => {
+    if (!loading && !product && mode === 'local') {
+      navigate('/', { replace: true });
+    }
+  }, [loading, product, mode, navigate]);
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen text-gray-400 dark:text-gray-500">Loading...</div>;

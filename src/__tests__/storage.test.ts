@@ -11,9 +11,11 @@ import {
   getWorkspaceId,
   appendChangeLogEntry,
   clearAllLocalProducts,
+  saveProduct,
   saveProductImmediate,
   loadProductIndex,
   loadProduct,
+  cancelPendingSaves,
 } from '../lib/storage';
 import { SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from '../lib/constants';
 
@@ -503,6 +505,30 @@ describe('clearAllLocalProducts', () => {
   it('is safe to call with no products', () => {
     expect(() => clearAllLocalProducts()).not.toThrow();
     expect(loadProductIndex()).toEqual([]);
+  });
+});
+
+// --- cancelPendingSaves ---
+describe('cancelPendingSaves', () => {
+  it('prevents a debounced saveProduct from writing to localStorage', () => {
+    vi.useFakeTimers();
+    try {
+      const p = createNewProduct('Doomed Product');
+      // Schedule a debounced save — this should NOT reach localStorage.
+      saveProduct(p);
+      // Cancel before the 500ms debounce fires.
+      cancelPendingSaves();
+      // Fast-forward past the debounce window.
+      vi.advanceTimersByTime(1000);
+      // Product document was never written.
+      expect(loadProduct(p.id)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is safe to call with no pending saves', () => {
+    expect(() => cancelPendingSaves()).not.toThrow();
   });
 });
 

@@ -186,6 +186,7 @@ export interface StorageDriver {
   onProductChange(id: string, callback: (product: Product) => void): () => void;
   onSaveError(callback: (error: Error) => void): void;
   flushPendingSaves(): void;
+  cancelPendingSaves(): void;
 }
 
 // ---------------------------------------------------------------------------

@@ -252,6 +252,26 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       }
     },
 
+    /**
+     * Cancel both pending debounce timers WITHOUT writing.
+     * Used by sign-out cleanup — a trailing write after credential
+     * revocation produces PERMISSION_DENIED, and a trailing write
+     * that races revocation may commit stale state to the user's
+     * cloud doc after they believed they signed out.
+     */
+    cancelPendingSaves() {
+      if (productTimer) {
+        clearTimeout(productTimer);
+        productTimer = null;
+      }
+      productPending = null;
+      if (prefsTimer) {
+        clearTimeout(prefsTimer);
+        prefsTimer = null;
+      }
+      prefsPending = null;
+    },
+
     onSaveError(cb: (error: Error) => void) {
       _onSaveError = cb;
     },
