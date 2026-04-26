@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 0.25.0 (2026-04-26)
+
+Cloud Storage modal unification. Targeted UX refinement — no schema, provider, or driver changes.
+
+### Changed
+- **Unified chip click behavior across all three auth states.** Previously, clicking the storage status pill did three different things depending on state: cloud-signed-in opened an inline "Account" modal, signed-in-local opened a popover with "Switch to Cloud Storage" and "Sign Out" buttons, and signed-out opened App Settings. All three states now open the same Cloud Storage modal. Sign-out and storage-mode switching are reached through the modal's identity card, not through divergent chip behaviors.
+- **Modal renamed from "App Settings" to "Cloud Storage".** Reflects the modal's actual primary purpose — managing storage mode, sign-in, and migration. Export Attribution and Notifications remain second-class sections within the same modal.
+- **Identity card display name now normalized.** Microsoft Entra ID returns `displayName` as `"Last, First MI"`, which read awkwardly as the primary identity label. The card now shows `"First MI Last"` reading order. Google sign-ins (already in `"First Last"` order) pass through unchanged. Pulled from a new shared utility so the chip and the identity card always agree.
+- **Voluntary popup-dismiss is now silent.** Closing the Google or Microsoft sign-in popup yourself (`auth/popup-closed-by-user`) no longer surfaces a "Sign-in was cancelled." message — the user explicitly dismissed the popup, so an error label was redundant. Popup-blocked and other auth errors still surface their recovery message.
+
+### Added
+- **"Keep using local storage" button (signed-in + local mode only).** When you sign in but have not yet switched to cloud storage, the modal now shows an outline button below the identity card that closes the modal without changing storage mode. Previously the only ways out without switching were ×, Esc, or backdrop click — discoverable, but not obvious. The button is intentionally hidden when already on cloud storage (Sign Out and the Local radio already cover that case).
+- **Auto-close after sign-out.** Clicking the red "Sign out" link in the identity card now closes the Cloud Storage modal automatically once `signOutCleanup` resolves. The chip updates to the signed-out variant in place, no page reload.
+
+### Internal
+- New module `src/lib/userDisplay.ts` exports `normalizeDisplayName` (comma-detection swap for Microsoft `"Last, First MI"` format) and `getFirstName` (first token, falling back to email local-part). Replaces duplicated inline parsing that previously lived in both `StorageStatusPill` and `AccountPopoverLocal`.
+- `StorageStatusPill` reduced to a pure visual component. All click handling collapses to a single `onClick` prop call — no internal modals, no inline popover, no `signOutCleanup` import, no refs. Three visual variants and the `onClick: () => void` interface are unchanged, so `ProductList` and `ProductLayout` need no updates.
+- `AppSettingsModal` now passes `onClose` through to `StorageSection`, which uses it for both the new "Keep using local storage" button and post-sign-out auto-close. The prop is optional; `StorageSection` consumers that render it without a parent modal continue to work.
+- `AccountPopoverLocal.tsx` deleted. Its functionality (display name + email + sign-out + switch-to-cloud) is now subsumed by the unified Cloud Storage modal.
+
+### Test & lint baseline restored
+The ship gate caught a backlog of pre-existing failures on `main` that had accumulated and were blocking clean releases. Fixed in this delta so v0.25.0 ships against a green baseline.
+- `useSizingLayout` no longer crashes when a caller passes a `SizingFilter` without a `releaseIds` field. The interface still types `releaseIds` as required, but the runtime now guards with `(filter.releaseIds?.length ?? 0) > 0` to match how older test fixtures construct filters. Restores 6 sizing-layout tests.
+- `computeLayout.test.ts` `totalWidth` assertions updated to include `RIGHT_LABEL_WIDTH`. The mirrored release-label column was added in v0.21 but the two affected expectations were not migrated. Restores 2 layout tests.
+- `ReleaseDivider.tsx` destructures `useInlineEdit` and `useTooltip` returns at the top of the component to comply with the React 19 `react-hooks/refs` rule, which flags `someHook.refField` access during render. Behavior is identical; this is a zero-cost lint fix following the project's standing pattern.
+- `useMapDrag.ts` adds `layout.releaseLanes` to the `handleDragMove` `useCallback` dep array — it is read inside the callback body via `buildReleaseMoveState` but was missing from the dep list. Resolves both `react-hooks/exhaustive-deps` and `react-hooks/preserve-manual-memoization`.
+- `StoryMapView.tsx` removes the unused `handleAddRelease` from the `useMapHandlers` destructure (only `handleAddReleaseAfter` is wired to the canvas).
+
 ## Version 0.24.0 (2026-04-19)
 
 Privacy and correctness bug-fix release. No new features, no schema changes, no Firestore rule changes.

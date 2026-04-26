@@ -64,8 +64,8 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
     if (filter.themeIds.length > 0 && !filter.themeIds.includes(theme.id)) return;
 
     // Release filter — show only ribs allocated to selected releases
-    if (filter.releaseIds.length > 0) {
-      const allocated = rib.releaseAllocations?.some(a => filter.releaseIds.includes(a.releaseId));
+    if ((filter.releaseIds?.length ?? 0) > 0) {
+      const allocated = rib.releaseAllocations?.some(a => filter.releaseIds!.includes(a.releaseId));
       if (!allocated) return;
     }
 

@@ -34,14 +34,40 @@ export default function ReleaseDivider({
   onClick, onReleaseDragStart,
 }: ReleaseDividerProps) {
   // Left label inline edit
-  const leftEdit = useInlineEdit(lane.releaseName, (name) => onRename(lane.releaseId, name));
+  const {
+    editing: leftEditing,
+    draft: leftDraft,
+    setDraft: setLeftDraft,
+    inputRef: leftInputRef,
+    startEditing: startLeftEditing,
+    commit: commitLeftEdit,
+    handleKeyDown: handleLeftKeyDown,
+  } = useInlineEdit(lane.releaseName, (name) => onRename(lane.releaseId, name));
   // Right label inline edit (shares the same rename callback)
-  const rightEdit = useInlineEdit(lane.releaseName, (name) => onRename(lane.releaseId, name));
+  const {
+    editing: rightEditing,
+    draft: rightDraft,
+    setDraft: setRightDraft,
+    inputRef: rightInputRef,
+    startEditing: startRightEditing,
+    commit: commitRightEdit,
+    handleKeyDown: handleRightKeyDown,
+  } = useInlineEdit(lane.releaseName, (name) => onRename(lane.releaseId, name));
 
   // Delete tooltip
   const deleteTooltipText = hasAllocations ? 'Remove all items first' : `Delete ${lane.releaseName}`;
-  const leftDeleteTooltip = useTooltip(deleteTooltipText);
-  const rightDeleteTooltip = useTooltip(deleteTooltipText);
+  const {
+    triggerRef: leftDeleteTriggerRef,
+    onMouseEnter: leftDeleteOnMouseEnter,
+    onMouseLeave: leftDeleteOnMouseLeave,
+    tooltipEl: leftDeleteTooltipEl,
+  } = useTooltip(deleteTooltipText);
+  const {
+    triggerRef: rightDeleteTriggerRef,
+    onMouseEnter: rightDeleteOnMouseEnter,
+    onMouseLeave: rightDeleteOnMouseLeave,
+    tooltipEl: rightDeleteTooltipEl,
+  } = useTooltip(deleteTooltipText);
 
   // Click/double-click disambiguation for left label
   const leftClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,7 +82,7 @@ export default function ReleaseDivider({
   const handleLeftDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (leftClickTimer.current) { clearTimeout(leftClickTimer.current); leftClickTimer.current = null; }
-    leftEdit.startEditing();
+    startLeftEditing();
   };
 
   // Click/double-click disambiguation for right label
@@ -72,7 +98,7 @@ export default function ReleaseDivider({
   const handleRightDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (rightClickTimer.current) { clearTimeout(rightClickTimer.current); rightClickTimer.current = null; }
-    rightEdit.startEditing();
+    startRightEditing();
   };
 
   // Drag grip handler
@@ -116,14 +142,14 @@ export default function ReleaseDivider({
         className="absolute flex items-start pt-2 px-2 pointer-events-none"
         style={{ top: lane.y, left: 0, width: LANE_LABEL_WIDTH, height: lane.height }}
       >
-        {leftEdit.editing ? (
+        {leftEditing ? (
           <input
-            ref={leftEdit.inputRef}
+            ref={leftInputRef}
             type="text"
-            value={leftEdit.draft}
-            onChange={e => leftEdit.setDraft(e.target.value)}
-            onBlur={leftEdit.commit}
-            onKeyDown={leftEdit.handleKeyDown}
+            value={leftDraft}
+            onChange={e => setLeftDraft(e.target.value)}
+            onBlur={commitLeftEdit}
+            onKeyDown={handleLeftKeyDown}
             onClick={e => e.stopPropagation()}
             className="pointer-events-auto text-xs font-semibold text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-gray-800/80 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-full border-0"
           />
@@ -139,7 +165,7 @@ export default function ReleaseDivider({
           </span>
         )}
         {/* Drag grip */}
-        {onReleaseDragStart && !leftEdit.editing && (
+        {onReleaseDragStart && !leftEditing && (
           <span
             className="pointer-events-auto text-sm leading-none text-blue-300 hover:text-blue-500 dark:text-blue-600 dark:hover:text-blue-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 ml-1 select-none"
             onPointerDown={handleGripPointerDown}
@@ -163,9 +189,9 @@ export default function ReleaseDivider({
       )}
       {onDeleteRelease && (
         <button
-          ref={leftDeleteTooltip.triggerRef}
-          onMouseEnter={leftDeleteTooltip.onMouseEnter}
-          onMouseLeave={leftDeleteTooltip.onMouseLeave}
+          ref={leftDeleteTriggerRef as React.Ref<HTMLButtonElement>}
+          onMouseEnter={leftDeleteOnMouseEnter}
+          onMouseLeave={leftDeleteOnMouseLeave}
           className={`absolute text-[10px] font-medium rounded px-1 py-0.5 transition-colors ${
             hasAllocations
               ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
@@ -175,7 +201,7 @@ export default function ReleaseDivider({
           onClick={(e) => { e.stopPropagation(); if (!hasAllocations) onDeleteRelease(lane.releaseId); }}
         >
           ×
-          {leftDeleteTooltip.tooltipEl}
+          {leftDeleteTooltipEl}
         </button>
       )}
 
@@ -186,14 +212,14 @@ export default function ReleaseDivider({
         className="absolute flex items-start pt-2 px-2 pointer-events-none"
         style={{ top: lane.y, left: rightLabelX, width: RIGHT_LABEL_WIDTH, height: lane.height }}
       >
-        {rightEdit.editing ? (
+        {rightEditing ? (
           <input
-            ref={rightEdit.inputRef}
+            ref={rightInputRef}
             type="text"
-            value={rightEdit.draft}
-            onChange={e => rightEdit.setDraft(e.target.value)}
-            onBlur={rightEdit.commit}
-            onKeyDown={rightEdit.handleKeyDown}
+            value={rightDraft}
+            onChange={e => setRightDraft(e.target.value)}
+            onBlur={commitRightEdit}
+            onKeyDown={handleRightKeyDown}
             onClick={e => e.stopPropagation()}
             className="pointer-events-auto text-xs font-semibold text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-gray-800/80 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-full border-0"
           />
@@ -209,7 +235,7 @@ export default function ReleaseDivider({
           </span>
         )}
         {/* Drag grip */}
-        {onReleaseDragStart && !rightEdit.editing && (
+        {onReleaseDragStart && !rightEditing && (
           <span
             className="pointer-events-auto text-sm leading-none text-blue-300 hover:text-blue-500 dark:text-blue-600 dark:hover:text-blue-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 ml-1 select-none"
             onPointerDown={handleGripPointerDown}
@@ -233,9 +259,9 @@ export default function ReleaseDivider({
       )}
       {onDeleteRelease && (
         <button
-          ref={rightDeleteTooltip.triggerRef}
-          onMouseEnter={rightDeleteTooltip.onMouseEnter}
-          onMouseLeave={rightDeleteTooltip.onMouseLeave}
+          ref={rightDeleteTriggerRef as React.Ref<HTMLButtonElement>}
+          onMouseEnter={rightDeleteOnMouseEnter}
+          onMouseLeave={rightDeleteOnMouseLeave}
           className={`absolute text-[10px] font-medium rounded px-1 py-0.5 transition-colors ${
             hasAllocations
               ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
@@ -245,7 +271,7 @@ export default function ReleaseDivider({
           onClick={(e) => { e.stopPropagation(); if (!hasAllocations) onDeleteRelease(lane.releaseId); }}
         >
           ×
-          {rightDeleteTooltip.tooltipEl}
+          {rightDeleteTooltipEl}
         </button>
       )}
     </>

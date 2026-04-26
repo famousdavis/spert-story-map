@@ -13,6 +13,7 @@ import {
   THEME_HEIGHT,
   BACKBONE_HEIGHT,
   LANE_LABEL_WIDTH,
+  RIGHT_LABEL_WIDTH,
   MIN_LANE_HEIGHT,
 } from '../components/storymap/useMapLayout';
 
@@ -108,7 +109,7 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     const expectedContentWidth = 2 * (COL_WIDTH + COL_GAP) - COL_GAP;
-    expect(result.totalWidth).toBe(LANE_LABEL_WIDTH + expectedContentWidth);
+    expect(result.totalWidth).toBe(LANE_LABEL_WIDTH + expectedContentWidth + RIGHT_LABEL_WIDTH);
   });
 
   it('creates release lanes with correct positions', () => {
@@ -302,7 +303,7 @@ describe('computeLayout', () => {
     expect(result.themeSpans[0].themeId).toBe('t1');
     expect(result.themeSpans[0].isEmpty).toBe(true);
     expect(result.themeSpans[0].width).toBe(COL_WIDTH);
-    expect(result.totalWidth).toBe(LANE_LABEL_WIDTH + COL_WIDTH);
+    expect(result.totalWidth).toBe(LANE_LABEL_WIDTH + COL_WIDTH + RIGHT_LABEL_WIDTH);
   });
 
   it('positions multiple empty themes correctly', () => {
