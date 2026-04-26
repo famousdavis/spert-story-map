@@ -213,7 +213,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
 
     dragRef.current = state;
     setDragState(state);
-  }, [screenToMap, findReleaseLane, findColumn, findThemeSpan, layout.cells, layout.columns, layout.themeSpans]);
+  }, [screenToMap, findReleaseLane, findColumn, findThemeSpan, layout.cells, layout.columns, layout.themeSpans, layout.releaseLanes]);
 
   // --- Shared end handler ---
   const handleDragEnd = useCallback(() => {

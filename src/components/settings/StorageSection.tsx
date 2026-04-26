@@ -14,6 +14,7 @@ import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import TosConsentModal from './TosConsentModal';
 import { isTosAcceptedLocally, cacheTosAcceptance } from '../../lib/tosHelpers';
+import { normalizeDisplayName } from '../../lib/userDisplay';
 import type { StorageMode } from '../../types';
 
 function GoogleIcon() {
@@ -40,7 +41,11 @@ function MicrosoftIcon() {
 
 type AuthProvider = 'google' | 'microsoft';
 
-export default function StorageSection() {
+interface StorageSectionProps {
+  onClose?: () => void;
+}
+
+export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   const { user, firebaseAvailable, signInWithGoogle, signInWithMicrosoft } = useAuth();
   const { driver, mode, switchMode, isCloudAvailable } = useStorage();
   const navigate = useNavigate();
@@ -170,7 +175,9 @@ export default function StorageSection() {
       } else if (code === 'auth/cancelled-popup-request') {
         setAuthError('Your browser blocked the sign-in popup. Please allow popups for this site and try again.');
       } else if (code === 'auth/popup-closed-by-user') {
-        setAuthError('Sign-in was cancelled.');
+        // User intentionally dismissed the popup — stay silent.
+        setAuthError(null);
+        return;
       } else {
         setAuthError('Sign-in failed. Please try again.');
       }
@@ -188,6 +195,7 @@ export default function StorageSection() {
 
   const handleSignOut = async () => {
     await signOutCleanup(driver, switchMode);
+    onClose?.();
   };
 
   return (
@@ -259,18 +267,31 @@ export default function StorageSection() {
           )}
         </div>
       ) : (
-        <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3">
-          <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.displayName || 'Signed in'}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
+        <>
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {normalizeDisplayName(user.displayName) || user.email?.split('@')[0] || 'Signed in'}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+            >
+              Sign out
+            </button>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-          >
-            Sign out
-          </button>
-        </div>
+          {mode === 'local' && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-3 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              Keep using local storage
+            </button>
+          )}
+        </>
       )}
 
       {/* Download all projects (cloud mode only) */}

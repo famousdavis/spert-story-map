@@ -29,8 +29,8 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="App Settings">
-      <StorageSection />
+    <Modal open={open} onClose={onClose} title="Cloud Storage">
+      <StorageSection onClose={onClose} />
 
       <Section title="Export Attribution">
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">

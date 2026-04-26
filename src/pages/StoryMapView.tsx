@@ -141,7 +141,7 @@ export default function StoryMapView() {
     handleRenameTheme, handleRenameBackbone, handleRenameRib, handleRenameRelease,
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
     handleConfirmDelete, deleteTarget, setDeleteTarget,
-    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRibToRelease, handleAddRelease, handleAddReleaseAfter,
+    handleAddTheme, handleAddBackbone, handleAddRib, handleAddRibToRelease, handleAddReleaseAfter,
     dragLabel,
   } = useMapHandlers({
     product, updateProduct, mutations,
