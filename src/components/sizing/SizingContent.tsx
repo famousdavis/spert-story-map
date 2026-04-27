@@ -2,18 +2,21 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SIZE_COLORS } from '../ui/SizePicker';
 import { useTooltip } from '../ui/Tooltip';
+import KebabMenu from '../ui/KebabMenu';
 import { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, HEADER_HEIGHT, ZONE_GAP } from './useSizingLayout';
 import type { Size, Category } from '../../types';
 
-interface SizingCell {
+export interface SizingCell {
   id: string;
   name: string;
   size: Size;
   sizeLabel: string | null;
   category: Category;
+  themeId: string;
+  backboneId: string;
   backboneName: string;
   locked: boolean;
   percentComplete: number;
@@ -60,6 +63,9 @@ interface SizingContentProps {
   mapSizeRef: React.MutableRefObject<{ width: number; height: number }>;
   dragState: SizingDragState | null;
   onDragStart: (e: React.PointerEvent, cell: SizingCell) => void;
+  onRibEdit: (cell: SizingCell) => void;
+  onRibSplit: (cell: SizingCell) => void;
+  onRibDelete: (cell: SizingCell) => void;
 }
 
 // Header background colors keyed by size label (lighter fill for column headers)
@@ -74,7 +80,7 @@ const HEADER_BG: Record<string, string> = {
 };
 const DEFAULT_HEADER_BG = 'bg-gray-50 border-gray-200 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300';
 
-export default function SizingContent({ layout, mapSizeRef, dragState, onDragStart }: SizingContentProps) {
+export default function SizingContent({ layout, mapSizeRef, dragState, onDragStart, onRibEdit, onRibSplit, onRibDelete }: SizingContentProps) {
   const { sizeColumns, unsizedZone, unsizedCount, sizeColumnsY, cells, totalWidth, totalHeight } = layout;
 
   // Report map dimensions for auto-fit
@@ -163,6 +169,9 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
           cell={cell}
           onDragStart={onDragStart}
           isDragging={isDragging && dragRibId === cell.id}
+          onEdit={onRibEdit}
+          onSplit={onRibSplit}
+          onDelete={onRibDelete}
         />
       ))}
 
@@ -193,17 +202,31 @@ interface SizingRibCellProps {
   cell: SizingCell;
   onDragStart: (e: React.PointerEvent, cell: SizingCell) => void;
   isDragging: boolean;
+  onEdit: (cell: SizingCell) => void;
+  onSplit: (cell: SizingCell) => void;
+  onDelete: (cell: SizingCell) => void;
 }
 
-function SizingRibCell({ cell, onDragStart, isDragging }: SizingRibCellProps) {
+function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelete }: SizingRibCellProps) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const locked = cell.locked;
   const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(cell.name);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Suppress hover tooltip while the kebab menu is open.
+  const handleMouseEnter = () => { if (!menuOpen) onMouseEnter(); };
+
+  // When the kebab menu opens, also dismiss any active tooltip so it doesn't stick
+  // through the menu / modal flow.
+  const handleMenuOpenChange = (open: boolean) => {
+    setMenuOpen(open);
+    if (open) onMouseLeave();
+  };
 
   return (
     <div
       ref={triggerRef}
-      onMouseEnter={onMouseEnter}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={onMouseLeave}
       className={`absolute rounded border text-left select-none transition-colors ${
         isDragging
@@ -240,6 +263,15 @@ function SizingRibCell({ cell, onDragStart, isDragging }: SizingRibCellProps) {
             {cell.size}
           </span>
         )}
+        <KebabMenu
+          ariaLabel={`Actions for ${cell.name}`}
+          onOpenChange={handleMenuOpenChange}
+          items={[
+            { label: 'Edit…', onClick: () => onEdit(cell) },
+            { label: 'Split', onClick: () => onSplit(cell) },
+            { label: 'Delete…', onClick: () => onDelete(cell), danger: true },
+          ]}
+        />
       </div>
       <div className={`flex items-center gap-1.5 mt-0.5 text-[10px] ${locked ? 'opacity-50' : ''}`}>
         <span className="text-gray-400 dark:text-gray-500 truncate">{cell.backboneName}</span>

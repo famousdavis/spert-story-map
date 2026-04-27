@@ -331,3 +331,42 @@ describe('computeSizingLayout filtering', () => {
     expect(layout.cells).toHaveLength(4);
   });
 });
+
+describe('computeSizingLayout cell identity fields', () => {
+  it('emits themeId on each cell matching its parent theme', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'B1', ribs: [
+            { id: 'r1' }, { id: 'r2' },
+          ] },
+        ] },
+        { id: 't2', name: 'Theme 2', backbones: [
+          { id: 'b2', name: 'B2', ribs: [
+            { id: 'r3' },
+          ] },
+        ] },
+      ],
+    });
+    const layout = computeSizingLayout(product);
+    const byId = Object.fromEntries(layout.cells.map(c => [c.id, c]));
+    expect(byId.r1.themeId).toBe('t1');
+    expect(byId.r2.themeId).toBe('t1');
+    expect(byId.r3.themeId).toBe('t2');
+  });
+
+  it('emits backboneId on each cell matching its parent backbone', () => {
+    const product = makeProduct({
+      themes: [
+        { id: 't1', name: 'Theme 1', backbones: [
+          { id: 'b1', name: 'B1', ribs: [{ id: 'r1' }] },
+          { id: 'b2', name: 'B2', ribs: [{ id: 'r2' }] },
+        ] },
+      ],
+    });
+    const layout = computeSizingLayout(product);
+    const byId = Object.fromEntries(layout.cells.map(c => [c.id, c]));
+    expect(byId.r1.backboneId).toBe('b1');
+    expect(byId.r2.backboneId).toBe('b2');
+  });
+});

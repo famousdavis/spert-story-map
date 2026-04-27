@@ -5,11 +5,10 @@
 import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
+import { NOTES_MAX } from '../../lib/constants';
 import SizePicker from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 import type { RibItem, Product, Category, Size } from '../../types';
-
-const NOTES_MAX = 2000;
 
 interface DetailRib extends RibItem {
   themeId: string;

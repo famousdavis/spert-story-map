@@ -136,7 +136,7 @@ Product
 ├── releaseCardOrder: { [colId]: [ribId, ...] }
 ├── sizingCardOrder: { [sizeLabel|'unsized']: [ribId, ...] }
 ├── _originRef                                      # Workspace reconciliation token (set at creation)
-├── _changeLog: [{ t, op, entity, id? }]            # Structural operation log (capped at 500)
+├── _changeLog: [{ t, op, entity, id?, source? }]   # Structural operation log (capped at 500). op: 'create'|'add'|'delete'|'import'|'cloud-migration'|'duplicate'|'split'. source: originating entity ID for 'duplicate' (product) and 'split' (rib).
 └── themes: [Theme]
     ├── color?                                      # Optional color key (blue, teal, violet, etc.)
     └── backboneItems: [Backbone]

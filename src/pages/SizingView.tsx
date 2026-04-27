@@ -5,6 +5,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useProductMutations } from '../hooks/useProductMutations';
+import { useSessionState } from '../hooks/useSessionState';
 import MapCanvas from '../components/storymap/MapCanvas';
 import DragGhost from '../components/storymap/DragGhost';
 import useSizingLayout from '../components/sizing/useSizingLayout';
@@ -12,13 +13,35 @@ import { DEFAULT_SIZING_FILTER } from '../components/sizing/useSizingLayout';
 import type { SizingFilter } from '../components/sizing/useSizingLayout';
 import useSizingDrag from '../components/sizing/useSizingDrag';
 import SizingContent from '../components/sizing/SizingContent';
+import type { SizingCell } from '../components/sizing/SizingContent';
 import SizingFilterPanel from '../components/sizing/SizingFilterPanel';
+import SizingRibModal from '../components/sizing/SizingRibModal';
+import type { SizingRibModalSaveInput, SizingRibModalCreateInput } from '../components/sizing/SizingRibModal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import type { OutletContextValue } from '../types';
 
 export default function SizingView() {
   const { product, updateProduct, undo, redo } = useOutletContext<OutletContextValue>();
   const mutations = useProductMutations(updateProduct);
-  const [filter, setFilter] = useState<SizingFilter>(DEFAULT_SIZING_FILTER);
+  const [filter, setFilter] = useSessionState<SizingFilter>(
+    `sizing-filter:${product.id}`,
+    DEFAULT_SIZING_FILTER,
+  );
+
+  // Orphan strip: drop any themeIds/releaseIds in the persisted filter that no longer
+  // exist in the current product. Self-heals when entities are deleted in another tab.
+  useEffect(() => {
+    const validThemeIds = new Set(product.themes.map(t => t.id));
+    const validReleaseIds = new Set((product.releases ?? []).map(r => r.id));
+    const cleanThemes = filter.themeIds.filter(id => validThemeIds.has(id));
+    const cleanReleases = (filter.releaseIds ?? []).filter(id => validReleaseIds.has(id));
+    if (
+      cleanThemes.length !== filter.themeIds.length ||
+      cleanReleases.length !== (filter.releaseIds ?? []).length
+    ) {
+      setFilter({ ...filter, themeIds: cleanThemes, releaseIds: cleanReleases });
+    }
+  }, [product.themes, product.releases, filter, setFilter]);
   const layout = useSizingLayout(product, filter);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -69,7 +92,65 @@ export default function SizingView() {
   const handleFilterChange = useCallback((next: SizingFilter) => {
     didAutoFit.current = false;
     setFilter(next);
+  }, [setFilter]);
+
+  // Per-rib actions wired into kebab menu on each card
+  const [pendingDeleteCell, setPendingDeleteCell] = useState<SizingCell | null>(null);
+  const [editingCell, setEditingCell] = useState<SizingCell | null>(null);
+
+  const handleRibEdit = useCallback((cell: SizingCell) => {
+    setEditingCell(cell);
   }, []);
+
+  const handleEditSave = useCallback((updates: SizingRibModalSaveInput) => {
+    if (!editingCell) return;
+    // Locked-state size-omission boundary: when the original cell was locked,
+    // strip `size` from the mutation payload so historical points/percent math is preserved.
+    const payload = editingCell.locked
+      ? { name: updates.name, description: updates.description, category: updates.category, notes: updates.notes }
+      : updates;
+    mutations.updateRib(editingCell.themeId, editingCell.backboneId, editingCell.id, payload);
+  }, [editingCell, mutations]);
+
+  // Add Rib flow — modal create mode with smart defaults frozen at click time
+  const [createPresets, setCreatePresets] = useState<{ presetThemeId?: string; presetBackboneId?: string } | null>(null);
+
+  const openAddModal = useCallback(() => {
+    // Compute presets from the current filter at the moment of click; frozen for modal lifetime.
+    const presetThemeId = filter.themeIds.length === 1 ? filter.themeIds[0] : undefined;
+    let presetBackboneId: string | undefined;
+    if (presetThemeId) {
+      const theme = product.themes.find(t => t.id === presetThemeId);
+      if (theme && theme.backboneItems.length === 1) {
+        presetBackboneId = theme.backboneItems[0].id;
+      }
+    }
+    setCreatePresets({ presetThemeId, presetBackboneId });
+  }, [filter, product.themes]);
+
+  const handleCreate = useCallback((input: SizingRibModalCreateInput) => {
+    mutations.addNamedRib(input.themeId, input.backboneId, {
+      name: input.name,
+      category: input.category,
+      size: input.size,
+      description: input.description,
+      notes: input.notes,
+    });
+  }, [mutations]);
+
+  const handleRibSplit = useCallback((cell: SizingCell) => {
+    mutations.splitRib(cell.themeId, cell.backboneId, cell.id);
+  }, [mutations]);
+
+  const handleRibDelete = useCallback((cell: SizingCell) => {
+    setPendingDeleteCell(cell);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (!pendingDeleteCell) return;
+    mutations.deleteRib(pendingDeleteCell.themeId, pendingDeleteCell.backboneId, pendingDeleteCell.id);
+    setPendingDeleteCell(null);
+  }, [pendingDeleteCell, mutations]);
 
   // Undo/redo + Escape keyboard shortcuts
   useEffect(() => {
@@ -115,12 +196,21 @@ export default function SizingView() {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         overlayControls={
-          <SizingFilterPanel
-            themes={themes}
-            releases={releases}
-            filter={filter}
-            onFilterChange={handleFilterChange}
-          />
+          <div className="flex flex-col items-end gap-2">
+            <SizingFilterPanel
+              themes={themes}
+              releases={releases}
+              filter={filter}
+              onFilterChange={handleFilterChange}
+            />
+            <button
+              type="button"
+              onClick={openAddModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded shadow-sm"
+            >
+              + Rib
+            </button>
+          </div>
         }
       >
         <SizingContent
@@ -128,6 +218,9 @@ export default function SizingView() {
           mapSizeRef={mapSizeRef}
           dragState={dragState}
           onDragStart={handleDragStart}
+          onRibEdit={handleRibEdit}
+          onRibSplit={handleRibSplit}
+          onRibDelete={handleRibDelete}
         />
       </MapCanvas>
 
@@ -137,6 +230,39 @@ export default function SizingView() {
         <div className="absolute top-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
           {dragLabel}
         </div>
+      )}
+
+      <ConfirmDialog
+        open={pendingDeleteCell !== null}
+        onClose={() => setPendingDeleteCell(null)}
+        onConfirm={confirmDelete}
+        title="Delete rib item?"
+        message={pendingDeleteCell ? `Delete "${pendingDeleteCell.name}"? You can undo with Ctrl+Z.` : ''}
+        danger
+      />
+
+      {editingCell && (
+        <SizingRibModal
+          key={editingCell.id}
+          open
+          mode={{ kind: 'edit', themeId: editingCell.themeId, backboneId: editingCell.backboneId, ribId: editingCell.id }}
+          product={product}
+          locked={editingCell.locked}
+          onClose={() => setEditingCell(null)}
+          onSave={handleEditSave}
+        />
+      )}
+
+      {createPresets && (
+        <SizingRibModal
+          key={`create:${createPresets.presetThemeId ?? ''}:${createPresets.presetBackboneId ?? ''}`}
+          open
+          mode={{ kind: 'create', presetThemeId: createPresets.presetThemeId, presetBackboneId: createPresets.presetBackboneId }}
+          product={product}
+          locked={false}
+          onClose={() => setCreatePresets(null)}
+          onCreate={handleCreate}
+        />
       )}
     </div>
   );

@@ -21,6 +21,167 @@ function cleanCardOrder(cardOrder: Record<string, string[]> | undefined, ribIds:
 }
 
 /**
+ * Pure transformation: append a fully-named rib to a backbone in a single update.
+ * Used by both the React hook and the unit tests.
+ *
+ * Distinct from `addRib` (which creates a placeholder named "New Rib Item" and
+ * relies on a follow-up `updateRib` to set the name): `addNamedRib` is atomic —
+ * one product mutation, one changelog entry, no placeholder flash.
+ */
+export function addNamedRibToProduct(
+  prev: Product,
+  themeId: string,
+  backboneId: string,
+  newId: string,
+  attrs: { name: string; category?: 'core' | 'non-core'; size?: RibItem['size']; description?: string; notes?: string },
+): Product {
+  let didAdd = false;
+
+  const themes = prev.themes.map(t => {
+    if (t.id !== themeId) return t;
+    return {
+      ...t,
+      backboneItems: t.backboneItems.map(b => {
+        if (b.id !== backboneId) return b;
+        const newRib: RibItem = {
+          id: newId,
+          name: attrs.name,
+          description: attrs.description ?? '',
+          order: b.ribItems.length + 1,
+          size: attrs.size ?? null,
+          category: attrs.category ?? 'core',
+          releaseAllocations: [],
+          progressHistory: [],
+          notes: attrs.notes ?? '',
+        };
+        didAdd = true;
+        return { ...b, ribItems: [...b.ribItems, newRib] };
+      }),
+    };
+  });
+
+  if (!didAdd) return prev;
+
+  const next = { ...prev, themes };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'rib', id: newId }),
+  };
+}
+
+/**
+ * Pure transformation: split a rib in place. Used by both the React hook
+ * (which wraps it in updateProduct) and the unit tests.
+ *
+ * Suffix detection uses /^(.*?)\s*\((\d+)\)\s*$/ — names already ending in
+ * "(N)" preserve their name and the new sibling becomes "(N+1)". Names with
+ * no numeric suffix get renamed to "(1)" with a sibling "(2)".
+ *
+ * The new rib is inserted into the parent backbone immediately after the original
+ * and into sizingCardOrder['unsized'] adjacent to the original (bootstrapping the
+ * unsized order array if needed).
+ *
+ * `source` on the changelog entry holds the originating rib's ID, consistent with
+ * how `'duplicate'` uses it for the originating product's ID at storage.ts:305.
+ */
+export function splitRibInProduct(
+  prev: Product,
+  themeId: string,
+  backboneId: string,
+  ribId: string,
+  newId: string,
+): Product {
+  let didSplit = false;
+
+  const themes = prev.themes.map(t => {
+    if (t.id !== themeId) return t;
+    return {
+      ...t,
+      backboneItems: t.backboneItems.map(b => {
+        if (b.id !== backboneId) return b;
+        const idx = b.ribItems.findIndex(r => r.id === ribId);
+        if (idx < 0) return b;
+        const original = b.ribItems[idx];
+
+        const trailingSuffix = /^(.*?)\s*\((\d+)\)\s*$/;
+        const match = original.name.match(trailingSuffix);
+        const prefix = match ? match[1] : original.name;
+
+        // Find the highest existing (N) suffix in this backbone for the same prefix.
+        // This prevents collisions when splitting an earlier-numbered sibling
+        // (e.g., splitting "Foo (1)" while "Foo (2)" already exists must produce "Foo (3)",
+        // not a duplicate "Foo (2)").
+        const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const siblingPattern = new RegExp(`^${escapedPrefix}\\s*\\((\\d+)\\)\\s*$`);
+        const siblingNumbers = b.ribItems
+          .map(r => {
+            const m = r.name.match(siblingPattern);
+            return m ? parseInt(m[1], 10) : null;
+          })
+          .filter((n): n is number => n !== null);
+        const maxExisting = siblingNumbers.length > 0 ? Math.max(...siblingNumbers) : 0;
+
+        let originalName: string;
+        let newName: string;
+        if (match) {
+          originalName = original.name; // already suffixed: keep original name
+          newName = `${prefix} (${maxExisting + 1})`;
+        } else {
+          // Unsuffixed original: assign next two available numbers in the prefix family.
+          originalName = `${prefix} (${maxExisting + 1})`;
+          newName = `${prefix} (${maxExisting + 2})`;
+        }
+
+        const renamedOriginal = original.name === originalName
+          ? original
+          : { ...original, name: originalName };
+
+        const newRib: RibItem = {
+          id: newId,
+          name: newName,
+          description: '',
+          order: b.ribItems.length + 1,
+          size: null,
+          category: original.category,
+          releaseAllocations: [],
+          progressHistory: [],
+          notes: '',
+        };
+
+        didSplit = true;
+        return {
+          ...b,
+          ribItems: [
+            ...b.ribItems.slice(0, idx),
+            renamedOriginal,
+            newRib,
+            ...b.ribItems.slice(idx + 1),
+          ],
+        };
+      }),
+    };
+  });
+
+  if (!didSplit) return prev;
+
+  const cardOrder = { ...(prev.sizingCardOrder || {}) };
+  const existingUnsized = cardOrder['unsized'] ? [...cardOrder['unsized']] : [];
+  let originalIdx = existingUnsized.indexOf(ribId);
+  if (originalIdx < 0) {
+    existingUnsized.push(ribId);
+    originalIdx = existingUnsized.length - 1;
+  }
+  existingUnsized.splice(originalIdx + 1, 0, newId);
+  cardOrder['unsized'] = existingUnsized;
+
+  const next = { ...prev, themes, sizingCardOrder: cardOrder };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, { op: 'split', entity: 'rib', id: newId, source: ribId }),
+  };
+}
+
+/**
  * Provides reusable CRUD operations for the product's theme/backbone/rib hierarchy.
  * Keeps mutation logic DRY between StructureView, SettingsView, and anywhere else
  * that needs to modify the product tree.
@@ -260,6 +421,22 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     });
   }, [updateProduct]);
 
+  const splitRib = useCallback((themeId: string, backboneId: string, ribId: string) => {
+    const newId = crypto.randomUUID();
+    updateProduct(prev => splitRibInProduct(prev, themeId, backboneId, ribId, newId));
+    return newId;
+  }, [updateProduct]);
+
+  const addNamedRib = useCallback((
+    themeId: string,
+    backboneId: string,
+    attrs: { name: string; category?: 'core' | 'non-core'; size?: RibItem['size']; description?: string; notes?: string },
+  ) => {
+    const newId = crypto.randomUUID();
+    updateProduct(prev => addNamedRibToProduct(prev, themeId, backboneId, newId, attrs));
+    return newId;
+  }, [updateProduct]);
+
   const deleteRibs = useCallback((entries: { ribId: string }[]) => {
     if (!entries.length) return;
     updateProduct(prev => {
@@ -298,6 +475,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     addTheme,
     addBackbone,
     addRib,
+    addNamedRib,
     addRibToRelease,
     addRelease,
     addReleaseAfter,
@@ -306,6 +484,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     deleteBackbone,
     deleteRib,
     deleteRibs,
+    splitRib,
     moveItem,
   };
 }
