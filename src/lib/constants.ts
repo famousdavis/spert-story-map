@@ -30,3 +30,10 @@ export const CATEGORIES = {
   CORE: 'core',
   NON_CORE: 'non-core',
 } as const;
+
+/**
+ * Max length of UI-editable rib-item notes (textarea counter cap).
+ * Distinct from validateProduct.ts:MAX_MEMO, which is the broader validation-layer
+ * cap covering description, allocation memo, progress comment, and notes.
+ */
+export const NOTES_MAX = 2000;

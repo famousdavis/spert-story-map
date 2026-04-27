@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect, vi } from 'vitest';
+import { splitRibInProduct, addNamedRibToProduct } from '../hooks/useProductMutations';
 
 // Mock crypto.randomUUID
 let uuidCounter = 0;
@@ -262,5 +263,233 @@ describe('addReleaseAfter', () => {
     const result = applyAddReleaseAfter(empty, null);
     expect(result.releases).toHaveLength(1);
     expect(result.releases[0].order).toBe(1);
+  });
+});
+
+// --- splitRib ---
+describe('splitRibInProduct', () => {
+  function makeRibNamed(id, name, opts = {}) {
+    return { ...makeRib(id, opts), name };
+  }
+
+  function makeProductWithRibs(ribs) {
+    return makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', ribs)])],
+    });
+  }
+
+  function findRibByName(product, name) {
+    return product.themes[0].backboneItems[0].ribItems.find(r => r.name === name);
+  }
+
+  it('original with no suffix renames to "(1)" and creates "(2)"', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'Foo')]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs).toHaveLength(2);
+    expect(ribs[0].name).toBe('Foo (1)');
+    expect(ribs[1].name).toBe('Foo (2)');
+    expect(ribs[1].id).toBe('new-uuid');
+  });
+
+  it('original with " (3)" suffix preserves original name and creates "(4)"', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'Foo (3)')]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs[0].name).toBe('Foo (3)');
+    expect(ribs[1].name).toBe('Foo (4)');
+  });
+
+  it('name with non-numeric parens like "Login (web)" is treated as no-suffix', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'Login (web)')]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs[0].name).toBe('Login (web) (1)');
+    expect(ribs[1].name).toBe('Login (web) (2)');
+  });
+
+  it('name with multiple suffixes "X (3) (1)" matches the trailing one', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'X (3) (1)')]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs[0].name).toBe('X (3) (1)');
+    expect(ribs[1].name).toBe('X (3) (2)');
+  });
+
+  it('new rib has size: null, empty allocations, empty progress, copied category, cleared description, cleared notes', () => {
+    const original = {
+      ...makeRib('r1', { size: 'L', category: 'non-core' }),
+      name: 'Bar',
+      description: 'original description',
+      notes: 'original notes',
+      releaseAllocations: [{ releaseId: 'rel1', percentage: 100 }],
+      progressHistory: [{ sprintId: 's1', releaseId: 'rel1', percentComplete: 50 }],
+    };
+    const product = makeProductWithRibs([original]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const newRib = findRibByName(result, 'Bar (2)');
+    expect(newRib.size).toBe(null);
+    expect(newRib.releaseAllocations).toEqual([]);
+    expect(newRib.progressHistory).toEqual([]);
+    expect(newRib.category).toBe('non-core');
+    expect(newRib.description).toBe('');
+    expect(newRib.notes).toBe('');
+  });
+
+  it('new rib is inserted into backbone.ribItems immediately after original', () => {
+    const product = makeProductWithRibs([
+      makeRibNamed('r1', 'A'),
+      makeRibNamed('r2', 'B'),
+      makeRibNamed('r3', 'C'),
+    ]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r2', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs.map(r => r.name)).toEqual(['A', 'B (1)', 'B (2)', 'C']);
+  });
+
+  it("sizingCardOrder['unsized'] places new rib ID immediately after original", () => {
+    const product = {
+      ...makeProductWithRibs([
+        makeRibNamed('r1', 'A'),
+        makeRibNamed('r2', 'B'),
+        makeRibNamed('r3', 'C'),
+      ]),
+      sizingCardOrder: { unsized: ['r1', 'r2', 'r3'] },
+    };
+    const result = splitRibInProduct(product, 't1', 'b1', 'r2', 'new-uuid');
+    expect(result.sizingCardOrder.unsized).toEqual(['r1', 'r2', 'new-uuid', 'r3']);
+  });
+
+  it('sizingCardOrder bootstrap when unsized array was empty', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'Solo')]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    expect(result.sizingCardOrder.unsized).toEqual(['r1', 'new-uuid']);
+  });
+
+  it("changelog entry uses op: 'split' with source pointing at original", () => {
+    const product = {
+      ...makeProductWithRibs([makeRibNamed('r1', 'Foo')]),
+      _changeLog: [],
+    };
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const last = result._changeLog[result._changeLog.length - 1];
+    expect(last.op).toBe('split');
+    expect(last.entity).toBe('rib');
+    expect(last.id).toBe('new-uuid');
+    expect(last.source).toBe('r1');
+  });
+
+  it('returns prev unchanged when rib not found', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'A')]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'nonexistent', 'new-uuid');
+    expect(result).toBe(product);
+  });
+
+  it('avoids collision when splitting earlier-numbered sibling — uses max(existing N) + 1', () => {
+    // After two splits the user has "(1)" and "(2)". Splitting "(1)" must produce "(3)",
+    // not another "(2)" that collides with the existing sibling.
+    const product = makeProductWithRibs([
+      makeRibNamed('r1', 'Foo (1)'),
+      makeRibNamed('r2', 'Foo (2)'),
+    ]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    const names = ribs.map(r => r.name);
+    expect(names).toContain('Foo (1)');
+    expect(names).toContain('Foo (2)');
+    expect(names).toContain('Foo (3)');
+    // No duplicates
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('avoids collision when splitting unsuffixed original alongside numbered siblings', () => {
+    // Edge case: original is "Foo" but "Foo (5)" already exists.
+    // New names must continue the existing series, not collide.
+    const product = makeProductWithRibs([
+      makeRibNamed('r1', 'Foo'),
+      makeRibNamed('r2', 'Foo (5)'),
+    ]);
+    const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    const names = ribs.map(r => r.name);
+    expect(names).toContain('Foo (5)');
+    expect(names).toContain('Foo (6)');
+    expect(names).toContain('Foo (7)');
+    expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+// --- addNamedRib ---
+describe('addNamedRibToProduct', () => {
+  function emptyProduct() {
+    return {
+      ...makeProduct({ themes: [makeTheme('t1', [makeBackbone('b1', [])])] }),
+      _changeLog: [],
+    };
+  }
+
+  it('applies name in a single update (no flash of "New Rib Item")', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'b1', 'new-uuid', { name: 'My Rib' });
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs).toHaveLength(1);
+    expect(ribs[0].name).toBe('My Rib');
+    expect(ribs[0].id).toBe('new-uuid');
+  });
+
+  it('applies optional category, size, description, notes', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'b1', 'new-uuid', {
+      name: 'Rich Rib',
+      category: 'non-core',
+      size: 'L',
+      description: 'desc',
+      notes: 'notes',
+    });
+    const rib = result.themes[0].backboneItems[0].ribItems[0];
+    expect(rib.category).toBe('non-core');
+    expect(rib.size).toBe('L');
+    expect(rib.description).toBe('desc');
+    expect(rib.notes).toBe('notes');
+  });
+
+  it('defaults match plain addRib when attrs omitted', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'b1', 'new-uuid', { name: 'Default' });
+    const rib = result.themes[0].backboneItems[0].ribItems[0];
+    expect(rib.category).toBe('core');
+    expect(rib.size).toBe(null);
+    expect(rib.description).toBe('');
+    expect(rib.notes).toBe('');
+    expect(rib.releaseAllocations).toEqual([]);
+    expect(rib.progressHistory).toEqual([]);
+    expect(rib.order).toBe(1);
+  });
+
+  it("changelog entry has op: 'add', entity: 'rib'", () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'b1', 'new-uuid', { name: 'X' });
+    const last = result._changeLog[result._changeLog.length - 1];
+    expect(last.op).toBe('add');
+    expect(last.entity).toBe('rib');
+    expect(last.id).toBe('new-uuid');
+  });
+
+  it('returned ID matches the rib in the product', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'b1', 'specific-id', { name: 'X' });
+    expect(result.themes[0].backboneItems[0].ribItems[0].id).toBe('specific-id');
+  });
+
+  it('returns prev unchanged when theme not found', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 'wrong-theme', 'b1', 'new-uuid', { name: 'X' });
+    expect(result).toBe(product);
+  });
+
+  it('returns prev unchanged when backbone not found', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'wrong-bb', 'new-uuid', { name: 'X' });
+    expect(result).toBe(product);
   });
 });

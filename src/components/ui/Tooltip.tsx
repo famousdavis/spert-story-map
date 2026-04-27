@@ -50,7 +50,7 @@ export function useTooltip(text: string, delay = 200): UseTooltipReturn {
   const tooltipEl = visible && text
     ? createPortal(
         <div
-          className="fixed z-[9999] pointer-events-none px-2 py-1 text-xs text-white bg-gray-800 rounded shadow-lg max-w-xs break-words whitespace-pre-wrap"
+          className="fixed z-40 pointer-events-none px-2 py-1 text-xs text-white bg-gray-800 rounded shadow-lg max-w-xs break-words whitespace-pre-wrap"
           style={{
             left: pos.x,
             top: pos.y - 4,
