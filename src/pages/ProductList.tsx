@@ -213,9 +213,7 @@ export default function ProductList() {
               <img
                 src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
                 alt="SPERT Story Map icon"
-                width={28}
-                height={28}
-                className="rounded-[11%] shrink-0"
+                className="mr-2 h-7 w-7 rounded-lg ring-1 ring-white/20"
               />
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 SPERT<sup className="text-[0.45em] text-gray-400 dark:text-gray-500 font-normal tracking-wide">®</sup> Story Map
