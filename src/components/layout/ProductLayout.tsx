@@ -76,9 +76,7 @@ export default function ProductLayout() {
               <img
                 src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
                 alt="SPERT Story Map icon"
-                width={24}
-                height={24}
-                className="rounded-[11%] shrink-0"
+                className="mr-2 h-7 w-7 rounded-lg ring-1 ring-white/20"
               />
               <a href="/" className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm">
                 ← Projects
