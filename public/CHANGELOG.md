@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.26.1 (2026-04-30)
+
+Branding polish — replaces the default Vite SVG favicon with the SPERT Story Map indigo mark and surfaces the icon in both header surfaces.
+
+### Added
+- **Branded favicon.** New `public/spert-favicon-storymap.png` (192×192, indigo `#4f46e5` panels with rounded corners) replaces the Vite SVG placeholder in the browser tab.
+- **Dark-mode favicon variant.** `public/spert-favicon-storymap-dark.png` swaps the source PNG's near-black center pixels (`R<20 & G<20 & B<20 & A>200`) for charcoal `#2a2a2a` so the icon stays legible against dark backgrounds.
+- **Header icon on the homepage.** `ProductList` now renders a 28×28 rounded icon immediately to the left of the `SPERT® Story Map` title. Source switches between light and dark variants based on `useDarkMode()`'s `isDark` flag — honors the user's explicit light/dark toggle, not just `prefers-color-scheme`.
+- **Header icon on per-project pages.** `ProductLayout` adds a 24×24 rounded icon at the start of the top header (before the `← Projects` link) so branding stays consistent when drilling into a project.
+
+### Internal
+- No new runtime dependencies. Pillow-based dark-variant generation is a one-off dev script. No schema changes.
+
 ## Version 0.26.0 (2026-04-26)
 
 Sizing tab becomes a self-sufficient triage surface: persisted filters, per-card kebab menu, and in-tab create / edit / split / delete. Five user-facing features plus shared infrastructure (kebab menu, modal, sessionStorage hook). Architecture decisions resolved up front in the implementation plan; gates ran clean after every step.

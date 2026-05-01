@@ -31,7 +31,7 @@ export default function ProductLayout() {
   const navigate = useNavigate();
   const [saveError, setSaveError] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const { theme, toggleTheme } = useDarkMode();
+  const { theme, toggleTheme, isDark } = useDarkMode();
   const location = useLocation();
   const isCanvasView = /\/(storymap|sizing)(\/|$)/.test(location.pathname);
 
@@ -73,6 +73,13 @@ export default function ProductLayout() {
         <div className="max-w-[1600px] mx-auto px-6">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-4">
+              <img
+                src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
+                alt="SPERT Story Map icon"
+                width={24}
+                height={24}
+                className="rounded-[11%] shrink-0"
+              />
               <a href="/" className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm">
                 ← Projects
               </a>

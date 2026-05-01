@@ -42,7 +42,7 @@ export default function ProductList() {
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useDarkMode();
+  const { theme, toggleTheme, isDark } = useDarkMode();
 
   // Drag-to-reorder state
   const [projectOrder, setProjectOrder] = useState(null);
@@ -209,9 +209,18 @@ export default function ProductList() {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-              SPERT<sup className="text-[0.45em] text-gray-400 dark:text-gray-500 font-normal tracking-wide">®</sup> Story Map
-            </h1>
+            <div className="flex items-center gap-2 mb-1">
+              <img
+                src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
+                alt="SPERT Story Map icon"
+                width={28}
+                height={28}
+                className="rounded-[11%] shrink-0"
+              />
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                SPERT<sup className="text-[0.45em] text-gray-400 dark:text-gray-500 font-normal tracking-wide">®</sup> Story Map
+              </h1>
+            </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Plan and track agile project releases.{' '}
               {mode === 'cloud'
