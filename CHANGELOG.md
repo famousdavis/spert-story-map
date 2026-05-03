@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.26.3 (2026-05-03)
+
+Insights tab console-warning cleanup.
+
+### Fixed
+- **Recharts `width(-1)/height(-1)` warning on Insights.** The Core vs Non-core pie chart was wrapping a fixed-size 160×160 container in `<ResponsiveContainer width="100%" height="100%">`. The percentage-string sizing forces Recharts to wait for its `ResizeObserver` to fire before it can compute dimensions, and during that one-frame window it logs a console warning with `-1` placeholders. Since the parent dimensions are already known and fixed, the `ResponsiveContainer` was redundant — replaced with a direct `<PieChart width={160} height={160}>`. Visual output is identical; warning is gone. The other three charts on the tab (`Sizing Distribution`, `Release Breakdown`, `Burn-up`) already pass numeric heights and were not affected.
+
 ## Version 0.26.2 (2026-05-03)
 
 Three-category bug sweep — surfaces silent Firestore write failures on shared projects, hardens the real-time listener, and clears the one active browser warning on `<input type="email">`.

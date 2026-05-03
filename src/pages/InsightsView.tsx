@@ -102,17 +102,16 @@ export default function InsightsView() {
                 <div className="text-xs text-gray-400 dark:text-gray-500">{totalPoints > 0 ? Math.round(core / totalPoints * 100) : 0}%</div>
               </div>
 
-              {/* Pie chart */}
-              <div className="flex-shrink-0" style={{ width: 160, height: 160 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={coreNonCoreData} cx="50%" cy="50%" outerRadius={70} innerRadius={0} dataKey="value" label={false} isAnimationActive={false}>
-                      <Cell fill="#3b82f6" />
-                      <Cell fill={nonCoreFill} />
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                  </PieChart>
-                </ResponsiveContainer>
+              {/* Pie chart — fixed pixel dimensions; ResponsiveContainer omitted to avoid
+                  Recharts' width(-1)/height(-1) warning on initial measurement. */}
+              <div className="flex-shrink-0">
+                <PieChart width={160} height={160}>
+                  <Pie data={coreNonCoreData} cx="50%" cy="50%" outerRadius={70} innerRadius={0} dataKey="value" label={false} isAnimationActive={false}>
+                    <Cell fill="#3b82f6" />
+                    <Cell fill={nonCoreFill} />
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} />
+                </PieChart>
               </div>
 
               {/* Right label - Non-core */}
