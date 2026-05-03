@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.26.4 (2026-05-03)
+
+Form-hygiene cleanup — silences Chrome DevTools Issues warnings around `id`/`name` on form fields and `<label>` association.
+
+### Fixed
+- **All form fields now carry a `name` attribute.** 35 inputs / textareas / selects across 21 files lacked any `id` or `name`, triggering Chrome's "form field element should have an id or name attribute" warning. Each field now has a stable, semantic `name` (e.g. `projectName`, `ribName`, `releaseName`, `sprintAssessmentNote`). No real `<form>` elements wrap these inputs — React owns state directly — so the names are purely advisory; reusing the same name across visually distinct inputs (e.g. `releaseName` in `ReleaseColumn`, `ReleaseDetailPanel`, and `ReleaseDivider`'s left + right labels) is intentional and harmless.
+- **All standalone `<label>` elements now associate with their input.** 7 bare `<label>` tags across `CreateProjectModal`, `CommentPanel`, `AppSettingsModal`, `SettingsView`, and the `Field` component (`Section.tsx`) gained `htmlFor` pointing at a `useId()`-generated stable id on the matching input. The `Field` component now accepts an optional `htmlFor` prop for callers that want explicit association — non-breaking; existing callers passing no `htmlFor` continue to render unchanged.
+
+### Why this wasn't caught in v0.26.2
+The previous patch's Category 3 sweep was scoped strictly to `autoComplete` attributes per the original prompt's rules, even though I had eyes on every field that lacks `name`/`id` while doing it. Adjacent form-hygiene warnings (id-or-name, label association) are separate Chrome DevTools rules and weren't in scope. Lesson logged: when fixing one class of form-hygiene warning, scan the same fields for the related ones.
+
 ## Version 0.26.3 (2026-05-03)
 
 Insights tab console-warning cleanup.

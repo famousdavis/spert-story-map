@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React from 'react';
+import React, { useId } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { formatDate } from '../../lib/formatDate';
 import type { RibItem, Sprint } from '../../types';
@@ -45,6 +45,7 @@ export default function CommentPanel({
   const draft = commentDrafts[rowKey] ?? savedComment;
   const history = getCommentHistory(rib, rib._releaseId);
   const pastHistory = history.filter(h => h.sprintId !== selectedSprint);
+  const noteId = useId();
 
   const handleBlur = (): void => {
     const value = commentDrafts[rowKey];
@@ -64,10 +65,12 @@ export default function CommentPanel({
       {/* Current sprint comment input */}
       {editable ? (
         <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+          <label htmlFor={noteId} className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             {sprint?.name || 'Sprint'} assessment note
           </label>
           <textarea
+            id={noteId}
+            name="sprintAssessmentNote"
             rows={2}
             value={draft}
             onChange={e => setCommentDrafts(prev => ({ ...prev, [rowKey]: e.target.value }))}

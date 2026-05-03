@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useId } from 'react';
 import Modal from '../ui/Modal';
 import SizePicker from '../ui/SizePicker';
 import { NOTES_MAX } from '../../lib/constants';
@@ -104,6 +104,7 @@ export default function SizingRibModal({
   const [initial] = useState({ themeId, backboneId, name, description, category, size, notes });
 
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+  const baseId = useId();
 
   // Theme/backbone option lists (create-mode only)
   const themes = product.themes;
@@ -250,6 +251,8 @@ export default function SizingRibModal({
         {showThemeSelect && (
           <Field label="Theme">
             <select
+              id={`${baseId}-theme`}
+              name="ribTheme"
               value={themeId}
               onChange={e => handleThemeChange(e.target.value)}
               className="w-full rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500"
@@ -265,6 +268,8 @@ export default function SizingRibModal({
         {showBackboneSelect && (
           <Field label="Backbone">
             <select
+              id={`${baseId}-backbone`}
+              name="ribBackbone"
               value={effectiveBackboneId}
               onChange={e => setBackboneId(e.target.value)}
               disabled={!selectedTheme}
@@ -280,6 +285,8 @@ export default function SizingRibModal({
 
         <Field label="Name">
           <input
+            id={`${baseId}-name`}
+            name="ribName"
             type="text"
             value={name}
             onChange={e => setName(e.target.value)}
@@ -291,6 +298,8 @@ export default function SizingRibModal({
 
         <Field label="Description">
           <textarea
+            id={`${baseId}-desc`}
+            name="ribDescription"
             value={description}
             onChange={e => setDescription(e.target.value)}
             rows={2}
@@ -339,6 +348,8 @@ export default function SizingRibModal({
 
         <Field label="Notes">
           <textarea
+            id={`${baseId}-notes`}
+            name="ribNotes"
             value={notes}
             onChange={e => setNotes(e.target.value)}
             maxLength={NOTES_MAX}

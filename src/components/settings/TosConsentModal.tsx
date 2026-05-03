@@ -44,6 +44,7 @@ export default function TosConsentModal({ open, onClose, onAccept }: TosConsentM
         <label className="flex items-start gap-3 cursor-pointer pt-2">
           <input
             type="checkbox"
+            name="tosAccept"
             checked={checked}
             onChange={(e) => setChecked(e.target.checked)}
             className="mt-0.5 text-blue-600 rounded"

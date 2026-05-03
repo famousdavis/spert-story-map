@@ -37,6 +37,7 @@ export default function ProgressHeader({
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400">Sprint:</span>
           <select
+            name="selectedSprint"
             value={selectedSprint || ''}
             onChange={e => setSelectedSprint(e.target.value)}
             className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"

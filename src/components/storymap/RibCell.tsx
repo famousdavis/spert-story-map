@@ -93,6 +93,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
         {editing ? (
           <input
             ref={inputRef}
+            name="ribName"
             type="text"
             value={draft}
             onChange={e => setDraft(e.target.value)}

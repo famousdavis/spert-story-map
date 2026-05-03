@@ -55,6 +55,7 @@ export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelet
       {editing ? (
         <input
           ref={inputRef}
+          name="themeName"
           type="text"
           value={draft}
           onChange={e => setDraft(e.target.value)}

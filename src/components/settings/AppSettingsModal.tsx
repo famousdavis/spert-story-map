@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import Modal from '../ui/Modal';
 import { Section, Field } from '../ui/Section';
 import StorageSection from './StorageSection';
@@ -17,6 +17,7 @@ interface AppSettingsModalProps {
 export default function AppSettingsModal({ open, onClose }: AppSettingsModalProps) {
   const { driver } = useStorage();
   const [prefs, setPrefs] = useState<UserSettings>({});
+  const baseId = useId();
 
   useEffect(() => {
     if (open && driver) driver.loadPreferences().then(setPrefs);
@@ -37,8 +38,10 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
           Identify yourself on exported files. These fields are included in JSON exports for traceability.
         </p>
         <div className="space-y-3">
-          <Field label="Name">
+          <Field label="Name" htmlFor={`${baseId}-export-name`}>
             <input
+              id={`${baseId}-export-name`}
+              name="exportName"
               type="text"
               autoComplete="name"
               value={prefs.exportName || ''}
@@ -47,8 +50,10 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
             />
           </Field>
-          <Field label="Identifier">
+          <Field label="Identifier" htmlFor={`${baseId}-export-id`}>
             <input
+              id={`${baseId}-export-id`}
+              name="exportId"
               type="text"
               value={prefs.exportId || ''}
               onChange={e => updatePref('exportId', e.target.value)}

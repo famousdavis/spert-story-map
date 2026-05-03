@@ -85,6 +85,7 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
                   <span className="text-sm text-gray-700 dark:text-gray-300 w-40 truncate">{release.name}</span>
                   <input
                     type="number"
+                    name="allocationPercentage"
                     min={0}
                     max={100}
                     value={alloc.percentage}
@@ -101,6 +102,7 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
                 <div className="ml-43">
                   <input
                     type="text"
+                    name="allocationMemo"
                     value={alloc.memo || ''}
                     onChange={e => updateMemo(alloc.releaseId, e.target.value)}
                     placeholder="Add a note..."

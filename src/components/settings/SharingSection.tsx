@@ -150,6 +150,7 @@ export default function SharingSection({ productId }: SharingSectionProps) {
       <div className="flex gap-2">
         <input
           type="email"
+          name="memberEmail"
           autoComplete="off"
           value={email}
           onChange={e => { setEmail(e.target.value); setError(null); }}
@@ -210,6 +211,7 @@ function MemberRow({ uid, role, isOwner, isSelf, onRemove, onRoleChange }: Membe
         ) : (
           <>
             <select
+              name="memberRole"
               value={role}
               onChange={e => onRoleChange(e.target.value)}
               className="text-xs border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded px-1.5 py-1"
