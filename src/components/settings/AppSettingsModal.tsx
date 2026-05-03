@@ -40,6 +40,7 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
           <Field label="Name">
             <input
               type="text"
+              autoComplete="name"
               value={prefs.exportName || ''}
               onChange={e => updatePref('exportName', e.target.value)}
               placeholder="e.g., Jane Smith"

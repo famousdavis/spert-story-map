@@ -98,6 +98,7 @@ export default function SharingSection({ productId }: SharingSectionProps) {
 
   const handleRemoveMember = async (uid) => {
     if (uid === owner || !db) return;
+    setError(null);
     try {
       const ref = doc(db, PROJECTS_COL, productId);
       const updated = { ...members };
@@ -106,11 +107,13 @@ export default function SharingSection({ productId }: SharingSectionProps) {
       setMembers(updated);
     } catch (e) {
       console.error('Failed to remove member:', e instanceof Error ? e.message : 'Unknown error');
+      setError('Failed to remove member. Please try again.');
     }
   };
 
   const handleRoleChange = async (uid, newRole) => {
     if (uid === owner || !db) return;
+    setError(null);
     try {
       const ref = doc(db, PROJECTS_COL, productId);
       const updated = { ...members, [uid]: newRole };
@@ -118,6 +121,7 @@ export default function SharingSection({ productId }: SharingSectionProps) {
       setMembers(updated);
     } catch (e) {
       console.error('Failed to change role:', e instanceof Error ? e.message : 'Unknown error');
+      setError('Failed to change role. Please try again.');
     }
   };
 
@@ -146,6 +150,7 @@ export default function SharingSection({ productId }: SharingSectionProps) {
       <div className="flex gap-2">
         <input
           type="email"
+          autoComplete="off"
           value={email}
           onChange={e => { setEmail(e.target.value); setError(null); }}
           placeholder="Enter email address"
