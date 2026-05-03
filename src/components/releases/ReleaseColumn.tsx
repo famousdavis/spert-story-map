@@ -177,6 +177,7 @@ export default function ReleaseColumn({
               {nameEditing ? (
                 <input
                   ref={nameInputRef}
+                  name="releaseName"
                   value={nameDraft}
                   onChange={e => setNameDraft(e.target.value)}
                   onBlur={commitNameEdit}

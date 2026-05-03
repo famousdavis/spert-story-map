@@ -89,6 +89,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
             {editing ? (
               <input
                 ref={inputRef}
+                name="ribName"
                 type="text"
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
@@ -193,6 +194,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
         <div className="flex flex-col flex-1 min-h-0 px-5 pb-5 border-t border-gray-100 dark:border-gray-800">
           <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mt-5 mb-2 shrink-0">Notes</h4>
           <textarea
+            name="ribNotes"
             value={notes}
             onChange={e => setNotes(e.target.value)}
             onBlur={handleNotesBlur}

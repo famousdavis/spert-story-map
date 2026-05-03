@@ -50,6 +50,7 @@ export default function SizeMappingSection({ sizeMapping, updateProduct }: SizeM
           <div key={i} className="flex items-center gap-3">
             <input
               type="text"
+              name="sizeLabel"
               value={m.label}
               onChange={e => updateSizeMapping(i, 'label', e.target.value)}
               className="w-24 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm text-center"
@@ -57,6 +58,7 @@ export default function SizeMappingSection({ sizeMapping, updateProduct }: SizeM
             />
             <input
               type="number"
+              name="sizePoints"
               value={m.points}
               onChange={e => updateSizeMapping(i, 'points', e.target.value)}
               onBlur={() => commitSizePoints(i)}

@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useId } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
@@ -19,6 +19,7 @@ export default function SettingsView() {
   const { addRelease, addSprint } = useProductMutations(updateProduct);
   const { driver } = useStorage();
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const baseId = useId();
 
   // Release drag-to-reorder state
   const [dragReleaseId, setDragReleaseId] = useState(null);
@@ -100,16 +101,20 @@ export default function SettingsView() {
       {/* Project Info */}
       <Section title="Project Details">
         <div className="space-y-3">
-          <Field label="Name">
+          <Field label="Name" htmlFor={`${baseId}-projectName`}>
             <input
+              id={`${baseId}-projectName`}
+              name="projectName"
               type="text"
               value={product.name}
               onChange={e => updateProduct(prev => ({ ...prev, name: e.target.value }))}
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
             />
           </Field>
-          <Field label="Description">
+          <Field label="Description" htmlFor={`${baseId}-projectDesc`}>
             <textarea
+              id={`${baseId}-projectDesc`}
+              name="projectDescription"
               value={product.description || ''}
               onChange={e => updateProduct(prev => ({ ...prev, description: e.target.value }))}
               rows={2}
@@ -143,6 +148,7 @@ export default function SettingsView() {
                 </div>
                 <input
                   type="text"
+                  name="releaseName"
                   value={r.name}
                   onChange={e => updateRelease(r.id, { name: e.target.value })}
                   className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
@@ -151,6 +157,7 @@ export default function SettingsView() {
                   Target
                   <input
                     type="date"
+                    name="releaseTargetDate"
                     value={r.targetDate || ''}
                     onChange={e => updateRelease(r.id, { targetDate: e.target.value || null })}
                     className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"
@@ -167,8 +174,10 @@ export default function SettingsView() {
       {/* Sprints */}
       <Section title="Sprints">
         <div className="flex items-center gap-3 mb-4">
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Sprint cadence</label>
+          <label htmlFor={`${baseId}-sprintCadence`} className="text-xs font-medium text-gray-500 dark:text-gray-400">Sprint cadence</label>
           <select
+            id={`${baseId}-sprintCadence`}
+            name="sprintCadenceWeeks"
             value={product.sprintCadenceWeeks || 2}
             onChange={e => updateProduct(prev => ({ ...prev, sprintCadenceWeeks: parseInt(e.target.value, 10) || 2 }))}
             className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm text-gray-700"
@@ -184,6 +193,7 @@ export default function SettingsView() {
             <div key={s.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
               <input
                 type="text"
+                name="sprintName"
                 value={s.name}
                 onChange={e => updateSprint(s.id, { name: e.target.value })}
                 className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
@@ -192,6 +202,7 @@ export default function SettingsView() {
                 Finish
                 <input
                   type="date"
+                  name="sprintEndDate"
                   value={s.endDate || ''}
                   onChange={e => updateSprint(s.id, { endDate: e.target.value || null })}
                   className="border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 rounded px-2 py-1.5 text-sm text-gray-600"

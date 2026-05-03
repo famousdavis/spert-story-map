@@ -50,6 +50,7 @@ export default function InlineEdit({ value, onSave, className = '', placeholder 
     return (
       <input
         ref={inputRef}
+        name="inlineEdit"
         type="text"
         value={draft}
         onChange={e => setDraft(e.target.value)}

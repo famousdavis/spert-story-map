@@ -139,6 +139,7 @@ export default function SizingFilterPanel({ themes, releases, filter, onFilterCh
               </label>
               <input
                 id="sizing-hide-locked"
+                name="hideLocked"
                 type="checkbox"
                 checked={filter.hideLocked}
                 onChange={toggleHideLocked}

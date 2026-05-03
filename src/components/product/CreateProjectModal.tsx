@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import Modal from '../ui/Modal';
 
 interface CreateProjectModalProps {
@@ -14,6 +14,7 @@ interface CreateProjectModalProps {
 export default function CreateProjectModal({ open, onClose, onCreate }: CreateProjectModalProps) {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
+  const baseId = useId();
 
   const handleCreate = () => {
     if (!name.trim()) return;
@@ -32,8 +33,10 @@ export default function CreateProjectModal({ open, onClose, onCreate }: CreatePr
     <Modal open={open} onClose={handleClose} title="Create New Project">
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project Name</label>
+          <label htmlFor={`${baseId}-name`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project Name</label>
           <input
+            id={`${baseId}-name`}
+            name="projectName"
             type="text"
             value={name}
             onChange={e => setName(e.target.value)}
@@ -44,8 +47,10 @@ export default function CreateProjectModal({ open, onClose, onCreate }: CreatePr
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
+          <label htmlFor={`${baseId}-desc`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
           <textarea
+            id={`${baseId}-desc`}
+            name="projectDescription"
             value={desc}
             onChange={e => setDesc(e.target.value)}
             placeholder="Brief description of the project"

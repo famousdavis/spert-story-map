@@ -81,6 +81,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
             {editing ? (
               <input
                 ref={inputRef}
+                name="releaseName"
                 type="text"
                 value={draft}
                 onChange={e => setDraft(e.target.value)}

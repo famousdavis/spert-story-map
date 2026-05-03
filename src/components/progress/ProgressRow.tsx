@@ -134,6 +134,7 @@ export default function ProgressRow({
             progressDrafts[rowKey] !== undefined ? (
               <input
                 type="number"
+                name="progressPercent"
                 min={0}
                 max={maxPct}
                 value={progressDrafts[rowKey]}

@@ -56,6 +56,7 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
       {editing ? (
         <input
           ref={inputRef}
+          name="backboneName"
           type="text"
           value={draft}
           onChange={e => setDraft(e.target.value)}

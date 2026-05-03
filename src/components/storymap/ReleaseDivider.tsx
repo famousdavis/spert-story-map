@@ -145,6 +145,7 @@ export default function ReleaseDivider({
         {leftEditing ? (
           <input
             ref={leftInputRef}
+            name="releaseName"
             type="text"
             value={leftDraft}
             onChange={e => setLeftDraft(e.target.value)}
@@ -215,6 +216,7 @@ export default function ReleaseDivider({
         {rightEditing ? (
           <input
             ref={rightInputRef}
+            name="releaseName"
             type="text"
             value={rightDraft}
             onChange={e => setRightDraft(e.target.value)}
