@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 0.26.2 (2026-05-03)
+
+Three-category bug sweep — surfaces silent Firestore write failures on shared projects, hardens the real-time listener, and clears the one active browser warning on `<input type="email">`.
+
+### Fixed
+- **Sharing errors are no longer silent.** `Remove member` and `Change role` failures in `SharingSection` previously logged to console only. They now surface inline through the existing `setError(...)` UI that `Add member` already used — same red text below the add-member input, identical pattern, no new infrastructure. Both handlers also clear stale errors at the top of the call.
+- **`onSnapshot` listener has an error callback.** The single `onProductChange` subscription in `firestoreDriver.ts` was passing only a success callback. A permission-denied or sustained network drop on the live-sync stream would have thrown unhandled. Added the third-arg error handler — logs to console using the same shape as `handleWriteError`, and invokes the driver-level `_onSaveError` callback so the existing red save-error banner in `ProductLayout` covers a sync interruption with the same surface as a write failure.
+- **`<input type="email">` warning silenced.** The email-entry input in `SharingSection` for adding collaborators now carries `autoComplete="off"` — Chrome flags `type="email"` without `autoComplete` unconditionally. The field collects another user's email (for sharing), never the signed-in user's own credential, so `"off"` is the right value.
+
+### Hygiene
+- **Export Attribution Name field carries `autoComplete="name"`.** The `Name` input in App Settings → Export Attribution is the user's own name (per `CLAUDE.md`, students fill in their own name and identifier before exporting). Adding `autoComplete="name"` enables browser autofill suggestions on a field whose semantics match the standard `name` token. Preemptive only — `type="text"` is not browser-flagged when `autoComplete` is missing.
+
+### Out of scope
+- `AuthProvider` profile upsert and `tosHelpers.writeTosAcceptance` errors remain console-only. They run inside `onAuthStateChanged` before any product page mounts; the existing banner is per-route and `ProductList` does not subscribe to `onSaveError`. Wiring them in would require a new global notification surface, which is explicitly deferred.
+- The Identifier field in Export Attribution (placeholder `"e.g., student ID, email, or team name"`) intentionally does not get an `autoComplete` value — the field accepts mixed personal-identifier formats and the prompt's hygiene rules name this exact case as a skip.
+
 ## Version 0.26.1 (2026-04-30)
 
 Branding polish — replaces the default Vite SVG favicon with the SPERT Story Map indigo mark and surfaces the icon in both header surfaces.

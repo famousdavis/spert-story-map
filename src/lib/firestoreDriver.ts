@@ -282,12 +282,19 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      */
     onProductChange(id: string, cb: (product: Product) => void) {
       const ref = doc(db, PROJECTS_COL, id);
-      return onSnapshot(ref, (snap) => {
-        if (snap.metadata.hasPendingWrites) return;
-        if (!snap.exists()) return;
-        const data = snap.data();
-        cb(migrateToV2(stripFirestoreFields({ id: snap.id, ...data })));
-      });
+      return onSnapshot(
+        ref,
+        (snap) => {
+          if (snap.metadata.hasPendingWrites) return;
+          if (!snap.exists()) return;
+          const data = snap.data();
+          cb(migrateToV2(stripFirestoreFields({ id: snap.id, ...data })));
+        },
+        (error) => {
+          console.error('Firestore listener error:', error instanceof Error ? error.message : 'Unknown error');
+          if (_onSaveError) _onSaveError(error);
+        },
+      );
     },
   };
 }
