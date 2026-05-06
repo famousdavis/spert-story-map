@@ -144,11 +144,7 @@ export default function ProductLayout() {
         <Outlet context={{ product, updateProduct, undo, redo }} />
       </main>
 
-      {!isCanvasView && (
-        <div className="max-w-[1600px] mx-auto w-full px-6">
-          <Footer />
-        </div>
-      )}
+      {!isCanvasView && <Footer />}
 
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
     </div>
