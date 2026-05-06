@@ -19,8 +19,8 @@ export default function ChangelogView() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-3xl mx-auto px-6 py-12">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
+      <div className="max-w-3xl mx-auto px-6 py-12 flex-1 w-full">
         <div className="mb-8">
           <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Products</Link>
         </div>
@@ -97,32 +97,32 @@ function MarkdownRenderer({ content }) {
 
 export function Footer() {
   return (
-    <footer className="border-t border-gray-200 dark:border-gray-800 mt-12 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
-      <div>
-        <span>&copy; {new Date().getFullYear()} William W. Davis, MSPM, PMP</span>
-        {' | '}
-        <Link to="/changelog" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
-          Version {APP_VERSION}
-        </Link>
-        {' | '}
-        <span>Licensed under GNU GPL v3</span>
-      </div>
-      <div className="mt-1">
-        <a href="https://spertsuite.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
-          SPERT® Suite
-        </a>
-        {' | '}
-        <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
-          Terms of Service
-        </a>
-        {' | '}
-        <a href={PRIVACY_POLICY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
-          Privacy Policy
-        </a>
-        {' | '}
-        <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
-          License
-        </a>
+    <footer className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-3 text-sm text-gray-500 dark:text-gray-400">
+      <div className="mx-auto w-full max-w-7xl px-4 text-center">
+        <div>
+          &copy; {new Date().getFullYear()} William W. Davis, MSPM, PMP |{' '}
+          <Link to="/changelog" className="text-blue-600 hover:text-blue-700">
+            Version {APP_VERSION}
+          </Link>{' '}
+          | Licensed under GNU GPL v3
+        </div>
+        <div className="mt-1">
+          <a href="https://spertsuite.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+            SPERT® Suite
+          </a>
+          {' | '}
+          <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+            Terms of Service
+          </a>
+          {' | '}
+          <a href={PRIVACY_POLICY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+            Privacy Policy
+          </a>
+          {' | '}
+          <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+            License
+          </a>
+        </div>
       </div>
     </footer>
   );

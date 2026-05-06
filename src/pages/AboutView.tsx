@@ -10,8 +10,8 @@ const R = () => <sup className="text-[0.45em] text-gray-400 font-normal tracking
 
 export default function AboutView() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-3xl mx-auto px-6 py-12">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
+      <div className="max-w-3xl mx-auto px-6 py-12 flex-1 w-full">
         <div className="mb-8">
           <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Projects</Link>
         </div>

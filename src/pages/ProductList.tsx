@@ -204,8 +204,8 @@ export default function ProductList() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
+      <div className="max-w-4xl mx-auto px-6 py-12 flex-1 w-full">
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
@@ -366,9 +366,7 @@ export default function ProductList() {
 
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
 
-      <div className="max-w-4xl mx-auto px-6">
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 }
