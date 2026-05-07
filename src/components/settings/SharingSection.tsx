@@ -151,21 +151,37 @@ export default function SharingSection({ productId }: SharingSectionProps) {
   };
 
   const handleSendInvitations = async () => {
-    const emails = parseBulkEmails(bulkEmails);
-    if (emails.length === 0 || !driver || !db) return;
+    const {valid, invalid} = parseBulkEmails(bulkEmails);
+    if (valid.length === 0 && invalid.length === 0) return;
+    if (!driver || !db) return;
     setSending(true);
     setInviteResult(null);
+    // Pre-built failure entries for malformed addresses. The CF never sees
+    // these (we filter client-side), so we have to surface them ourselves.
+    const invalidFailures = invalid.map(email => ({
+      email,
+      reason: 'invalid-format',
+    }));
     try {
+      // No valid emails — short-circuit and just show the format errors.
+      if (valid.length === 0) {
+        setInviteResult({added: [], invited: [], failed: invalidFailures});
+        return;
+      }
+
       const callable = getSendInvitationEmail();
       if (!callable) throw new Error('Invitation service unavailable.');
       const res = await callable({
         appId: 'spertstorymap',  // string literal — NOT TOS_APP_ID (Lesson 15)
         modelId: productId,
-        emails,
+        emails: valid,
         role,
         isVoting: false,
       });
-      setInviteResult(res.data);
+      setInviteResult({
+        ...res.data,
+        failed: [...res.data.failed, ...invalidFailures],
+      });
       // Re-fetch members: CF auto-add may have added existing users.
       // SharingSection uses direct Firestore for owner/members — intentional
       // (the driver strips those fields). Consistent with the initial load.
@@ -173,6 +189,10 @@ export default function SharingSection({ productId }: SharingSectionProps) {
       if (snap.exists()) setMembers(snap.data().members || {});
       const updated = await driver.listPendingInvites(productId);
       setPendingInvites(updated);
+      // Clear the textarea on a successful send so the user doesn't have
+      // to manually delete addresses they just dispatched. Result chips
+      // remain visible until the user types into the empty textarea.
+      setBulkEmails('');
     } catch (e) {
       console.error('Send invitations failed:', e instanceof Error ? e.message : 'Unknown error');
       setError(mapInvitationError(e, 'send'));
