@@ -7,57 +7,114 @@ import { parseBulkEmails, mapInvitationError } from '../lib/invitationErrors';
 
 describe('parseBulkEmails', () => {
   it('parses comma-separated emails', () => {
-    expect(parseBulkEmails('a@b.com, c@d.com')).toEqual(['a@b.com', 'c@d.com']);
+    expect(parseBulkEmails('a@b.com, c@d.com')).toEqual({
+      valid: ['a@b.com', 'c@d.com'],
+      invalid: [],
+    });
   });
 
   it('parses whitespace-separated emails', () => {
-    expect(parseBulkEmails('a@b.com c@d.com')).toEqual(['a@b.com', 'c@d.com']);
+    expect(parseBulkEmails('a@b.com c@d.com')).toEqual({
+      valid: ['a@b.com', 'c@d.com'],
+      invalid: [],
+    });
   });
 
   it('parses semicolon-separated emails', () => {
-    expect(parseBulkEmails('a@b.com;c@d.com')).toEqual(['a@b.com', 'c@d.com']);
+    expect(parseBulkEmails('a@b.com;c@d.com')).toEqual({
+      valid: ['a@b.com', 'c@d.com'],
+      invalid: [],
+    });
   });
 
   it('parses newline-separated emails', () => {
-    expect(parseBulkEmails('a@b.com\nc@d.com')).toEqual(['a@b.com', 'c@d.com']);
+    expect(parseBulkEmails('a@b.com\nc@d.com')).toEqual({
+      valid: ['a@b.com', 'c@d.com'],
+      invalid: [],
+    });
   });
 
   it('parses mixed separators', () => {
-    expect(parseBulkEmails('a@b.com, c@d.com;e@f.com\ng@h.com')).toEqual([
-      'a@b.com', 'c@d.com', 'e@f.com', 'g@h.com',
-    ]);
+    expect(parseBulkEmails('a@b.com, c@d.com;e@f.com\ng@h.com')).toEqual({
+      valid: ['a@b.com', 'c@d.com', 'e@f.com', 'g@h.com'],
+      invalid: [],
+    });
   });
 
-  it('deduplicates emails', () => {
-    expect(parseBulkEmails('a@b.com, a@b.com, c@d.com')).toEqual(['a@b.com', 'c@d.com']);
+  it('deduplicates valid emails', () => {
+    expect(parseBulkEmails('a@b.com, a@b.com, c@d.com')).toEqual({
+      valid: ['a@b.com', 'c@d.com'],
+      invalid: [],
+    });
   });
 
-  it('lowercases emails', () => {
-    expect(parseBulkEmails('Alice@Example.COM')).toEqual(['alice@example.com']);
+  it('lowercases valid emails', () => {
+    expect(parseBulkEmails('Alice@Example.COM')).toEqual({
+      valid: ['alice@example.com'],
+      invalid: [],
+    });
   });
 
   it('deduplicates after lowercasing', () => {
-    expect(parseBulkEmails('Alice@example.com, ALICE@example.com')).toEqual(['alice@example.com']);
+    expect(parseBulkEmails('Alice@example.com, ALICE@example.com')).toEqual({
+      valid: ['alice@example.com'],
+      invalid: [],
+    });
   });
 
-  it('filters bare words (no @)', () => {
-    expect(parseBulkEmails('alice, bob@b.com')).toEqual(['bob@b.com']);
+  it('separates invalid (no @) from valid', () => {
+    expect(parseBulkEmails('alice, bob@b.com')).toEqual({
+      valid: ['bob@b.com'],
+      invalid: ['alice'],
+    });
   });
 
-  it('filters missing TLD', () => {
-    expect(parseBulkEmails('alice@b, bob@b.com')).toEqual(['bob@b.com']);
+  it('separates invalid (missing TLD) from valid', () => {
+    expect(parseBulkEmails('alice@b, bob@b.com')).toEqual({
+      valid: ['bob@b.com'],
+      invalid: ['alice@b'],
+    });
   });
 
-  it('returns empty array for empty input', () => {
-    expect(parseBulkEmails('')).toEqual([]);
+  it('captures the gmailcom case (missing dot)', () => {
+    // Reproduces the v0.27.0 bug: yourmama@gmailcom was silently dropped.
+    expect(parseBulkEmails(
+      'a@b.com, c@d.com, yourmama@gmailcom',
+    )).toEqual({
+      valid: ['a@b.com', 'c@d.com'],
+      invalid: ['yourmama@gmailcom'],
+    });
   });
 
-  it('returns empty array for whitespace-only input', () => {
-    expect(parseBulkEmails('   \n  ')).toEqual([]);
+  it('lowercases invalid tokens too', () => {
+    expect(parseBulkEmails('FOO@BAR')).toEqual({
+      valid: [],
+      invalid: ['foo@bar'],
+    });
   });
 
-  it('returns empty array for invalid-only input', () => {
-    expect(parseBulkEmails('garbage, also garbage')).toEqual([]);
+  it('deduplicates invalid tokens', () => {
+    expect(parseBulkEmails('garbage, garbage, also-garbage')).toEqual({
+      valid: [],
+      invalid: ['garbage', 'also-garbage'],
+    });
+  });
+
+  it('returns empty lists for empty input', () => {
+    expect(parseBulkEmails('')).toEqual({valid: [], invalid: []});
+  });
+
+  it('returns empty lists for whitespace-only input', () => {
+    expect(parseBulkEmails('   \n  ')).toEqual({valid: [], invalid: []});
+  });
+
+  it('returns only invalid for invalid-only input', () => {
+    expect(parseBulkEmails('garbage, also garbage')).toEqual({
+      valid: [],
+      invalid: ['garbage', 'also', 'garbage'].filter(
+        (v, i, a) => a.indexOf(v) === i,
+      ),
+    });
   });
 });
 

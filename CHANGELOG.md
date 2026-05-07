@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.27.1 (2026-05-06)
+
+Two bulk-invitation UX fixes surfaced by first-day production use.
+
+### Fixed
+- **Invalid email addresses in the bulk textarea are now reported.** Previously, a malformed address like `yourmama@gmailcom` (missing dot before `com`) was silently filtered out client-side before the Cloud Function call, so the user saw no signal it had been dropped. The result chip set now includes a red "Skipped: <addr> (invalid-format)" entry for each malformed token, alongside the existing CF-side failure reasons (`already-invited`, `already-member`, etc.). If the entire input is invalid, the CF is not called at all and only the format errors are shown.
+- **Bulk-invite textarea now clears on a successful send.** Previously, all addresses (including the ones that just succeeded) stayed in the textarea, leaving the user unsure whether re-clicking Send would re-dispatch them. The textarea now empties on a successful send response; result chips remain visible until the user types into the empty textarea (matching the existing chip-clear-on-edit behavior).
+
+### Internal
+- `parseBulkEmails` signature changed from `(string) => string[]` to `(string) => { valid: string[]; invalid: string[] }`. Sole consumer (`SharingSection`) updated. Tests expanded from 13 to 16 cases covering the dedup/lowercase behavior on both sides of the split.
+
 ## Version 0.27.0 (2026-05-06)
 
 Bulk Email Invitations — feature flag off in this release. The full implementation lands behind `INVITATIONS_ENABLED = false`; cross-app profile infrastructure activates immediately on merge. A subsequent single-line ship-gate commit flips the flag once the Landing Page PR deploys.

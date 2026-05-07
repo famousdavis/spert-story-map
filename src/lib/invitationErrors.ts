@@ -40,17 +40,36 @@ export function mapInvitationError(
   return 'An unexpected error occurred. Please try again.';
 }
 
+export interface ParsedBulkEmails {
+  valid: string[];
+  invalid: string[];
+}
+
 /**
- * Parse a raw textarea value into a deduplicated, lowercased list of valid emails.
- * Accepts whitespace, comma, or semicolon as separators.
+ * Parse a raw textarea value into deduplicated, lowercased lists of valid
+ * and invalid email tokens. Accepts whitespace, comma, or semicolon as
+ * separators. Empty tokens (from consecutive separators or trailing
+ * whitespace) are dropped silently.
+ *
+ * Invalid emails are returned alongside valid ones so the caller can surface
+ * them as "Skipped (invalid-format)" feedback in the UI. Without this, a
+ * malformed address would be filtered before the Cloud Function call and the
+ * user would see no signal that anything was dropped.
  */
-export function parseBulkEmails(raw: string): string[] {
-  return [
+export function parseBulkEmails(raw: string): ParsedBulkEmails {
+  const tokens = [
     ...new Set(
       raw
         .split(/[\s,;]+/)
         .map(e => e.trim().toLowerCase())
-        .filter(e => EMAIL_RE.test(e)),
+        .filter(e => e.length > 0),
     ),
   ];
+  const valid: string[] = [];
+  const invalid: string[] = [];
+  for (const t of tokens) {
+    if (EMAIL_RE.test(t)) valid.push(t);
+    else invalid.push(t);
+  }
+  return {valid, invalid};
 }
