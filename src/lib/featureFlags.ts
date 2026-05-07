@@ -6,4 +6,4 @@
  * Set to true only after PR 2 (Landing Page PR) is deployed.
  * Ship-gate PR is a single-line flip of this value.
  */
-export const INVITATIONS_ENABLED = false;
+export const INVITATIONS_ENABLED = true;
