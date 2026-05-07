@@ -19,7 +19,7 @@ import {
   loadProductIndex, loadProduct, loadPreferences,
   appendChangeLogEntry,
 } from './storage';
-import { sanitizeForFirestore } from './firestoreDriver';
+import { sanitizeForFirestore } from './firestoreUtils';
 
 const PROJECTS_COL = 'spertstorymap_projects';
 const SETTINGS_COL = 'spertstorymap_settings';

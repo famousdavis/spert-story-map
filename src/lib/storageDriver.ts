@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, StorageDriver } from '../types';
+import type { Product, StorageDriver, PendingInvite } from '../types';
 
 /**
  * Storage driver abstraction layer.
@@ -110,6 +110,22 @@ export function createLocalStorageDriver(): StorageDriver {
     /** No-op for local mode — no remote changes to subscribe to. */
     onProductChange() {
       return () => {};
+    },
+
+    listPendingInvites(_productId: string): Promise<PendingInvite[]> {
+      return Promise.resolve([]);
+    },
+
+    removeCollaborator(_productId: string, _uid: string): Promise<void> {
+      return Promise.resolve();
+    },
+
+    revokeInvite(_tokenId: string): Promise<void> {
+      return Promise.resolve();
+    },
+
+    resendInvite(_tokenId: string): Promise<void> {
+      return Promise.resolve();
     },
   };
 }

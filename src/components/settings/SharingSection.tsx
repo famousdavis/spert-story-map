@@ -2,12 +2,16 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, getSendInvitationEmail } from '../../lib/firebase';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
+import { INVITATIONS_ENABLED } from '../../lib/featureFlags';
+import { parseBulkEmails, mapInvitationError } from '../../lib/invitationErrors';
 import { Section } from '../ui/Section';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import type { PendingInvite, SendInvitationEmailResult } from '../../types';
 
 const PROJECTS_COL = 'spertstorymap_projects';
 const PROFILES_COL = 'spertstorymap_profiles';
@@ -23,12 +27,24 @@ interface SharingSectionProps {
 
 export default function SharingSection({ productId }: SharingSectionProps) {
   const { user } = useAuth();
-  const { mode } = useStorage();
+  const { mode, driver } = useStorage();
+  const baseId = useId();
+
   const [members, setMembers] = useState(null);
   const [owner, setOwner] = useState(null);
   const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
+
+  // Flag-on state
+  const [bulkEmails, setBulkEmails] = useState('');
+  const [role, setRole] = useState<'editor' | 'viewer'>('editor');
+  const [sending, setSending] = useState(false);
+  const [inviteResult, setInviteResult] = useState<SendInvitationEmailResult | null>(null);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
   const isOwner = user && owner === user.uid;
 
@@ -51,6 +67,16 @@ export default function SharingSection({ productId }: SharingSectionProps) {
     load();
     return () => { cancelled = true; };
   }, [mode, user, productId]);
+
+  // Load pending invitations (flag-on, owner only)
+  useEffect(() => {
+    if (!INVITATIONS_ENABLED || !isOwner || !driver) return;
+    setLoadingPending(true);
+    driver.listPendingInvites(productId)
+      .then(setPendingInvites)
+      .catch(() => setPendingInvites([]))
+      .finally(() => setLoadingPending(false));
+  }, [isOwner, driver, productId]);
 
   // Don't render if not cloud mode, not owner, or still loading
   if (mode !== 'cloud' || !user || !isOwner || !members) return null;
@@ -96,14 +122,13 @@ export default function SharingSection({ productId }: SharingSectionProps) {
     }
   };
 
-  const handleRemoveMember = async (uid) => {
-    if (uid === owner || !db) return;
+  const handleRemoveMember = async (uid: string) => {
+    if (uid === owner || !driver) return;
     setError(null);
     try {
-      const ref = doc(db, PROJECTS_COL, productId);
+      await driver.removeCollaborator(productId, uid);
       const updated = { ...members };
       delete updated[uid];
-      await updateDoc(ref, { members: updated });
       setMembers(updated);
     } catch (e) {
       console.error('Failed to remove member:', e instanceof Error ? e.message : 'Unknown error');
@@ -111,7 +136,7 @@ export default function SharingSection({ productId }: SharingSectionProps) {
     }
   };
 
-  const handleRoleChange = async (uid, newRole) => {
+  const handleRoleChange = async (uid: string, newRole: string) => {
     if (uid === owner || !db) return;
     setError(null);
     try {
@@ -122,6 +147,65 @@ export default function SharingSection({ productId }: SharingSectionProps) {
     } catch (e) {
       console.error('Failed to change role:', e instanceof Error ? e.message : 'Unknown error');
       setError('Failed to change role. Please try again.');
+    }
+  };
+
+  const handleSendInvitations = async () => {
+    const emails = parseBulkEmails(bulkEmails);
+    if (emails.length === 0 || !driver || !db) return;
+    setSending(true);
+    setInviteResult(null);
+    try {
+      const callable = getSendInvitationEmail();
+      if (!callable) throw new Error('Invitation service unavailable.');
+      const res = await callable({
+        appId: 'spertstorymap',  // string literal — NOT TOS_APP_ID (Lesson 15)
+        modelId: productId,
+        emails,
+        role,
+        isVoting: false,
+      });
+      setInviteResult(res.data);
+      // Re-fetch members: CF auto-add may have added existing users.
+      // SharingSection uses direct Firestore for owner/members — intentional
+      // (the driver strips those fields). Consistent with the initial load.
+      const snap = await getDoc(doc(db, PROJECTS_COL, productId));
+      if (snap.exists()) setMembers(snap.data().members || {});
+      const updated = await driver.listPendingInvites(productId);
+      setPendingInvites(updated);
+    } catch (e) {
+      console.error('Send invitations failed:', e instanceof Error ? e.message : 'Unknown error');
+      setError(mapInvitationError(e, 'send'));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleRevoke = async (tokenId: string) => {
+    if (!driver) return;
+    setActionBusy(tokenId);
+    try {
+      await driver.revokeInvite(tokenId);
+      setPendingInvites(prev => prev.filter(i => i.tokenId !== tokenId));
+    } catch (e) {
+      setError(mapInvitationError(e, 'revoke'));
+    } finally {
+      setActionBusy(null);
+      setRevokeTarget(null);
+    }
+  };
+
+  const handleResend = async (tokenId: string) => {
+    if (!driver) return;
+    setActionBusy(tokenId);
+    try {
+      await driver.resendInvite(tokenId);
+      const updated = await driver.listPendingInvites(productId);
+      setPendingInvites(updated);
+    } catch (e) {
+      setError(mapInvitationError(e, 'resend'));
+    } finally {
+      setActionBusy(null);
     }
   };
 
@@ -146,28 +230,128 @@ export default function SharingSection({ productId }: SharingSectionProps) {
         ))}
       </div>
 
-      {/* Add member */}
-      <div className="flex gap-2">
-        <input
-          type="email"
-          name="memberEmail"
-          autoComplete="off"
-          value={email}
-          onChange={e => { setEmail(e.target.value); setError(null); }}
-          placeholder="Enter email address"
-          className="flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
-          onKeyDown={e => { if (e.key === 'Enter') handleAddMember(); }}
-        />
-        <button
-          onClick={handleAddMember}
-          disabled={!email.trim() || adding}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors"
-        >
-          {adding ? 'Adding...' : 'Add'}
-        </button>
-      </div>
+      {INVITATIONS_ENABLED ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label htmlFor={`${baseId}-role`} className="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              Invite as
+            </label>
+            <select
+              id={`${baseId}-role`}
+              name="inviteRole"
+              value={role}
+              onChange={e => setRole(e.target.value as 'editor' | 'viewer')}
+              className="text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded px-2 py-1.5"
+            >
+              <option value="editor">Editor</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor={`${baseId}-emails`} className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              Email addresses
+            </label>
+            <textarea
+              id={`${baseId}-emails`}
+              name="inviteEmails"
+              value={bulkEmails}
+              onChange={e => {
+                setBulkEmails(e.target.value);
+                if (inviteResult) setInviteResult(null);
+              }}
+              placeholder="Enter email addresses separated by commas, spaces, or newlines"
+              rows={3}
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none resize-none"
+            />
+          </div>
+          <button
+            onClick={handleSendInvitations}
+            disabled={!bulkEmails.trim() || sending}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors"
+          >
+            {sending ? 'Sending...' : 'Send Invitations'}
+          </button>
+          {inviteResult && (
+            <div className="text-xs space-y-1">
+              {inviteResult.added.length > 0 && (
+                <p className="text-green-600 dark:text-green-400">Added: {inviteResult.added.join(', ')}</p>
+              )}
+              {inviteResult.invited.length > 0 && (
+                <p className="text-blue-600 dark:text-blue-400">Invited: {inviteResult.invited.join(', ')}</p>
+              )}
+              {inviteResult.failed.map(f => (
+                <p key={f.email} className="text-red-500 dark:text-red-400">Skipped: {f.email} ({f.reason})</p>
+              ))}
+            </div>
+          )}
+          {!loadingPending && pendingInvites.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Pending invitations</p>
+              <div className="space-y-2">
+                {pendingInvites.map(inv => (
+                  <div key={inv.tokenId} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-900 dark:text-gray-100 truncate">{inv.inviteeEmail}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{inv.role} · sent {inv.emailSendCount}/5</p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                      <button
+                        onClick={() => handleResend(inv.tokenId)}
+                        disabled={inv.emailSendCount >= 5 || actionBusy !== null}
+                        className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-40"
+                      >
+                        Resend ({inv.emailSendCount}/5)
+                      </button>
+                      <button
+                        onClick={() => setRevokeTarget(inv.tokenId)}
+                        disabled={actionBusy !== null}
+                        className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-40"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Legacy single-input UI — preserved byte-for-byte */
+        <div className="flex gap-2">
+          <input
+            type="email"
+            name="memberEmail"
+            autoComplete="off"
+            value={email}
+            onChange={e => { setEmail(e.target.value); setError(null); }}
+            placeholder="Enter email address"
+            className="flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
+            onKeyDown={e => { if (e.key === 'Enter') handleAddMember(); }}
+          />
+          <button
+            onClick={handleAddMember}
+            disabled={!email.trim() || adding}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors"
+          >
+            {adding ? 'Adding...' : 'Add'}
+          </button>
+        </div>
+      )}
       {error && (
         <p className="text-xs text-red-500 dark:text-red-400 mt-2">{error}</p>
+      )}
+
+      {INVITATIONS_ENABLED && (
+        <ConfirmDialog
+          open={!!revokeTarget}
+          onClose={() => setRevokeTarget(null)}
+          onConfirm={() => revokeTarget && void handleRevoke(revokeTarget)}
+          title="Revoke Invitation"
+          message="Are you sure you want to revoke this invitation? The recipient will no longer be able to accept it."
+          confirmLabel="Revoke"
+          danger
+        />
       )}
     </Section>
   );
