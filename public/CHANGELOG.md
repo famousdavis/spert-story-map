@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.28.0 (2026-05-07)
+
+Project tile actions get a visual refresh, and Share lands as a cloud-mode owner-only affordance — extending the just-merged owner-gating audit (CFD v0.10.2, Forecaster v0.27.1) to Story Map.
+
+### Added
+- **Share icon on the Projects homepage**, visible only when the user is in cloud mode AND owns the project. Opens a new `ShareDialog` modal that reuses the existing sharing logic (members list, bulk email invitations, pending-invitation management) without duplication. Editors and viewers don't see the Share affordance — consistent with GanttApp/CFD/Forecaster.
+- **`src/components/settings/ProjectSharingPanel.tsx`** — extracted from `SharingSection.tsx`. All sharing logic, state, effects, handlers, and JSX moved verbatim into this new component, plus a `withSectionWrapper` prop that controls whether the `<Section title="Sharing">` heading is rendered. The early-return guard for non-owners fires before any wrapper is constructed, so non-owners never see an empty "Sharing" header card. SharingSection (Settings page) sets `withSectionWrapper`; ShareDialog (homepage modal) doesn't, so its body has no nested heading.
+- **`src/components/product/ShareDialog.tsx`** — thin modal wrapper around `ProjectSharingPanel`. Uses the existing `Modal` component with `wide` and renders the project name as a subtitle below the modal header.
+
+### Changed
+- **Project tile action buttons: text → SVG icons (16×16)**. `src/components/product/ProjectCard.tsx` replaces three `group-hover:opacity-100` text buttons (Export, Duplicate, Delete) with always-visible icon buttons. Final left-to-right order: Share, Export, Duplicate, Delete. Each is gray by default and color-tinted on hover (Share: blue, Export: emerald, Duplicate: violet, Delete: red). Tile no longer requires a hover to expose its actions, matching the CFD/Forecaster project-tile pattern.
+- **`SharingSection.tsx` collapsed to a one-line passthrough** — `<ProjectSharingPanel productId={productId} withSectionWrapper />`. All logic now lives in the extracted panel; `SharingSection` is preserved as the import name `SettingsView` already uses.
+- **`Modal.tsx` is now stack-aware.** A module-level `openModalCount` plus a per-instance `myDepth` ensures Escape closes only the topmost modal and body-scroll lock is released only when the last modal closes. This fixes the cascade and scroll-restoration race that the new ShareDialog would otherwise expose by nesting a `ConfirmDialog` (Revoke confirmation) inside its outer `Modal`. The existing `ConfirmDialog` consumer inherits the fix automatically — no callsite changes.
+
+### Internal
+- `useEffect` in Modal: two effects (body-overflow + Escape listener) consolidated into one stack-aware effect. Behavior preserved for the single-modal case; nesting now works correctly.
+- `MemberRow` component and `MemberRowProps` interface relocated from `SharingSection.tsx` to `ProjectSharingPanel.tsx`.
+- `appId: 'spertstorymap'` literal in `getSendInvitationEmail` preserved verbatim through the extraction (Lesson 15).
+
 ## Version 0.27.1 (2026-05-06)
 
 Two bulk-invitation UX fixes surfaced by first-day production use.

@@ -17,9 +17,12 @@ interface ProjectSummary {
 interface ProjectCardProps {
   product: ProjectSummary;
   isShared: boolean;
+  isOwner: boolean;
+  isCloudMode: boolean;
   isDragging: boolean;
   isDropTarget: boolean;
   onNavigate: () => void;
+  onShare: () => void;
   onExport: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -32,9 +35,12 @@ interface ProjectCardProps {
 export default function ProjectCard({
   product: p,
   isShared,
+  isOwner,
+  isCloudMode,
   isDragging,
   isDropTarget,
   onNavigate,
+  onShare,
   onExport,
   onDuplicate,
   onDelete,
@@ -85,27 +91,49 @@ export default function ProjectCard({
             <span>Updated {(parseDate(p.updatedAt) || new Date()).toLocaleDateString()}</span>
           </div>
         </button>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1">
+          {isCloudMode && isOwner && (
+            <button
+              onClick={onShare}
+              className="p-1.5 rounded text-gray-400 transition-colors hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20"
+              title="Share"
+              aria-label="Share project"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={onExport}
-            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+            className="p-1.5 rounded text-gray-400 transition-colors hover:text-emerald-600 hover:bg-emerald-50 dark:hover:text-emerald-400 dark:hover:bg-emerald-900/20"
             title="Export as JSON"
+            aria-label="Export as JSON"
           >
-            Export
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+            </svg>
           </button>
           <button
             onClick={onDuplicate}
-            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+            className="p-1.5 rounded text-gray-400 transition-colors hover:text-violet-600 hover:bg-violet-50 dark:hover:text-violet-400 dark:hover:bg-violet-900/20"
             title="Duplicate"
+            aria-label="Duplicate project"
           >
-            Duplicate
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
           </button>
           <button
             onClick={onDelete}
-            className="px-2 py-1 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            className="p-1.5 rounded text-gray-400 transition-colors hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20"
             title="Delete"
+            aria-label="Delete project"
           >
-            Delete
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6" />
+            </svg>
           </button>
         </div>
       </div>

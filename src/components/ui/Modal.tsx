@@ -4,6 +4,11 @@
 
 import { useEffect, useRef } from 'react';
 
+// Module-level counter — tracks simultaneously open Modal instances.
+// Prevents Escape cascades and body-scroll restoration races when modals
+// nest (e.g., ShareDialog containing the Revoke ConfirmDialog).
+let openModalCount = 0;
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -16,20 +21,30 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
+    if (!open) return;
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    openModalCount += 1;
+    const myDepth = openModalCount;
+
+    if (myDepth === 1) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && openModalCount === myDepth) {
+        onClose();
+      }
     };
-    if (open) document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      openModalCount -= 1;
+      if (openModalCount === 0) {
+        document.body.style.overflow = '';
+      }
+    };
   }, [open, onClose]);
 
   if (!open) return null;
