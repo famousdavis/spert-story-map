@@ -18,6 +18,10 @@ vi.mock('../lib/firebase', () => ({
   auth: { currentUser: { uid: 'test-user' } },
   db: null,
   isFirebaseAvailable: true,
+  getSendInvitationEmail: vi.fn(() => null),
+  getClaimPendingInvitations: vi.fn(() => null),
+  getRevokeInvite: vi.fn(() => null),
+  getResendInvite: vi.fn(() => null),
 }));
 
 import { signOutCleanup } from '../lib/signOutCleanup';

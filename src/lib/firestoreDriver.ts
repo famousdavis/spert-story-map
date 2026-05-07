@@ -17,31 +17,16 @@ import {
   doc, getDoc, setDoc, deleteDoc, getDocs,
   collection, query, where,
   onSnapshot, serverTimestamp,
+  updateDoc, deleteField,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { migrateToV2 } from './storage';
+import { sanitizeForFirestore } from './firestoreUtils';
+import { getRevokeInvite, getResendInvite } from './firebase';
+import type { PendingInvite } from '../types';
 
 const PROJECTS_COL = 'spertstorymap_projects';
 const SETTINGS_COL = 'spertstorymap_settings';
-
-/**
- * Recursively strip `undefined` values from an object.
- * Firestore rejects explicit `undefined` — must omit the field entirely.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
-export function sanitizeForFirestore(obj: any): any {
-  if (obj === null || obj === undefined) return null;
-  if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
-  if (typeof obj !== 'object') return obj;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
-  const clean: Record<string, any> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
-      clean[key] = sanitizeForFirestore(value);
-    }
-  }
-  return clean;
-}
 
 /** Remove Firestore-only fields from product data. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
@@ -295,6 +280,63 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           if (_onSaveError) _onSaveError(error);
         },
       );
+    },
+
+    async listPendingInvites(productId: string): Promise<PendingInvite[]> {
+      try {
+        const q = query(
+          collection(db, 'spertsuite_invitations'),
+          where('inviterUid', '==', uid),
+          where('modelId', '==', productId),
+        );
+        const snap = await getDocs(q);
+        const results: PendingInvite[] = [];
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          if (d.status !== 'pending') return;
+          results.push({
+            tokenId: docSnap.id,
+            inviteeEmail: d.inviteeEmail as string,
+            role: d.role as 'editor' | 'viewer',
+            status: d.status as PendingInvite['status'],
+            createdAt: (d.createdAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0,
+            expiresAt: (d.expiresAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0,
+            lastEmailSentAt: (d.lastEmailSentAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0,
+            modelId: d.modelId as string,
+            modelName: d.modelName as string,
+            emailSendCount: (d.emailSendCount as number) ?? 0,
+            inviterUid: d.inviterUid as string,
+            appId: d.appId as string,
+            isVoting: (d.isVoting as boolean) ?? false,
+          });
+        });
+        return results.sort((a, b) => b.createdAt - a.createdAt);
+      } catch (e) {
+        console.error('Failed to load pending invites:', e instanceof Error ? e.message : 'Unknown error');
+        return [];
+      }
+    },
+
+    async removeCollaborator(productId: string, targetUid: string): Promise<void> {
+      if (!db) return; // defensive: db is null when Firebase is unavailable
+      try {
+        const ref = doc(db, PROJECTS_COL, productId);
+        await updateDoc(ref, { [`members.${targetUid}`]: deleteField() });
+      } catch (e) {
+        handleWriteError(e);
+      }
+    },
+
+    async revokeInvite(tokenId: string): Promise<void> {
+      const callable = getRevokeInvite();
+      if (!callable) return;
+      await callable({ tokenId });
+    },
+
+    async resendInvite(tokenId: string): Promise<void> {
+      const callable = getResendInvite();
+      if (!callable) return;
+      await callable({ tokenId });
     },
   };
 }

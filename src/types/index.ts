@@ -188,6 +188,10 @@ export interface StorageDriver {
   onSaveError(callback: (error: Error) => void): void;
   flushPendingSaves(): void;
   cancelPendingSaves(): void;
+  listPendingInvites(productId: string): Promise<PendingInvite[]>;
+  removeCollaborator(productId: string, uid: string): Promise<void>;
+  revokeInvite(tokenId: string): Promise<void>;
+  resendInvite(tokenId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +231,7 @@ export interface UserSettings {
 export interface UserProfile {
   displayName: string;
   email: string;
-  lastLogin?: unknown; // Firestore Timestamp
+  updatedAt?: unknown; // Firestore Timestamp
 }
 
 export interface TosAcceptance {
@@ -258,3 +262,53 @@ export interface RibContext {
   theme: Theme;
   backbone: Backbone;
 }
+
+// ---------------------------------------------------------------------------
+// Invitation types
+// ---------------------------------------------------------------------------
+
+export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
+
+export interface PendingInvite {
+  tokenId: string;
+  inviteeEmail: string;
+  role: 'editor' | 'viewer';
+  status: InvitationStatus;
+  createdAt: number;          // millis — converted from Firestore Timestamp
+  expiresAt: number;          // millis
+  lastEmailSentAt: number;    // millis
+  modelId: string;
+  modelName: string;
+  emailSendCount: number;
+  inviterUid: string;
+  appId: string;
+  isVoting: boolean;
+}
+
+export interface SpertModelsChangedDetail {
+  claimed: { appId: string; modelId: string; modelName: string }[];
+}
+
+// Callable I/O types
+export interface SendInvitationEmailInput {
+  appId: 'spertstorymap';  // string literal — NOT TOS_APP_ID (Lesson 15)
+  modelId: string;
+  emails: string[];
+  role: 'editor' | 'viewer';
+  isVoting: false;          // always false — no voting model in Story Map
+}
+
+export interface SendInvitationEmailResult {
+  added: string[];
+  invited: string[];
+  failed: { email: string; reason: string }[];
+}
+
+export interface ClaimPendingInvitationsResult {
+  claimed: { appId: string; modelId: string; modelName: string }[];
+}
+
+export interface RevokeInviteInput { tokenId: string }
+export interface ResendInviteInput { tokenId: string }
+export interface RevokeInviteResult { revoked: true }
+export interface ResendInviteResult { resent: true; emailSendCount: number }

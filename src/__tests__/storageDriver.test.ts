@@ -26,6 +26,10 @@ vi.mock('../lib/firebase', () => ({
   db: null,
   auth: null,
   isFirebaseAvailable: false,
+  getSendInvitationEmail: vi.fn(() => null),
+  getClaimPendingInvitations: vi.fn(() => null),
+  getRevokeInvite: vi.fn(() => null),
+  getResendInvite: vi.fn(() => null),
 }));
 
 // Mock firebase/firestore — prevent import errors

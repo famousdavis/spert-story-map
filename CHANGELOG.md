@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 0.27.0 (2026-05-06)
+
+Bulk Email Invitations — feature flag off in this release. The full implementation lands behind `INVITATIONS_ENABLED = false`; cross-app profile infrastructure activates immediately on merge. A subsequent single-line ship-gate commit flips the flag once the Landing Page PR deploys.
+
+### New feature (INVITATIONS_ENABLED = false — not yet active)
+- **Bulk invitations.** Project owners can invite multiple collaborators by email in one operation. Existing SPERT Suite users are added immediately; others receive an invitation email and are added automatically when they sign in.
+- **Pending invitations panel.** Project Settings → Sharing now shows outstanding invitations with Resend (up to 5×) and Revoke actions, gated by a confirmation dialog for revoke.
+- **Invitation landing banner.** When a user navigates from an invitation email link, a banner appears prompting sign-in (with Google / Microsoft buttons and ToS consent gate), then transitions to a success confirmation when the claim resolves. Auto-flips storage mode to cloud only when the user has zero local projects (Lesson 28 guard).
+
+### Active in this release regardless of invitation flag
+- **Suite-wide `spertsuite_profiles` dual-write** added to AuthProvider. Every sign-in now populates the cross-app profile required for invitation email lookup, alongside the existing per-app `spertstorymap_profiles` write.
+- **Display-name normalization fix.** Microsoft Entra ID "Last, First" displayName format now correctly becomes "First Last" in profile writes and all display contexts. Multi-part names (e.g., "Smith, Jane Ann") are also correctly handled. Implementation delegates to a new `denormalizeLastFirst` helper that mirrors the canonical Cloud Functions implementation in the Landing Page repo (`functions/src/mailHeaders.ts`).
+- **`photoURL`** included in all profile writes.
+- **Profile email stored lowercased** for cross-app lookup consistency.
+- **Profile timestamp renamed** from `lastLogin` to `updatedAt`.
+- **Removing a project collaborator** now routes through the `StorageDriver` interface (`driver.removeCollaborator`) instead of writing directly to Firestore.
+
+### Internal refactors (no UX change)
+- `sanitizeForFirestore` extracted from `firestoreDriver.ts` into a new `firestoreUtils.ts` module so it can be shared with AuthProvider's profile writes without circular imports.
+- `GoogleIcon` / `MicrosoftIcon` extracted to `src/components/auth/AuthProviderLogos.tsx` and shared between StorageSection and InvitationBanner.
+- New `useSignInWithTosGate` hook captures the consent-gate sign-in flow that StorageSection had inlined; InvitationBanner reuses it.
+- New `useInvitationLanding` hook owns the invite-token capture, URL stripping, mode flip, and claim-event listener.
+
+### Tests
+- New pure-function tests for `parseBulkEmails`, `mapInvitationError`, and `denormalizeLastFirst` (38 new assertions across 2 files). Hook and component tests for `useInvitationLanding` and `InvitationBanner` are deferred to a follow-up chore PR — they require `jsdom` + `@testing-library/react`.
+
 ## Version 0.26.4 (2026-05-03)
 
 Form-hygiene cleanup — silences Chrome DevTools Issues warnings around `id`/`name` on form fields and `<label>` association.

@@ -11,6 +11,7 @@ import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from
 import { sortByOrder } from '../lib/sortByOrder';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
+import { INVITATIONS_ENABLED } from '../lib/featureFlags';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import StorageStatusPill from '../components/ui/StorageStatusPill';
@@ -76,6 +77,19 @@ export default function ProductList() {
   useEffect(() => {
     if (storageReady) refresh();
   }, [storageReady, refresh]);
+
+  // Refresh project list when a pending invitation is claimed.
+  // `refresh` is useCallback([driver, mode]) — stable; effect re-attaches
+  // only when mode or driver changes, both legitimate triggers.
+  useEffect(() => {
+    if (!INVITATIONS_ENABLED) return;
+    const onModelsChanged = () => {
+      if (mode !== 'cloud') return;
+      void refresh();
+    };
+    window.addEventListener('spert:models-changed', onModelsChanged);
+    return () => window.removeEventListener('spert:models-changed', onModelsChanged);
+  }, [mode, refresh]);
 
   // Load persisted project order from preferences
   useEffect(() => {
