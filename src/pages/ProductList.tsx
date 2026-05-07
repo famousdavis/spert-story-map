@@ -20,6 +20,7 @@ import AppSettingsModal from '../components/settings/AppSettingsModal';
 import FirstRunBanner from '../components/ui/FirstRunBanner';
 import CreateProjectModal from '../components/product/CreateProjectModal';
 import ProjectCard from '../components/product/ProjectCard';
+import ShareDialog from '../components/product/ShareDialog';
 import { Footer } from './ChangelogView';
 
 function enrichProduct(entry, full) {
@@ -41,7 +42,9 @@ export default function ProductList() {
   const [showWarning, setShowWarning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
+  const [shareTarget, setShareTarget] = useState<{ id: string; name: string } | null>(null);
   const { user } = useAuth();
+  const isCloudMode = mode === 'cloud';
   const navigate = useNavigate();
   const { theme, toggleTheme, isDark } = useDarkMode();
 
@@ -336,23 +339,32 @@ export default function ProductList() {
           </div>
         ) : (
           <div className="space-y-3">
-            {sortedProducts.map(p => (
-              <ProjectCard
-                key={p.id}
-                product={p}
-                isShared={!!(p._owner && user && p._owner !== user.uid)}
-                isDragging={dragId === p.id}
-                isDropTarget={dropBeforeId === p.id}
-                onNavigate={() => navigate(`/product/${p.id}/structure`)}
-                onExport={() => handleExport(p.id)}
-                onDuplicate={() => handleDuplicate(p.id)}
-                onDelete={() => setDeleteTarget(p)}
-                onDragStart={e => handleProjectDragStart(e, p.id)}
-                onDragOver={e => handleProjectDragOver(e, p.id)}
-                onDrop={handleProjectDrop}
-                onDragEnd={handleProjectDragEnd}
-              />
-            ))}
+            {sortedProducts.map(p => {
+              // isOwner: local-mode users own all their projects; cloud-mode users
+              // own only projects where _owner matches their uid. isShared is the
+              // near-inverse: true when someone else's cloud project is shared with you.
+              const isOwner = mode !== 'cloud' || !p._owner || p._owner === user?.uid;
+              return (
+                <ProjectCard
+                  key={p.id}
+                  product={p}
+                  isShared={!!(p._owner && user && p._owner !== user.uid)}
+                  isOwner={isOwner}
+                  isCloudMode={isCloudMode}
+                  isDragging={dragId === p.id}
+                  isDropTarget={dropBeforeId === p.id}
+                  onNavigate={() => navigate(`/product/${p.id}/structure`)}
+                  onShare={() => setShareTarget({ id: p.id, name: p.name })}
+                  onExport={() => handleExport(p.id)}
+                  onDuplicate={() => handleDuplicate(p.id)}
+                  onDelete={() => setDeleteTarget(p)}
+                  onDragStart={e => handleProjectDragStart(e, p.id)}
+                  onDragOver={e => handleProjectDragOver(e, p.id)}
+                  onDrop={handleProjectDrop}
+                  onDragEnd={handleProjectDragEnd}
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -379,6 +391,14 @@ export default function ProductList() {
       />
 
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+
+      {shareTarget && (
+        <ShareDialog
+          productId={shareTarget.id}
+          productName={shareTarget.name}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
 
       <Footer />
     </div>
