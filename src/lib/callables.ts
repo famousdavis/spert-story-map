@@ -37,9 +37,32 @@ function requireFunctions() {
   return functionsInstance;
 }
 
+/**
+ * Sends bulk invitation emails for a project.
+ *
+ * Defense-in-depth note: TypeScript erases at runtime, so the
+ * `'editor' | 'viewer'` literal on `SendInvitationEmailInput.role` does
+ * NOT prevent a future code path or DOM-tampered call site from sending
+ * `'owner'` or arbitrary strings. We runtime-validate `role` here. The
+ * Cloud Function MUST also independently validate (this client check is
+ * not a security boundary).
+ *
+ * Resend cap: server-side only (audit M3).
+ *   The 5/5 resend cap is enforced exclusively by the `resendInvite` CF;
+ *   the UI's `disabled={inv.emailSendCount >= 5}` on the Resend button is
+ *   a UX gate, not a security gate. Direct client writes to
+ *   `spertsuite_invitations` are denied by Firestore rules
+ *   (`allow write: if false`), so a caller bypassing the UI cannot
+ *   increment `emailSendCount` directly — they must go through the CF,
+ *   which rejects with `functions/resource-exhausted` past the cap.
+ *   `mapInvitationError` already surfaces this as a meaningful message.
+ */
 export async function callSendInvitationEmail(
   input: SendInvitationEmailInput,
 ): Promise<SendInvitationEmailResult> {
+  if (input.role !== 'editor' && input.role !== 'viewer') {
+    throw new Error(`Invalid invitation role: ${String(input.role)}`);
+  }
   const r = await httpsCallable<SendInvitationEmailInput, SendInvitationEmailResult>(
     requireFunctions(), 'sendInvitationEmail',
   )(input);

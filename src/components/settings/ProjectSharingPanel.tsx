@@ -496,6 +496,11 @@ function InvitationSection({
                     <p className="text-xs text-gray-500 dark:text-gray-400">{inv.role} · sent {inv.emailSendCount}/5</p>
                   </div>
                   <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                    {/* UX gate only — the resend cap is enforced server-side
+                        by the resendInvite CF. Firestore rules deny client
+                        writes to spertsuite_invitations, so a caller
+                        bypassing this UI cannot increment emailSendCount
+                        directly. See callables.ts for the trust model. */}
                     <button
                       onClick={() => handleResend(inv.tokenId)}
                       disabled={inv.emailSendCount >= 5 || actionBusy !== null}

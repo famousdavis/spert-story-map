@@ -50,8 +50,14 @@ function clamp(v: number, min: number, max: number): number {
 }
 
 /**
- * Known top-level product fields. Any field not in this set is stripped
- * on import to prevent unexpected data from propagating into state.
+ * Field allowlists for every entity that participates in the import walk.
+ * Any key not in the corresponding set is stripped before the validated
+ * object reaches state or persistence (audit M2 + L4). Keys named
+ * `__proto__`, `constructor`, or `prototype` are explicitly rejected on
+ * every nested object via `stripObject` to prevent prototype pollution
+ * (which `JSON.parse` does NOT itself trigger in modern V8, but which
+ * any subsequent `Object.assign` / spread of these objects would
+ * propagate as enumerable own-keys).
  */
 const KNOWN_PRODUCT_FIELDS = new Set([
   'id', 'name', 'description', 'createdAt', 'updatedAt',
@@ -61,6 +67,38 @@ const KNOWN_PRODUCT_FIELDS = new Set([
   // Export-time fields (stripped after validation by importProductFromJSON)
   '_storageRef', '_exportedBy', '_exportedById',
 ]);
+
+const KNOWN_THEME_FIELDS = new Set(['id', 'name', 'order', 'color', 'backboneItems']);
+const KNOWN_BACKBONE_FIELDS = new Set(['id', 'name', 'description', 'order', 'ribItems']);
+const KNOWN_RIB_FIELDS = new Set([
+  'id', 'name', 'description', 'order', 'size', 'category',
+  'releaseAllocations', 'progressHistory', 'notes',
+]);
+const KNOWN_RELEASE_FIELDS = new Set(['id', 'name', 'description', 'order', 'targetDate']);
+const KNOWN_SPRINT_FIELDS = new Set(['id', 'name', 'order', 'endDate']);
+const KNOWN_ALLOCATION_FIELDS = new Set(['releaseId', 'percentage', 'memo']);
+const KNOWN_PROGRESS_FIELDS = new Set([
+  'sprintId', 'releaseId', 'percentComplete', 'comment', 'updatedAt',
+]);
+const KNOWN_CHANGELOG_FIELDS = new Set(['t', 'op', 'entity', 'id', 'uid', 'source']);
+const KNOWN_SIZEMAPPING_FIELDS = new Set(['label', 'points']);
+
+const PROTO_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Strip prototype-pollution keys and unknown fields from a plain object,
+ * mutating it in place. Returns the object for chainability.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function stripObject(obj: any, allowed: Set<string>): any {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  for (const key of Object.keys(obj)) {
+    if (PROTO_KEYS.has(key) || !allowed.has(key)) {
+      delete obj[key];
+    }
+  }
+  return obj;
+}
 
 /**
  * Validate and sanitize a parsed product object.
@@ -97,6 +135,7 @@ export function validateProduct(data: unknown): Product {
       assert(isNum(r.order), 'Release order must be a number');
       r.order = clamp(Math.floor(r.order), 0, 10000);
     }
+    stripObject(r, KNOWN_RELEASE_FIELDS);
   }
 
   // --- Sprints ---
@@ -110,6 +149,7 @@ export function validateProduct(data: unknown): Product {
       assert(isNum(s.order), 'Sprint order must be a number');
       s.order = clamp(Math.floor(s.order), 0, 10000);
     }
+    stripObject(s, KNOWN_SPRINT_FIELDS);
   }
 
   // --- Size mapping ---
@@ -119,6 +159,7 @@ export function validateProduct(data: unknown): Product {
     for (const sm of sizeMapping) {
       assert(isValidString(sm.label, 20), 'Size mapping label must be a string (max 20 chars)');
       assert(isNum(sm.points) && sm.points >= 0, 'Size mapping points must be a non-negative number');
+      stripObject(sm, KNOWN_SIZEMAPPING_FIELDS);
     }
   }
 
@@ -205,6 +246,7 @@ export function validateProduct(data: unknown): Product {
               assert(typeof alloc.memo === 'string' && alloc.memo.length <= MAX_MEMO,
                 'Allocation memo too long');
             }
+            stripObject(alloc, KNOWN_ALLOCATION_FIELDS);
           }
         }
 
@@ -231,10 +273,15 @@ export function validateProduct(data: unknown): Product {
               assert(typeof p.comment === 'string' && p.comment.length <= MAX_MEMO,
                 'Progress comment too long');
             }
+            stripObject(p, KNOWN_PROGRESS_FIELDS);
           }
         }
+
+        stripObject(rib, KNOWN_RIB_FIELDS);
       }
+      stripObject(bb, KNOWN_BACKBONE_FIELDS);
     }
+    stripObject(theme, KNOWN_THEME_FIELDS);
   }
 
   // --- releaseCardOrder ---
@@ -270,6 +317,15 @@ export function validateProduct(data: unknown): Product {
       assert(typeof entry === 'object' && entry !== null, 'Changelog entry must be an object');
       assert(isNum(entry.t) && entry.t > 0 && entry.t < 4102444800,
         'Changelog entry timestamp must be a valid Unix timestamp');
+      // Bound string fields so a tampered import can't smuggle large
+      // payloads through the changelog. Drop oversized strings rather
+      // than rejecting the whole import — these are advisory.
+      for (const k of ['op', 'entity', 'id', 'uid', 'source'] as const) {
+        if (entry[k] !== undefined && (typeof entry[k] !== 'string' || entry[k].length > 128)) {
+          delete entry[k];
+        }
+      }
+      stripObject(entry, KNOWN_CHANGELOG_FIELDS);
     }
   }
 

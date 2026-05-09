@@ -396,6 +396,154 @@ describe('validateProduct', () => {
     expect(Object.prototype.hasOwnProperty.call(result.sizingCardOrder, 'constructor')).toBe(false);
   });
 
+  // --- Per-entity unknown-field stripping (audit M2) ---
+  it('strips unknown fields from theme', () => {
+    const data = minimal({
+      themes: [{ id: 't1', name: 'T1', backboneItems: [], junk: 'evil', tracking: 1 }],
+    });
+    const result = validateProduct(data);
+    const theme = result.themes[0] as Record<string, unknown>;
+    expect(theme.id).toBe('t1');
+    expect(Object.prototype.hasOwnProperty.call(theme, 'junk')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(theme, 'tracking')).toBe(false);
+  });
+
+  it('strips unknown fields from backbone', () => {
+    const data = minimal({
+      themes: [{
+        id: 't1', name: 'T1',
+        backboneItems: [{ id: 'b1', name: 'B1', ribItems: [], hidden: 'x' }],
+      }],
+    });
+    const result = validateProduct(data);
+    const bb = result.themes[0].backboneItems[0] as Record<string, unknown>;
+    expect(bb.id).toBe('b1');
+    expect(Object.prototype.hasOwnProperty.call(bb, 'hidden')).toBe(false);
+  });
+
+  it('strips unknown fields from rib', () => {
+    const data = minimal({
+      themes: [{
+        id: 't1', name: 'T1',
+        backboneItems: [{
+          id: 'b1', name: 'B1',
+          ribItems: [{ id: 'r1', name: 'R1', tracker: 'evil', _injected: 1 }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    const rib = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    expect(rib.id).toBe('r1');
+    expect(Object.prototype.hasOwnProperty.call(rib, 'tracker')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(rib, '_injected')).toBe(false);
+  });
+
+  it('strips unknown fields from release', () => {
+    const data = minimal({ releases: [{ id: 'r1', name: 'R1', evil: 'x' }] });
+    const result = validateProduct(data);
+    expect(Object.prototype.hasOwnProperty.call(result.releases[0], 'evil')).toBe(false);
+  });
+
+  it('strips unknown fields from sprint', () => {
+    const data = minimal({ sprints: [{ id: 's1', name: 'S1', injected: true }] });
+    const result = validateProduct(data);
+    expect(Object.prototype.hasOwnProperty.call(result.sprints[0], 'injected')).toBe(false);
+  });
+
+  it('strips unknown fields from release allocation', () => {
+    const data = minimal({
+      releases: [{ id: 'r1', name: 'R1' }],
+      themes: [{
+        id: 't1', name: 'T1',
+        backboneItems: [{
+          id: 'b1', name: 'B1',
+          ribItems: [{
+            id: 'rib1', name: 'Rib1',
+            releaseAllocations: [{ releaseId: 'r1', percentage: 50, evil: 'x' }],
+          }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    const alloc = result.themes[0].backboneItems[0].ribItems[0].releaseAllocations[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(alloc, 'evil')).toBe(false);
+  });
+
+  it('strips unknown fields from progress entry', () => {
+    const data = minimal({
+      sprints: [{ id: 's1', name: 'S1' }],
+      releases: [{ id: 'r1', name: 'R1' }],
+      themes: [{
+        id: 't1', name: 'T1',
+        backboneItems: [{
+          id: 'b1', name: 'B1',
+          ribItems: [{
+            id: 'rib1', name: 'Rib1',
+            progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: 10, evil: 'x' }],
+          }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    const p = result.themes[0].backboneItems[0].ribItems[0].progressHistory[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(p, 'evil')).toBe(false);
+  });
+
+  it('strips unknown fields from sizeMapping entry', () => {
+    const data = minimal({
+      sizeMapping: [{ label: 'M', points: 3, evil: 'x' }],
+    });
+    const result = validateProduct(data);
+    const sm = result.sizeMapping[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(sm, 'evil')).toBe(false);
+  });
+
+  it('strips unknown fields and bounds string lengths on changelog entry (L4)', () => {
+    const data = minimal({
+      _changeLog: [{
+        t: 1700000000,
+        op: 'add',
+        evil: 'x',
+        source: 'a'.repeat(200),  // exceeds 128-char bound — should be dropped
+      }],
+    });
+    const result = validateProduct(data);
+    const entry = (result._changeLog ?? [])[0] as Record<string, unknown>;
+    expect(entry.op).toBe('add');
+    expect(Object.prototype.hasOwnProperty.call(entry, 'evil')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(entry, 'source')).toBe(false);
+  });
+
+  // --- Per-entity prototype-pollution key rejection (audit M2) ---
+  it('strips __proto__/constructor/prototype from theme object', () => {
+    const theme = JSON.parse('{"id":"t1","name":"T1","backboneItems":[],"__proto__":{"polluted":true},"constructor":1,"prototype":"x"}');
+    const result = validateProduct(minimal({ themes: [theme] }));
+    const t = result.themes[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(t, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(t, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(t, 'prototype')).toBe(false);
+  });
+
+  it('strips __proto__/constructor/prototype from rib object', () => {
+    const rib = JSON.parse('{"id":"r1","name":"R1","__proto__":{"x":1},"constructor":"hack"}');
+    const data = minimal({
+      themes: [{
+        id: 't1', name: 'T1',
+        backboneItems: [{ id: 'b1', name: 'B1', ribItems: [rib] }],
+      }],
+    });
+    const result = validateProduct(data);
+    const r = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(r, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(r, 'constructor')).toBe(false);
+  });
+
+  it('strips __proto__ from release object', () => {
+    const r = JSON.parse('{"id":"r1","name":"R1","__proto__":{"x":1}}');
+    const result = validateProduct(minimal({ releases: [r] }));
+    expect(Object.prototype.hasOwnProperty.call(result.releases[0], '__proto__')).toBe(false);
+  });
+
   // --- Import error message sanitization ---
   it('gives generic error for malformed JSON on import', async () => {
     const { importProductFromJSON } = await import('../lib/importExport');

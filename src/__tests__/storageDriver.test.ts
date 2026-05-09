@@ -162,4 +162,10 @@ describe('createLocalStorageDriver', () => {
     unsub();
     expect(cb).not.toHaveBeenCalled();
   });
+
+  it('tearDownListeners is a safe no-op (audit L3)', () => {
+    const driver = createLocalStorageDriver();
+    expect(() => driver.tearDownListeners()).not.toThrow();
+    expect(() => driver.tearDownListeners()).not.toThrow();
+  });
 });
