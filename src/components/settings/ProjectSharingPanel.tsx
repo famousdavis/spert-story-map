@@ -244,10 +244,13 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
       } else {
         console.warn('[ProjectSharingPanel] pending invites refresh failed:', pendingResult.reason);
       }
-      // Clear the textarea on a successful send so the user doesn't have
-      // to manually delete addresses they just dispatched. Result chips
-      // remain visible until the user types into the empty textarea.
-      setBulkEmails('');
+      // Clear the textarea only when at least one address actually went
+      // through (added or invited). If every valid address ended up in
+      // result.failed[] (e.g. CF rate-limited, all already-invited), preserve
+      // the textarea so the user can retry without re-typing. (Lesson 43.)
+      const anyDelivered =
+        (res.data.added?.length ?? 0) + (res.data.invited?.length ?? 0) > 0;
+      if (anyDelivered) setBulkEmails('');
     } catch (e) {
       console.error('Send invitations failed:', e instanceof Error ? e.message : 'Unknown error');
       setError(mapInvitationError(e, 'send'));
