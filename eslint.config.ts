@@ -9,7 +9,12 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // Skip the build output and any nested git worktrees under .claude/ —
+  // Claude Code creates these for parallel feature work, and their freshly
+  // built `dist/` bundles caused ESLint to scan ~30k minified-bundle errors
+  // when run from the repo root. Worktrees lint themselves; we don't lint
+  // them through the parent.
+  { ignores: ['dist', '.claude/**'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{js,jsx,ts,tsx}'],
