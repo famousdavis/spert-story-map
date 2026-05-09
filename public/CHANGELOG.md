@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.29.1 (2026-05-09)
+
+Maintenance refactor — no behavior change. Targeted decomposition of the Sharing panel and a small batch of type-annotation and signature cleanups. All 510 tests remain green.
+
+### Internal
+- **`InvitationSection` extracted from `ProjectSharingPanel.tsx`.** The flag-on bulk-invitation subsystem (8 state hooks, the `listPendingInvites` effect, `handleSendInvitations` / `handleRevoke` / `handleResend`, and the revoke `ConfirmDialog`) is now a self-contained sub-component declared below `MemberRow` in the same file. The parent retains member-CRUD state and handlers (`handleAddMember`, `handleRemoveMember`, `handleRoleChange`), the members-loading effect, all render gates, and the legacy single-email-input form for the flag-off path. Communication contract: `InvitationSection` receives `productId`, `driver`, `ownerStatus`, `members`, `onMembersUpdate`, and `onOwnerStatusError`. The post-send members-refresh failure path still hides the panel — `onOwnerStatusError()` advances the parent's `ownerStatus` to `'error'`, identical observable behavior to the previous inline `setOwnerStatus('error')`. Invitation-flow errors are now displayed via a local `inviteError` state inside the section; the parent's `error` state continues to serve member-CRUD failures only.
+- **Explicit generics on `useState(null)` calls.** `members` (`Record<string, string> | null`), `owner` (`string | null`), `error` (`string | null`) in `ProjectSharingPanel`; `profile` (`{ displayName?: string; email?: string } | null`) in `MemberRow`.
+- **Type annotations in `mapMutations.ts`.** `let ribData: RibItem | null = null` in `moveRibBetweenBackbones`; `let backboneData: Backbone | null = null` in `moveBackboneToTheme`; `const ids = new Set<string>()` in `getColumnRibIds`. Added `Backbone` to the type import.
+- **Collapsed `enrichProduct` redundant dual-parameter signature in `ProductList.tsx`.** Was `enrichProduct(entry, full)` always called as `enrichProduct(p, p)`; now `enrichProduct(product)` with a single argument.
+
 ## Version 0.29.0 (2026-05-09)
 
 Bulk-sharing retrograde audit — six confirmed gaps closed across the sharing UI, callable wrapper layer, invitation landing hook, and banner shell. PR 1 (driver hardening, v0.28.0 → unreleased) landed `removeCollaborator` three-guard `runTransaction` and `onProductChange` `_owner` re-attach. This release ships the correctness + hygiene pass.

@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, RibItem, ReleaseAllocation, Theme } from '../../types';
+import type { Product, RibItem, ReleaseAllocation, Theme, Backbone } from '../../types';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
@@ -83,7 +83,7 @@ function spliceCardOrderByColumn(cardOrder: Record<string, string[]>, key: strin
  * Used to translate per-column insert indices to global card order positions.
  */
 function getColumnRibIds(themes: Theme[], backboneId: string, releaseId: string | null, excludeRibId: string): Set<string> {
-  const ids = new Set();
+  const ids = new Set<string>();
   for (const t of themes) {
     for (const b of t.backboneItems) {
       if (b.id !== backboneId) continue;
@@ -133,7 +133,7 @@ export function transferAllocation(rib: RibItem, fromReleaseId: string | null, t
  * Returns { themes, ribData } or null if the rib wasn't found.
  */
 function moveRibBetweenBackbones(themes: Theme[], ribId: string, fromThemeId: string, fromBackboneId: string, toThemeId: string, toBackboneId: string) {
-  let ribData = null;
+  let ribData: RibItem | null = null;
 
   // 1. Remove rib from source backbone
   const stripped = themes.map(t => {
@@ -239,7 +239,7 @@ export function moveRibToBackbone(updateProduct: UpdateProduct, ribId: string, f
  */
 export function moveBackboneToTheme(updateProduct: UpdateProduct, backboneId: string, fromThemeId: string, toThemeId: string, insertIndex: number | null): void {
   updateProduct(prev => {
-    let backboneData = null;
+    let backboneData: Backbone | null = null;
 
     // 1. Remove backbone from source theme
     const themes = prev.themes.map(t => {

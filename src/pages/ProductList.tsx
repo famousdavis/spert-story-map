@@ -23,12 +23,12 @@ import ProjectCard from '../components/product/ProjectCard';
 import ShareDialog from '../components/product/ShareDialog';
 import { Footer } from './ChangelogView';
 
-function enrichProduct(entry, full) {
-  const allRibs = getAllRibItems(full);
-  const totalPoints = getTotalProjectPoints(full);
+function enrichProduct(product) {
+  const allRibs = getAllRibItems(product);
+  const totalPoints = getTotalProjectPoints(product);
   const unsized = allRibs.filter(r => !r.size).length;
-  const pctComplete = getProjectPercentComplete(full);
-  return { ...entry, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
+  const pctComplete = getProjectPercentComplete(product);
+  return { ...product, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
 }
 
 export default function ProductList() {
@@ -64,7 +64,7 @@ export default function ProductList() {
     setLoading(true);
     try {
       const allProducts = await driver.loadProductIndex();
-      const detailed = allProducts.filter(Boolean).map(p => enrichProduct(p, p));
+      const detailed = allProducts.filter(Boolean).map(p => enrichProduct(p));
       setProducts(detailed);
       // In cloud mode, detect local projects that weren't migrated
       if (mode === 'cloud' && detailed.length === 0) {
