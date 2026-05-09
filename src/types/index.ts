@@ -188,6 +188,13 @@ export interface StorageDriver {
   onSaveError(callback: (error: Error) => void): void;
   flushPendingSaves(): void;
   cancelPendingSaves(): void;
+  /**
+   * Detach every active listener subscribed via this driver. Called by
+   * signOutCleanup before firebaseSignOut so a listener cannot fire
+   * `permission-denied` after credentials are revoked. No-op for the
+   * local driver. (Audit L3.)
+   */
+  tearDownListeners(): void;
   listPendingInvites(productId: string): Promise<PendingInvite[]>;
   removeCollaborator(productId: string, uid: string): Promise<void>;
   revokeInvite(tokenId: string): Promise<void>;

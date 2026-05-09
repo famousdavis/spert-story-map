@@ -47,6 +47,7 @@ function makeDriver() {
     mode: 'cloud' as const,
     cancelPendingSaves: vi.fn(),
     flushPendingSaves: vi.fn(),
+    tearDownListeners: vi.fn(),
     // Unused stubs — required to satisfy the StorageDriver shape.
     loadProductIndex: vi.fn(),
     loadProduct: vi.fn(),
@@ -82,6 +83,22 @@ describe('signOutCleanup', () => {
     await signOutCleanup(driver as any);
 
     expect(callOrder).toEqual(['cancel', 'firebaseSignOut']);
+  });
+
+  it('detaches driver listeners before firebaseSignOut (audit L3)', async () => {
+    const driver = makeDriver();
+    const callOrder: string[] = [];
+    driver.cancelPendingSaves.mockImplementation(() => { callOrder.push('cancel'); });
+    driver.tearDownListeners.mockImplementation(() => { callOrder.push('tearDown'); });
+    firebaseSignOutMock.mockImplementation(() => {
+      callOrder.push('firebaseSignOut');
+      return Promise.resolve();
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test double
+    await signOutCleanup(driver as any);
+
+    expect(callOrder).toEqual(['cancel', 'tearDown', 'firebaseSignOut']);
   });
 
   it('removes every rp_product_* key but preserves non-matching keys', async () => {

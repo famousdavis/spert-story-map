@@ -112,6 +112,9 @@ export function createLocalStorageDriver(): StorageDriver {
       return () => {};
     },
 
+    /** No-op for local mode — there are no listeners to detach. */
+    tearDownListeners() {},
+
     listPendingInvites(_productId: string): Promise<PendingInvite[]> {
       return Promise.resolve([]);
     },

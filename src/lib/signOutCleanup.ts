@@ -20,15 +20,19 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
  *   1. Cancel any pending debounced Firestore writes — prevents
  *      PERMISSION_DENIED after credential revocation and prevents
  *      stale writes from landing during the revoke race.
- *   2. Clear every rp_product_* key from localStorage.
- *   3. Clear rp_products_index.
- *   4. Clear rp_app_preferences (contains Export Attribution PII).
- *   5. Reset persisted storage mode to 'local'. If switchMode is
+ *   2. Detach every active onSnapshot listener registered through the
+ *      driver (audit L3). Without this, listeners survive into the
+ *      logged-out auth state and fire `permission-denied`, surfacing
+ *      a misleading toast on a logged-out screen.
+ *   3. Clear every rp_product_* key from localStorage.
+ *   4. Clear rp_products_index.
+ *   5. Clear rp_app_preferences (contains Export Attribution PII).
+ *   6. Reset persisted storage mode to 'local'. If switchMode is
  *      provided (UI-initiated sign-out), use it so React state stays
  *      in sync; otherwise write directly to localStorage (used by
  *      AuthProvider's ToS-failure branches, which have no context
  *      access to switchMode).
- *   6. Revoke the Firebase session. onAuthStateChanged will fire with
+ *   7. Revoke the Firebase session. onAuthStateChanged will fire with
  *      null as a result, which is the mechanism that updates React
  *      auth state. Do NOT call setUser(null) elsewhere.
  *
@@ -44,9 +48,11 @@ export async function signOutCleanup(
   // 1. Cancel pending writes on the live driver before credentials are revoked.
   if (driver) {
     driver.cancelPendingSaves();
+    // 2. Detach live onSnapshot listeners (audit L3).
+    driver.tearDownListeners();
   }
 
-  // 2. Clear every rp_product_* key by iterating localStorage directly.
+  // 3. Clear every rp_product_* key by iterating localStorage directly.
   //    This catches orphaned product docs that are not in the index.
   const prefix = STORAGE_KEYS.PRODUCT_PREFIX;
   const productKeys: string[] = [];
@@ -56,20 +62,20 @@ export async function signOutCleanup(
   }
   for (const key of productKeys) localStorage.removeItem(key);
 
-  // 3. Clear the product index.
+  // 4. Clear the product index.
   localStorage.removeItem(STORAGE_KEYS.PRODUCTS_INDEX);
 
-  // 4. Clear Export Attribution and other per-user preferences.
+  // 5. Clear Export Attribution and other per-user preferences.
   localStorage.removeItem(STORAGE_KEYS.PREFERENCES);
 
-  // 5. Reset persisted storage mode to 'local'.
+  // 6. Reset persisted storage mode to 'local'.
   if (switchMode) {
     switchMode('local');
   } else {
     localStorage.setItem(STORAGE_MODE_KEY, 'local');
   }
 
-  // 6. Revoke Firebase session (fires onAuthStateChanged(null)).
+  // 7. Revoke Firebase session (fires onAuthStateChanged(null)).
   if (auth) {
     await firebaseSignOut(auth);
   }

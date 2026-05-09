@@ -44,6 +44,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
   let prefsPending: any = null;
 
+  // Active onSnapshot unsubscribers (audit L3). Tracked centrally so
+  // signOutCleanup can detach all listeners before credential revocation.
+  const activeListeners = new Set<() => void>();
+
   function handleWriteError(e: unknown): void {
     console.error('Firestore write error:', e instanceof Error ? e.message : 'Unknown error');
     if (_onSaveError) _onSaveError(e);
@@ -276,7 +280,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      */
     onProductChange(id: string, cb: (product: Product) => void) {
       const ref = doc(db, PROJECTS_COL, id);
-      return onSnapshot(
+      const rawUnsubscribe = onSnapshot(
         ref,
         (snap) => {
           if (snap.metadata.hasPendingWrites) return;
@@ -291,6 +295,29 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           if (_onSaveError) _onSaveError(error);
         },
       );
+      // Wrap so tearDownListeners and the consumer's React-effect-cleanup
+      // both work correctly. Calling either path removes the entry from
+      // activeListeners exactly once. (Audit L3.)
+      const wrapped = () => {
+        if (activeListeners.delete(wrapped)) {
+          rawUnsubscribe();
+        }
+      };
+      activeListeners.add(wrapped);
+      return wrapped;
+    },
+
+    /**
+     * Detach every active onProductChange subscription. Called by
+     * signOutCleanup before credentials are revoked so listeners do not
+     * fire `permission-denied` errors against a logged-out auth state.
+     * Safe to call multiple times — the wrapped unsubscribers are
+     * idempotent. (Audit L3.)
+     */
+    tearDownListeners() {
+      // Snapshot first because `wrapped()` mutates `activeListeners`.
+      const all = Array.from(activeListeners);
+      for (const unsub of all) unsub();
     },
 
     async listPendingInvites(productId: string): Promise<PendingInvite[]> {
