@@ -91,7 +91,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       snap.forEach(docSnap => {
         const data = docSnap.data();
         const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
-        product._owner = data.owner;
+        // Re-attach owner/members from the raw doc — stripFirestoreFields
+        // removed them. Use `?? null` so the field shape is stable for the
+        // UI's strict-equality ownership checks. (Lessons 38, 49.)
+        product._owner = data.owner ?? null;
         product._members = data.members;
         products.push(product);
       });
@@ -264,6 +267,12 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     /**
      * Subscribe to real-time changes for a product.
      * Uses hasPendingWrites for echo prevention.
+     *
+     * stripFirestoreFields removes `owner`/`members` from the parsed product;
+     * we re-attach `_owner` from the raw doc so per-project listener echoes
+     * don't blank the field set by the initial loadProductIndex. Without
+     * this, the Share button disappears 1–3s after Add Project as the first
+     * snapshot arrives. (Lesson 49: third strip site.)
      */
     onProductChange(id: string, cb: (product: Product) => void) {
       const ref = doc(db, PROJECTS_COL, id);
@@ -273,7 +282,9 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           if (snap.metadata.hasPendingWrites) return;
           if (!snap.exists()) return;
           const data = snap.data();
-          cb(migrateToV2(stripFirestoreFields({ id: snap.id, ...data })));
+          const product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
+          product._owner = data.owner ?? null;
+          cb(product);
         },
         (error) => {
           console.error('Firestore listener error:', error instanceof Error ? error.message : 'Unknown error');
