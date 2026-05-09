@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useState, useEffect, useId } from 'react';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { callSendInvitationEmail } from '../../lib/callables';
 import { useAuth } from '../../lib/AuthProvider';
@@ -110,7 +110,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
 
     try {
       // Look up user by email in profiles
-      const q = query(collection(db, PROFILES_COL), where('email', '==', email.trim()));
+      const q = query(collection(db, PROFILES_COL), where('email', '==', email.trim()), limit(1));
       const snap = await getDocs(q);
 
       if (snap.empty) {

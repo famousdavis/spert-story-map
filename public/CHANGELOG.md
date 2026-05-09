@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.29.2 (2026-05-09)
+
+Security audit hardening — Story Map app-side prerequisite for the suite-parity Firestore rules tightening landing in the Landing Page repo. No user-visible behavior change in production (the path under change is gated behind `INVITATIONS_ENABLED === false`, which is currently `true`).
+
+### Security
+- **Legacy single-add email lookup now bounded by `limit(1)` (audit L6/L7).** The flag-off "add member by email" form in `ProjectSharingPanel.tsx` previously issued an unbounded `query(collection(db, PROFILES_COL), where('email', '==', …))`. The companion canonical `firestore.rules` change restricts `spertstorymap_profiles` `list` permission to `request.query.limit <= 1` — matching the suite-wide pattern already in place for `spertahp_profiles` and `spertsuite_profiles` — to block bulk profile enumeration by any signed-in SPERT user. This commit adds `limit(1)` to the query so the legacy path remains rule-compliant if the feature flag is ever toggled. With `INVITATIONS_ENABLED = true` (current state) the legacy path is unreachable, so no production behavior change. Pairs with M5 (project create rule binds top-level `owner` to caller) in the same Landing Page rules patch.
+
 ## Version 0.29.1 (2026-05-09)
 
 Maintenance refactor — no behavior change. Targeted decomposition of the Sharing panel and a small batch of type-annotation and signature cleanups. All 510 tests remain green.
