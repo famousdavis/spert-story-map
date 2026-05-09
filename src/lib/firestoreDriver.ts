@@ -17,7 +17,7 @@ import {
   doc, getDoc, setDoc, deleteDoc, getDocs,
   collection, query, where,
   onSnapshot, serverTimestamp,
-  updateDoc, deleteField, runTransaction,
+  deleteField, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { migrateToV2 } from './storage';
