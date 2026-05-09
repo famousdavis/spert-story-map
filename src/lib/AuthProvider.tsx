@@ -11,7 +11,8 @@ import {
   OAuthProvider,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, isFirebaseAvailable, getClaimPendingInvitations } from './firebase';
+import { auth, db, isFirebaseAvailable } from './firebase';
+import { callClaimPendingInvitations } from './callables';
 import { signOutCleanup } from './signOutCleanup';
 import {
   isTosAcceptedLocally,
@@ -39,11 +40,12 @@ import type { SpertModelsChangedDetail } from '../types';
 function claimPendingInvitationsAndNotify(firebaseUser: User): void {
   if (!INVITATIONS_ENABLED) return;
   if (!firebaseUser.emailVerified) return;
-  const callable = getClaimPendingInvitations();
-  if (!callable) return;
-  void callable({})
-    .then((res) => {
-      const claimed = res.data?.claimed ?? [];
+  // The async wrapper in lib/callables wraps requireFunctions()'s synchronous
+  // throw in a rejected promise, so the .catch below handles both
+  // "Functions not initialized" and CF-side rejections uniformly.
+  void callClaimPendingInvitations()
+    .then((data) => {
+      const claimed = data?.claimed ?? [];
       if (claimed.length > 0 && typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent<SpertModelsChangedDetail>('spert:models-changed', {

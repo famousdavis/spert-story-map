@@ -8,13 +8,7 @@ import type { Auth } from 'firebase/auth';
 import { initializeApp, getApps } from 'firebase/app';
 import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import type {
-  SendInvitationEmailInput, SendInvitationEmailResult,
-  ClaimPendingInvitationsResult,
-  RevokeInviteInput, RevokeInviteResult,
-  ResendInviteInput, ResendInviteResult,
-} from '../types';
+import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -45,38 +39,12 @@ export const db: Firestore | null = app
 
 export const auth: Auth | null = app ? getAuth(app) : null;
 
-const functionsInstance = app ? getFunctions(app, 'us-central1') : null;
+/**
+ * Firebase Functions instance (us-central1). May be null when Firebase is
+ * not configured. Imported by `lib/callables.ts`, which wraps each callable
+ * with a `requireFunctions()` guard (Lesson 61).
+ */
+export const functionsInstance = app ? getFunctions(app, 'us-central1') : null;
 
 /** True when Firebase SDK is initialized and available. */
 export const isFirebaseAvailable = isFirebaseConfigured && app !== null;
-
-// ── Lazy callable factories ─────────────────────────────────────────────────
-// Each returns null when Firebase is not configured. Callers check for null.
-
-export function getSendInvitationEmail() {
-  if (!functionsInstance) return null;
-  return httpsCallable<SendInvitationEmailInput, SendInvitationEmailResult>(
-    functionsInstance, 'sendInvitationEmail',
-  );
-}
-
-export function getClaimPendingInvitations() {
-  if (!functionsInstance) return null;
-  return httpsCallable<Record<string, never>, ClaimPendingInvitationsResult>(
-    functionsInstance, 'claimPendingInvitations',
-  );
-}
-
-export function getRevokeInvite() {
-  if (!functionsInstance) return null;
-  return httpsCallable<RevokeInviteInput, RevokeInviteResult>(
-    functionsInstance, 'revokeInvite',
-  );
-}
-
-export function getResendInvite() {
-  if (!functionsInstance) return null;
-  return httpsCallable<ResendInviteInput, ResendInviteResult>(
-    functionsInstance, 'resendInvite',
-  );
-}

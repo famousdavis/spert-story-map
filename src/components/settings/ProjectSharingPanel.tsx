@@ -4,7 +4,8 @@
 
 import { useState, useEffect, useId } from 'react';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db, getSendInvitationEmail } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
+import { callSendInvitationEmail } from '../../lib/callables';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
 import { INVITATIONS_ENABLED } from '../../lib/featureFlags';
@@ -212,9 +213,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
         return;
       }
 
-      const callable = getSendInvitationEmail();
-      if (!callable) throw new Error('Invitation service unavailable.');
-      const res = await callable({
+      const data = await callSendInvitationEmail({
         appId: 'spertstorymap',  // string literal — NOT TOS_APP_ID (Lesson 15)
         modelId: productId,
         emails: valid,
@@ -222,8 +221,8 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
         isVoting: false,
       });
       setInviteResult({
-        ...res.data,
-        failed: [...res.data.failed, ...invalidFailures],
+        ...data,
+        failed: [...data.failed, ...invalidFailures],
       });
       // Re-fetch members + pending invites in parallel (Lesson 64).
       // Promise.allSettled so a rejection in one doesn't lose the other's
@@ -249,7 +248,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
       // result.failed[] (e.g. CF rate-limited, all already-invited), preserve
       // the textarea so the user can retry without re-typing. (Lesson 43.)
       const anyDelivered =
-        (res.data.added?.length ?? 0) + (res.data.invited?.length ?? 0) > 0;
+        (data.added?.length ?? 0) + (data.invited?.length ?? 0) > 0;
       if (anyDelivered) setBulkEmails('');
     } catch (e) {
       console.error('Send invitations failed:', e instanceof Error ? e.message : 'Unknown error');

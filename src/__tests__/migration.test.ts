@@ -24,10 +24,15 @@ vi.mock('../lib/firebase', () => ({
   db: { type: 'mock-firestore' },
   auth: null,
   isFirebaseAvailable: true,
-  getSendInvitationEmail: vi.fn(() => null),
-  getClaimPendingInvitations: vi.fn(() => null),
-  getRevokeInvite: vi.fn(() => null),
-  getResendInvite: vi.fn(() => null),
+  functionsInstance: null,
+}));
+
+// Mock callables.ts (Lesson 61: centralized requireFunctions wrappers)
+vi.mock('../lib/callables', () => ({
+  callSendInvitationEmail: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
+  callClaimPendingInvitations: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
+  callRevokeInvite: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
+  callResendInvite: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
 }));
 
 // Mock firebase/firestore
