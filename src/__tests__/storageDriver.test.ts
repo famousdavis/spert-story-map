@@ -26,10 +26,17 @@ vi.mock('../lib/firebase', () => ({
   db: null,
   auth: null,
   isFirebaseAvailable: false,
-  getSendInvitationEmail: vi.fn(() => null),
-  getClaimPendingInvitations: vi.fn(() => null),
-  getRevokeInvite: vi.fn(() => null),
-  getResendInvite: vi.fn(() => null),
+  functionsInstance: null,
+}));
+
+// Mock callables.ts — replaces the previous four lazy callable getters.
+// Each wrapper rejects synchronously when invoked; tests don't trigger
+// any of these paths but the mock must exist for module resolution.
+vi.mock('../lib/callables', () => ({
+  callSendInvitationEmail: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
+  callClaimPendingInvitations: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
+  callRevokeInvite: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
+  callResendInvite: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
 }));
 
 // Mock firebase/firestore — prevent import errors

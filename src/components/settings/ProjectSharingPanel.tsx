@@ -4,7 +4,8 @@
 
 import { useState, useEffect, useId } from 'react';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db, getSendInvitationEmail } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
+import { callSendInvitationEmail } from '../../lib/callables';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
 import { INVITATIONS_ENABLED } from '../../lib/featureFlags';
@@ -30,6 +31,20 @@ interface ProjectSharingPanelProps {
   withSectionWrapper?: boolean;
 }
 
+/**
+ * Four-state ownership/load status for the Sharing panel (Lesson 60).
+ *
+ *   loading    — initial fetch in flight; render nothing yet
+ *   owner      — fetch succeeded, current user is the project owner
+ *   not-owner  — fetch succeeded, current user is not the owner; render nothing
+ *   error      — fetch threw or doc missing; render a visible "couldn't load" message
+ *
+ * Replaces the previous boolean `isOwner` derivation, which silently rendered
+ * nothing on transient Firestore read failures. Non-cloud mode short-circuits
+ * before the status branches are consulted.
+ */
+type OwnerStatus = 'loading' | 'owner' | 'not-owner' | 'error';
+
 export default function ProjectSharingPanel({ productId, withSectionWrapper = false }: ProjectSharingPanelProps) {
   const { user } = useAuth();
   const { mode, driver } = useStorage();
@@ -37,6 +52,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
 
   const [members, setMembers] = useState(null);
   const [owner, setOwner] = useState(null);
+  const [ownerStatus, setOwnerStatus] = useState<OwnerStatus>('loading');
   const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -51,22 +67,29 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
-  const isOwner = user && owner === user.uid;
-
-  // Load project members from Firestore
+  // Load project members from Firestore.
+  // ownerStatus advances loading → owner | not-owner | error based on outcome.
   useEffect(() => {
     if (mode !== 'cloud' || !user || !productId || !db) return;
     let cancelled = false;
+    setOwnerStatus('loading');
 
     async function load() {
       try {
         const snap = await getDoc(doc(db, PROJECTS_COL, productId));
-        if (!snap.exists() || cancelled) return;
+        if (cancelled) return;
+        if (!snap.exists()) {
+          setOwnerStatus('error');
+          return;
+        }
         const data = snap.data();
         setOwner(data.owner);
         setMembers(data.members || {});
+        setOwnerStatus(data.owner === user.uid ? 'owner' : 'not-owner');
       } catch (e) {
+        if (cancelled) return;
         console.error('Failed to load project members:', e instanceof Error ? e.message : 'Unknown error');
+        setOwnerStatus('error');
       }
     }
     load();
@@ -75,18 +98,29 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
 
   // Load pending invitations (flag-on, owner only)
   useEffect(() => {
-    if (!INVITATIONS_ENABLED || !isOwner || !driver) return;
+    if (!INVITATIONS_ENABLED || ownerStatus !== 'owner' || !driver) return;
     setLoadingPending(true);
     driver.listPendingInvites(productId)
       .then(setPendingInvites)
       .catch(() => setPendingInvites([]))
       .finally(() => setLoadingPending(false));
-  }, [isOwner, driver, productId]);
+  }, [ownerStatus, driver, productId]);
 
-  // Don't render if not cloud mode, not owner, or still loading.
-  // This early return fires BEFORE any Section wrapper is constructed,
-  // so non-owners never see an empty "Sharing" header card.
-  if (mode !== 'cloud' || !user || !isOwner || !members) return null;
+  // Render gates (cascade — first match wins). Non-cloud short-circuits before
+  // status branches; loading and not-owner render nothing; error surfaces a
+  // visible message inside the optional Section wrapper.
+  if (mode !== 'cloud' || !user) return null;
+  if (ownerStatus === 'loading') return null;
+  if (ownerStatus === 'not-owner') return null;
+  if (ownerStatus === 'error') {
+    const errorBody = (
+      <p className="text-sm text-red-500 dark:text-red-400">
+        Couldn&rsquo;t load sharing details. Refresh the page to try again.
+      </p>
+    );
+    return withSectionWrapper ? <Section title="Sharing">{errorBody}</Section> : errorBody;
+  }
+  if (!members) return null; // ownerStatus === 'owner' but defensive null narrow
 
   const memberUids = Object.keys(members);
 
@@ -179,9 +213,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
         return;
       }
 
-      const callable = getSendInvitationEmail();
-      if (!callable) throw new Error('Invitation service unavailable.');
-      const res = await callable({
+      const data = await callSendInvitationEmail({
         appId: 'spertstorymap',  // string literal — NOT TOS_APP_ID (Lesson 15)
         modelId: productId,
         emails: valid,
@@ -189,20 +221,35 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
         isVoting: false,
       });
       setInviteResult({
-        ...res.data,
-        failed: [...res.data.failed, ...invalidFailures],
+        ...data,
+        failed: [...data.failed, ...invalidFailures],
       });
-      // Re-fetch members: CF auto-add may have added existing users.
-      // SharingSection uses direct Firestore for owner/members — intentional
-      // (the driver strips those fields). Consistent with the initial load.
-      const snap = await getDoc(doc(db, PROJECTS_COL, productId));
-      if (snap.exists()) setMembers(snap.data().members || {});
-      const updated = await driver.listPendingInvites(productId);
-      setPendingInvites(updated);
-      // Clear the textarea on a successful send so the user doesn't have
-      // to manually delete addresses they just dispatched. Result chips
-      // remain visible until the user types into the empty textarea.
-      setBulkEmails('');
+      // Re-fetch members + pending invites in parallel (Lesson 64).
+      // Promise.allSettled so a rejection in one doesn't lose the other's
+      // update. Members refresh is direct Firestore — driver strips
+      // owner/members from the parsed product, so the UI reads them itself.
+      const [membersResult, pendingResult] = await Promise.allSettled([
+        getDoc(doc(db, PROJECTS_COL, productId)),
+        driver.listPendingInvites(productId),
+      ]);
+      if (membersResult.status === 'fulfilled' && membersResult.value.exists()) {
+        setMembers(membersResult.value.data().members || {});
+      } else if (membersResult.status === 'rejected') {
+        console.warn('[ProjectSharingPanel] members refresh failed:', membersResult.reason);
+        setOwnerStatus('error');
+      }
+      if (pendingResult.status === 'fulfilled') {
+        setPendingInvites(pendingResult.value);
+      } else {
+        console.warn('[ProjectSharingPanel] pending invites refresh failed:', pendingResult.reason);
+      }
+      // Clear the textarea only when at least one address actually went
+      // through (added or invited). If every valid address ended up in
+      // result.failed[] (e.g. CF rate-limited, all already-invited), preserve
+      // the textarea so the user can retry without re-typing. (Lesson 43.)
+      const anyDelivered =
+        (data.added?.length ?? 0) + (data.invited?.length ?? 0) > 0;
+      if (anyDelivered) setBulkEmails('');
     } catch (e) {
       console.error('Send invitations failed:', e instanceof Error ? e.message : 'Unknown error');
       setError(mapInvitationError(e, 'send'));

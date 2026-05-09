@@ -22,7 +22,7 @@ import {
 import { db } from './firebase';
 import { migrateToV2 } from './storage';
 import { sanitizeForFirestore } from './firestoreUtils';
-import { getRevokeInvite, getResendInvite } from './firebase';
+import { callRevokeInvite, callResendInvite } from './callables';
 import type { PendingInvite } from '../types';
 
 const PROJECTS_COL = 'spertstorymap_projects';
@@ -376,15 +376,11 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     },
 
     async revokeInvite(tokenId: string): Promise<void> {
-      const callable = getRevokeInvite();
-      if (!callable) return;
-      await callable({ tokenId });
+      await callRevokeInvite({ tokenId });
     },
 
     async resendInvite(tokenId: string): Promise<void> {
-      const callable = getResendInvite();
-      if (!callable) return;
-      await callable({ tokenId });
+      await callResendInvite({ tokenId });
     },
   };
 }

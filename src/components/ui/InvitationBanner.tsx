@@ -130,7 +130,7 @@ function BannerShell({
   return (
     // role="status" + aria-live="polite": announces state transitions to screen readers
     <div className={`${c.wrapper} px-4 py-3`} role="status" aria-live="polite">
-      <div className="max-w-4xl mx-auto flex items-start justify-between gap-3">
+      <div className="max-w-lg mx-auto flex items-start justify-between gap-3">
         <div className="flex-1">{children}</div>
         <button
           onClick={onDismiss}

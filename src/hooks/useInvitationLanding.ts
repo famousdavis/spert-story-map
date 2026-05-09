@@ -25,13 +25,29 @@ export function useInvitationLanding(): UseInvitationLandingResult {
   // credential; claim dispatches spert:models-changed BEFORE any Effect fires here
   // (the CF call is async, but that's still before Effect 3 processes the event).
   const { mode, switchMode } = useStorage();
-  const [state, setState] = useState<InvitationState>('idle');
+  // Lazy useState initializer (Lesson 66). React 19 + Vite SPA — no SSR
+  // justification for setState-in-effect. On first render we read
+  // SESSION_KEY synchronously and seed 'pre_auth' if a token has already
+  // been captured (re-mount / navigate case). Effect 1 still runs to handle
+  // fresh page loads with `?invite=` and to perform side effects (URL
+  // strip, sessionStorage write, mode flip) the initializer can't.
+  const [state, setState] = useState<InvitationState>(() => {
+    if (typeof window === 'undefined') return 'idle';
+    if (!INVITATIONS_ENABLED) return 'idle';
+    try {
+      return sessionStorage.getItem(SESSION_KEY) ? 'pre_auth' : 'idle';
+    } catch {
+      return 'idle';
+    }
+  });
   const [claimedNames, setClaimedNames] = useState<string[]>([]);
 
   // Effect 1 — capture ?invite= on mount; strip URL; auto-flip storage mode.
-  // deps intentionally [] — mode and firebaseAvailable captured at mount; subsequent
-  // mode flips are handled by Effect 2 + StorageProvider's own listener.
-  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- mount-only landing capture; setState transitions UI state from URL */
+  // Cannot collapse into the lazy initializer: this effect performs DOM side
+  // effects (history.replaceState), sessionStorage writes, and a possible
+  // switchMode() — none of which belong in a render-phase initializer.
+  // deps intentionally [] — mount-only landing capture.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- mount-only landing capture; setState transitions UI state from URL after side effects */
   useEffect(() => {
     if (!INVITATIONS_ENABLED) return;
     const url = new URL(window.location.href);
@@ -52,7 +68,12 @@ export function useInvitationLanding(): UseInvitationLandingResult {
     setState('pre_auth');
   }, []);
 
-  // Effect 2 — restore pre_auth state from sessionStorage on re-mount / navigate
+  // Effect 2 — narrowed (Lesson 66 follow-up). Lazy initializer covers fresh
+  // load and re-mount when SESSION_KEY is already populated. This effect
+  // remains for the firebaseAvailable=false→true async transition: if
+  // Firebase warms up after first render and a token arrived during the
+  // gap, advance to 'pre_auth'. Effect 1's setState only fires when ?invite=
+  // is actually in the URL — this covers the re-render path.
   useEffect(() => {
     if (!INVITATIONS_ENABLED) return;
     if (state !== 'idle') return;
