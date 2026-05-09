@@ -17,7 +17,7 @@ import {
   doc, getDoc, setDoc, deleteDoc, getDocs,
   collection, query, where,
   onSnapshot, serverTimestamp,
-  updateDoc, deleteField,
+  deleteField, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { migrateToV2 } from './storage';
@@ -91,7 +91,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       snap.forEach(docSnap => {
         const data = docSnap.data();
         const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
-        product._owner = data.owner;
+        // Re-attach owner/members from the raw doc — stripFirestoreFields
+        // removed them. Use `?? null` so the field shape is stable for the
+        // UI's strict-equality ownership checks. (Lessons 38, 49.)
+        product._owner = data.owner ?? null;
         product._members = data.members;
         products.push(product);
       });
@@ -264,6 +267,12 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     /**
      * Subscribe to real-time changes for a product.
      * Uses hasPendingWrites for echo prevention.
+     *
+     * stripFirestoreFields removes `owner`/`members` from the parsed product;
+     * we re-attach `_owner` from the raw doc so per-project listener echoes
+     * don't blank the field set by the initial loadProductIndex. Without
+     * this, the Share button disappears 1–3s after Add Project as the first
+     * snapshot arrives. (Lesson 49: third strip site.)
      */
     onProductChange(id: string, cb: (product: Product) => void) {
       const ref = doc(db, PROJECTS_COL, id);
@@ -273,7 +282,9 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           if (snap.metadata.hasPendingWrites) return;
           if (!snap.exists()) return;
           const data = snap.data();
-          cb(migrateToV2(stripFirestoreFields({ id: snap.id, ...data })));
+          const product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
+          product._owner = data.owner ?? null;
+          cb(product);
         },
         (error) => {
           console.error('Firestore listener error:', error instanceof Error ? error.message : 'Unknown error');
@@ -317,13 +328,50 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       }
     },
 
+    /**
+     * Remove a collaborator from a project's members map.
+     *
+     * Three-guard pattern (Lesson 50). Firestore rules permit an owner to
+     * remove themselves (passes "caller is owner" check), but the resulting
+     * `members[ownerUid] === undefined` makes every subsequent read fail —
+     * the project becomes permanently inaccessible. These guards backstop
+     * the rules.
+     *
+     *   Guard 1 (pre-tx, fast-fail): caller is not the target.
+     *   Guard 2 (in-tx): caller is the project owner.
+     *   Guard 3 (in-tx): target is not the project owner.
+     *
+     * Errors are thrown with human-readable messages so callers can surface
+     * them directly to the user. The factory closes over `uid`; there is no
+     * `this`.
+     */
     async removeCollaborator(productId: string, targetUid: string): Promise<void> {
       if (!db) return; // defensive: db is null when Firebase is unavailable
+      // Guard 1 — pre-tx fast fail
+      if (targetUid === uid) {
+        throw new Error('Cannot remove yourself from a project.');
+      }
       try {
         const ref = doc(db, PROJECTS_COL, productId);
-        await updateDoc(ref, { [`members.${targetUid}`]: deleteField() });
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) {
+            throw new Error('Project not found.');
+          }
+          const data = snap.data();
+          // Guard 2 — defense-in-depth (UI is owner-gated)
+          if (data.owner !== uid) {
+            throw new Error('Only the project owner can remove members.');
+          }
+          // Guard 3 — block removing the owner
+          if (data.owner === targetUid) {
+            throw new Error('Cannot remove the project owner.');
+          }
+          tx.update(ref, { [`members.${targetUid}`]: deleteField() });
+        });
       } catch (e) {
         handleWriteError(e);
+        throw e; // re-throw so the UI catch surfaces the guard message
       }
     },
 
