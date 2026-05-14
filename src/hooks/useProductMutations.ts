@@ -182,6 +182,124 @@ export function splitRibInProduct(
 }
 
 /**
+ * Pure transformation: clone a rib in place, copying all fields except id, name,
+ * order, and progressHistory. Used by both the React hook and the unit tests.
+ *
+ * Naming: sibling-scan with the same regex/prefix pattern as splitRibInProduct,
+ * but the original is NEVER renamed. New name = `${prefix} (max(existing N) + 1)`
+ * where existing N's are the trailing-suffix numbers of siblings sharing the
+ * same prefix. Cloning unsuffixed "Foo" twice produces "Foo (1)" then "Foo (2)"
+ * — no collision.
+ *
+ * The new rib is inserted into the parent backbone immediately after the original.
+ * For each release in the original's releaseAllocations, releaseCardOrder[releaseId]
+ * is updated to splice newId immediately after ribId (or append if missing).
+ * sizingCardOrder is similarly updated under the original's size bucket
+ * (or 'unsized' when size is null).
+ *
+ * `source` on the changelog entry holds the originating rib's ID. We reuse the
+ * existing 'duplicate' op (already used at storage.ts:305 for product-level
+ * duplication) rather than adding a new 'clone' op to the ChangeLogOp union.
+ */
+export function cloneRibInProduct(
+  prev: Product,
+  themeId: string,
+  backboneId: string,
+  ribId: string,
+  newId: string,
+): Product {
+  let didClone = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- captured for cardOrder updates outside the themes map
+  let clonedOriginal: any = null;
+
+  const themes = prev.themes.map(t => {
+    if (t.id !== themeId) return t;
+    return {
+      ...t,
+      backboneItems: t.backboneItems.map(b => {
+        if (b.id !== backboneId) return b;
+        const idx = b.ribItems.findIndex(r => r.id === ribId);
+        if (idx < 0) return b;
+        const original = b.ribItems[idx];
+
+        const trailingSuffix = /^(.*?)\s*\((\d+)\)\s*$/;
+        const match = original.name.match(trailingSuffix);
+        const prefix = match ? match[1] : original.name;
+
+        const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const siblingPattern = new RegExp(`^${escapedPrefix}\\s*\\((\\d+)\\)\\s*$`);
+        const siblingNumbers = b.ribItems
+          .map(r => {
+            const m = r.name.match(siblingPattern);
+            return m ? parseInt(m[1], 10) : null;
+          })
+          .filter((n): n is number => n !== null);
+        const maxExisting = siblingNumbers.length > 0 ? Math.max(...siblingNumbers) : 0;
+        const newName = `${prefix} (${maxExisting + 1})`;
+
+        const clone: RibItem = {
+          id: newId,
+          name: newName,
+          description: original.description,
+          order: b.ribItems.length + 1,
+          size: original.size,
+          category: original.category,
+          releaseAllocations: original.releaseAllocations.map(a => ({ ...a })),
+          progressHistory: [],
+          notes: original.notes ?? '',
+        };
+
+        didClone = true;
+        clonedOriginal = original;
+        return {
+          ...b,
+          ribItems: [
+            ...b.ribItems.slice(0, idx + 1),
+            clone,
+            ...b.ribItems.slice(idx + 1),
+          ],
+        };
+      }),
+    };
+  });
+
+  if (!didClone) return prev;
+
+  // releaseCardOrder: splice newId after ribId in every release the original is in.
+  const nextReleaseCardOrder: Record<string, string[]> = { ...(prev.releaseCardOrder || {}) };
+  for (const alloc of clonedOriginal.releaseAllocations) {
+    const bucket = nextReleaseCardOrder[alloc.releaseId] ? [...nextReleaseCardOrder[alloc.releaseId]] : [];
+    const pos = bucket.indexOf(ribId);
+    if (pos >= 0) bucket.splice(pos + 1, 0, newId);
+    else bucket.push(newId);
+    nextReleaseCardOrder[alloc.releaseId] = bucket;
+  }
+
+  // sizingCardOrder: splice newId after ribId in the original's size bucket.
+  const sizingKey: string = clonedOriginal.size ?? 'unsized';
+  const nextSizingCardOrder: Record<string, string[]> = { ...(prev.sizingCardOrder || {}) };
+  const sizingBucket = nextSizingCardOrder[sizingKey] ? [...nextSizingCardOrder[sizingKey]] : [];
+  let sizingPos = sizingBucket.indexOf(ribId);
+  if (sizingPos < 0) {
+    sizingBucket.push(ribId);
+    sizingPos = sizingBucket.length - 1;
+  }
+  sizingBucket.splice(sizingPos + 1, 0, newId);
+  nextSizingCardOrder[sizingKey] = sizingBucket;
+
+  const next = {
+    ...prev,
+    themes,
+    releaseCardOrder: nextReleaseCardOrder,
+    sizingCardOrder: nextSizingCardOrder,
+  };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, { op: 'duplicate', entity: 'rib', id: newId, source: ribId }),
+  };
+}
+
+/**
  * Provides reusable CRUD operations for the product's theme/backbone/rib hierarchy.
  * Keeps mutation logic DRY between StructureView, SettingsView, and anywhere else
  * that needs to modify the product tree.
@@ -427,6 +545,12 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     return newId;
   }, [updateProduct]);
 
+  const cloneRib = useCallback((themeId: string, backboneId: string, ribId: string) => {
+    const newId = crypto.randomUUID();
+    updateProduct(prev => cloneRibInProduct(prev, themeId, backboneId, ribId, newId));
+    return newId;
+  }, [updateProduct]);
+
   const addNamedRib = useCallback((
     themeId: string,
     backboneId: string,
@@ -485,6 +609,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     deleteRib,
     deleteRibs,
     splitRib,
+    cloneRib,
     moveItem,
   };
 }

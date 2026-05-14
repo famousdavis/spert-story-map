@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.30.0 (2026-05-14)
+
+Map tab affordance overhaul.
+
+- **Empty backbones now show a hover "+ Rib" affordance in every release lane and the unassigned lane.** Previously, a backbone with no rib items had no contextual way to add the first one — you had to scroll to the bottom of the map and click a persistent footer button. Now hovering any empty cell under such a column reveals "+ Rib" right there.
+- **Persistent column-bottom "+ Rib" buttons removed.** The hover-reveal affordance (both the existing below-last-card variant and the new empty-cell variant) now covers every case, so the always-visible row at the map's footer was redundant clutter.
+- **Clone icon on every rib card.** Hovering a rib card reveals a small "two squares" clone icon to the left of the delete ×. Click it to duplicate the rib in place — same size, category, description, notes, and release allocations as the original, with progress history starting fresh. The clone sits immediately below the original in every release lane it inhabits (and in the same size bucket on the Sizing tab). Smart naming: "Foo" → "Foo (1)", clone "Foo" again → "Foo (2)", clone "Foo (3)" → "Foo (4)". The new card opens in the detail panel with the name field focused, ready to tweak. Designed for the slice-a-rib-into-smaller-pieces workflow.
+
+14 new tests covering `cloneRibInProduct` (525 → 539 total).
+
 ## Version 0.29.3 (2026-05-09)
 
 Security audit wrap-up — bundles every remaining non-deferred audit finding (M1, M2, M3, L1, L3, L4) into a single Story Map release plus a companion canonical-rules patch (M4) in the Landing Page repo. No user-visible behavior change. Test count grows from 510 → 524.

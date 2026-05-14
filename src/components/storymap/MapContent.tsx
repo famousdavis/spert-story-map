@@ -30,6 +30,7 @@ interface MapContentProps {
   onDeleteTheme?: (themeId: string) => void;
   onDeleteBackbone?: (themeId: string, backboneId: string) => void;
   onDeleteRib?: (themeId: string, backboneId: string, ribId: string) => void;
+  onCloneRib?: (themeId: string, backboneId: string, ribId: string) => void;
   onDeleteRelease?: (releaseId: string) => void;
   onAddTheme?: () => void;
   onAddBackbone?: (themeId: string) => void;
@@ -48,7 +49,7 @@ interface MapContentProps {
 export default function MapContent({
   layout, themes, product, onRibClick, onReleaseClick, mapSizeRef,
   onRenameTheme, onRenameBackbone, onRenameRib, onRenameRelease,
-  onDeleteTheme, onDeleteBackbone, onDeleteRib, onDeleteRelease,
+  onDeleteTheme, onDeleteBackbone, onDeleteRib, onCloneRib, onDeleteRelease,
   onAddTheme, onAddBackbone, onAddRib, onAddRibToRelease, onAddReleaseAfter,
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
   selectedIds,
@@ -220,6 +221,7 @@ export default function MapContent({
             onClick={onRibClick}
             onRename={onRenameRib}
             onDelete={onDeleteRib}
+            onClone={onCloneRib}
             onDragStart={onDragStart}
             isDragging={draggedIds?.has(cell.id)}
             isSelected={selectedIds?.has(cell.id)}
@@ -265,21 +267,6 @@ export default function MapContent({
         </button>
       )}
 
-      {/* + Rib buttons (bottom of each backbone column) */}
-      {onAddRib && columns.map(col => {
-        const ribBtnTop = Math.max(totalHeight - 24, THEME_HEIGHT + BACKBONE_HEIGHT + 2);
-        return (
-          <button
-            key={`add-rib-${col.backboneId}`}
-            className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-[10px] rounded px-1 py-0.5 transition-colors"
-            style={{ left: col.x + 4, top: ribBtnTop, width: col.width - 8 }}
-            onClick={() => onAddRib(col.themeId, col.backboneId)}
-            title="Add rib item"
-          >
-            + Rib
-          </button>
-        );
-      })}
     </div>
   );
 }

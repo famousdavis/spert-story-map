@@ -216,21 +216,39 @@ export function computeLayout(product: Product): any {
     }
   }
 
-  // 7. Compute gap buttons (hover "+ Rib" zones below last card in each column×lane)
+  // 7. Compute gap buttons (hover "+ Rib" zones below last card in each column×lane).
+  // Backbones with zero total ribs additionally get a button in every empty cell so
+  // users can add the first rib without scrolling to the bottom of the map.
   const MIN_GAP_HEIGHT = 24;
   const gapButtons = [];
+
+  const emptyBackboneColIdx = new Set<number>();
+  for (const col of columns) {
+    const hasRibs =
+      releaseLanes.some(lane => (ribsByRelCol[`${lane.releaseId}:${col.colIdx}`]?.length || 0) > 0)
+      || (unassignedByCol[col.colIdx]?.length || 0) > 0;
+    if (!hasRibs) emptyBackboneColIdx.add(col.colIdx);
+  }
 
   for (const lane of releaseLanes) {
     for (const col of columns) {
       const key = `${lane.releaseId}:${col.colIdx}`;
       const ribCount = ribsByRelCol[key]?.length || 0;
-      if (ribCount === 0) continue; // no button in empty cells
-      const lastCardBottom = lane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
-      const availableGap = (lane.y + lane.height) - lastCardBottom - CELL_PAD;
-      if (availableGap < MIN_GAP_HEIGHT) continue; // no room
+      let buttonY: number;
+      let availableGap: number;
+      if (ribCount === 0) {
+        if (!emptyBackboneColIdx.has(col.colIdx)) continue;
+        buttonY = lane.y + CELL_PAD;
+        availableGap = lane.height - CELL_PAD * 2;
+      } else {
+        const lastCardBottom = lane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
+        buttonY = lastCardBottom + 2;
+        availableGap = (lane.y + lane.height) - lastCardBottom - CELL_PAD;
+      }
+      if (availableGap < MIN_GAP_HEIGHT) continue;
       gapButtons.push({
         themeId: col.themeId, backboneId: col.backboneId, releaseId: lane.releaseId,
-        x: col.x + CELL_PAD, y: lastCardBottom + 2, width: COL_WIDTH - CELL_PAD * 2,
+        x: col.x + CELL_PAD, y: buttonY, width: COL_WIDTH - CELL_PAD * 2,
       });
     }
   }
@@ -238,13 +256,21 @@ export function computeLayout(product: Product): any {
   if (unassignedLane) {
     for (const col of columns) {
       const ribCount = unassignedByCol[col.colIdx]?.length || 0;
-      if (ribCount === 0) continue;
-      const lastCardBottom = unassignedLane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
-      const availableGap = (unassignedLane.y + unassignedLane.height) - lastCardBottom - CELL_PAD;
+      let buttonY: number;
+      let availableGap: number;
+      if (ribCount === 0) {
+        if (!emptyBackboneColIdx.has(col.colIdx)) continue;
+        buttonY = unassignedLane.y + CELL_PAD;
+        availableGap = unassignedLane.height - CELL_PAD * 2;
+      } else {
+        const lastCardBottom = unassignedLane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
+        buttonY = lastCardBottom + 2;
+        availableGap = (unassignedLane.y + unassignedLane.height) - lastCardBottom - CELL_PAD;
+      }
       if (availableGap < MIN_GAP_HEIGHT) continue;
       gapButtons.push({
         themeId: col.themeId, backboneId: col.backboneId, releaseId: null,
-        x: col.x + CELL_PAD, y: lastCardBottom + 2, width: COL_WIDTH - CELL_PAD * 2,
+        x: col.x + CELL_PAD, y: buttonY, width: COL_WIDTH - CELL_PAD * 2,
       });
     }
   }

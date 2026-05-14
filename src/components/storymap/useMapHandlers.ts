@@ -108,6 +108,11 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
     onRibAdded(id);
   }, [mutations, onRibAdded]);
 
+  const handleCloneRib = useCallback((themeId: string, backboneId: string, ribId: string) => {
+    const id = mutations.cloneRib(themeId, backboneId, ribId);
+    onRibAdded(id);
+  }, [mutations, onRibAdded]);
+
   const handleAddRelease = useCallback((beforeReleaseId: string | null) => {
     if (!beforeReleaseId) {
       // Clicked on unassigned lane divider — append after all releases
@@ -156,6 +161,7 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
     handleConfirmDelete, deleteTarget, setDeleteTarget,
     handleAddTheme, handleAddBackbone, handleAddRib, handleAddRibToRelease, handleAddRelease, handleAddReleaseAfter,
+    handleCloneRib,
     dragLabel,
   };
 }

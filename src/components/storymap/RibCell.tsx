@@ -31,12 +31,13 @@ interface RibCellProps {
   onClick: (cell: CellData, e: React.MouseEvent) => void;
   onRename: (themeId: string, backboneId: string, ribId: string, name: string) => void;
   onDelete?: (themeId: string, backboneId: string, ribId: string) => void;
+  onClone?: (themeId: string, backboneId: string, ribId: string) => void;
   onDragStart?: (e: React.PointerEvent, cell: CellData) => void;
   isDragging: boolean;
   isSelected: boolean;
 }
 
-export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart, isDragging, isSelected }: RibCellProps) {
+export default function RibCell({ cell, onClick, onRename, onDelete, onClone, onDragStart, isDragging, isSelected }: RibCellProps) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const allocWarning = cell.allocTotal > 0 && cell.allocTotal !== 100;
 
@@ -114,6 +115,19 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onDragStart
           <span className={`text-[10px] font-medium px-1 py-0.5 rounded flex-shrink-0 leading-none ${sizeColor}`}>
             {cell.size}
           </span>
+        )}
+        {onClone && (
+          <button
+            className="leading-none text-blue-300 hover:text-blue-600 dark:text-blue-400/50 dark:hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+            onClick={(e) => { e.stopPropagation(); onClone(cell.themeId, cell.backboneId, cell.id); }}
+            title="Clone rib item"
+            aria-label="Clone rib item"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
         )}
         {onDelete && (
           <button
