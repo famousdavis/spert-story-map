@@ -191,6 +191,7 @@ export default function StoryMapView() {
           onThemeDragStart={handleThemeDragStart}
           onReleaseDragStart={handleReleaseDragStart}
           selectedIds={selectedIds}
+          editingRibId={selectedRibId}
         />
       </MapCanvas>
 

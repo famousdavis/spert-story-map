@@ -45,6 +45,9 @@ interface MapContentProps {
   onThemeDragStart: (e: React.PointerEvent, themeSpan: any) => void;
   onReleaseDragStart?: (e: React.PointerEvent, lane: any) => void;
   selectedIds?: Set<string>;
+  /** ID of the rib whose detail panel is open — visually anchored as "selected" so the
+   * user can see which card the edit panel is attached to. */
+  editingRibId?: string | null;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -54,7 +57,7 @@ export default function MapContent({
   onDeleteTheme, onDeleteBackbone, onDeleteRib, onCloneRib, onSetCardColor, onDeleteRelease,
   onAddTheme, onAddBackbone, onAddRib, onAddRibToRelease, onAddReleaseAfter,
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
-  selectedIds,
+  selectedIds, editingRibId,
 }: MapContentProps) {
   const { columns, themeSpans, releaseLanes, cells, unassignedLane, gapButtons, totalWidth, totalHeight } = layout;
 
@@ -227,7 +230,7 @@ export default function MapContent({
             onSetCardColor={onSetCardColor}
             onDragStart={onDragStart}
             isDragging={draggedIds?.has(cell.id)}
-            isSelected={selectedIds?.has(cell.id)}
+            isSelected={selectedIds?.has(cell.id) || cell.id === editingRibId}
           />
         );
       })}
