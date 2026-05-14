@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.31.2 (2026-05-14)
+
+Bug fix: name-tooltips no longer get stuck after using the color picker. The card's hover tooltip is dismissed via `mouseLeave` on the card div — but when the color-picker portal opens, the cursor never physically leaves the card's bounding box during picker interaction, so `mouseLeave` never fired and the tooltip stayed visible. Repeated across cards, the screen would accumulate a stack of stuck tooltips. Now the swatch click explicitly dismisses any visible tooltip and suppresses it while the picker is open.
+
 ## Version 0.31.1 (2026-05-14)
 
 Selected rib card now stays visually anchored while its detail panel is open. Previously the blue border + ring only appeared for multi-selected cards (drag-select), so clicking a single card to edit it left no visual cue tying the open detail panel back to its source. Now the card whose detail panel is open keeps the same selection styling for the duration of the edit. No data changes; UI-only patch.
