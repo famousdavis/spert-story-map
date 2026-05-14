@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect, vi } from 'vitest';
-import { splitRibInProduct, addNamedRibToProduct } from '../hooks/useProductMutations';
+import { splitRibInProduct, addNamedRibToProduct, cloneRibInProduct } from '../hooks/useProductMutations';
 
 // Mock crypto.randomUUID
 let uuidCounter = 0;
@@ -416,6 +416,197 @@ describe('splitRibInProduct', () => {
     expect(names).toContain('Foo (6)');
     expect(names).toContain('Foo (7)');
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+// --- cloneRibInProduct ---
+describe('cloneRibInProduct', () => {
+  function makeRibNamed(id, name, opts = {}) {
+    return { ...makeRib(id, opts), name };
+  }
+
+  function makeProductWithRibs(ribs) {
+    return makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', ribs)])],
+    });
+  }
+
+  it('clone of unsuffixed rib appends " (1)" to name', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'Foo')]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs).toHaveLength(2);
+    expect(ribs[0].name).toBe('Foo');
+    expect(ribs[1].name).toBe('Foo (1)');
+    expect(ribs[1].id).toBe('new-uuid');
+  });
+
+  it('cloning the same unsuffixed original twice produces (1) and (2) — no collision', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'Foo')]);
+    const r1 = cloneRibInProduct(product, 't1', 'b1', 'r1', 'uuid-a');
+    const r2 = cloneRibInProduct(r1, 't1', 'b1', 'r1', 'uuid-b');
+    const names = r2.themes[0].backboneItems[0].ribItems.map(r => r.name);
+    expect(names).toContain('Foo');
+    expect(names).toContain('Foo (1)');
+    expect(names).toContain('Foo (2)');
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('clone of already-suffixed rib honors existing siblings (max + 1)', () => {
+    const product = makeProductWithRibs([
+      makeRibNamed('r1', 'Foo (3)'),
+      makeRibNamed('r2', 'Foo (5)'),
+    ]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const names = result.themes[0].backboneItems[0].ribItems.map(r => r.name);
+    expect(names).toContain('Foo (3)');
+    expect(names).toContain('Foo (5)');
+    expect(names).toContain('Foo (6)');
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('clone of suffixed rib with no other siblings uses max(itself) + 1', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'Foo (3)')]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const names = result.themes[0].backboneItems[0].ribItems.map(r => r.name);
+    expect(names).toEqual(['Foo (3)', 'Foo (4)']);
+  });
+
+  it('copies size, category, description, and notes verbatim', () => {
+    const original = {
+      ...makeRib('r1', { size: 'L', category: 'non-core' }),
+      name: 'Bar',
+      description: 'orig desc',
+      notes: 'orig notes',
+    };
+    const product = makeProductWithRibs([original]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const clone = result.themes[0].backboneItems[0].ribItems[1];
+    expect(clone.size).toBe('L');
+    expect(clone.category).toBe('non-core');
+    expect(clone.description).toBe('orig desc');
+    expect(clone.notes).toBe('orig notes');
+  });
+
+  it('clone progressHistory is empty even when original has entries', () => {
+    const original = {
+      ...makeRib('r1'),
+      name: 'Bar',
+      progressHistory: [{ sprintId: 's1', releaseId: 'rel1', percentComplete: 50 }],
+    };
+    const product = makeProductWithRibs([original]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const clone = result.themes[0].backboneItems[0].ribItems[1];
+    expect(clone.progressHistory).toEqual([]);
+  });
+
+  it('releaseAllocations is a deep copy — mutating the clone does not affect the original', () => {
+    const original = {
+      ...makeRib('r1'),
+      name: 'Bar',
+      releaseAllocations: [{ releaseId: 'rel1', percentage: 60 }, { releaseId: 'rel2', percentage: 40 }],
+    };
+    const product = makeProductWithRibs([original]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    const clone = ribs[1];
+    expect(clone.releaseAllocations).toEqual([{ releaseId: 'rel1', percentage: 60 }, { releaseId: 'rel2', percentage: 40 }]);
+    // Mutate the clone's allocations
+    clone.releaseAllocations[0].percentage = 99;
+    // Original (in-place ref to ribs[0]) should be untouched
+    expect(ribs[0].releaseAllocations[0].percentage).toBe(60);
+  });
+
+  it('releaseCardOrder for each release in original.releaseAllocations gets newId spliced after ribId', () => {
+    const original = {
+      ...makeRib('r1'),
+      name: 'A',
+      releaseAllocations: [{ releaseId: 'rel1', percentage: 100 }, { releaseId: 'rel2', percentage: 100 }],
+    };
+    const product = {
+      ...makeProductWithRibs([original, makeRibNamed('r2', 'B')]),
+      releaseCardOrder: {
+        rel1: ['r1', 'r2'],
+        rel2: ['r2', 'r1'],
+      },
+    };
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    expect(result.releaseCardOrder.rel1).toEqual(['r1', 'new-uuid', 'r2']);
+    expect(result.releaseCardOrder.rel2).toEqual(['r2', 'r1', 'new-uuid']);
+  });
+
+  it('releaseCardOrder falls back to append when original is missing from the bucket', () => {
+    const original = {
+      ...makeRib('r1'),
+      name: 'A',
+      releaseAllocations: [{ releaseId: 'rel1', percentage: 100 }],
+    };
+    const product = {
+      ...makeProductWithRibs([original]),
+      releaseCardOrder: { rel1: ['r2', 'r3'] },
+    };
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    expect(result.releaseCardOrder.rel1).toEqual(['r2', 'r3', 'new-uuid']);
+  });
+
+  it('unassigned clone (no releaseAllocations) leaves releaseCardOrder untouched', () => {
+    const product = {
+      ...makeProductWithRibs([makeRibNamed('r1', 'A')]),
+      releaseCardOrder: { rel1: ['r99'] },
+    };
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    expect(result.releaseCardOrder).toEqual({ rel1: ['r99'] });
+  });
+
+  it("sizingCardOrder places newId after ribId in the original's size bucket", () => {
+    const product = {
+      ...makeProductWithRibs([
+        makeRibNamed('r1', 'A', { size: 'M' }),
+        makeRibNamed('r2', 'B', { size: 'M' }),
+      ]),
+      sizingCardOrder: { M: ['r1', 'r2'] },
+    };
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    expect(result.sizingCardOrder.M).toEqual(['r1', 'new-uuid', 'r2']);
+  });
+
+  it("sizingCardOrder uses 'unsized' bucket when original size is null", () => {
+    const product = {
+      ...makeProductWithRibs([makeRibNamed('r1', 'A')]),
+      sizingCardOrder: { unsized: ['r1'] },
+    };
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    expect(result.sizingCardOrder.unsized).toEqual(['r1', 'new-uuid']);
+  });
+
+  it('returns prev unchanged when rib not found', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'A')]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'nonexistent', 'new-uuid');
+    expect(result).toBe(product);
+  });
+
+  it("changelog entry uses op: 'duplicate' with source pointing at original", () => {
+    const product = {
+      ...makeProductWithRibs([makeRibNamed('r1', 'Foo')]),
+      _changeLog: [],
+    };
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const last = result._changeLog[result._changeLog.length - 1];
+    expect(last.op).toBe('duplicate');
+    expect(last.entity).toBe('rib');
+    expect(last.id).toBe('new-uuid');
+    expect(last.source).toBe('r1');
+  });
+
+  it('new rib is inserted into backbone.ribItems immediately after original', () => {
+    const product = makeProductWithRibs([
+      makeRibNamed('r1', 'A'),
+      makeRibNamed('r2', 'B'),
+      makeRibNamed('r3', 'C'),
+    ]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r2', 'new-uuid');
+    const ribs = result.themes[0].backboneItems[0].ribItems;
+    expect(ribs.map(r => r.id)).toEqual(['r1', 'r2', 'new-uuid', 'r3']);
   });
 });
 

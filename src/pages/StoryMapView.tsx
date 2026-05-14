@@ -142,6 +142,7 @@ export default function StoryMapView() {
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
     handleConfirmDelete, deleteTarget, setDeleteTarget,
     handleAddTheme, handleAddBackbone, handleAddRib, handleAddRibToRelease, handleAddReleaseAfter,
+    handleCloneRib,
     dragLabel,
   } = useMapHandlers({
     product, updateProduct, mutations,
@@ -175,6 +176,7 @@ export default function StoryMapView() {
           onDeleteTheme={handleDeleteTheme}
           onDeleteBackbone={handleDeleteBackbone}
           onDeleteRib={handleDeleteRib}
+          onCloneRib={handleCloneRib}
           onDeleteRelease={handleDeleteRelease}
           onAddTheme={handleAddTheme}
           onAddBackbone={handleAddBackbone}
