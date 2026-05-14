@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.31.1 (2026-05-14)
+
+Selected rib card now stays visually anchored while its detail panel is open. Previously the blue border + ring only appeared for multi-selected cards (drag-select), so clicking a single card to edit it left no visual cue tying the open detail panel back to its source. Now the card whose detail panel is open keeps the same selection styling for the duration of the edit. No data changes; UI-only patch.
+
 ## Version 0.31.0 (2026-05-14)
 
 Rib-card layout reshuffle + per-card color flagging on the Map tab.
