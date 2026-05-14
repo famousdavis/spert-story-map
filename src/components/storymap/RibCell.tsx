@@ -66,6 +66,12 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
 
   const handleSwatchClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Dismiss any visible name-tooltip before opening the picker. The picker portal
+    // overlays part of the card, so the cursor never physically leaves the card's
+    // bounding box during picker interaction — mouseLeave never fires and the
+    // tooltip would otherwise stay stuck on top of the picker / for the rest of the
+    // session as the user moves between cards.
+    onMouseLeave();
     setPickerAnchor({ x: e.clientX, y: e.clientY });
   };
 
@@ -195,7 +201,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
           </span>
         </div>
       </div>
-      {tooltipEl}
+      {!pickerAnchor && tooltipEl}
       {pickerAnchor && onSetCardColor && (
         <RibCardColorPicker
           anchor={pickerAnchor}
