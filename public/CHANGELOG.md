@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.31.3 (2026-05-14)
+
+Bug fix: refreshing the browser on a deep route (e.g. `/product/<id>` or any nested tab like `/product/<id>/storymap`) no longer returns Vercel's generic `404: NOT_FOUND` page. The repo had no `vercel.json` and no SPA fallback, so Vercel treated parameterized routes as literal file requests and 404'd before React Router ever got a chance to resolve the URL. Added `vercel.json` with a catch-all rewrite to `/index.html` so all routes deliver the app shell and React Router takes over. Refresh now reloads cleanly on whatever route you're on — no need to bounce back to the project dashboard.
+
 ## Version 0.31.2 (2026-05-14)
 
 Bug fix: name-tooltips no longer get stuck after using the color picker. The card's hover tooltip is dismissed via `mouseLeave` on the card div — but when the color-picker portal opens, the cursor never physically leaves the card's bounding box during picker interaction, so `mouseLeave` never fired and the tooltip stayed visible. Repeated across cards, the screen would accumulate a stack of stuck tooltips. Now the swatch click explicitly dismisses any visible tooltip and suppresses it while the picker is open.
