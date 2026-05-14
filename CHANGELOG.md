@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.31.0 (2026-05-14)
+
+Rib-card layout reshuffle + per-card color flagging on the Map tab.
+
+- **New 3-column card layout.** Drag grip on the left now has a color-swatch button stacked below it (hover-only, like the clone/delete icons). Clone and delete icons moved to a vertical stack in the top-right corner, with clone on top (it's the more frequently used of the two). "Core" / "Non-Core" label is now anchored at the bottom-right corner, freeing the bottom row for points and percentage.
+- **Per-card color flag.** Clicking the color-swatch button opens a small popover with 7 mid-tone colors (rose, amber, yellow, emerald, sky, violet, slate) plus a "clear" option. The chosen color shades the entire rib card so flagged cards stand out across the whole map — useful for triaging cards suspected of being unneeded so the team can locate them quickly at the next meeting. Cloning a colored rib carries the color over (matches the existing "shares everything" clone semantics; clear it manually if the slice no longer needs the flag).
+- **Schema:** new optional `RibItem.cardColor` field. Validator allowlist updated; unknown color values are cleared non-destructively (matches the existing `size` validator pattern). No data migration needed — existing ribs default to no color.
+
+4 new tests (clone inherits cardColor, clone omits when none, validator accepts known values, validator clears unknown values). Total 539 → 543.
+
 ## Version 0.30.0 (2026-05-14)
 
 Map tab affordance overhaul.

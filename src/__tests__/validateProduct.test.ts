@@ -438,6 +438,37 @@ describe('validateProduct', () => {
     expect(Object.prototype.hasOwnProperty.call(rib, '_injected')).toBe(false);
   });
 
+  it('accepts known cardColor values on rib', () => {
+    const data = minimal({
+      themes: [{
+        id: 't1', name: 'T1',
+        backboneItems: [{
+          id: 'b1', name: 'B1',
+          ribItems: [{ id: 'r1', name: 'R1', cardColor: 'rose' }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    const rib = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    expect(rib.cardColor).toBe('rose');
+  });
+
+  it('clears unknown cardColor values on rib (non-destructive)', () => {
+    const data = minimal({
+      themes: [{
+        id: 't1', name: 'T1',
+        backboneItems: [{
+          id: 'b1', name: 'B1',
+          ribItems: [{ id: 'r1', name: 'R1', cardColor: 'fuchsia' }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    const rib = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(rib, 'cardColor')).toBe(false);
+    expect(rib.id).toBe('r1');
+  });
+
   it('strips unknown fields from release', () => {
     const data = minimal({ releases: [{ id: 'r1', name: 'R1', evil: 'x' }] });
     const result = validateProduct(data);

@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import type { Product } from '../../types';
+import type { RibCardColorKey } from '../../lib/ribCardColors';
 import { deleteReleaseFromProduct } from '../../lib/settingsMutations';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
@@ -113,6 +114,10 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
     onRibAdded(id);
   }, [mutations, onRibAdded]);
 
+  const handleSetRibCardColor = useCallback((themeId: string, backboneId: string, ribId: string, color: RibCardColorKey | undefined) => {
+    mutations.updateRib(themeId, backboneId, ribId, { cardColor: color });
+  }, [mutations]);
+
   const handleAddRelease = useCallback((beforeReleaseId: string | null) => {
     if (!beforeReleaseId) {
       // Clicked on unassigned lane divider — append after all releases
@@ -162,6 +167,7 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
     handleConfirmDelete, deleteTarget, setDeleteTarget,
     handleAddTheme, handleAddBackbone, handleAddRib, handleAddRibToRelease, handleAddRelease, handleAddReleaseAfter,
     handleCloneRib,
+    handleSetRibCardColor,
     dragLabel,
   };
 }

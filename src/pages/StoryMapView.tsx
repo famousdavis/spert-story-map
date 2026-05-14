@@ -143,6 +143,7 @@ export default function StoryMapView() {
     handleConfirmDelete, deleteTarget, setDeleteTarget,
     handleAddTheme, handleAddBackbone, handleAddRib, handleAddRibToRelease, handleAddReleaseAfter,
     handleCloneRib,
+    handleSetRibCardColor,
     dragLabel,
   } = useMapHandlers({
     product, updateProduct, mutations,
@@ -177,6 +178,7 @@ export default function StoryMapView() {
           onDeleteBackbone={handleDeleteBackbone}
           onDeleteRib={handleDeleteRib}
           onCloneRib={handleCloneRib}
+          onSetCardColor={handleSetRibCardColor}
           onDeleteRelease={handleDeleteRelease}
           onAddTheme={handleAddTheme}
           onAddBackbone={handleAddBackbone}
