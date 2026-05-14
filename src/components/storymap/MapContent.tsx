@@ -14,6 +14,7 @@ import InsertionIndicator from './InsertionIndicator';
 import { getThemeColorClasses } from '../../lib/themeColors';
 import { releaseHasAllocations } from '../../lib/settingsMutations';
 import type { Theme, Product } from '../../types';
+import type { RibCardColorKey } from '../../lib/ribCardColors';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
 interface MapContentProps {
@@ -31,6 +32,7 @@ interface MapContentProps {
   onDeleteBackbone?: (themeId: string, backboneId: string) => void;
   onDeleteRib?: (themeId: string, backboneId: string, ribId: string) => void;
   onCloneRib?: (themeId: string, backboneId: string, ribId: string) => void;
+  onSetCardColor?: (themeId: string, backboneId: string, ribId: string, color: RibCardColorKey | undefined) => void;
   onDeleteRelease?: (releaseId: string) => void;
   onAddTheme?: () => void;
   onAddBackbone?: (themeId: string) => void;
@@ -49,7 +51,7 @@ interface MapContentProps {
 export default function MapContent({
   layout, themes, product, onRibClick, onReleaseClick, mapSizeRef,
   onRenameTheme, onRenameBackbone, onRenameRib, onRenameRelease,
-  onDeleteTheme, onDeleteBackbone, onDeleteRib, onCloneRib, onDeleteRelease,
+  onDeleteTheme, onDeleteBackbone, onDeleteRib, onCloneRib, onSetCardColor, onDeleteRelease,
   onAddTheme, onAddBackbone, onAddRib, onAddRibToRelease, onAddReleaseAfter,
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
   selectedIds,
@@ -222,6 +224,7 @@ export default function MapContent({
             onRename={onRenameRib}
             onDelete={onDeleteRib}
             onClone={onCloneRib}
+            onSetCardColor={onSetCardColor}
             onDragStart={onDragStart}
             isDragging={draggedIds?.has(cell.id)}
             isSelected={selectedIds?.has(cell.id)}

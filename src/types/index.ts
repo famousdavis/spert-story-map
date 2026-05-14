@@ -81,6 +81,8 @@ export interface RibItem {
   releaseAllocations: ReleaseAllocation[];
   progressHistory: ProgressEntry[];
   notes?: string;
+  /** Optional per-card color flag for visual triage (e.g., suspected unneeded). */
+  cardColor?: string;
 }
 
 export interface Backbone {

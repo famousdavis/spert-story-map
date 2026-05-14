@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product } from '../types';
+import { isRibCardColorKey } from './ribCardColors';
 
 /**
  * Comprehensive schema validation for imported product data.
@@ -72,7 +73,7 @@ const KNOWN_THEME_FIELDS = new Set(['id', 'name', 'order', 'color', 'backboneIte
 const KNOWN_BACKBONE_FIELDS = new Set(['id', 'name', 'description', 'order', 'ribItems']);
 const KNOWN_RIB_FIELDS = new Set([
   'id', 'name', 'description', 'order', 'size', 'category',
-  'releaseAllocations', 'progressHistory', 'notes',
+  'releaseAllocations', 'progressHistory', 'notes', 'cardColor',
 ]);
 const KNOWN_RELEASE_FIELDS = new Set(['id', 'name', 'description', 'order', 'targetDate']);
 const KNOWN_SPRINT_FIELDS = new Set(['id', 'name', 'order', 'endDate']);
@@ -224,6 +225,11 @@ export function validateProduct(data: unknown): Product {
         if (rib.category !== undefined) {
           assert(rib.category === 'core' || rib.category === 'non-core',
             'Rib category must be "core" or "non-core"');
+        }
+
+        // Card color: clear unknown values (non-destructive — matches `size` handling)
+        if (rib.cardColor !== undefined && rib.cardColor !== null && !isRibCardColorKey(rib.cardColor)) {
+          delete rib.cardColor;
         }
 
         // Release allocations

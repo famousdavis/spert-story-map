@@ -608,6 +608,21 @@ describe('cloneRibInProduct', () => {
     const ribs = result.themes[0].backboneItems[0].ribItems;
     expect(ribs.map(r => r.id)).toEqual(['r1', 'r2', 'new-uuid', 'r3']);
   });
+
+  it('clone inherits cardColor when original has one set', () => {
+    const original = { ...makeRibNamed('r1', 'A'), cardColor: 'rose' };
+    const product = makeProductWithRibs([original]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const clone = result.themes[0].backboneItems[0].ribItems[1];
+    expect(clone.cardColor).toBe('rose');
+  });
+
+  it('clone omits cardColor when original has none', () => {
+    const product = makeProductWithRibs([makeRibNamed('r1', 'A')]);
+    const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
+    const clone = result.themes[0].backboneItems[0].ribItems[1];
+    expect(clone.cardColor).toBeUndefined();
+  });
 });
 
 // --- addNamedRib ---

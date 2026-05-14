@@ -247,6 +247,7 @@ export function cloneRibInProduct(
           releaseAllocations: original.releaseAllocations.map(a => ({ ...a })),
           progressHistory: [],
           notes: original.notes ?? '',
+          ...(original.cardColor !== undefined ? { cardColor: original.cardColor } : {}),
         };
 
         didClone = true;
