@@ -217,7 +217,7 @@ export default function SettingsView() {
 
       <SharingSection productId={product.id} />
 
-      <DataSection product={product} driver={driver} />
+      {driver && <DataSection product={product} driver={driver} updateProduct={updateProduct} />}
 
       {/* Delete confirm (release with allocations) */}
       <ConfirmDialog

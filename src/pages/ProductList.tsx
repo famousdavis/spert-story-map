@@ -4,8 +4,10 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { exportProduct, readImportFile, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
+import { exportProduct, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
 import { exportAllProductsBundled } from '../lib/importExport';
+import { useImportState } from '../hooks/useImportState';
+import ImportPreviewSection from '../components/product/ImportPreviewSection';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
 import { sortByOrder } from '../lib/sortByOrder';
@@ -37,8 +39,7 @@ export default function ProductList() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [importConfirm, setImportConfirm] = useState(null);
-  const [importError, setImportError] = useState(null);
+  const [cloudDataLoaded, setCloudDataLoaded] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
@@ -66,6 +67,7 @@ export default function ProductList() {
       const allProducts = await driver.loadProductIndex();
       const detailed = allProducts.filter(Boolean).map(p => enrichProduct(p));
       setProducts(detailed);
+      if (mode === 'cloud') setCloudDataLoaded(true);
       // In cloud mode, detect local projects that weren't migrated
       if (mode === 'cloud' && detailed.length === 0) {
         setLocalOrphanCount(loadLocalIndex().length);
@@ -80,6 +82,22 @@ export default function ProductList() {
   useEffect(() => {
     if (storageReady) refresh();
   }, [storageReady, refresh]);
+
+  // Reset cloud hydration flag when mode or driver changes (e.g., uid-change
+  // driver swap). Each change is followed by exactly one refresh() call →
+  // cloudDataLoaded=true; the briefly-disabled Import button is acceptable.
+  useEffect(() => {
+    setCloudDataLoaded(false);
+  }, [mode, driver]);
+
+  const {
+    phase: importPhase,
+    fileInputRef,
+    handleFileChange,
+    setDecision: setImportDecision,
+    handleConfirmImport,
+    handleCancel: cancelImport,
+  } = useImportState(driver, mode, cloudDataLoaded, refresh);
 
   // Refresh project list when a pending invitation is claimed.
   // `refresh` is useCallback([driver, mode]) — stable; effect re-attaches
@@ -186,40 +204,6 @@ export default function ProductList() {
     if (product) exportProduct(product, driver.getWorkspaceId());
   };
 
-  const handleImport = () => {
-    setImportError(null);
-    readImportFile(
-      async (imported) => {
-        if (!driver) return;
-        let existing = null;
-        let targetId = imported.id;
-        try {
-          existing = await driver.loadProduct(imported.id);
-        } catch {
-          // Cloud mode: Firestore get rules fail for non-existent docs
-          // (resource.data is null → isProjectMember check fails).
-          // Generate a new ID to avoid collision with inaccessible docs.
-          targetId = crypto.randomUUID();
-        }
-        if (existing) {
-          setImportConfirm({ product: imported, existingName: existing.name });
-        } else {
-          await driver.createProduct({ ...imported, id: targetId });
-          refresh();
-        }
-      },
-      (errorMsg) => setImportError(errorMsg),
-    );
-  };
-
-  const confirmImport = async () => {
-    if (importConfirm && driver) {
-      await driver.replaceProduct(importConfirm.product);
-      setImportConfirm(null);
-      refresh();
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
       <div className="max-w-4xl mx-auto px-6 py-12 flex-1 w-full">
@@ -273,8 +257,9 @@ export default function ProductList() {
             + New Project
           </button>
           <button
-            onClick={handleImport}
-            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
+            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Import Project
           </button>
@@ -293,13 +278,16 @@ export default function ProductList() {
           </button>
         </div>
 
-        {/* Import error */}
-        {importError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 rounded-lg px-4 py-3 mb-6 flex items-start justify-between gap-3">
-            <p className="text-sm text-red-700 dark:text-red-300">{importError}</p>
-            <button onClick={() => setImportError(null)} className="text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300 flex-shrink-0">&times;</button>
-          </div>
-        )}
+        <ImportPreviewSection
+          phase={importPhase}
+          mode={mode}
+          cloudDataLoaded={cloudDataLoaded}
+          fileInputRef={fileInputRef}
+          onFileChange={handleFileChange}
+          onSetDecision={setImportDecision}
+          onConfirm={handleConfirmImport}
+          onCancel={cancelImport}
+        />
 
         {/* Data warning */}
         {showWarning && mode === 'local' && (
@@ -378,16 +366,6 @@ export default function ProductList() {
         onConfirm={() => handleDelete(deleteTarget.id)}
         title="Delete Project"
         message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone. Consider exporting first.`}
-      />
-
-      {/* Import Confirm (overwrite existing) */}
-      <ConfirmDialog
-        open={!!importConfirm}
-        onClose={() => setImportConfirm(null)}
-        onConfirm={confirmImport}
-        title="Overwrite Project"
-        message={`Importing "${importConfirm?.product.name}" will overwrite the existing project "${importConfirm?.existingName}" because they share the same internal ID. This cannot be undone.`}
-        confirmLabel="Overwrite"
       />
 
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />

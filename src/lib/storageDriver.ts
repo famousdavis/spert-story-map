@@ -20,6 +20,7 @@ import {
   loadProduct as _loadProduct,
   saveProduct as _saveProduct,
   saveProductImmediate as _saveProductImmediate,
+  saveProductImmediateOrThrow as _saveProductImmediateOrThrow,
   deleteProduct as _deleteProduct,
   loadPreferences as _loadPreferences,
   savePreferences as _savePreferences,
@@ -55,10 +56,19 @@ export function createLocalStorageDriver(): StorageDriver {
       return Promise.resolve(_loadProduct(id));
     },
 
-    /** Create a new product. Ownership fields are N/A in local mode. */
-    createProduct(product: Product) {
-      _saveProductImmediate(product);
-      return Promise.resolve();
+    /**
+     * Create a new product. Ownership fields are N/A in local mode.
+     *
+     * Default: best-effort (errors swallowed via handleSaveError → onSaveError banner).
+     * options.throwOnError: rethrows for callers that need to correlate failures with
+     *                       specific products (the import pipeline).
+     */
+    async createProduct(product: Product, options?: { throwOnError?: boolean }) {
+      if (options?.throwOnError) {
+        _saveProductImmediateOrThrow(product);
+      } else {
+        _saveProductImmediate(product);
+      }
     },
 
     saveProduct(product: Product) {
@@ -71,10 +81,25 @@ export function createLocalStorageDriver(): StorageDriver {
       return Promise.resolve();
     },
 
-    /** Full overwrite for imports. In local mode, same as saveProductImmediate. */
-    replaceProduct(product: Product) {
-      _saveProductImmediate(product);
-      return Promise.resolve();
+    /**
+     * Full content replace for import. Reads the existing product first to preserve
+     * identity fields before overwriting content.
+     *
+     * createdAt  — preserved so dashboard shows original creation date
+     * _originRef — workspace provenance fingerprint (academic integrity tracking)
+     *
+     * Local mode is single-writer; no transaction needed. Uses
+     * saveProductImmediateOrThrow so a QuotaExceededError surfaces to applyImport
+     * instead of being silently dropped.
+     */
+    async replaceProduct(product: Product) {
+      const existing = _loadProduct(product.id);
+      const merged: Product = {
+        ...product,
+        createdAt: existing?.createdAt ?? product.createdAt,
+        _originRef: existing?._originRef ?? product._originRef,
+      };
+      _saveProductImmediateOrThrow(merged);
     },
 
     deleteProduct(id: string) {

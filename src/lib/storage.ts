@@ -170,6 +170,29 @@ export function saveProductImmediate(product: Product): Product {
   return updated;
 }
 
+/**
+ * Synchronous immediate save that propagates write errors instead of swallowing
+ * them via handleSaveError. Used by the import pipeline so callers can correlate
+ * a quota failure with the specific product that failed.
+ *
+ * Non-import paths should continue to use saveProductImmediate (best-effort,
+ * fires onSaveError banner globally).
+ */
+export function saveProductImmediateOrThrow(product: Product): Product {
+  const updated = { ...product, updatedAt: new Date().toISOString() };
+  localStorage.setItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${product.id}`, JSON.stringify(updated));
+  const index = loadProductIndex();
+  const existing = index.findIndex(p => p.id === product.id);
+  const entry = { id: product.id, name: product.name, updatedAt: updated.updatedAt };
+  if (existing >= 0) {
+    index[existing] = entry;
+  } else {
+    index.push(entry);
+  }
+  localStorage.setItem(STORAGE_KEYS.PRODUCTS_INDEX, JSON.stringify(index));
+  return updated;
+}
+
 export function deleteProduct(id: string): void {
   try {
     localStorage.removeItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${id}`);
