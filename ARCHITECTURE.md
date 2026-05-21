@@ -27,7 +27,8 @@ src/
 │   ├── constants.ts                  # Storage keys, schema version, size defaults
 │   ├── version.ts                    # APP_VERSION constant (single source of truth)
 │   ├── storage.ts                    # localStorage CRUD with debouncing, workspace identity
-│   ├── importExport.ts               # Export/import product JSON, file picker utility
+│   ├── importExport.ts               # Export product JSON, bundled export, legacy single-file import helper
+│   ├── import-utils.ts               # Multi-project import: parse, conflict detection, applyImport (Layer 2 drift re-validation)
 │   ├── validateProduct.ts            # Comprehensive schema validation for imported products
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
@@ -46,6 +47,7 @@ src/
 │   ├── useProduct.ts                 # Load/save product state with debounced persistence
 │   ├── useProductMutations.ts        # Reusable CRUD for theme/backbone/rib hierarchy
 │   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag)
+│   ├── useImportState.ts             # State machine for multi-project import (idle/preview/applying/done/error)
 │   └── useDarkMode.ts                # Theme toggle hook (localStorage + system preference)
 │
 ├── components/
@@ -70,7 +72,12 @@ src/
 │   │   ├── SharingSection.tsx        # Project sharing (cloud mode, owner only)
 │   │   ├── TosConsentModal.tsx       # Clickwrap ToS/Privacy consent modal for cloud sign-in
 │   │   ├── SizeMappingSection.tsx    # T-shirt size mapping editor
-│   │   └── DataSection.tsx           # Import/export buttons + confirm dialogs
+│   │   └── DataSection.tsx           # Per-project import (parseImportFile + updateProduct) and export buttons
+│   ├── product/
+│   │   ├── CreateProjectModal.tsx    # New-project create dialog
+│   │   ├── ProjectCard.tsx           # Card on the project list homepage
+│   │   ├── ShareDialog.tsx           # Cloud-mode project sharing dialog
+│   │   └── ImportPreviewSection.tsx  # Homepage import preview UI: phase rendering + decision rows + result banner
 │   ├── progress/
 │   │   ├── ProgressHeader.tsx        # Sprint selector, group-by buttons, expand/collapse toggle
 │   │   ├── SprintSummaryCard.tsx     # Sprint summary stats card

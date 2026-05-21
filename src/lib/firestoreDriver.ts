@@ -117,8 +117,18 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      * Create a new product with ownership.
      * Only place where owner/members are set — used by ProductList.handleCreate
      * and ProductList.handleDuplicate.
+     *
+     * Default: best-effort (errors caught via handleWriteError → onSaveError banner).
+     * options.throwOnError: rethrows for callers that need to correlate failures with
+     *                       specific products (the import pipeline).
      */
-    async createProduct(product) {
+    async createProduct(product, options?: { throwOnError?: boolean }) {
+      if (!db) {
+        const err = new Error('Cloud storage unavailable. Please try again.');
+        if (options?.throwOnError) throw err;
+        handleWriteError(err);
+        return;
+      }
       try {
         const ref = doc(db, PROJECTS_COL, product.id);
         const { id: _id, ...rest } = product;
@@ -130,6 +140,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           updatedAt: serverTimestamp(),
         });
       } catch (e) {
+        if (options?.throwOnError) throw e;
         handleWriteError(e);
       }
     },
@@ -158,31 +169,39 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     },
 
     /**
-     * Full overwrite for imports. Reads existing owner/members first,
-     * then writes the entire document without merge: true so stale
-     * fields from the old document are not retained.
+     * Full content replace for import. Uses runTransaction to eliminate the prior
+     * getDoc+setDoc lost-write race.
+     *
+     * Preserved from existing doc:
+     *   owner, members — collaborator permissions (Firestore-only)
+     *   createdAt      — original creation timestamp
+     *   _originRef     — workspace provenance fingerprint (academic integrity)
+     *
+     * Errors propagate to applyImport's per-write try/catch and surface in the
+     * import done banner (outcome.errors). NOT routed through handleWriteError.
      */
     async replaceProduct(product: Product) {
+      if (!db) throw new Error('Cloud storage unavailable. Please try again.');
       if (productTimer) {
         clearTimeout(productTimer);
         productTimer = null;
         productPending = null;
       }
-      try {
-        const ref = doc(db, PROJECTS_COL, product.id);
-        const snap = await getDoc(ref);
+      const ref = doc(db, PROJECTS_COL, product.id);
+      const { id: _id, ...rest } = product;
+      const data = sanitizeForFirestore(rest);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
         const existing = snap.exists() ? snap.data() : {};
-        const { id: _id, ...rest } = product;
-        const data = sanitizeForFirestore(rest);
-        await setDoc(ref, {
+        tx.set(ref, {
           ...data,
-          owner: existing.owner || uid,
-          members: existing.members || { [uid]: 'owner' },
+          owner: existing.owner ?? uid,
+          members: existing.members ?? { [uid]: 'owner' },
+          createdAt: existing.createdAt ?? data.createdAt,
+          _originRef: (existing._originRef as string | undefined) ?? data._originRef,
           updatedAt: serverTimestamp(),
         });
-      } catch (e) {
-        handleWriteError(e);
-      }
+      });
     },
 
     async deleteProduct(id: string) {

@@ -178,7 +178,7 @@ export interface StorageDriver {
   mode: StorageMode;
   loadProductIndex(): Promise<Product[]>;
   loadProduct(id: string): Promise<Product | null>;
-  createProduct(product: Product): Promise<void>;
+  createProduct(product: Product, options?: { throwOnError?: boolean }): Promise<void>;
   saveProduct(product: Product): Promise<void>;
   saveProductImmediate(product: Product): Promise<void>;
   replaceProduct(product: Product): Promise<void>;
@@ -321,3 +321,57 @@ export interface RevokeInviteInput { tokenId: string }
 export interface ResendInviteInput { tokenId: string }
 export interface RevokeInviteResult { revoked: true }
 export interface ResendInviteResult { resent: true; emailSendCount: number }
+
+// ---------------------------------------------------------------------------
+// Import system types (v0.32.0)
+// ---------------------------------------------------------------------------
+
+export interface ParsedImport {
+  products: Product[];
+  fileName: string;
+}
+
+export interface ImportConflict {
+  type: 'id' | 'name';
+  incomingProduct: Product;
+  existingProduct: Product;
+  /** ID of the existing product at Layer 1 detection time. Used in Layer 2 drift detection. */
+  originalExistingId: string;
+}
+
+export type ConflictAction = 'skip' | 'replace' | 'copy';
+
+export interface ImportDecision {
+  importedProductId: string;
+  kind: 'id' | 'name';
+  originalExistingId: string;
+  action: ConflictAction;
+}
+
+export interface ImportOutcome {
+  added: number;
+  replaced: number;
+  copied: number;
+  skipped: number;
+  driftSkipped: Array<{ productName: string; reason: string }>;
+  errors: Array<{ productName: string; reason: string }>;
+}
+
+export type ImportPhase =
+  | { tag: 'idle' }
+  | {
+      tag: 'preview';
+      parsed: ParsedImport;
+      conflicts: ImportConflict[];
+      decisions: ImportDecision[];
+      /**
+       * Monotonically increasing counter incremented by useImportState on every
+       * file pick. Used as the React `key` on ImportPreviewBody to force a remount
+       * (and re-fire the heading-focus useEffect) even when the user picks two
+       * files with identical names in succession.
+       */
+      pickSeq: number;
+    }
+  | { tag: 'applying' }
+  | { tag: 'done'; outcome: ImportOutcome }
+  | { tag: 'error'; message: string };

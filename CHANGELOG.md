@@ -1,5 +1,35 @@
 # Changelog
 
+## Version 0.32.0 (2026-05-20)
+
+Level 4 Import — multi-project preview, conflict resolution, and import-as-copy.
+
+**New features**
+
+- **Multi-project import preview.** Pick a file on the project list homepage and review every project before anything changes. ID conflicts (definite match — same project ID) and name conflicts (probable match — same name, different origin) are detected with per-project resolution choices: skip, replace existing, or import as copy.
+- **Bundle file import (bug fix).** "Export All Projects" previously produced a file that the Import button rejected with "Product must be a JSON object". Bundled exports are now fully importable via the project list homepage. Using a bundled file in Settings → Data → Import now shows a targeted message directing you to the homepage importer.
+- **Import as copy.** Creates a new project with a disambiguated name, fully regenerated IDs for all nested entities (themes, backbones, rib items, releases, sprints, allocations, progress entries, card order maps), and a preserved audit history from the source file (matching the 'add' path).
+
+**Improvements**
+
+- **Cloud-mode import readiness.** Import button gated on Firestore data hydration, not just authentication. Prevents false "no conflicts" results during workspace loading.
+- **Mid-write protection.** The Import button is disabled while an import is being applied, and the hook rejects file picks while writes are in flight.
+- **Applying state.** Spinner shown while imports write. Cloud imports can take 1–3 seconds per project.
+- **Result banners.** Confirms counts of added, replaced, copied, skipped. All-skip shows "N skipped" rather than silently doing nothing. Workspace-changed skips reported separately with the conflicting project's name.
+- **Import failures surface in the banner.** Write errors during add, replace, and copy now appear in the import result banner (per-project), not silently in a separate global banner. Both local and cloud modes report failures correctly. Driver-level `createProduct` gained a `throwOnError` option for this path; existing callers retain best-effort semantics.
+- **Replace protection (Firestore).** Cloud replace uses `runTransaction`, eliminating a concurrent-edit race. Original creation date (`createdAt`) and workspace fingerprint (`_originRef`) are preserved.
+- **Identity field preservation (local).** Local replace reads the existing project before overwriting, preserving `createdAt` and `_originRef` so academic-integrity provenance is not laundered through a re-import.
+- **DataSection cleanup.** Per-project replace (Settings → Data → Import) no longer forces a full page reload. Errors shown inline. Bundle files show a targeted message. Driver write failures surface as errors.
+
+**Tests:** 23 new tests across 3 new files (`importUtils.test.ts`, `useImportState.test.ts`, `dataSection.test.tsx`) covering the parse → conflict → apply pipeline, the hook state machine, and the per-project replace surface. Total 554 → 577.
+
+**Known limitations**
+
+- Cloud mode always shows the preview — no one-click fast path even for conflict-free files (intentional: Firestore may still be loading).
+- For multi-project cloud imports, writes are sequential and span several seconds. A concurrent peer edit during that window is not detected after the Layer 2 re-read.
+- The per-project import in Settings → Data is not gated on cloud hydration (only the homepage importer is). Importing immediately after sign-in via this surface could theoretically overwrite stale data.
+- After enabling cloud sync, wait for the dashboard to load your existing projects before importing. The homepage Import button enables once your projects are loaded.
+
 ## Version 0.31.3 (2026-05-14)
 
 Bug fix: refreshing the browser on a deep route (e.g. `/product/<id>` or any nested tab like `/product/<id>/storymap`) no longer returns Vercel's generic `404: NOT_FOUND` page. The repo had no `vercel.json` and no SPA fallback, so Vercel treated parameterized routes as literal file requests and 404'd before React Router ever got a chance to resolve the URL. Added `vercel.json` with a catch-all rewrite to `/index.html` so all routes deliver the app shell and React Router takes over. Refresh now reloads cleanly on whatever route you're on — no need to bounce back to the project dashboard.

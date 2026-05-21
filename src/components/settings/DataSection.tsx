@@ -2,40 +2,109 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState } from 'react';
-import { exportProduct, readImportFile } from '../../lib/storage';
+import { useState, useRef, type ChangeEvent } from 'react';
+import { exportProduct } from '../../lib/storage';
 import { downloadForecasterExport } from '../../lib/exportForForecaster';
 import { downloadExcelExport } from '../../lib/exportForExcel';
+import { parseImportFile } from '../../lib/import-utils';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
-import type { Product, StorageDriver } from '../../types';
+import type { Product, StorageDriver, ProductUpdater } from '../../types';
 
 interface DataSectionProps {
   product: Product;
   driver: StorageDriver;
+  /** Updates in-memory product state after a successful replace (replaces window.location.reload). */
+  updateProduct: (updater: ProductUpdater) => void;
 }
 
-export default function DataSection({ product, driver }: DataSectionProps) {
-  const [importConfirm, setImportConfirm] = useState(null);
-  const [importError, setImportError] = useState(null);
+export default function DataSection({ product, driver, updateProduct }: DataSectionProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importConfirm, setImportConfirm] = useState<Product | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  // Ref-based double-submission guard. Using useState would race because two
+  // rapid synchronous clicks both read the same stale `false` from the closure
+  // before setState commits.
+  const applyingRef = useRef(false);
 
   const handleExport = () => exportProduct(product, driver.getWorkspaceId());
 
   const handleImport = () => {
     setImportError(null);
-    readImportFile(
-      (imported) => setImportConfirm(imported),
-      (errorMsg) => setImportError(errorMsg),
-    );
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!file) return;
+
+    try {
+      // FileReader (not file.text()) for jsdom compatibility and consistency
+      // with useImportState. Wrapped in a promise so the rest of the handler
+      // can stay linear.
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target!.result as string);
+        reader.onerror = () => reject(new Error('Could not read file. Please try again.'));
+        reader.readAsText(file);
+      });
+      const result = parseImportFile(text);
+
+      if (!result.ok) {
+        setImportError(result.error);
+        return;
+      }
+
+      if (result.products.length > 1) {
+        setImportError(
+          'This file contains multiple projects. To import a bundled file, use the "Import Project" button on the project list homepage.',
+        );
+        return;
+      }
+
+      const imported = result.products[0];
+      if (!imported) {
+        setImportError('Unexpected empty result from file parser. Please try again.');
+        return;
+      }
+
+      setImportConfirm(imported);
+    } catch (err) {
+      setImportError(`Failed to read file: ${(err as Error).message}`);
+    }
   };
 
   const confirmImport = async () => {
-    if (importConfirm) {
-      const merged = { ...importConfirm, id: product.id };
+    if (!importConfirm || applyingRef.current) return;
+    applyingRef.current = true;
+    try {
+      const merged: Product = { ...importConfirm, id: product.id };
       await driver.replaceProduct(merged);
+
+      // Preserve createdAt and _originRef from the current product in the
+      // in-memory state. Without this, useProduct's 500ms debounced saveProduct
+      // would write the imported file's values back, overwriting what
+      // replaceProduct just preserved.
+      //
+      // owner/members are absent from the in-memory product because
+      // validateProduct strips any key not in KNOWN_PRODUCT_FIELDS during
+      // import, and stripFirestoreFields destroys them on every Firestore
+      // listener echo. doSaveProduct's payload therefore omits them, and
+      // merge:true preserves Firestore's existing values.
+      updateProduct({
+        ...merged,
+        createdAt: product.createdAt,
+        _originRef: product._originRef,
+      });
+
       setImportConfirm(null);
-      window.location.reload();
+    } catch (err) {
+      setImportError(`Import failed: ${(err as Error).message}`);
+      setImportConfirm(null);
+    } finally {
+      applyingRef.current = false;
     }
   };
 
@@ -91,6 +160,15 @@ export default function DataSection({ product, driver }: DataSectionProps) {
 
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleFileChange}
+        aria-hidden="true"
+      />
+
       <Section title="Data">
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Export and import this project's data.</p>
         <div className="flex flex-wrap gap-3">
