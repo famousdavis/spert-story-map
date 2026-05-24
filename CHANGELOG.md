@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.32.1 (2026-05-24)
+
+About page polish — renames the QRG download button to match the canonical label shared across all SPERT® Suite apps.
+
+**About page**
+- Renamed the QRG download button from `Quick Reference Guide (PDF)` to `Open Quick Reference Guide (PDF)` so the label matches the convention used by SPERT® Forecaster, MyScrumBudget, and SPERT® AHP.
+
 ## Version 0.32.0 (2026-05-20)
 
 Level 4 Import — multi-project preview, conflict resolution, and import-as-copy.
