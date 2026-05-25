@@ -19,9 +19,17 @@ export default function InlineEdit({ value, onSave, className = '', placeholder 
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Sync draft from external value only when NOT editing — otherwise an
+  // onProductChange echo arriving mid-edit would overwrite the user's
+  // in-progress text. setState-in-effect is intentional here: the effect
+  // mirrors external state into local state on the (editing → !editing)
+  // transition; without it, the field would keep showing a stale draft
+  // after Escape or after a wholesale cloud-echo product replacement.
+  /* eslint-disable react-hooks/set-state-in-effect -- intentional external→local sync */
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (editing && inputRef.current) {

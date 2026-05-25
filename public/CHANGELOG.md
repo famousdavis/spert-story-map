@@ -1,5 +1,50 @@
 # Changelog
 
+## Version 0.33.0 (2026-05-24)
+
+Cloud storage remediation — sign-out safety, debounce reduction, buffered inputs, per-user localStorage namespacing, Firestore mergeFields + atomic changelog, multi-subscriber error surface, and permission-denied recovery.
+
+**Reliability**
+
+- **Sign-out safety.** Driver teardown (cancel pending saves + detach Firestore listeners) now runs through a single-slot registry, guaranteed to complete before Firebase credentials are revoked. Prevents `PERMISSION_DENIED` toasts after a successful sign-out and prevents trailing writes from landing on the user's cloud doc after they believed they signed out. All three sign-out paths (UI button, ToS-stale, ToS-error) go through the same sequence.
+- **Delete is now atomic.** `deleteProduct` (both local and cloud) cancels any pending debounced save for the product before deleting — a trailing write would otherwise resurrect the just-deleted doc. The local driver also cancels the products-index timer in the same atomic step.
+- **Driver-swap flush.** `useProduct` now flushes pending saves to the outgoing driver on mode/uid changes — typing-in-progress when switching local↔cloud no longer disappears.
+- **`pagehide` + `beforeunload`.** Mobile browsers fire `pagehide` reliably where `beforeunload` does not; both are now wired so up-to-200ms of typing is preserved on tab close.
+
+**Performance**
+
+- **Save latency cut by ~60%.** The old 500ms outer debounce in `useProduct` stacked on top of the driver's 500ms inner debounce produced ~1s of perceived input latency. The outer timer is removed and the inner debounce is reduced to 200ms; `lastSaved` is now mode-aware (optimistic for local, server-timestamped for cloud — no flash).
+- **Batch export reads prefs once.** `exportAllProducts` now hoists a single Firestore preferences read and threads it through to each per-product `exportProduct` call via a `cachedPrefs` parameter (a cloud user exporting N projects used to incur N reads). Single-product export callers are unchanged.
+
+**Input handling**
+
+- **Buffered text inputs (`useBufferedField`).** Project name, description, release name, and sprint name in Settings now commit on blur, not on every keystroke. Mid-type cloud echoes can no longer scramble cursors or wipe pending characters. Date pickers and selects are intentionally unbuffered (their native commit semantics differ).
+- **`InlineEdit` mid-edit sync fix.** External value updates no longer overwrite the editing draft — sync is gated on `!editing`.
+- **`onProductChange` invariant documented.** Echoes are wholesale tree replacements; components that buffer user input must gate sync on focus state.
+
+**Storage isolation**
+
+- **Per-user localStorage namespacing.** Keys are now `rp:{uid}:product_<id>` / `rp:{uid}:products_index` / `rp:{uid}:preferences` (and `rp:local:*` when anonymous). The same browser can hold multiple users' caches without collision. `rp_workspace_id` is never namespaced (per-browser academic-integrity token must survive sign-outs).
+- **One-time legacy migration.** Pre-v0.33.0 data at `rp_product_*` / `rp_products_index` / `rp_app_preferences` is migrated to `rp:local:*` in a top-level `await` before React mounts. Uses `navigator.locks` when available (exclusive across tabs); falls back to a 30s timestamp lock. Corrupt JSON preserves the old key and logs a warning rather than silently dropping data.
+- **Sign-out clears only the active namespace.** A signed-out cloud user's anonymous-session data at `rp:local:*` survives — they get it back if they keep using the app without signing in.
+
+**Firestore write semantics**
+
+- **`mergeFields` replaces `merge: true`.** Saves now whitelist exactly which top-level keys can be written. Side-write fields (`_storageRef`, `_exportedBy`, `_exportedById`, `owner`/`members`/`_owner`/`_members` aliases) can no longer leak into Firestore via a routine save.
+- **Atomic changelog (`arrayUnion`).** `_changeLog` is now excluded from `mergeFields` and written via a separate `updateDoc(_changeLog: arrayUnion(...newEntries))` that appends only entries new to the server. A smaller local log can no longer truncate the server's history.
+- **`seq` nonce on every changelog entry.** A per-entry uniqueness token distinguishes same-second writes (notably bulk-deletes that share `op: 'delete'` / `entity: 'rib'` and omit `id`/`uid`/`source`) so `arrayUnion`'s structural dedupe doesn't collapse them. Validator allowlist updated; backward-compatible with pre-v0.33.0 imports.
+- **Listener echo re-attaches `_members`.** Without this, the Sharing UI lost owner/editor/viewer discrimination 1-3s after every save when the snapshot arrived.
+
+**Error surface**
+
+- **Multi-subscriber `onSaveError`.** Both `ProductLayout` and `ProductList` can register independently — previously the second registration silently replaced the first. Returns an unsubscribe function so unmounting components don't leak setState targets.
+- **Mode-aware save error banner.** Cloud failures show "Changes may not have saved. Check your connection." instead of the quota-focused localStorage message.
+
+**Access denied recovery**
+
+- **Cold-load and live `permission-denied`.** Both paths now redirect to the project list with a one-shot "You no longer have access to that project." banner. The live path unsubscribes the listener immediately so it can't keep firing. The cold-load path falls through to the existing "Project not found" UI for non-permission errors.
+- **`onProductChange` accepts an optional `onError` callback.** Routes Firestore listener errors per-call when provided; falls back to the save-error subscribers when omitted.
+
 ## Version 0.32.1 (2026-05-24)
 
 About page polish — renames the QRG download button to match the canonical label shared across all SPERT® Suite apps.

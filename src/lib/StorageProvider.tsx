@@ -6,6 +6,8 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { createLocalStorageDriver, createFirestoreDriver } from './storageDriver';
 import { isFirebaseAvailable } from './firebase';
 import { useAuth } from './AuthProvider';
+import { registerDriverCleanup, clearDriverCleanup } from './driverCleanupRegistry';
+import { setStorageNamespace } from './storage';
 import type { StorageDriver, StorageMode } from '../types';
 
 interface StorageContextValue {
@@ -50,6 +52,12 @@ export function StorageProvider({ children }: { children: React.ReactNode }) {
   // Update driver when auth resolves or mode changes
   /* eslint-disable react-hooks/set-state-in-effect -- driver must be created after auth resolves */
   useEffect(() => {
+    // Bind the active localStorage namespace before the (cloud-pending) early
+    // return so any synchronous code that runs while we wait for auth reads
+    // from the correct namespace. UID wins whenever signed in, even in local
+    // mode, so per-user local caches stay isolated.
+    setStorageNamespace(user?.uid ?? 'local');
+
     if (authLoading && persistedMode === 'cloud' && isFirebaseAvailable) {
       return; // Still waiting for auth
     }
@@ -61,6 +69,23 @@ export function StorageProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, effectiveMode, user?.uid, persistedMode]); // eslint-disable-line react-hooks/exhaustive-deps -- user?.uid captures the needed dependency
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Register driver teardown so signOutCleanup (which no longer takes a
+  // driver reference) can fire cancelPendingSaves + tearDownListeners
+  // before credential revocation, regardless of which sign-out path is
+  // taken (UI button, ToS-stale, ToS-error).
+  useEffect(() => {
+    if (!driver) return;
+    registerDriverCleanup(async () => {
+      driver.cancelPendingSaves();
+      driver.tearDownListeners();
+    });
+    return () => {
+      driver.cancelPendingSaves();
+      driver.tearDownListeners();
+      clearDriverCleanup();
+    };
+  }, [driver]);
 
   const switchMode = useCallback((newMode: StorageMode) => {
     localStorage.setItem(STORAGE_MODE_KEY, newMode);

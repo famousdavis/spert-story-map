@@ -129,11 +129,15 @@ export function createLocalStorageDriver(): StorageDriver {
     },
 
     onSaveError(cb: (error: Error) => void) {
-      _onSaveError(cb);
+      return _onSaveError(cb);
     },
 
-    /** No-op for local mode — no remote changes to subscribe to. */
-    onProductChange() {
+    /**
+     * No-op for local mode — no remote changes to subscribe to. The
+     * optional onError is accepted (and ignored) to keep the signature
+     * uniform with the cloud driver.
+     */
+    onProductChange(_id: string, _cb: (product: Product) => void, _onError?: (error: unknown) => void) {
       return () => {};
     },
 

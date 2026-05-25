@@ -50,12 +50,15 @@ export async function testCloudConnection(uid: string): Promise<boolean> {
  * @returns {{ uploaded: number, skipped: number }}
  */
 export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: number; skipped: number }> {
-  const index = loadProductIndex();
+  // Explicit 'local' overrides — migration always reads from the anonymous-
+  // session namespace. At sign-in the active namespace becomes the uid, but
+  // the user's pre-sign-in projects live at rp:local:*, not rp:{uid}:*.
+  const index = loadProductIndex('local');
   let uploaded = 0;
   let skipped = 0;
 
   for (const entry of index) {
-    const product = loadProduct(entry.id);
+    const product = loadProduct(entry.id, 'local');
     if (!product) {
       skipped++;
       continue;
@@ -102,8 +105,9 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
     uploaded++;
   }
 
-  // Migrate preferences
-  const prefs = loadPreferences();
+  // Migrate preferences — read from the anonymous-session namespace, since
+  // they were captured before the user signed in.
+  const prefs = loadPreferences('local');
   if (prefs && Object.keys(prefs).length > 0) {
     await setDoc(doc(db, SETTINGS_COL, uid), sanitizeForFirestore(prefs), { merge: true });
   }

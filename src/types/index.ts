@@ -123,6 +123,13 @@ export interface ChangeLogEntry {
   id?: string;
   uid?: string;
   source?: string;
+  /**
+   * Per-entry uniqueness nonce (v0.33.0+). Distinguishes two entries with the
+   * same (t, op, entity, id, uid, source) tuple — notably bulk-delete entries
+   * that omit id/uid/source. Optional for backward compatibility with
+   * pre-v0.33.0 imports.
+   */
+  seq?: string;
 }
 
 export interface Product {
@@ -186,8 +193,28 @@ export interface StorageDriver {
   loadPreferences(): Promise<UserSettings>;
   savePreferences(prefs: UserSettings): Promise<void>;
   getWorkspaceId(): string;
-  onProductChange(id: string, callback: (product: Product) => void): () => void;
-  onSaveError(callback: (error: Error) => void): void;
+  /**
+   * Subscribe to remote document changes for a single product.
+   *
+   * `onError` (optional) is invoked with the underlying Firestore error when
+   * the listener fails — most importantly, `permission-denied` when a
+   * collaborator is removed mid-session. When omitted, errors route to the
+   * driver's save-error subscribers as a fallback (preserves pre-v0.33.0
+   * behaviour for callers that don't opt in).
+   *
+   * Returns an unsubscribe function.
+   */
+  onProductChange(
+    id: string,
+    callback: (product: Product) => void,
+    onError?: (error: unknown) => void,
+  ): () => void;
+  /**
+   * Subscribe to write failures (storage quota, permission denied, etc.).
+   * Multi-subscriber: multiple components can register independently.
+   * Returns an unsubscribe function — call on effect cleanup.
+   */
+  onSaveError(callback: (error: Error) => void): () => void;
   flushPendingSaves(): void;
   cancelPendingSaves(): void;
   /**

@@ -9,6 +9,15 @@ import './index.css'
 import App from './App'
 import { AuthProvider } from './lib/AuthProvider'
 import { StorageProvider } from './lib/StorageProvider'
+import { runLegacyMigration } from './lib/migrateLegacyKeys'
+
+// Top-level await: migrate legacy localStorage keys (rp_* → rp:local:*)
+// BEFORE React mounts. The first read inside StorageProvider's effect
+// happens with the new key shape, so there's no race between migration
+// and the first product load. tsconfig.app.json has module=ESNext +
+// target=ES2020; Vite bundles with esbuild which supports TLA at the
+// entry point.
+await runLegacyMigration();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

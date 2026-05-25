@@ -81,7 +81,10 @@ const KNOWN_ALLOCATION_FIELDS = new Set(['releaseId', 'percentage', 'memo']);
 const KNOWN_PROGRESS_FIELDS = new Set([
   'sprintId', 'releaseId', 'percentComplete', 'comment', 'updatedAt',
 ]);
-const KNOWN_CHANGELOG_FIELDS = new Set(['t', 'op', 'entity', 'id', 'uid', 'source']);
+// `seq` (v0.33.0+) — per-entry uniqueness nonce. Must be in the allowlist or
+// stripObject will delete it on every import, re-exposing the bulk-delete
+// same-second collision that seq exists to prevent.
+const KNOWN_CHANGELOG_FIELDS = new Set(['t', 'op', 'entity', 'id', 'uid', 'source', 'seq']);
 const KNOWN_SIZEMAPPING_FIELDS = new Set(['label', 'points']);
 
 const PROTO_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -326,7 +329,7 @@ export function validateProduct(data: unknown): Product {
       // Bound string fields so a tampered import can't smuggle large
       // payloads through the changelog. Drop oversized strings rather
       // than rejecting the whole import — these are advisory.
-      for (const k of ['op', 'entity', 'id', 'uid', 'source'] as const) {
+      for (const k of ['op', 'entity', 'id', 'uid', 'source', 'seq'] as const) {
         if (entry[k] !== undefined && (typeof entry[k] !== 'string' || entry[k].length > 128)) {
           delete entry[k];
         }
