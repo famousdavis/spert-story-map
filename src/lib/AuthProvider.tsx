@@ -129,14 +129,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               // ToS outdated or missing — sign out
               clearTosAcceptance();
-              await signOutCleanup(null);
+              await signOutCleanup();
               return;
             }
           } catch (e) {
             console.error('Failed to check ToS acceptance:', e instanceof Error ? e.message : 'Unknown error');
             // Cannot verify ToS — sign out to prevent bypass
             clearTosAcceptance();
-            await signOutCleanup(null);
+            await signOutCleanup();
             return;
           }
         }
@@ -166,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     if (!auth) return;
-    await signOutCleanup(null);
+    await signOutCleanup();
   };
 
   return (

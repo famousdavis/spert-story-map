@@ -536,6 +536,13 @@ describe('cancelPendingSaves', () => {
 describe('exportProduct', () => {
   let capturedBlob;
 
+  // exportProduct now takes a driver as the second argument and reads
+  // attribution prefs via driver.loadPreferences(). The minimal stub
+  // returns {} so the export still produces a file but stamps no
+  // attribution — these tests focus on _storageRef behaviour.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial StorageDriver shape; only loadPreferences is exercised
+  const mockDriver = { loadPreferences: () => Promise.resolve({}) } as any;
+
   beforeEach(() => {
     capturedBlob = null;
     // Mock DOM APIs for export
@@ -550,7 +557,7 @@ describe('exportProduct', () => {
 
   it('uses storageRefOverride for _storageRef when provided', async () => {
     const product = { id: 'p1', name: 'Test', themes: [] };
-    exportProduct(product, 'firebase-uid-789');
+    await exportProduct(product, mockDriver, 'firebase-uid-789');
     const text = await capturedBlob.text();
     const data = JSON.parse(text);
     expect(data._storageRef).toBe('firebase-uid-789');
@@ -558,9 +565,18 @@ describe('exportProduct', () => {
 
   it('falls back to getWorkspaceId() when storageRefOverride is not provided', async () => {
     const product = { id: 'p1', name: 'Test', themes: [] };
-    exportProduct(product);
+    await exportProduct(product, mockDriver);
     const text = await capturedBlob.text();
     const data = JSON.parse(text);
     expect(data._storageRef).toBe(getWorkspaceId());
+  });
+
+  it('uses cachedPrefs when provided (batch-export path)', async () => {
+    const product = { id: 'p1', name: 'Test', themes: [] };
+    await exportProduct(product, mockDriver, undefined, { exportName: 'Alice', exportId: 'UF001' });
+    const text = await capturedBlob.text();
+    const data = JSON.parse(text);
+    expect(data._exportedBy).toBe('Alice');
+    expect(data._exportedById).toBe('UF001');
   });
 });

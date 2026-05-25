@@ -36,7 +36,13 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   // Don't render if Firebase is not configured
   if (!isCloudAvailable || !firebaseAvailable) return null;
 
-  const localCount = mode === 'local' ? loadProductIndex().length : 0;
+  // Explicit 'local' override — the local-projects count for the migration
+  // banner must reflect the anonymous-session cache, not the signed-in
+  // user's per-uid local cache (which is empty for fresh sign-ins).
+  const localCount = mode === 'local' ? loadProductIndex('local').length : 0;
+  // Preferences DO follow the active namespace — for a signed-in user this
+  // reads their per-uid prefs (which is where _hasUploadedToCloud is
+  // recorded after their first migration).
   const prefs = loadPreferences();
   const hasUploadedBefore = !!prefs._hasUploadedToCloud;
 
@@ -105,7 +111,10 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   };
 
   const confirmCleanup = () => {
-    clearAllLocalProducts();
+    // Explicit 'local' override — confirmCleanup clears the anonymous-session
+    // cache that was just migrated to cloud, not the user's per-uid local
+    // namespace (which is unrelated and should not be touched).
+    clearAllLocalProducts('local');
     setShowCleanupConfirm(false);
     setMigrateResult(prev => prev + ' Local data cleared.');
   };
@@ -124,7 +133,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   };
 
   const handleSignOut = async () => {
-    await signOutCleanup(driver, switchMode);
+    await signOutCleanup(switchMode);
     onClose?.();
   };
 

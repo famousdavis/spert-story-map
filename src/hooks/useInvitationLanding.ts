@@ -61,7 +61,10 @@ export function useInvitationLanding(): UseInvitationLandingResult {
     if (!firebaseAvailable) return;
     // Auto-flip to cloud only when no local projects exist (Lesson 28).
     // AHP reference omits this gate — verified and confirmed; Story Map adds it.
-    const localProjectCount = loadProductIndex().length;
+    // Explicit 'local' override — at landing time the user is unauthenticated
+    // so the active namespace is already 'local', but be explicit so this
+    // does not silently break if a future change reorders provider mount.
+    const localProjectCount = loadProductIndex('local').length;
     if (localProjectCount === 0 && mode !== 'cloud') {
       switchMode('cloud');
     }

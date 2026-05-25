@@ -93,10 +93,13 @@ function createLocalProduct(id, name) {
 }
 
 function seedLocalStorage(products) {
+  // v0.33.0 namespaced shape. Migration always reads from the 'local'
+  // namespace (anonymous-session data) because the user must be signed
+  // out at the time pre-migration data was captured.
   const index = products.map(p => ({ id: p.id, name: p.name, updatedAt: new Date().toISOString() }));
-  localStorage.setItem('rp_products_index', JSON.stringify(index));
+  localStorage.setItem('rp:local:products_index', JSON.stringify(index));
   for (const p of products) {
-    localStorage.setItem(`rp_product_${p.id}`, JSON.stringify(p));
+    localStorage.setItem(`rp:local:product_${p.id}`, JSON.stringify(p));
   }
 }
 
@@ -169,7 +172,8 @@ describe('migrateLocalToCloud', () => {
 
   it('migrates preferences', async () => {
     seedLocalStorage([]);
-    localStorage.setItem('rp_app_preferences', JSON.stringify({ exportName: 'Alice' }));
+    // v0.33.0 namespaced shape — pre-migration prefs live at rp:local:preferences.
+    localStorage.setItem('rp:local:preferences', JSON.stringify({ exportName: 'Alice' }));
 
     await migrateLocalToCloud('user-1');
 
@@ -183,9 +187,9 @@ describe('migrateLocalToCloud', () => {
 
     await migrateLocalToCloud('user-1');
 
-    // Local data should still be there
-    expect(localStorage.getItem('rp_product_proj-1')).toBeTruthy();
-    expect(localStorage.getItem('rp_products_index')).toBeTruthy();
+    // Local data should still be there (v0.33.0 namespaced shape)
+    expect(localStorage.getItem('rp:local:product_proj-1')).toBeTruthy();
+    expect(localStorage.getItem('rp:local:products_index')).toBeTruthy();
   });
 });
 

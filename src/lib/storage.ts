@@ -5,19 +5,62 @@
 import type { Product, ChangeLogEntry, UserSettings } from '../types';
 import { STORAGE_KEYS, SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from './constants';
 
-// Save error callback — subscribe to get notified when localStorage writes fail
-let _onSaveError: ((error: unknown) => void) | null = null;
-export function onSaveError(callback: (error: unknown) => void): void { _onSaveError = callback; }
+// ── localStorage namespace ──────────────────────────────────────────
+//
+// Every per-user write goes through a namespace so the same browser can
+// hold multiple users' caches without collision. StorageProvider binds the
+// active namespace on every auth transition: `uid` when signed in, `'local'`
+// when anonymous. Callers can override per-call (e.g. ProductList's orphan
+// check reads `'local'` while in cloud mode).
+//
+// Workspace identity (rp_workspace_id) is NEVER namespaced — it's a
+// per-browser academic integrity token that must survive sign-outs.
+
+let activeNamespace: string = 'local';
+
+export function setStorageNamespace(ns: string): void {
+  activeNamespace = ns || 'local';
+}
+
+export function getActiveNamespace(): string {
+  return activeNamespace;
+}
+
+function productKeyFor(id: string, ns: string): string {
+  return `rp:${ns}:product_${id}`;
+}
+
+function indexKeyFor(ns: string): string {
+  return `rp:${ns}:products_index`;
+}
+
+function preferencesKeyFor(ns: string): string {
+  return `rp:${ns}:preferences`;
+}
+
+// Save error subscribers — multi-subscriber Set so ProductLayout AND
+// ProductList can each receive write-failure notifications without one
+// overwriting the other (the prior single-callback model only kept the
+// last registrant). Returns an unsubscribe function — call on effect
+// cleanup so an unmounted component doesn't leak a setState target.
+const saveErrorSubs = new Set<(error: unknown) => void>();
+
+export function onSaveError(callback: (error: unknown) => void): () => void {
+  saveErrorSubs.add(callback);
+  return () => { saveErrorSubs.delete(callback); };
+}
 
 function handleSaveError(e: unknown): void {
   console.error('Failed to save to localStorage:', e instanceof Error ? e.message : 'Unknown error');
-  if (_onSaveError) _onSaveError(e);
+  for (const cb of saveErrorSubs) {
+    try { cb(e); } catch (err) { console.error('onSaveError subscriber threw:', err); }
+  }
 }
 
 // Debounce helper
 let saveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 let pendingSaves: Record<string, unknown> = {};
-function debouncedSave(key: string, data: unknown, delay = 500): void {
+function debouncedSave(key: string, data: unknown, delay = 200): void {
   if (saveTimers[key]) clearTimeout(saveTimers[key]);
   pendingSaves[key] = data;
   saveTimers[key] = setTimeout(() => {
@@ -68,12 +111,13 @@ function immediatelyLoad(key: string): unknown {
 }
 
 // Product Index
-export function loadProductIndex(): { id: string; name: string; updatedAt?: string }[] {
-  return (immediatelyLoad(STORAGE_KEYS.PRODUCTS_INDEX) as { id: string; name: string; updatedAt?: string }[] | null) || [];
+export function loadProductIndex(ns?: string): { id: string; name: string; updatedAt?: string }[] {
+  const key = indexKeyFor(ns ?? activeNamespace);
+  return (immediatelyLoad(key) as { id: string; name: string; updatedAt?: string }[] | null) || [];
 }
 
-export function saveProductIndex(index: { id: string; name: string; updatedAt?: string }[]): void {
-  debouncedSave(STORAGE_KEYS.PRODUCTS_INDEX, index, 100);
+export function saveProductIndex(index: { id: string; name: string; updatedAt?: string }[], ns?: string): void {
+  debouncedSave(indexKeyFor(ns ?? activeNamespace), index, 100);
 }
 
 // Schema migration: v1 → v2 (per-release progress)
@@ -120,13 +164,15 @@ export function migrateToV2(product: any): any {
 }
 
 // Products
-export function loadProduct(id: string): Product | null {
-  let product = immediatelyLoad(`${STORAGE_KEYS.PRODUCT_PREFIX}${id}`);
+export function loadProduct(id: string, ns?: string): Product | null {
+  const namespace = ns ?? activeNamespace;
+  const key = productKeyFor(id, namespace);
+  let product = immediatelyLoad(key);
   if (product && (product.schemaVersion || 1) < SCHEMA_VERSION) {
     product = migrateToV2(product);
     // Save immediately so migration only runs once
     try {
-      localStorage.setItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${id}`, JSON.stringify(product));
+      localStorage.setItem(key, JSON.stringify(product));
     } catch (e) {
       console.error('Failed to save migrated product:', e instanceof Error ? e.message : 'Unknown error');
     }
@@ -136,7 +182,7 @@ export function loadProduct(id: string): Product | null {
 
 export function saveProduct(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
-  debouncedSave(`${STORAGE_KEYS.PRODUCT_PREFIX}${product.id}`, updated);
+  debouncedSave(productKeyFor(product.id, activeNamespace), updated);
 
   // Update index
   const index = loadProductIndex();
@@ -154,7 +200,7 @@ export function saveProduct(product: Product): Product {
 export function saveProductImmediate(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
   try {
-    localStorage.setItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${product.id}`, JSON.stringify(updated));
+    localStorage.setItem(productKeyFor(product.id, activeNamespace), JSON.stringify(updated));
     const index = loadProductIndex();
     const existing = index.findIndex(p => p.id === product.id);
     const entry = { id: product.id, name: product.name, updatedAt: updated.updatedAt };
@@ -163,7 +209,7 @@ export function saveProductImmediate(product: Product): Product {
     } else {
       index.push(entry);
     }
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS_INDEX, JSON.stringify(index));
+    localStorage.setItem(indexKeyFor(activeNamespace), JSON.stringify(index));
   } catch (e) {
     handleSaveError(e);
   }
@@ -180,7 +226,7 @@ export function saveProductImmediate(product: Product): Product {
  */
 export function saveProductImmediateOrThrow(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
-  localStorage.setItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${product.id}`, JSON.stringify(updated));
+  localStorage.setItem(productKeyFor(product.id, activeNamespace), JSON.stringify(updated));
   const index = loadProductIndex();
   const existing = index.findIndex(p => p.id === product.id);
   const entry = { id: product.id, name: product.name, updatedAt: updated.updatedAt };
@@ -189,36 +235,45 @@ export function saveProductImmediateOrThrow(product: Product): Product {
   } else {
     index.push(entry);
   }
-  localStorage.setItem(STORAGE_KEYS.PRODUCTS_INDEX, JSON.stringify(index));
+  localStorage.setItem(indexKeyFor(activeNamespace), JSON.stringify(index));
   return updated;
 }
 
 export function deleteProduct(id: string): void {
+  // Drop any pending debounced writes for this product and the index — a
+  // trailing save would resurrect the deleted product or write a stale
+  // index entry referencing it.
+  const productKey = productKeyFor(id, activeNamespace);
+  const indexKey = indexKeyFor(activeNamespace);
+  if (saveTimers[productKey]) { clearTimeout(saveTimers[productKey]); delete saveTimers[productKey]; delete pendingSaves[productKey]; }
+  if (saveTimers[indexKey])   { clearTimeout(saveTimers[indexKey]);   delete saveTimers[indexKey];   delete pendingSaves[indexKey]; }
   try {
-    localStorage.removeItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${id}`);
+    localStorage.removeItem(productKey);
     const index = loadProductIndex().filter(p => p.id !== id);
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS_INDEX, JSON.stringify(index));
+    localStorage.setItem(indexKey, JSON.stringify(index));
   } catch (e) {
     console.error('Failed to delete product:', e instanceof Error ? e.message : 'Unknown error');
   }
 }
 
-/** Remove all local products and clear the product index. */
-export function clearAllLocalProducts(): void {
-  const index = loadProductIndex();
+/** Remove all local products in a namespace and clear that namespace's index. */
+export function clearAllLocalProducts(ns?: string): void {
+  const namespace = ns ?? activeNamespace;
+  const index = loadProductIndex(namespace);
   for (const entry of index) {
-    localStorage.removeItem(`${STORAGE_KEYS.PRODUCT_PREFIX}${entry.id}`);
+    localStorage.removeItem(productKeyFor(entry.id, namespace));
   }
-  localStorage.removeItem(STORAGE_KEYS.PRODUCTS_INDEX);
+  localStorage.removeItem(indexKeyFor(namespace));
 }
 
 // Preferences
-export function loadPreferences(): UserSettings {
-  return (immediatelyLoad(STORAGE_KEYS.PREFERENCES) as UserSettings | null) || {};
+export function loadPreferences(ns?: string): UserSettings {
+  const key = preferencesKeyFor(ns ?? activeNamespace);
+  return (immediatelyLoad(key) as UserSettings | null) || {};
 }
 
-export function savePreferences(prefs: UserSettings): void {
-  debouncedSave(STORAGE_KEYS.PREFERENCES, prefs, 200);
+export function savePreferences(prefs: UserSettings, ns?: string): void {
+  debouncedSave(preferencesKeyFor(ns ?? activeNamespace), prefs, 200);
 }
 
 // Workspace identity — generated once per browser, persists across sessions
@@ -231,10 +286,22 @@ export function getWorkspaceId(): string {
   return id;
 }
 
-// Append an entry to a product's _changeLog, capping at max size
-export function appendChangeLogEntry(product: Pick<Product, '_changeLog'>, entry: Omit<ChangeLogEntry, 't'>): ChangeLogEntry[] {
+/**
+ * Append an entry to a product's `_changeLog`.
+ *
+ * Adds a per-entry uniqueness nonce (`seq`) so two entries appended in the
+ * same second are still distinguishable in Firestore's arrayUnion path —
+ * arrayUnion dedupes by structural equality, so bulk-delete entries that
+ * omit id/uid/source would collapse to a single entry without seq.
+ *
+ * Caps at CHANGELOG_MAX_ENTRIES.
+ */
+export function appendChangeLogEntry(product: Pick<Product, '_changeLog'>, entry: Omit<ChangeLogEntry, 't' | 'seq'>): ChangeLogEntry[] {
   const log = product._changeLog || [];
-  const updated = [...log, { ...entry, t: Math.floor(Date.now() / 1000) }];
+  const nonce = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const updated = [...log, { ...entry, t: Math.floor(Date.now() / 1000), seq: nonce }];
   return updated.length > CHANGELOG_MAX_ENTRIES
     ? updated.slice(updated.length - CHANGELOG_MAX_ENTRIES)
     : updated;
@@ -331,3 +398,8 @@ export function duplicateProduct(product: Product, workspaceIdOverride?: string)
 
 // Re-export import/export functions from dedicated module
 export { exportProduct, exportAllProducts, importProductFromJSON, readImportFile } from './importExport';
+
+// Note: exportProduct is now async and takes (product, driver, storageRefOverride?, cachedPrefs?).
+// All call sites have been updated to pass `driver` as the second argument; the previous
+// sync signature relied on a synchronous loadPreferences() that broke cloud-mode export
+// attribution (cloud prefs live in Firestore, not localStorage).

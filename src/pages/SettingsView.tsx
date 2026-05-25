@@ -2,17 +2,80 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useRef, useId } from 'react';
+import { useState, useRef, useId, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { useStorage } from '../lib/StorageProvider';
+import { useBufferedField } from '../hooks/useBufferedField';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { Section, Field } from '../components/ui/Section';
 import SharingSection from '../components/settings/SharingSection';
 import SizeMappingSection from '../components/settings/SizeMappingSection';
 import DataSection from '../components/settings/DataSection';
 import type { OutletContextValue } from '../types';
+
+// ──────────────────────────────────────────────────────────────────
+// Buffered input wrappers
+//
+// Each field is its own component so useBufferedField's local state is
+// keyed per element. Without this isolation, switching focus between rows
+// would leak draft text between sibling rows of the same kind. SettingsView
+// holds the per-row commit handlers; the wrappers just route value/handlers.
+// ──────────────────────────────────────────────────────────────────
+
+interface BufferedTextProps {
+  value: string;
+  onCommit: (v: string) => void;
+  id?: string;
+  name?: string;
+  className?: string;
+  rows?: number;
+  multiline?: boolean;
+}
+
+function BufferedText({ value, onCommit, id, name, className, rows, multiline }: BufferedTextProps) {
+  const { localValue, setLocalValue, handleFocus, handleBlur, revertValue } =
+    useBufferedField(value, onCommit);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      revertValue();
+      (e.target as HTMLElement).blur();
+    } else if (e.key === 'Enter' && !multiline) {
+      (e.target as HTMLElement).blur();
+    }
+  };
+
+  if (multiline) {
+    return (
+      <textarea
+        id={id}
+        name={name}
+        value={localValue}
+        onChange={e => setLocalValue(e.target.value)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onKeyDown={onKeyDown}
+        rows={rows}
+        className={className}
+      />
+    );
+  }
+  return (
+    <input
+      id={id}
+      name={name}
+      type="text"
+      value={localValue}
+      onChange={e => setLocalValue(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={onKeyDown}
+      className={className}
+    />
+  );
+}
 
 export default function SettingsView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
@@ -25,6 +88,17 @@ export default function SettingsView() {
   const [dragReleaseId, setDragReleaseId] = useState(null);
   const [dropBeforeReleaseId, setDropBeforeReleaseId] = useState(null);
   const dropBeforeReleaseRef = useRef(null);
+
+  // Per-row commit handlers — kept here (not in BufferedText) so the buffered
+  // wrapper stays a pure leaf and updateProduct identity stays stable across
+  // re-renders.
+  const commitName = useCallback((name: string) => {
+    updateProduct(prev => ({ ...prev, name }));
+  }, [updateProduct]);
+
+  const commitDescription = useCallback((description: string) => {
+    updateProduct(prev => ({ ...prev, description }));
+  }, [updateProduct]);
 
   // Releases
   const updateRelease = (id, updates) => {
@@ -102,21 +176,21 @@ export default function SettingsView() {
       <Section title="Project Details">
         <div className="space-y-3">
           <Field label="Name" htmlFor={`${baseId}-projectName`}>
-            <input
+            <BufferedText
               id={`${baseId}-projectName`}
               name="projectName"
-              type="text"
               value={product.name}
-              onChange={e => updateProduct(prev => ({ ...prev, name: e.target.value }))}
+              onCommit={commitName}
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
             />
           </Field>
           <Field label="Description" htmlFor={`${baseId}-projectDesc`}>
-            <textarea
+            <BufferedText
               id={`${baseId}-projectDesc`}
               name="projectDescription"
               value={product.description || ''}
-              onChange={e => updateProduct(prev => ({ ...prev, description: e.target.value }))}
+              onCommit={commitDescription}
+              multiline
               rows={2}
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none resize-none"
             />
@@ -146,15 +220,17 @@ export default function SettingsView() {
                 >
                   <span className="text-sm leading-none">⠿</span>
                 </div>
-                <input
-                  type="text"
+                <BufferedText
                   name="releaseName"
                   value={r.name}
-                  onChange={e => updateRelease(r.id, { name: e.target.value })}
+                  onCommit={(name) => updateRelease(r.id, { name })}
                   className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
                 />
                 <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                   Target
+                  {/* Date input is NOT buffered — native date pickers handle their own
+                      input lifecycle, and onChange fires only when the user commits
+                      via the picker UI (not on each keystroke). */}
                   <input
                     type="date"
                     name="releaseTargetDate"
@@ -175,6 +251,7 @@ export default function SettingsView() {
       <Section title="Sprints">
         <div className="flex items-center gap-3 mb-4">
           <label htmlFor={`${baseId}-sprintCadence`} className="text-xs font-medium text-gray-500 dark:text-gray-400">Sprint cadence</label>
+          {/* Select is NOT buffered — single-value change on user selection. */}
           <select
             id={`${baseId}-sprintCadence`}
             name="sprintCadenceWeeks"
@@ -191,15 +268,15 @@ export default function SettingsView() {
         <div className="space-y-2">
           {product.sprints.map((s) => (
             <div key={s.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-              <input
-                type="text"
+              <BufferedText
                 name="sprintName"
                 value={s.name}
-                onChange={e => updateSprint(s.id, { name: e.target.value })}
+                onCommit={(name) => updateSprint(s.id, { name })}
                 className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
               />
               <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                 Finish
+                {/* Date input is NOT buffered — see release target note above. */}
                 <input
                   type="date"
                   name="sprintEndDate"

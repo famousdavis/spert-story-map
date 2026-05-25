@@ -28,7 +28,15 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
   // before setState commits.
   const applyingRef = useRef(false);
 
-  const handleExport = () => exportProduct(product, driver.getWorkspaceId());
+  // exportProduct is async — wrap in `void` so React's click handler doesn't
+  // get a Promise return type. Errors are logged but not surfaced (the only
+  // failure mode is a Firestore prefs read for cloud users; download still
+  // happens with empty attribution).
+  const handleExport = () => {
+    void exportProduct(product, driver, driver.getWorkspaceId()).catch(err => {
+      console.error('Export failed:', err);
+    });
+  };
 
   const handleImport = () => {
     setImportError(null);

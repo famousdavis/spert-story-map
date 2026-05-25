@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, StorageDriver } from '../types';
+import type { Product, ChangeLogEntry, StorageDriver } from '../types';
 
 /**
  * Firestore-backed storage driver.
@@ -14,10 +14,10 @@ import type { Product, StorageDriver } from '../types';
  */
 
 import {
-  doc, getDoc, setDoc, deleteDoc, getDocs,
+  doc, getDoc, setDoc, deleteDoc, getDocs, updateDoc,
   collection, query, where,
   onSnapshot, serverTimestamp,
-  deleteField, runTransaction,
+  deleteField, runTransaction, arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { migrateToV2 } from './storage';
@@ -36,8 +36,29 @@ export function stripFirestoreFields(data: any): any {
   return product;
 }
 
+/**
+ * Per-product set of changelog-entry signatures already known to the server.
+ * Used to compute the delta of new entries to push via arrayUnion. Without
+ * this, every save would push the entire log array on top of itself, and
+ * Firestore's arrayUnion dedupe (structural equality) would silently drop
+ * everything but the first occurrence of each entry — yielding partial
+ * truncation as the log grows.
+ */
+function entrySig(entry: ChangeLogEntry): string {
+  return [
+    entry.t,
+    entry.op,
+    entry.entity ?? '',
+    entry.id ?? '',
+    entry.uid ?? '',
+    entry.source ?? '',
+    entry.seq ?? '',
+  ].join('|');
+}
+
 export function createFirestoreDriver(uid: string): StorageDriver {
-  let _onSaveError: ((error: unknown) => void) | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- subscribers may receive heterogeneous error shapes
+  const saveErrorSubs = new Set<(error: any) => void>();
   let productTimer: ReturnType<typeof setTimeout> | null = null;
   let productPending: Product | null = null;
   let prefsTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,19 +69,109 @@ export function createFirestoreDriver(uid: string): StorageDriver {
   // signOutCleanup can detach all listeners before credential revocation.
   const activeListeners = new Set<() => void>();
 
-  function handleWriteError(e: unknown): void {
-    console.error('Firestore write error:', e instanceof Error ? e.message : 'Unknown error');
-    if (_onSaveError) _onSaveError(e);
+  // Per-product changelog baseline: signatures of entries the server is
+  // known to already have. doSaveProduct sends only the delta via
+  // arrayUnion; baseline is reset whenever the driver re-syncs from the
+  // server (loadProduct, onProductChange echo, createProduct,
+  // replaceProduct). Closure-scoped per driver instance so swapping users
+  // wipes the map.
+  const changeLogBaseline = new Map<string, Set<string>>();
+
+  function getNewChangeLogEntries(productId: string, log: ChangeLogEntry[]): ChangeLogEntry[] {
+    const baseline = changeLogBaseline.get(productId) ?? new Set<string>();
+    return log.filter(e => !baseline.has(entrySig(e)));
   }
 
+  function advanceBaseline(productId: string, newEntries: ChangeLogEntry[]): void {
+    const cur = changeLogBaseline.get(productId) ?? new Set<string>();
+    const upd = new Set(cur);
+    newEntries.forEach(e => upd.add(entrySig(e)));
+    changeLogBaseline.set(productId, upd);
+  }
+
+  function resetChangeLogBaseline(productId: string, log: ChangeLogEntry[]): void {
+    changeLogBaseline.set(productId, new Set(log.map(entrySig)));
+  }
+
+  function handleWriteError(e: unknown): void {
+    console.error('Firestore write error:', e instanceof Error ? e.message : 'Unknown error');
+    for (const cb of saveErrorSubs) {
+      try { cb(e); } catch (err) { console.error('onSaveError subscriber threw:', err); }
+    }
+  }
+
+  /**
+   * Save a product to Firestore.
+   *
+   * Two-write sequence:
+   *   1. setDoc with mergeFields — overwrites whitelisted fields only.
+   *      `_changeLog` is excluded from mergeFields so a smaller local log
+   *      doesn't truncate the server's history (would happen on every echo
+   *      that arrives before the local log catches up).
+   *   2. updateDoc with arrayUnion(...newEntries) — appends only entries
+   *      the server doesn't already have, tracked via changeLogBaseline.
+   *      arrayUnion is atomic on the array field and dedupes by structural
+   *      equality; the `seq` nonce in each entry guarantees uniqueness for
+   *      same-second bulk-delete writes.
+   *
+   * Non-atomicity: if setDoc succeeds and the subsequent updateDoc fails,
+   * the changelog entry isn't sent. The baseline isn't advanced for failed
+   * writes, so the entry is retried on the next save (the user makes any
+   * other change). Acceptable for a best-effort audit trail.
+   *
+   * Side-write fields stripped: id (URL-encoded into the doc ref),
+   * _owner/_members (Firestore-only, set by createProduct/replaceProduct
+   * — never by editor saves), _storageRef/_exportedBy/_exportedById
+   * (export-time-only fields that would leak attribution into Firestore).
+   */
   async function doSaveProduct(product: Product): Promise<void> {
     try {
       const ref = doc(db, PROJECTS_COL, product.id);
-      const { id: _id, ...rest } = product;
-      const data = sanitizeForFirestore(rest);
-      // Never include owner/members in regular saves — prevents editors
-      // from overwriting ownership. merge: true preserves them.
-      await setDoc(ref, { ...data, updatedAt: serverTimestamp() }, { merge: true });
+      const {
+        id: _id,
+        // Cloud-only / export-only fields that must never be written by a
+        // routine save. owner/_owner and members/_members are owned by
+        // createProduct + replaceProduct exclusively.
+        owner: _o0, members: _m0,
+        _storageRef: _sr, _exportedBy: _eb, _exportedById: _ebi,
+        // Excluded from mergeFields below so the server's _changeLog isn't
+        // truncated by a smaller local copy; sent via arrayUnion instead.
+        _changeLog: _cl,
+        ...rest
+      } = product as Product & {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw doc may have stripped/sentinel shapes
+        _owner?: any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        _members?: any;
+      };
+      // _owner / _members are alias fields re-attached by onProductChange
+      // for in-memory state; they alias the canonical owner/members from
+      // the raw doc and must also be stripped before write.
+      const restNoAliases: Record<string, unknown> = { ...rest };
+      delete restNoAliases._owner;
+      delete restNoAliases._members;
+
+      const sanitized = sanitizeForFirestore(restNoAliases);
+      // mergeFields whitelist — every key from sanitized except canonical
+      // owner/members (which never appear here anyway because they were
+      // destructured out), plus updatedAt. _changeLog is intentionally
+      // excluded; the updateDoc(arrayUnion) call below appends only the
+      // new entries so the server's history is monotonic.
+      const mergeFields = [
+        ...Object.keys(sanitized).filter(k =>
+          k !== 'owner' && k !== 'members' && k !== 'createdAt' &&
+          k !== '_originRef' && k !== '_changeLog',
+        ),
+        'updatedAt',
+      ];
+      await setDoc(ref, { ...sanitized, updatedAt: serverTimestamp() }, { mergeFields });
+
+      // Changelog delta — push only entries new to the server.
+      const newEntries = getNewChangeLogEntries(product.id, product._changeLog ?? []);
+      if (newEntries.length > 0) {
+        await updateDoc(ref, { _changeLog: arrayUnion(...newEntries) });
+        advanceBaseline(product.id, newEntries);
+      }
     } catch (e) {
       handleWriteError(e);
     }
@@ -100,6 +211,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         // UI's strict-equality ownership checks. (Lessons 38, 49.)
         product._owner = data.owner ?? null;
         product._members = data.members;
+        // Seed the baseline so the first save after a list-page load doesn't
+        // re-send every entry (and so arrayUnion isn't asked to dedupe the
+        // entire history).
+        resetChangeLogBaseline(product.id, product._changeLog ?? []);
         products.push(product);
       });
       return products;
@@ -110,7 +225,17 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       const snap = await getDoc(ref);
       if (!snap.exists()) return null;
       const data = snap.data();
-      return migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
+      const product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
+      // Seed _owner/_members on cold load too — without these the Share UI
+      // and ownership-gated affordances would briefly render in their
+      // "no access" state until the first onProductChange snapshot arrives.
+      product._owner = data.owner ?? null;
+      product._members = data.members ?? {};
+      // Reset the changelog baseline so the first save after a cold load
+      // sends only entries the user adds post-load (Option B — encapsulated
+      // inside the driver so useProduct doesn't need to know about it).
+      resetChangeLogBaseline(id, product._changeLog ?? []);
+      return product;
     },
 
     /**
@@ -129,6 +254,12 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         handleWriteError(err);
         return;
       }
+      // Drop any pending debounced save for this product before the create —
+      // a trailing setDoc after the explicit create would either overwrite the
+      // newly-set owner/members or race the import pipeline's per-product
+      // outcome reporting.
+      if (productTimer) { clearTimeout(productTimer); productTimer = null; }
+      productPending = null;
       try {
         const ref = doc(db, PROJECTS_COL, product.id);
         const { id: _id, ...rest } = product;
@@ -139,13 +270,17 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           members: { [uid]: 'owner' },
           updatedAt: serverTimestamp(),
         });
+        // Seed the baseline with the create-time changelog so future saves
+        // send only the delta — without this, the first updateProduct after
+        // a create would push the entire log via arrayUnion.
+        resetChangeLogBaseline(product.id, product._changeLog ?? []);
       } catch (e) {
         if (options?.throwOnError) throw e;
         handleWriteError(e);
       }
     },
 
-    /** Debounced save (500ms). Never sets owner/members. */
+    /** Debounced save (200ms). Never sets owner/members. */
     saveProduct(product: Product) {
       productPending = product;
       if (productTimer) clearTimeout(productTimer);
@@ -154,7 +289,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         const p = productPending;
         productPending = null;
         doSaveProduct(p!);
-      }, 500);
+      }, 200);
       return Promise.resolve();
     },
 
@@ -202,9 +337,20 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           updatedAt: serverTimestamp(),
         });
       });
+      // Baseline reset AFTER transaction commits — the new server-side log
+      // matches product._changeLog (replaceProduct overwrote the array),
+      // so future saves should send only post-replace deltas.
+      resetChangeLogBaseline(product.id, product._changeLog ?? []);
     },
 
     async deleteProduct(id: string) {
+      // Drop any pending debounced save for this product before deleting —
+      // otherwise the trailing setDoc would resurrect the just-deleted doc.
+      if (productTimer) { clearTimeout(productTimer); productTimer = null; }
+      productPending = null;
+      // Also drop the baseline so a stale-baseline read after a re-create
+      // doesn't suppress legitimate changelog entries.
+      changeLogBaseline.delete(id);
       try {
         await deleteDoc(doc(db, PROJECTS_COL, id));
       } catch (e) {
@@ -244,7 +390,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      * Flush both pending debounce timers.
      * Known limitation: beforeunload can't reliably await async Firestore
      * writes — the browser may kill the page before the promise resolves.
-     * At most 500ms of typing could be lost on tab close.
+     * At most 200ms of typing could be lost on tab close.
      */
     flushPendingSaves() {
       if (productTimer && productPending) {
@@ -283,8 +429,16 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       prefsPending = null;
     },
 
+    /**
+     * Subscribe to driver save errors. Multi-subscriber: ProductLayout and
+     * ProductList both register independently. Returns an unsubscribe
+     * function — call on effect cleanup so a re-render or unmount doesn't
+     * leak a stale setSaveError callback that fires after the component
+     * has gone away.
+     */
     onSaveError(cb: (error: Error) => void) {
-      _onSaveError = cb;
+      saveErrorSubs.add(cb);
+      return () => { saveErrorSubs.delete(cb); };
     },
 
     /**
@@ -292,12 +446,17 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      * Uses hasPendingWrites for echo prevention.
      *
      * stripFirestoreFields removes `owner`/`members` from the parsed product;
-     * we re-attach `_owner` from the raw doc so per-project listener echoes
-     * don't blank the field set by the initial loadProductIndex. Without
-     * this, the Share button disappears 1–3s after Add Project as the first
-     * snapshot arrives. (Lesson 49: third strip site.)
+     * we re-attach BOTH `_owner` AND `_members` from the raw doc so per-project
+     * listener echoes don't blank the field set by the initial loadProductIndex.
+     * Without `_members`, the Sharing UI's "is this user the owner / an editor
+     * / a viewer" check fails on the first echo, hiding affordances 1-3s after
+     * any save. (H1-B fix; Lesson 49 third strip site.)
      */
-    onProductChange(id: string, cb: (product: Product) => void) {
+    onProductChange(
+      id: string,
+      cb: (product: Product) => void,
+      onError?: (error: unknown) => void,
+    ) {
       const ref = doc(db, PROJECTS_COL, id);
       const rawUnsubscribe = onSnapshot(
         ref,
@@ -307,11 +466,23 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           const data = snap.data();
           const product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
           product._owner = data.owner ?? null;
+          product._members = (data.members as Record<string, string>) ?? {};
+          // Re-sync the changelog baseline with the server's authoritative
+          // copy so the next save's arrayUnion delta is correct.
+          resetChangeLogBaseline(id, product._changeLog ?? []);
           cb(product);
         },
         (error) => {
           console.error('Firestore listener error:', error instanceof Error ? error.message : 'Unknown error');
-          if (_onSaveError) _onSaveError(error);
+          // Route to per-call onError (Pass 5 permission-denied path) when
+          // provided; otherwise fall back to the save-error banner.
+          if (onError) {
+            onError(error);
+          } else {
+            for (const cb of saveErrorSubs) {
+              try { cb(error); } catch (err) { console.error('onSaveError subscriber threw:', err); }
+            }
+          }
         },
       );
       // Wrap so tearDownListeners and the consumer's React-effect-cleanup

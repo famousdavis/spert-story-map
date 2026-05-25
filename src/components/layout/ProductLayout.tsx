@@ -37,8 +37,13 @@ export default function ProductLayout() {
 
   useEffect(() => {
     if (!driver) return;
-    driver.onSaveError(() => setSaveError(true));
-    return () => driver.onSaveError(null);
+    // Capture the unsubscribe handle returned by the Set-backed subscriber
+    // API. Previous code called onSaveError(null) on cleanup, which only
+    // worked while the subscriber slot was a single-value field — under the
+    // multi-subscriber Set it would silently no-op and leak a setState
+    // target that fires after this component unmounts.
+    const unsub = driver.onSaveError(() => setSaveError(true));
+    return unsub;
   }, [driver]);
 
   // Safety net: if we end up in local mode with no loaded product
@@ -130,11 +135,15 @@ export default function ProductLayout() {
 
       <FirstRunBanner />
 
-      {/* Save error banner */}
+      {/* Save error banner — mode-aware copy. Cloud failures are usually
+          transient network issues, not quota exhaustion; the localStorage
+          message would be misleading there. */}
       {saveError && (
         <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-700/50 px-6 py-2 text-center">
           <p className="text-xs text-red-700 dark:text-red-300">
-            Storage full — your latest changes may not be saved. Export your data from Settings to avoid data loss.
+            {mode === 'cloud'
+              ? 'Changes may not have saved. Check your connection.'
+              : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
           </p>
         </div>
       )}

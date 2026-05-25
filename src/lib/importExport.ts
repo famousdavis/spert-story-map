@@ -2,16 +2,28 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, StorageDriver } from '../types';
+import type { Product, StorageDriver, UserSettings } from '../types';
 import { DEFAULT_SIZE_MAPPING, SCHEMA_VERSION } from './constants';
-import { loadPreferences, getWorkspaceId, migrateToV2, appendChangeLogEntry } from './storage';
+import { getWorkspaceId, migrateToV2, appendChangeLogEntry } from './storage';
 import { validateProduct } from './validateProduct';
 
 /**
  * Export a product as a downloadable JSON file.
+ *
+ * Reads Export Attribution from the storage driver — cloud users get the
+ * Firestore-stored prefs, local users get their localStorage prefs. Without
+ * this routing, a cloud user's export would be unstamped because the previous
+ * sync loadPreferences() only read localStorage. Single-product callers omit
+ * cachedPrefs; batch callers (exportAllProducts) hoist one read and pass the
+ * prefs through to avoid N Firestore reads.
  */
-export function exportProduct(product: Product, storageRefOverride?: string): void {
-  const prefs = loadPreferences();
+export async function exportProduct(
+  product: Product,
+  driver: StorageDriver,
+  storageRefOverride?: string,
+  cachedPrefs?: UserSettings,
+): Promise<void> {
+  const prefs = cachedPrefs ?? await driver.loadPreferences();
   const exportData = {
     ...product,
     _storageRef: storageRefOverride || getWorkspaceId(),
@@ -89,10 +101,14 @@ export function importProductFromJSON(jsonString: string): Product {
  * Export all products as individual JSON file downloads.
  * Uses the storage driver to load products (works for both local and cloud).
  *
+ * Hoists prefs to one read (passes through to exportProduct via cachedPrefs)
+ * so a cloud user with N projects pays for 1 Firestore preferences read, not N.
+ *
  * @param {object} driver - Storage driver from useStorage()
  * @param {string} [storageRefOverride] - Optional workspace ID override (cloud mode)
  */
 export async function exportAllProducts(driver: StorageDriver, storageRefOverride?: string) {
+  const prefs = await driver.loadPreferences();
   const products = await driver.loadProductIndex();
   let exported = 0;
 
@@ -104,7 +120,7 @@ export async function exportAllProducts(driver: StorageDriver, storageRefOverrid
       : await driver.loadProduct(product.id);
     if (!full) continue;
 
-    exportProduct(full, storageRefOverride);
+    await exportProduct(full, driver, storageRefOverride, prefs);
     exported++;
 
     // Small delay between downloads so browsers don't block them
@@ -121,7 +137,7 @@ export async function exportAllProducts(driver: StorageDriver, storageRefOverrid
  * Each product is stamped with _storageRef and export attribution.
  */
 export async function exportAllProductsBundled(driver: StorageDriver, storageRefOverride?: string) {
-  const prefs = loadPreferences();
+  const prefs = await driver.loadPreferences();
   const products = await driver.loadProductIndex();
   const bundle: Product[] = [];
 

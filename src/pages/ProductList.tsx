@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { exportProduct, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
 import { exportAllProductsBundled } from '../lib/importExport';
 import { useImportState } from '../hooks/useImportState';
@@ -44,9 +44,19 @@ export default function ProductList() {
   const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
   const [shareTarget, setShareTarget] = useState<{ id: string; name: string } | null>(null);
+  // One-shot banner shown when useProduct redirects here with router state
+  // because of a permission-denied (collaborator removed mid-session OR
+  // cold-load against a now-inaccessible project). Cleared by the explicit
+  // Dismiss button or by router-state cleanup below.
+  const [accessDeniedMsg, setAccessDeniedMsg] = useState(false);
+  // Save error banner — multi-subscriber to driver.onSaveError. ProductLayout
+  // also subscribes; both surface independently because users can hit save
+  // failures from either screen.
+  const [saveError, setSaveError] = useState(false);
   const { user } = useAuth();
   const isCloudMode = mode === 'cloud';
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme, isDark } = useDarkMode();
 
   // Drag-to-reorder state
@@ -68,9 +78,13 @@ export default function ProductList() {
       const detailed = allProducts.filter(Boolean).map(p => enrichProduct(p));
       setProducts(detailed);
       if (mode === 'cloud') setCloudDataLoaded(true);
-      // In cloud mode, detect local projects that weren't migrated
+      // In cloud mode, detect local projects that weren't migrated. Explicit
+      // 'local' override — the active namespace is the cloud user's uid here,
+      // so the default-namespace read would return that user's local-mode
+      // cache (signed-in users can technically have a per-uid local cache),
+      // not the anonymous-session orphans we want to surface a banner for.
       if (mode === 'cloud' && detailed.length === 0) {
-        setLocalOrphanCount(loadLocalIndex().length);
+        setLocalOrphanCount(loadLocalIndex('local').length);
       } else {
         setLocalOrphanCount(0);
       }
@@ -90,6 +104,31 @@ export default function ProductList() {
     setCloudDataLoaded(false);
   }, [mode, driver]);
 
+  // One-shot capture of router-state from useProduct redirects. Mount-only:
+  // StrictMode double-invokes the effect, but the second run finds the
+  // flag already cleared (location.state was nulled by the first run) and
+  // is a no-op.
+  /* eslint-disable react-hooks/exhaustive-deps -- mount-once; StrictMode double-fire is no-op after first clear */
+  useEffect(() => {
+    const denied = (location.state as { productAccessDenied?: boolean } | null)?.productAccessDenied;
+    if (denied) {
+      setAccessDeniedMsg(true);
+      // Clear the router state so a subsequent navigation (back/forward, link
+      // click) doesn't re-trigger the banner on re-mount.
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  // Subscribe to driver save errors. ProductLayout subscribes on the product
+  // detail screens; this subscription covers actions taken from the project
+  // list (create, duplicate, delete) so a failed save there isn't silent.
+  useEffect(() => {
+    if (!driver) return;
+    const unsub = driver.onSaveError(() => setSaveError(true));
+    return unsub;
+  }, [driver]);
+
   const {
     phase: importPhase,
     fileInputRef,
@@ -102,11 +141,17 @@ export default function ProductList() {
   // Refresh project list when a pending invitation is claimed.
   // `refresh` is useCallback([driver, mode]) — stable; effect re-attaches
   // only when mode or driver changes, both legitimate triggers.
+  //
+  // J2 peer-refresh gate: drop the hydrated flag BEFORE re-refreshing so the
+  // Import button briefly disables (it gates on cloudDataLoaded). Without
+  // the gate flip, a user who clicks Import in the ~100ms refresh window
+  // could race the project list and see partial data.
   useEffect(() => {
     if (!INVITATIONS_ENABLED) return;
-    const onModelsChanged = () => {
+    const onModelsChanged = async () => {
       if (mode !== 'cloud') return;
-      void refresh();
+      setCloudDataLoaded(false);
+      await refresh();
     };
     window.addEventListener('spert:models-changed', onModelsChanged);
     return () => window.removeEventListener('spert:models-changed', onModelsChanged);
@@ -201,7 +246,7 @@ export default function ProductList() {
   const handleExport = async (id) => {
     if (!driver) return;
     const product = await driver.loadProduct(id);
-    if (product) exportProduct(product, driver.getWorkspaceId());
+    if (product) await exportProduct(product, driver, driver.getWorkspaceId());
   };
 
   return (
@@ -247,6 +292,40 @@ export default function ProductList() {
         </div>
 
         <FirstRunBanner />
+
+        {/* Access-denied banner — one-shot, shown after useProduct redirects
+            here because Firestore returned permission-denied (owner revoked
+            collaborator access mid-session, or revoked between sessions). */}
+        {accessDeniedMsg && (
+          <div className="mb-4 flex items-start justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg px-4 py-3">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              You no longer have access to that project.
+            </p>
+            <button
+              onClick={() => setAccessDeniedMsg(false)}
+              className="text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 ml-4"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Save error banner — mode-aware copy (matches ProductLayout). */}
+        {saveError && (
+          <div className="mb-4 flex items-start justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 rounded-lg px-4 py-3">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              {mode === 'cloud'
+                ? 'Changes may not have saved. Check your connection.'
+                : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
+            </p>
+            <button
+              onClick={() => setSaveError(false)}
+              className="text-xs font-medium text-red-700 hover:text-red-900 dark:text-red-300 dark:hover:text-red-100 ml-4"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3 mb-8">
