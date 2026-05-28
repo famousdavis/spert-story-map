@@ -256,11 +256,18 @@ export default function ProductList() {
         <div className="flex items-start justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <img
-                src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
-                alt="SPERT Story Map icon"
-                className="mr-2 h-7 w-7 rounded-lg ring-1 ring-white/20"
-              />
+              <Link
+                to="/"
+                onClick={() => window.scrollTo(0, 0)}
+                aria-label="Go to projects home"
+                className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <img
+                  src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
+                  alt="SPERT Story Map icon"
+                  className="h-7 w-7 rounded-lg ring-1 ring-white/20"
+                />
+              </Link>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 SPERT<sup className="text-[0.45em] text-gray-400 dark:text-gray-500 font-normal tracking-wide">®</sup> Story Map
               </h1>
