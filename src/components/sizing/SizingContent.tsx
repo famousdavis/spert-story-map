@@ -123,7 +123,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
       {Array.from({ length: unsizedGridCols }).map((_, i) => (
         <div
           key={`col-letter-${i}`}
-          className="absolute flex items-center justify-center text-[10px] font-mono font-medium text-gray-400 dark:text-gray-500 pointer-events-none select-none"
+          className="absolute flex items-center justify-center text-sm font-mono font-semibold text-gray-500 dark:text-gray-400 pointer-events-none select-none"
           style={{
             left: NUMBER_GUTTER_WIDTH + CELL_PAD + i * (CELL_WIDTH + CELL_GAP),
             top: 0,
@@ -136,12 +136,12 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
       ))}
       {/* "Unsized (n)" label — right-aligned on the column-letter row */}
       <div
-        className="absolute text-xs font-medium text-gray-400 dark:text-gray-500 pointer-events-none select-none flex items-center justify-end pr-1"
+        className="absolute text-sm font-medium text-gray-500 dark:text-gray-400 pointer-events-none select-none flex items-center justify-end pr-2"
         style={{
           right: 0,
           top: 0,
           height: LETTER_STRIP_HEIGHT,
-          maxWidth: NUMBER_GUTTER_WIDTH + 120,
+          maxWidth: NUMBER_GUTTER_WIDTH + 140,
         }}
       >
         Unsized ({unsizedCount})
@@ -164,7 +164,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
       {Array.from({ length: visibleRows }).map((_, i) => (
         <div
           key={`row-num-${i}`}
-          className="absolute flex items-center justify-center text-[10px] font-mono font-medium text-gray-400 dark:text-gray-500 pointer-events-none select-none"
+          className="absolute flex items-center justify-center text-sm font-mono font-semibold text-gray-500 dark:text-gray-400 pointer-events-none select-none"
           style={{
             left: 0,
             top: LETTER_STRIP_HEIGHT + CELL_PAD + i * (CELL_HEIGHT + CELL_GAP),

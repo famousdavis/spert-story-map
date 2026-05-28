@@ -15,6 +15,7 @@ import useMapDrag from '../components/storymap/useMapDrag';
 import useMapLayout from '../components/storymap/useMapLayout';
 import useMapKeyboard from '../components/storymap/useMapKeyboard';
 import useMapHandlers from '../components/storymap/useMapHandlers';
+import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
 import type { OutletContextValue } from '../types';
 
 export default function StoryMapView() {
@@ -37,12 +38,18 @@ export default function StoryMapView() {
   const containerRef = useRef(null);
   const didAutoFit = useRef(false);
 
-  const { dragState, handleDragStart, handleBackboneDragStart, handleThemeDragStart, handleReleaseDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({
+  const { dragState, dragPointerRef, handleDragStart, handleBackboneDragStart, handleThemeDragStart, handleReleaseDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({
     layout,
     zoom,
     pan,
     updateProduct,
     selectedIds,
+  });
+
+  useEdgeAutoPan({
+    isDragging: !!dragState?.isDragging,
+    pointerRef: dragPointerRef,
+    setPan,
   });
 
   // Track recent drag completion to suppress click-after-drag

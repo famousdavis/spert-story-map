@@ -31,6 +31,10 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
   const [dragState, setDragState] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- layout/cell objects from computeLayout have complex inferred shape
   const dragRef = useRef<any>(null);
+  // Latest pointer position in screen (client) coordinates. Kept fresh on every
+  // pointermove so useEdgeAutoPan can read it from its RAF loop without
+  // depending on dragState re-renders.
+  const dragPointerRef = useRef<{ screenX: number; screenY: number } | null>(null);
 
   // Keep current zoom/pan in refs so screenToMap always uses latest values
   const zoomRef = useRef(zoom);
@@ -109,6 +113,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
       mapContainerRect: rect,
     };
     dragRef.current = state;
+    dragPointerRef.current = { screenX: e.clientX, screenY: e.clientY };
     setDragState(state);
   }, [screenToMap, getContainerRect, selectedIds]);
 
@@ -135,6 +140,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
       mapContainerRect: rect,
     };
     dragRef.current = state;
+    dragPointerRef.current = { screenX: e.clientX, screenY: e.clientY };
     setDragState(state);
   }, [screenToMap, getContainerRect]);
 
@@ -159,6 +165,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
       mapContainerRect: rect,
     };
     dragRef.current = state;
+    dragPointerRef.current = { screenX: e.clientX, screenY: e.clientY };
     setDragState(state);
   }, [screenToMap, getContainerRect]);
 
@@ -183,6 +190,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
       mapContainerRect: rect,
     };
     dragRef.current = state;
+    dragPointerRef.current = { screenX: e.clientX, screenY: e.clientY };
     setDragState(state);
   }, [screenToMap, getContainerRect]);
 
@@ -190,6 +198,9 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
   const handleDragMove = useCallback((e: PointerEvent) => {
     const prev = dragRef.current;
     if (!prev) return;
+
+    // Update latest pointer position for edge auto-pan (read by useEdgeAutoPan's RAF loop)
+    dragPointerRef.current = { screenX: e.clientX, screenY: e.clientY };
 
     const container = document.querySelector('[data-map-container]');
     const rect = container ? container.getBoundingClientRect() : prev.mapContainerRect;
@@ -220,6 +231,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     const state = dragRef.current;
     if (!state || !state.isDragging) {
       dragRef.current = null;
+      dragPointerRef.current = null;
       setDragState(null);
       return;
     }
@@ -235,16 +247,19 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     }
 
     dragRef.current = null;
+    dragPointerRef.current = null;
     setDragState(null);
   }, [updateProduct, layout.cells]);
 
   const cancelDrag = useCallback(() => {
     dragRef.current = null;
+    dragPointerRef.current = null;
     setDragState(null);
   }, []);
 
   return {
     dragState,
+    dragPointerRef,
     handleDragStart,
     handleBackboneDragStart,
     handleThemeDragStart,

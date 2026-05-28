@@ -17,9 +17,10 @@ export const HEADER_HEIGHT = 40;
 export const UNSIZED_MIN_HEIGHT = 100;
 export const ZONE_GAP = 16;
 
-// Excel-style headers on the unsized grid
-export const LETTER_STRIP_HEIGHT = 16;  // top band for A/B/C column letters
-export const NUMBER_GUTTER_WIDTH = 28;  // left gutter for 1/2/3 row numbers (3 digits)
+// Excel-style headers on the unsized grid — sized to read clearly against
+// `text-sm` (14px) card titles. Header text itself is 14px semibold (see SizingContent).
+export const LETTER_STRIP_HEIGHT = 24;  // top band for A/B/C column letters
+export const NUMBER_GUTTER_WIDTH = 36;  // left gutter for 1/2/3 row numbers (3 digits)
 
 export const CELL_WIDTH = COL_WIDTH - CELL_PAD * 2;
 
