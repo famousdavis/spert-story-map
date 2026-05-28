@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.34.0 (2026-05-28)
+
+UX polish — clickable logo home navigation and broader `+ Rib` affordance coverage on the Map tab.
+
+**Navigation**
+
+- **Logo links to home.** The SPERT favicon in both the homepage and per-project headers is now a `Link` to `/`. Clicking it returns to the projects list and scrolls to top — works as expected even on the homepage itself, where it acts as a refresh-and-scroll. Includes a focus-visible ring for keyboard users and an `aria-label` for screen readers.
+
+**Map tab — `+ Rib` affordance**
+
+- **`+ Rib` button now appears in every empty release×column cell.** Previously the hover affordance only rendered in an empty cell if the entire backbone column was empty across all lanes — meaning a half-filled column would leave its empty release rows with no way to add a rib without scrolling to the unassigned lane. Every empty cell under a release divider now hosts a `+ Rib` button at the top of the cell.
+- **Longest column in the unassigned lane is no longer excluded.** The unassigned lane's height used to be sized exactly to fit its tallest column, leaving zero pixels below the last rib for a `+ Rib` button. The lane now reserves `ADD_BUTTON_RESERVED` (24px) below the rib stack when at least one rib is present, so the longest column gets the same affordance every other column gets.
+- **Release lanes get the same treatment.** Release-lane heights also reserve 24px below the longest column's rib stack, so a `+ Rib` button sits below the last card in every column — including the one that determines lane height.
+- **Simpler layout code.** The `emptyBackboneColIdx` exclusion set and `availableGap` / `MIN_GAP_HEIGHT` runtime guard are removed from `computeLayout`. Lane heights now guarantee room, so the gap-button loop just emits one entry per `(lane × column)` cell unconditionally — top of cell when empty, below last card when populated. New `ADD_BUTTON_RESERVED` constant is exported alongside the other layout constants.
+
+**Tests**
+
+- `computeLayout.test.ts` — updated lane-height expectation to account for the reserved button padding; added a new case asserting that a `+ Rib` button is emitted for every `(lane × column)` cell, including the longest unassigned column and empty release cells inside a partially-filled backbone.
+
 ## Version 0.33.0 (2026-05-24)
 
 Cloud storage remediation — sign-out safety, debounce reduction, buffered inputs, per-user localStorage namespacing, Firestore mergeFields + atomic changelog, multi-subscriber error surface, and permission-denied recovery.

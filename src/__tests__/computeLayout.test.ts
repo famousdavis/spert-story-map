@@ -15,6 +15,7 @@ import {
   LANE_LABEL_WIDTH,
   RIGHT_LABEL_WIDTH,
   MIN_LANE_HEIGHT,
+  ADD_BUTTON_RESERVED,
 } from '../components/storymap/useMapLayout';
 
 function makeRib(id, allocations = []) {
@@ -223,8 +224,46 @@ describe('computeLayout', () => {
     });
 
     const result = computeLayout(product);
-    const expectedHeight = 3 * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2;
+    const expectedHeight = 3 * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED;
     expect(result.releaseLanes[0].height).toBe(Math.max(expectedHeight, MIN_LANE_HEIGHT));
+  });
+
+  it('emits a + Rib gap button for every column×lane (including longest unassigned column)', () => {
+    // Build two backbones; column 0 has 2 unassigned ribs (longest), column 1
+    // has 1 release-allocated rib + 0 unassigned. Pre-v0.34 the longest
+    // unassigned column and the empty unassigned cell in column 1 would both
+    // be skipped. v0.34 emits one gap button per (lane × column).
+    const r0a = makeRib('a', []);
+    const r0b = makeRib('b', []);
+    const r1 = makeRib('c', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]);
+    const product = makeProduct({
+      themes: [makeTheme('t1', [
+        makeBackbone('b0', [r0a, r0b]),
+        makeBackbone('b1', [r1]),
+      ])],
+      releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
+    });
+
+    const result = computeLayout(product);
+    // 1 release × 2 columns + 1 unassigned × 2 columns = 4 gap buttons
+    expect(result.gapButtons).toHaveLength(4);
+
+    // Longest unassigned column (col 0, 2 ribs) — button sits below the last
+    // rib, inside the reserved bottom padding.
+    const longest = result.gapButtons.find(
+      g => g.releaseId === null && g.backboneId === 'b0'
+    );
+    expect(longest).toBeDefined();
+    const longestExpectedY =
+      result.unassignedLane.y + CELL_PAD + (2 - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
+    expect(longest!.y).toBe(longestExpectedY);
+
+    // Empty release×column in column 0 (no allocations) — button at top of cell.
+    const emptyRel = result.gapButtons.find(
+      g => g.releaseId === 'rel-1' && g.backboneId === 'b0'
+    );
+    expect(emptyRel).toBeDefined();
+    expect(emptyRel!.y).toBe(result.releaseLanes[0].y + CELL_PAD);
   });
 
   it('creates multiple cells for partial allocations', () => {

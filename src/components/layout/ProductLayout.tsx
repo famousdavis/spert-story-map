@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useState, useEffect } from 'react';
-import { NavLink, useParams, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useParams, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useProduct } from '../../hooks/useProduct';
 import { useStorage } from '../../lib/StorageProvider';
 import { formatRelativeTime } from '../../lib/formatDate';
@@ -78,11 +78,18 @@ export default function ProductLayout() {
         <div className="max-w-[1600px] mx-auto px-6">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-4">
-              <img
-                src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
-                alt="SPERT Story Map icon"
-                className="mr-2 h-7 w-7 rounded-lg ring-1 ring-white/20"
-              />
+              <Link
+                to="/"
+                onClick={() => window.scrollTo(0, 0)}
+                aria-label="Go to projects home"
+                className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <img
+                  src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
+                  alt="SPERT Story Map icon"
+                  className="h-7 w-7 rounded-lg ring-1 ring-white/20"
+                />
+              </Link>
               <a href="/" className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm">
                 ← Projects
               </a>

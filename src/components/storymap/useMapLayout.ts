@@ -17,8 +17,12 @@ const BACKBONE_HEIGHT = 44;
 const LANE_LABEL_WIDTH = 160;
 const RIGHT_LABEL_WIDTH = LANE_LABEL_WIDTH;
 const MIN_LANE_HEIGHT = 72;
+// Vertical space reserved at the bottom of a populated lane so the "+ Rib"
+// hover button has a real cell to live in — even in the longest column, which
+// would otherwise be sized exactly to its rib stack with no room below.
+const ADD_BUTTON_RESERVED = 24;
 
-export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT };
+export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT, ADD_BUTTON_RESERVED };
 
 export default function useMapLayout(product: Product) {
   return useMemo(() => computeLayout(product), [product]);
@@ -139,7 +143,10 @@ export function computeLayout(product: Product): any {
       const count = ribsByRelCol[key]?.length || 0;
       if (count > maxRibs) maxRibs = count;
     }
-    const height = Math.max(maxRibs * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2, MIN_LANE_HEIGHT);
+    const height = Math.max(
+      maxRibs > 0 ? maxRibs * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED : 0,
+      MIN_LANE_HEIGHT
+    );
     releaseLanes.push({
       releaseId: release.id,
       releaseName: release.name,
@@ -157,7 +164,10 @@ export function computeLayout(product: Product): any {
   }
   const unassignedLane = {
     y: currentY,
-    height: Math.max(maxUnassigned * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2, MIN_LANE_HEIGHT),
+    height: Math.max(
+      maxUnassigned > 0 ? maxUnassigned * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED : 0,
+      MIN_LANE_HEIGHT
+    ),
   };
   currentY += unassignedLane.height;
 
@@ -216,36 +226,20 @@ export function computeLayout(product: Product): any {
     }
   }
 
-  // 7. Compute gap buttons (hover "+ Rib" zones below last card in each column×lane).
-  // Backbones with zero total ribs additionally get a button in every empty cell so
-  // users can add the first rib without scrolling to the bottom of the map.
-  const MIN_GAP_HEIGHT = 24;
+  // 7. Compute gap buttons (hover "+ Rib" zones in every column×lane cell).
+  // Lane heights now reserve ADD_BUTTON_RESERVED below the longest column's rib
+  // stack, so every cell — empty or not, longest column or not — has room for
+  // an affordance. Empty cells get the button at the top (just below the
+  // divider); populated cells get it below the last card.
   const gapButtons = [];
-
-  const emptyBackboneColIdx = new Set<number>();
-  for (const col of columns) {
-    const hasRibs =
-      releaseLanes.some(lane => (ribsByRelCol[`${lane.releaseId}:${col.colIdx}`]?.length || 0) > 0)
-      || (unassignedByCol[col.colIdx]?.length || 0) > 0;
-    if (!hasRibs) emptyBackboneColIdx.add(col.colIdx);
-  }
 
   for (const lane of releaseLanes) {
     for (const col of columns) {
       const key = `${lane.releaseId}:${col.colIdx}`;
       const ribCount = ribsByRelCol[key]?.length || 0;
-      let buttonY: number;
-      let availableGap: number;
-      if (ribCount === 0) {
-        if (!emptyBackboneColIdx.has(col.colIdx)) continue;
-        buttonY = lane.y + CELL_PAD;
-        availableGap = lane.height - CELL_PAD * 2;
-      } else {
-        const lastCardBottom = lane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
-        buttonY = lastCardBottom + 2;
-        availableGap = (lane.y + lane.height) - lastCardBottom - CELL_PAD;
-      }
-      if (availableGap < MIN_GAP_HEIGHT) continue;
+      const buttonY = ribCount === 0
+        ? lane.y + CELL_PAD
+        : lane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
       gapButtons.push({
         themeId: col.themeId, backboneId: col.backboneId, releaseId: lane.releaseId,
         x: col.x + CELL_PAD, y: buttonY, width: COL_WIDTH - CELL_PAD * 2,
@@ -256,18 +250,9 @@ export function computeLayout(product: Product): any {
   if (unassignedLane) {
     for (const col of columns) {
       const ribCount = unassignedByCol[col.colIdx]?.length || 0;
-      let buttonY: number;
-      let availableGap: number;
-      if (ribCount === 0) {
-        if (!emptyBackboneColIdx.has(col.colIdx)) continue;
-        buttonY = unassignedLane.y + CELL_PAD;
-        availableGap = unassignedLane.height - CELL_PAD * 2;
-      } else {
-        const lastCardBottom = unassignedLane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT;
-        buttonY = lastCardBottom + 2;
-        availableGap = (unassignedLane.y + unassignedLane.height) - lastCardBottom - CELL_PAD;
-      }
-      if (availableGap < MIN_GAP_HEIGHT) continue;
+      const buttonY = ribCount === 0
+        ? unassignedLane.y + CELL_PAD
+        : unassignedLane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
       gapButtons.push({
         themeId: col.themeId, backboneId: col.backboneId, releaseId: null,
         x: col.x + CELL_PAD, y: buttonY, width: COL_WIDTH - CELL_PAD * 2,
