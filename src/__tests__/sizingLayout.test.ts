@@ -348,8 +348,8 @@ describe('computeSizingLayout targetWidth expansion', () => {
   });
 
   it('with wide targetWidth, sized columns expand and pack cards into sub-columns', () => {
-    // 3 sizes, 1300px canvas (incl. 28px row-number gutter) → each size column
-    // gets ~420px → 2 sub-cols inside each size zone
+    // 3 sizes, 1300px canvas (incl. 36px row-number gutter) → each size column
+    // gets ~415px → 2 sub-cols inside each size zone
     const product = makeProduct({
       ribs: [
         { id: 'r1', size: 'M' }, { id: 'r2', size: 'M' },
@@ -367,10 +367,10 @@ describe('computeSizingLayout targetWidth expansion', () => {
 
   it('totalWidth equals max(targetWidth, gutter + min stacked content width)', () => {
     // 3 sizes → content min = 3 * (200 + 8) - 8 = 616
-    // totalWidth = NUMBER_GUTTER_WIDTH (28) + content = 644 at minimum
+    // totalWidth = NUMBER_GUTTER_WIDTH (36) + content = 652 at minimum
     const product = makeProduct({ ribs: [{ id: 'r1', size: 'M' }] });
-    expect(computeSizingLayout(product, undefined, 0).totalWidth).toBe(644);
-    expect(computeSizingLayout(product, undefined, 400).totalWidth).toBe(644); // below min — clamped
+    expect(computeSizingLayout(product, undefined, 0).totalWidth).toBe(652);
+    expect(computeSizingLayout(product, undefined, 400).totalWidth).toBe(652); // below min — clamped
     expect(computeSizingLayout(product, undefined, 1300).totalWidth).toBe(1300);
   });
 });

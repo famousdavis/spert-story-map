@@ -169,21 +169,21 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
       <div className="absolute top-3 right-3 flex flex-col items-end gap-2 pointer-events-none">
         <div className="pointer-events-auto flex items-center gap-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm px-1 py-1">
           <button
-            onClick={() => setZoom(z => Math.min(MAX_ZOOM, z + ZOOM_STEP))}
-            className="w-7 h-7 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-sm font-medium"
-            title="Zoom in (+)"
-          >
-            +
-          </button>
-          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-10 text-center select-none">
-            {Math.round(zoom * 100)}%
-          </span>
-          <button
             onClick={() => setZoom(z => Math.max(MIN_ZOOM, z - ZOOM_STEP))}
             className="w-7 h-7 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-sm font-medium"
             title="Zoom out (-)"
           >
             −
+          </button>
+          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-10 text-center select-none">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            onClick={() => setZoom(z => Math.min(MAX_ZOOM, z + ZOOM_STEP))}
+            className="w-7 h-7 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-sm font-medium"
+            title="Zoom in (+)"
+          >
+            +
           </button>
           <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5" />
           <button

@@ -12,6 +12,7 @@ import useSizingLayout from '../components/sizing/useSizingLayout';
 import { DEFAULT_SIZING_FILTER } from '../components/sizing/useSizingLayout';
 import type { SizingFilter } from '../components/sizing/useSizingLayout';
 import useSizingDrag from '../components/sizing/useSizingDrag';
+import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
 import SizingContent from '../components/sizing/SizingContent';
 import type { SizingCell } from '../components/sizing/SizingContent';
 import SizingFilterPanel from '../components/sizing/SizingFilterPanel';
@@ -67,8 +68,14 @@ export default function SizingView() {
 
   const layout = useSizingLayout(product, filter, containerWidth);
 
-  const { dragState, handleDragStart, handleDragMove, handleDragEnd, cancelDrag } =
+  const { dragState, dragPointerRef, handleDragStart, handleDragMove, handleDragEnd, cancelDrag } =
     useSizingDrag({ layout, zoom, pan, mutations, updateProduct });
+
+  useEdgeAutoPan({
+    isDragging: !!dragState?.isDragging,
+    pointerRef: dragPointerRef,
+    setPan,
+  });
 
   // Auto-fit on first render once map dimensions are known
   useEffect(() => {

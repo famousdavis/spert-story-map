@@ -1,5 +1,27 @@
 # Changelog
 
+## Version 0.36.0 (2026-05-28)
+
+UX polish — conventional zoom button order, drag-edge auto-scroll on Map and Sizing tabs, and larger Excel-style headers on the Sizing grid.
+
+**Zoom controls**
+
+- **Minus on the left, plus on the right.** Swapped the order of the `−` / `+` zoom buttons on both Map and Sizing tabs to match the conventional left-to-right "less → more" arrangement most apps use. Keyboard shortcuts (`+` / `−` / `0` for fit) and the percentage label between the buttons are unchanged. Single edit in `MapCanvas`, which both tabs share.
+
+**Drag-edge auto-scroll on Map and Sizing tabs**
+
+- **Drag a card to the edge of the canvas and it scrolls automatically.** Previously when you grabbed a rib / backbone / theme / release card and dragged it toward the edge of the viewport, you hit a brick wall — to drop the card somewhere currently off-screen you had to first release, pan the canvas, then start the drag over. Now when the pointer enters a 60-pixel band along any edge during an active drag, the canvas pans automatically in that direction, scaled to how close to the edge you are: a slow creep at 60px in, faster the deeper you go, capped at 20 pixels per frame. Both axes work independently — diagonal corner drags pan in both X and Y. The instant the pointer leaves the edge zone or you release the card, panning stops. Applies to all four Map drag types (rib, backbone, theme, release) and the Sizing tab's rib drag.
+- **How it works.** New `useEdgeAutoPan` hook in `src/hooks/`. While drag is active, runs a `requestAnimationFrame` loop that reads the latest pointer position (kept fresh in a `dragPointerRef` exposed from both `useMapDrag` and `useSizingDrag`), measures distance from each edge of the canvas container, and updates `pan` via the existing setter. After each pan tick the hook synthesizes a `pointermove` event on the container so the drag hook re-runs hit-testing against the new pan — drop-target indicators stay accurate even when the user holds the pointer still in the edge zone. Pure delta math (`computeEdgeAutoPanDelta`) is exported separately for unit testing.
+- **Release Planning unchanged.** Release Planning still uses native HTML5 DnD (a different mechanism); edge-scroll there will be a separate follow-up if requested.
+
+**Sizing tab — bigger Excel-style headers**
+
+- **Column letters (A, B, C…) and row numbers (1, 2, 3…) are now legible at a glance.** Previously the letter strip was 16px tall and the gutter was 28px wide, both using 10px font. The letters/numbers were physically smaller than the 14px card titles next to them, which made them hard to read on standard-DPI displays. Bumped letter strip height `16 → 24px`, gutter width `28 → 36px`, and header font from 10px to 14px semibold — same size as the card title text so the grid address is as readable as the card itself. Color stays neutral (`gray-500` / `dark:gray-400`) so the headers read as structure, not content. The "Unsized (n)" label tracks the strip's new height and gets a small bump in max-width to accommodate longer counts.
+
+**Tests**
+
+- `sizingLayout.test.ts` — updated `totalWidth` expectations from 644 → 652 (gutter went from 28 → 36, so `36 + 616 = 652` at minimum).
+
 ## Version 0.35.0 (2026-05-28)
 
 UX polish — Sizing board canvas utilization, card color coding, Excel-style grid addressing, editable Description on the Map tab's detail panel, and quality-of-life fixes for the Sizing filter.
