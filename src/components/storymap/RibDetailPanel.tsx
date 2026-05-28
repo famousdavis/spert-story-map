@@ -2,10 +2,10 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React, { useState } from 'react';
-import { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
 import { NOTES_MAX } from '../../lib/constants';
+import { useBufferedField } from '../../hooks/useBufferedField';
 import SizePicker from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 import type { RibItem, Product, Category, Size } from '../../types';
@@ -24,7 +24,7 @@ interface RibDetailPanelProps {
   product: Product;
   onClose: () => void;
   onRename?: (themeId: string, backboneId: string, ribId: string, name: string) => void;
-  onUpdate?: (themeId: string, backboneId: string, ribId: string, updates: { category?: Category; size?: Size | string; notes?: string }) => void;
+  onUpdate?: (themeId: string, backboneId: string, ribId: string, updates: { category?: Category; size?: Size | string; notes?: string; description?: string }) => void;
   autoEdit?: boolean;
 }
 
@@ -33,18 +33,41 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(rib.name, (name) => onRename?.(rib.themeId, rib.backboneId, rib.id, name));
 
-  const [notes, setNotes] = useState(rib.notes ?? '');
+  // Description (buffered, collapsible). useBufferedField gates the external→local
+  // sync on focus, so cloud-mode onProductChange echoes don't scramble mid-type input.
+  const onCommitDescription = useCallback((v: string) => {
+    onUpdate?.(rib.themeId, rib.backboneId, rib.id, { description: v });
+  }, [onUpdate, rib.themeId, rib.backboneId, rib.id]);
+  const {
+    localValue: description,
+    setLocalValue: setDescription,
+    handleFocus: handleDescriptionFocus,
+    handleBlur: handleDescriptionBlur,
+  } = useBufferedField(rib.description ?? '', onCommitDescription);
+  const [descExpanded, setDescExpanded] = useState(() => Boolean(rib.description));
+
+  // Reset collapsed state when switching to a different rib
+  useEffect(() => {
+    setDescExpanded(Boolean(rib.description));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only resets on rib change
+  }, [rib.id]);
+
+  // Notes (buffered — same cloud-echo safety as Description)
+  const onCommitNotes = useCallback((v: string) => {
+    onUpdate?.(rib.themeId, rib.backboneId, rib.id, { notes: v });
+  }, [onUpdate, rib.themeId, rib.backboneId, rib.id]);
+  const {
+    localValue: notes,
+    setLocalValue: setNotes,
+    handleFocus: handleNotesFocus,
+    handleBlur: handleNotesBlur,
+  } = useBufferedField(rib.notes ?? '', onCommitNotes);
 
   // Auto-start name editing when panel opens for a newly added rib
   useEffect(() => {
     if (autoEdit) startEditing();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Reset notes when switching to a different rib
-  useEffect(() => {
-    setNotes(rib.notes ?? '');
-  }, [rib.id, rib.notes]);
 
   // Find release names for allocations
   const releaseMap = {};
@@ -58,12 +81,6 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
-
-  const handleNotesBlur = () => {
-    if (notes !== (rib.notes ?? '')) {
-      onUpdate?.(rib.themeId, rib.backboneId, rib.id, { notes });
-    }
-  };
 
   const notesLen = notes.length;
   const counterColor =
@@ -80,7 +97,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
       />
 
       {/* Panel — flex column so Notes fills remaining height */}
-      <div className="absolute top-0 right-0 z-50 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-lg flex flex-col overflow-hidden">
+      <div className="absolute top-0 right-0 z-50 h-full w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-lg flex flex-col overflow-hidden">
 
         {/* Top section: metadata + allocations, scrollable, capped at 60% of panel height */}
         <div className="p-5 space-y-5 overflow-y-auto shrink-0 max-h-[60%]">
@@ -115,10 +132,45 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
             </button>
           </div>
 
-          {/* Description */}
-          {rib.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">{rib.description}</p>
-          )}
+          {/* Description (collapsible — open if has content, collapsed when empty) */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setDescExpanded(v => !v)}
+              className="flex items-center gap-1.5 w-full text-left group"
+              aria-expanded={descExpanded}
+            >
+              <span
+                className={`text-[10px] leading-none transition-transform text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 ${
+                  descExpanded ? 'rotate-90' : ''
+                }`}
+                aria-hidden="true"
+              >
+                ▶
+              </span>
+              <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide group-hover:text-gray-600 dark:group-hover:text-gray-400">
+                Description
+              </span>
+              {!descExpanded && description && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1 min-w-0 normal-case font-normal italic">
+                  {description}
+                </span>
+              )}
+            </button>
+            {descExpanded && (
+              <textarea
+                name="ribDescription"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                onFocus={handleDescriptionFocus}
+                onBlur={handleDescriptionBlur}
+                maxLength={NOTES_MAX}
+                rows={2}
+                placeholder="Add a short description…"
+                className="w-full mt-1.5 text-sm resize-y rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-2 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 placeholder-gray-400 dark:placeholder-gray-600"
+              />
+            )}
+          </div>
 
           {/* Metadata */}
           <div className="space-y-3">
@@ -197,6 +249,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
             name="ribNotes"
             value={notes}
             onChange={e => setNotes(e.target.value)}
+            onFocus={handleNotesFocus}
             onBlur={handleNotesBlur}
             maxLength={NOTES_MAX}
             placeholder="Add notes, requirements, or reference text…"

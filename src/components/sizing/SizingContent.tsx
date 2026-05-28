@@ -6,7 +6,13 @@ import React, { useEffect, useState } from 'react';
 import { SIZE_COLORS } from '../ui/SizePicker';
 import { useTooltip } from '../ui/Tooltip';
 import KebabMenu from '../ui/KebabMenu';
-import { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, HEADER_HEIGHT, ZONE_GAP } from './useSizingLayout';
+import RibCardColorPicker from '../storymap/RibCardColorPicker';
+import {
+  RIB_CARD_COLOR_BG,
+  isRibCardColorKey,
+  type RibCardColorKey,
+} from '../../lib/ribCardColors';
+import { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, HEADER_HEIGHT, ZONE_GAP, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
 import type { Size, Category } from '../../types';
 
 export interface SizingCell {
@@ -20,6 +26,7 @@ export interface SizingCell {
   backboneName: string;
   locked: boolean;
   percentComplete: number;
+  cardColor?: string;
   x: number;
   y: number;
   width: number;
@@ -66,6 +73,7 @@ interface SizingContentProps {
   onRibEdit: (cell: SizingCell) => void;
   onRibSplit: (cell: SizingCell) => void;
   onRibDelete: (cell: SizingCell) => void;
+  onSetCardColor?: (themeId: string, backboneId: string, ribId: string, color: RibCardColorKey | undefined) => void;
 }
 
 // Header background colors keyed by size label (lighter fill for column headers)
@@ -80,8 +88,19 @@ const HEADER_BG: Record<string, string> = {
 };
 const DEFAULT_HEADER_BG = 'bg-gray-50 border-gray-200 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300';
 
-export default function SizingContent({ layout, mapSizeRef, dragState, onDragStart, onRibEdit, onRibSplit, onRibDelete }: SizingContentProps) {
-  const { sizeColumns, unsizedZone, unsizedCount, sizeColumnsY, cells, totalWidth, totalHeight } = layout;
+// Excel-style column label: 0 → A, 25 → Z, 26 → AA, 27 → AB, …
+function colLetter(idx: number): string {
+  let s = '';
+  let n = idx;
+  while (n >= 0) {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
+}
+
+export default function SizingContent({ layout, mapSizeRef, dragState, onDragStart, onRibEdit, onRibSplit, onRibDelete, onSetCardColor }: SizingContentProps) {
+  const { sizeColumns, unsizedZone, unsizedCount, unsizedRows, unsizedGridCols, sizeColumnsY, cells, totalWidth, totalHeight } = layout;
 
   // Report map dimensions for auto-fit
   useEffect(() => {
@@ -94,8 +113,39 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
   const dragRibId = dragState?.ribId;
   const targetSize = dragState?.targetSize;
 
+  // Effective grid dimensions for header rendering — show at least 1 row of numbers
+  // even when the unsized zone is empty so the grid structure is visible.
+  const visibleRows = Math.max(1, unsizedRows);
+
   return (
     <div className="relative" style={{ width: totalWidth, height: totalHeight }} data-map-bg="">
+      {/* Excel-style column letters (A, B, C…) above each unsized grid column */}
+      {Array.from({ length: unsizedGridCols }).map((_, i) => (
+        <div
+          key={`col-letter-${i}`}
+          className="absolute flex items-center justify-center text-[10px] font-mono font-medium text-gray-400 dark:text-gray-500 pointer-events-none select-none"
+          style={{
+            left: NUMBER_GUTTER_WIDTH + CELL_PAD + i * (CELL_WIDTH + CELL_GAP),
+            top: 0,
+            width: CELL_WIDTH,
+            height: LETTER_STRIP_HEIGHT,
+          }}
+        >
+          {colLetter(i)}
+        </div>
+      ))}
+      {/* "Unsized (n)" label — right-aligned on the column-letter row */}
+      <div
+        className="absolute text-xs font-medium text-gray-400 dark:text-gray-500 pointer-events-none select-none flex items-center justify-end pr-1"
+        style={{
+          right: 0,
+          top: 0,
+          height: LETTER_STRIP_HEIGHT,
+          maxWidth: NUMBER_GUTTER_WIDTH + 120,
+        }}
+      >
+        Unsized ({unsizedCount})
+      </div>
       {/* Unsized zone background */}
       <div
         className={`absolute rounded-lg border border-dashed transition-colors ${
@@ -104,19 +154,27 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
             : 'bg-gray-50 border-gray-300 dark:bg-gray-800 dark:border-gray-600'
         }`}
         style={{
-          left: 0,
+          left: unsizedZone.x,
           top: unsizedZone.y,
           width: unsizedZone.width,
           height: unsizedZone.height,
         }}
       />
-      {/* Unsized zone label */}
-      <div
-        className="absolute text-xs font-medium text-gray-400 dark:text-gray-500 pointer-events-none"
-        style={{ left: CELL_PAD, top: unsizedZone.y - 18 }}
-      >
-        Unsized ({unsizedCount})
-      </div>
+      {/* Excel-style row numbers (1, 2, 3…) in the left gutter */}
+      {Array.from({ length: visibleRows }).map((_, i) => (
+        <div
+          key={`row-num-${i}`}
+          className="absolute flex items-center justify-center text-[10px] font-mono font-medium text-gray-400 dark:text-gray-500 pointer-events-none select-none"
+          style={{
+            left: 0,
+            top: LETTER_STRIP_HEIGHT + CELL_PAD + i * (CELL_HEIGHT + CELL_GAP),
+            width: NUMBER_GUTTER_WIDTH,
+            height: CELL_HEIGHT,
+          }}
+        >
+          {i + 1}
+        </div>
+      ))}
 
       {/* Size column headers */}
       {sizeColumns.map(col => {
@@ -172,6 +230,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
           onEdit={onRibEdit}
           onSplit={onRibSplit}
           onDelete={onRibDelete}
+          onSetCardColor={onSetCardColor}
         />
       ))}
 
@@ -179,7 +238,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
       {cells.length === 0 && sizeColumns.length > 0 && (
         <div
           className="absolute text-sm text-gray-400 dark:text-gray-500 pointer-events-none"
-          style={{ left: totalWidth / 2 - 80, top: unsizedZone.height / 2 - 10 }}
+          style={{ left: totalWidth / 2 - 80, top: unsizedZone.y + unsizedZone.height / 2 - 10 }}
         >
           No rib items to size
         </div>
@@ -205,22 +264,35 @@ interface SizingRibCellProps {
   onEdit: (cell: SizingCell) => void;
   onSplit: (cell: SizingCell) => void;
   onDelete: (cell: SizingCell) => void;
+  onSetCardColor?: (themeId: string, backboneId: string, ribId: string, color: RibCardColorKey | undefined) => void;
 }
 
-function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelete }: SizingRibCellProps) {
+function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelete, onSetCardColor }: SizingRibCellProps) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const locked = cell.locked;
+  const cardColorKey: RibCardColorKey | undefined = isRibCardColorKey(cell.cardColor) ? cell.cardColor : undefined;
   const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(cell.name);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
 
-  // Suppress hover tooltip while the kebab menu is open.
-  const handleMouseEnter = () => { if (!menuOpen) onMouseEnter(); };
+  // Suppress hover tooltip while the kebab menu or color picker is open.
+  const handleMouseEnter = () => { if (!menuOpen && !pickerAnchor) onMouseEnter(); };
 
   // When the kebab menu opens, also dismiss any active tooltip so it doesn't stick
   // through the menu / modal flow.
   const handleMenuOpenChange = (open: boolean) => {
     setMenuOpen(open);
     if (open) onMouseLeave();
+  };
+
+  // Anchor the color picker below the card's right edge. RibCardColorPicker clamps
+  // to viewport so edge cards still render fully on-screen.
+  const handleColorMenuClick = () => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    onMouseLeave();
+    setPickerAnchor({ x: r.right - 156, y: r.bottom + 4 });
   };
 
   return (
@@ -231,9 +303,11 @@ function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelet
       className={`absolute rounded border text-left select-none transition-colors ${
         isDragging
           ? 'border-blue-400 bg-blue-50 opacity-50 shadow-lg ring-2 ring-blue-300 dark:bg-blue-900/30 dark:ring-blue-500/50'
-          : locked
-            ? 'border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/50'
-            : 'border-gray-200 bg-white hover:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500'
+          : cardColorKey
+            ? `border-gray-200 ${RIB_CARD_COLOR_BG[cardColorKey]} hover:border-blue-400 dark:border-gray-700 dark:hover:border-blue-500`
+            : locked
+              ? 'border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/50'
+              : 'border-gray-200 bg-white hover:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500'
       } ${locked ? '' : 'cursor-grab active:cursor-grabbing'} px-2 py-1.5 overflow-hidden`}
       onPointerDown={locked ? undefined : (e) => {
         e.stopPropagation();
@@ -268,6 +342,7 @@ function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelet
           onOpenChange={handleMenuOpenChange}
           items={[
             { label: 'Edit…', onClick: () => onEdit(cell) },
+            ...(onSetCardColor ? [{ label: 'Color…', onClick: handleColorMenuClick }] : []),
             { label: 'Split', onClick: () => onSplit(cell) },
             { label: 'Delete…', onClick: () => onDelete(cell), danger: true },
           ]}
@@ -279,7 +354,15 @@ function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelet
           {cell.category === 'core' ? 'Core' : 'Non-Core'}
         </span>
       </div>
-      {tooltipEl}
+      {!pickerAnchor && tooltipEl}
+      {pickerAnchor && onSetCardColor && (
+        <RibCardColorPicker
+          anchor={pickerAnchor}
+          current={cardColorKey}
+          onSelect={(color) => onSetCardColor(cell.themeId, cell.backboneId, cell.id, color)}
+          onClose={() => setPickerAnchor(null)}
+        />
+      )}
     </div>
   );
 }
@@ -337,31 +420,29 @@ function SizingInsertionIndicator({ dragState, layout }: SizingInsertionIndicato
     );
   }
 
-  // Sized column: vertical insertion line
+  // Sized column: grid-aware horizontal line at the insertion (row, subCol).
+  // Mirrors the unsized zone math so behavior is consistent across zones.
   const col = sizeColumns.find(c => c.label === targetSize);
   if (!col) return null;
 
-  const colCells = cells
-    .filter(c => c.sizeLabel === targetSize && c.id !== ribId)
-    .sort((a, b) => a.y - b.y);
+  const subCols = (layout.sizedSubColsByLabel && layout.sizedSubColsByLabel[targetSize]) || 1;
+  const colCellsCount = cells.filter(c => c.sizeLabel === targetSize && c.id !== ribId).length;
+  const idx = Math.min(insertIndex, colCellsCount);
+  const gridRow = Math.floor(idx / subCols);
+  const gridCol = idx % subCols;
 
-  let lineY;
-  if (colCells.length === 0 || insertIndex === 0) {
-    lineY = sizeColumnsY + CELL_PAD;
-  } else if (insertIndex >= colCells.length) {
-    const lastCell = colCells[colCells.length - 1];
-    lineY = lastCell.y + CELL_HEIGHT + CELL_GAP / 2;
-  } else {
-    lineY = colCells[insertIndex].y - CELL_GAP / 2;
-  }
+  const lineX = col.x + CELL_PAD + gridCol * (CELL_WIDTH + CELL_GAP);
+  const lineY = colCellsCount === 0 || idx === 0
+    ? sizeColumnsY + CELL_PAD
+    : sizeColumnsY + CELL_PAD + gridRow * (CELL_HEIGHT + CELL_GAP) - CELL_GAP / 2;
 
   return (
     <div
       className="absolute bg-blue-500 rounded-full pointer-events-none"
       style={{
-        left: col.x + 4,
+        left: lineX,
         top: lineY,
-        width: col.width - 8,
+        width: CELL_WIDTH,
         height: 2,
         zIndex: 40,
       }}

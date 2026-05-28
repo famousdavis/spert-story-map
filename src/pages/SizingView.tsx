@@ -42,12 +42,30 @@ export default function SizingView() {
       setFilter({ ...filter, themeIds: cleanThemes, releaseIds: cleanReleases });
     }
   }, [product.themes, product.releases, filter, setFilter]);
-  const layout = useSizingLayout(product, filter);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const mapSizeRef = useRef({ width: 0, height: 0 });
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const didAutoFit = useRef(false);
+
+  // Track container width so the layout can expand sized-column zones to fill
+  // available canvas (instead of stacking cards in fixed-width 200px columns).
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setContainerWidth(el.clientWidth);
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) {
+        const w = e.contentRect.width;
+        setContainerWidth(prev => (Math.abs(prev - w) > 1 ? w : prev));
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const layout = useSizingLayout(product, filter, containerWidth);
 
   const { dragState, handleDragStart, handleDragMove, handleDragEnd, cancelDrag } =
     useSizingDrag({ layout, zoom, pan, mutations, updateProduct });
@@ -146,6 +164,10 @@ export default function SizingView() {
     setPendingDeleteCell(cell);
   }, []);
 
+  const handleSetCardColor = useCallback((themeId: string, backboneId: string, ribId: string, color: string | undefined) => {
+    mutations.updateRib(themeId, backboneId, ribId, { cardColor: color });
+  }, [mutations]);
+
   const confirmDelete = useCallback(() => {
     if (!pendingDeleteCell) return;
     mutations.deleteRib(pendingDeleteCell.themeId, pendingDeleteCell.backboneId, pendingDeleteCell.id);
@@ -221,6 +243,7 @@ export default function SizingView() {
           onRibEdit={handleRibEdit}
           onRibSplit={handleRibSplit}
           onRibDelete={handleRibDelete}
+          onSetCardColor={handleSetCardColor}
         />
       </MapCanvas>
 

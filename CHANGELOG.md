@@ -1,5 +1,27 @@
 # Changelog
 
+## Version 0.35.0 (2026-05-28)
+
+UX polish — Sizing board canvas utilization, card color coding, Excel-style grid addressing, editable Description on the Map tab's detail panel, and quality-of-life fixes for the Sizing filter.
+
+**Sizing tab — make better use of the canvas**
+
+- **Sized columns now expand to fill the canvas.** Previously each size column was a fixed 200px-wide vertical strip — with only a few sizes (e.g. S/M/L) and many ribs, you got tall narrow columns and wasted horizontal canvas. Each size column zone now expands to fill its proportional share of the available width, and cards inside flow in a grid (multiple sub-columns) just like the unsized zone has always done. `computeSizingLayout` accepts a new optional `targetWidth` parameter; the hook reads container width via `ResizeObserver` and feeds it in. When `targetWidth` is unset or below the minimum stacked width, the layout falls back to the legacy 1-card-wide behavior (preserves back-compat for tests / SSR).
+- **Grid-aware insertion indicator inside sized zones.** When dragging into a sized column, the blue insertion line now snaps to the grid position (row, sub-col) instead of vertical-only. Mirrors the unsized zone math for consistency.
+- **Excel-style A/B/C column letters + 1/2/3 row numbers on the unsized grid.** With many unsized cards, you can now reference a specific card by its grid address (e.g. "B3"). Column letters render above each grid column in a 16px strip, row numbers render in a 28px gutter on the left. Letters use Excel-style addressing (`A`–`Z`, then `AA`, `AB`, …). The "Unsized (n)" label moves from the upper-left to the right edge of the letter strip so it doesn't fight for the `A` column position.
+- **Card color coding on Sizing cards.** Each Sizing card gets a new `Color…` entry in its kebab menu (`Edit / Color / Split / Delete`). Selecting it opens the same `RibCardColorPicker` used on the Map tab; when a color is set, the card background is tinted via `RIB_CARD_COLOR_BG`. Color is an organizational flag independent of work state, so locked cards still get tinted.
+- **Filter panel closes on outside click.** Clicking anywhere outside the Sizing filter panel (canvas, `+ Rib` button, a card) now collapses it — no more required re-click of the Filter button to dismiss. Same pattern as `RibCardColorPicker` and `KebabMenu`.
+
+**Map tab — RibDetailPanel polish**
+
+- **Description is now editable in the side panel.** Previously the field was only read-only when present (and entirely hidden when empty), so there was no signal that the field existed. The panel now has a collapsible `Description` section: header always visible (so the field is discoverable), expanded by default if the rib has a description, collapsed when empty. When collapsed-with-content, a single-line truncated preview shows next to the label. Uses `useBufferedField` for cloud-echo safety — same hook the v0.33.0 SettingsView fields use.
+- **Panel widened from `w-80` to `w-96`** (320 → 384px) so Description and Notes both get meaningful room without one crowding the other.
+- **Notes textarea migrated to `useBufferedField`** (drive-by) — same cloud-echo scramble fix the SettingsView fields got in v0.33.0.
+
+**Tests**
+
+- `sizingLayout.test.ts` — added 3 cases for the targetWidth-driven expansion: legacy 1-sub-col stacking at `targetWidth=0`, multi-sub-col packing at `targetWidth=1300`, and `totalWidth` clamping math (accounts for the 28px row-number gutter).
+
 ## Version 0.34.0 (2026-05-28)
 
 UX polish — clickable logo home navigation and broader `+ Rib` affordance coverage on the Map tab.

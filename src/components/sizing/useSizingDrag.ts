@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Product } from '../../types';
-import { CELL_HEIGHT, CELL_GAP, CELL_PAD } from './useSizingLayout';
+import { CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
@@ -57,27 +57,29 @@ export default function useSizingDrag({ layout, zoom, pan, updateProduct }: { la
 
   const computeInsertIndex = useCallback((targetSize: string | null, excludeId: string, mapX: number, mapY: number): number => {
     if (targetSize === null) {
-      // Unsized zone: grid position
+      // Unsized zone: grid position (subtract gutter + letter-strip offsets)
       const cellWidth = layout.cells.length > 0 ? layout.cells[0].width : 188;
-      const gridCol = Math.max(0, Math.floor(mapX / (cellWidth + CELL_GAP)));
-      const gridRow = Math.max(0, Math.floor(mapY / (CELL_HEIGHT + CELL_GAP)));
+      const localX = Math.max(0, mapX - NUMBER_GUTTER_WIDTH);
+      const localY = Math.max(0, mapY - LETTER_STRIP_HEIGHT);
+      const gridCol = Math.max(0, Math.floor(localX / (cellWidth + CELL_GAP)));
+      const gridRow = Math.max(0, Math.floor(localY / (CELL_HEIGHT + CELL_GAP)));
       const idx = gridRow * layout.unsizedGridCols + gridCol;
       const unsizedCount = layout.cells.filter(c => c.sizeLabel === null && c.id !== excludeId).length;
       return Math.min(idx, unsizedCount);
     }
 
-    // Sized column: vertical position
-    const colCells = layout.cells
-      .filter(c => c.sizeLabel === targetSize && c.id !== excludeId)
-      .sort((a, b) => a.y - b.y);
-
-    if (colCells.length === 0) return 0;
-
-    for (let i = 0; i < colCells.length; i++) {
-      const mid = colCells[i].y + CELL_HEIGHT / 2;
-      if (mapY < mid) return i;
-    }
-    return colCells.length;
+    // Sized column: grid position (mirrors unsized zone math)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- layout shape is inferred from computeSizingLayout
+    const col = layout.sizeColumns.find((c: any) => c.label === targetSize);
+    if (!col) return 0;
+    const subCols = (layout.sizedSubColsByLabel && layout.sizedSubColsByLabel[targetSize]) || 1;
+    const localX = Math.max(0, mapX - col.x - CELL_PAD);
+    const localY = Math.max(0, mapY - layout.sizeColumnsY - CELL_PAD);
+    const gridCol = Math.min(subCols - 1, Math.floor(localX / (CELL_WIDTH + CELL_GAP)));
+    const gridRow = Math.max(0, Math.floor(localY / (CELL_HEIGHT + CELL_GAP)));
+    const idx = gridRow * subCols + gridCol;
+    const count = layout.cells.filter(c => c.sizeLabel === targetSize && c.id !== excludeId).length;
+    return Math.min(idx, count);
   }, [layout]);
 
   // --- Drag start ---
