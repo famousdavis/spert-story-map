@@ -389,18 +389,13 @@ function SizingInsertionIndicator({ dragState, layout }: SizingInsertionIndicato
     const gridRow = Math.floor(idx / unsizedGridCols);
     const gridCol = idx % unsizedGridCols;
 
-    // If inserting at end of a full row, show at start of next row
-    const lineX = gridCol * (cellWidth + CELL_GAP) + CELL_PAD;
-    let lineY;
-    if (unsizedCells.length === 0 || idx === 0) {
-      lineY = CELL_PAD;
-    } else if (gridCol === 0 && idx > 0) {
-      // Start of a new row — line goes above this row
-      lineY = CELL_PAD + gridRow * (CELL_HEIGHT + CELL_GAP) - CELL_GAP / 2;
-    } else {
-      // Within a row — vertical line between cells (show as horizontal line above the insertion cell)
-      lineY = CELL_PAD + gridRow * (CELL_HEIGHT + CELL_GAP) - CELL_GAP / 2;
-    }
+    // Offsets match where unsized cells actually render — see useSizingLayout step 5.
+    // Without these the indicator lands inside the letter strip / gutter instead
+    // of between cards.
+    const lineX = NUMBER_GUTTER_WIDTH + gridCol * (cellWidth + CELL_GAP) + CELL_PAD;
+    const lineY = (unsizedCells.length === 0 || idx === 0)
+      ? LETTER_STRIP_HEIGHT + CELL_PAD
+      : LETTER_STRIP_HEIGHT + CELL_PAD + gridRow * (CELL_HEIGHT + CELL_GAP) - CELL_GAP / 2;
 
     // For the unsized grid, show a horizontal line spanning one cell width
     return (

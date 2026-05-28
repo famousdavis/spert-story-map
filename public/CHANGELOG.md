@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.36.1 (2026-05-28)
+
+Bug fix — Sizing tab insertion indicator was rendering in the wrong vertical position.
+
+**Fix**
+
+- **Insertion indicator in the unsized zone now lands between cards instead of inside the Excel-style header strip.** When dragging a card into the unsized grid, the blue horizontal line that shows where the card will land was using zero as its origin — but the cells themselves render below the column-letter strip and to the right of the row-number gutter. The result: the indicator was offset by the full strip height vertically (above the column letters) and by the full gutter width horizontally. The bug was introduced silently in v0.35.0 when the Excel-style headers were added (16px strip / 28px gutter, so the misalignment was easy to overlook) and became visibly worse in v0.36.0 when the headers were enlarged (24px strip / 36px gutter). Indicator coordinates now include the `LETTER_STRIP_HEIGHT` and `NUMBER_GUTTER_WIDTH` offsets, mirroring how `useSizingLayout` places the cells themselves. The sized-column branch of the same component was already correct (it uses `col.x` and `sizeColumnsY`, which carry the offsets) and is unchanged. While I was in the function, collapsed two identical `else` branches into a single ternary — no behavior change.
+
 ## Version 0.36.0 (2026-05-28)
 
 UX polish — conventional zoom button order, drag-edge auto-scroll on Map and Sizing tabs, and larger Excel-style headers on the Sizing grid.
