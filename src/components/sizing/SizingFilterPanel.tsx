@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SizingFilter } from './useSizingLayout';
 import { DEFAULT_SIZING_FILTER } from './useSizingLayout';
 
@@ -26,6 +26,26 @@ interface SizingFilterPanelProps {
 
 export default function SizingFilterPanel({ themes, releases, filter, onFilterChange }: SizingFilterPanelProps) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Close on outside click — clicking anywhere outside the panel (including the
+  // canvas) collapses the filter. Mirrors RibCardColorPicker / KebabMenu pattern.
+  // Defer attaching so the click that opened the panel doesn't immediately close it.
+  useEffect(() => {
+    if (!open) return;
+    function handleDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    const t = setTimeout(() => {
+      document.addEventListener('mousedown', handleDown);
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', handleDown);
+    };
+  }, [open]);
 
   const activeCount = filter.themeIds.length + filter.releaseIds.length + (filter.hideLocked ? 1 : 0);
   const hasActiveFilter = activeCount > 0;
@@ -53,7 +73,7 @@ export default function SizingFilterPanel({ themes, releases, filter, onFilterCh
   };
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div ref={rootRef} className="flex flex-col items-end gap-2">
         {/* Filter toggle button */}
         <button
           onClick={() => setOpen(!open)}

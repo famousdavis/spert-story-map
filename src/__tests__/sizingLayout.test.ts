@@ -332,6 +332,49 @@ describe('computeSizingLayout filtering', () => {
   });
 });
 
+describe('computeSizingLayout targetWidth expansion', () => {
+  it('with no targetWidth, sized columns are 200px wide (legacy 1-card-wide stacking)', () => {
+    const product = makeProduct({
+      ribs: [
+        { id: 'r1', size: 'M' }, { id: 'r2', size: 'M' }, { id: 'r3', size: 'M' },
+      ],
+    });
+    const layout = computeSizingLayout(product);
+    expect(layout.sizedSubColsByLabel.M).toBe(1);
+    const mCells = layout.cells.filter(c => c.sizeLabel === 'M').sort((a, b) => a.y - b.y);
+    // All three stack vertically — same x, ascending y
+    expect(mCells[0].x).toBe(mCells[1].x);
+    expect(mCells[1].x).toBe(mCells[2].x);
+  });
+
+  it('with wide targetWidth, sized columns expand and pack cards into sub-columns', () => {
+    // 3 sizes, 1300px canvas (incl. 28px row-number gutter) → each size column
+    // gets ~420px → 2 sub-cols inside each size zone
+    const product = makeProduct({
+      ribs: [
+        { id: 'r1', size: 'M' }, { id: 'r2', size: 'M' },
+        { id: 'r3', size: 'M' }, { id: 'r4', size: 'M' },
+      ],
+    });
+    const layout = computeSizingLayout(product, undefined, 1300);
+    expect(layout.sizedSubColsByLabel.M).toBeGreaterThanOrEqual(2);
+    const mCells = layout.cells.filter(c => c.sizeLabel === 'M');
+    // First two should be on the same row (same y, different x)
+    const sorted = [...mCells].sort((a, b) => a.y - b.y || a.x - b.x);
+    expect(sorted[0].y).toBe(sorted[1].y);
+    expect(sorted[1].x).toBeGreaterThan(sorted[0].x);
+  });
+
+  it('totalWidth equals max(targetWidth, gutter + min stacked content width)', () => {
+    // 3 sizes → content min = 3 * (200 + 8) - 8 = 616
+    // totalWidth = NUMBER_GUTTER_WIDTH (28) + content = 644 at minimum
+    const product = makeProduct({ ribs: [{ id: 'r1', size: 'M' }] });
+    expect(computeSizingLayout(product, undefined, 0).totalWidth).toBe(644);
+    expect(computeSizingLayout(product, undefined, 400).totalWidth).toBe(644); // below min — clamped
+    expect(computeSizingLayout(product, undefined, 1300).totalWidth).toBe(1300);
+  });
+});
+
 describe('computeSizingLayout cell identity fields', () => {
   it('emits themeId on each cell matching its parent theme', () => {
     const product = makeProduct({
