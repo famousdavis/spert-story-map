@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product } from '../types';
-import { isRibCardColorKey } from './ribCardColors';
+import { isRibCardColorKey, resolveCardColorKey } from './ribCardColors';
 
 /**
  * Comprehensive schema validation for imported product data.
@@ -232,9 +232,12 @@ export function validateProduct(data: unknown): Product {
             'Rib category must be "core" or "non-core"');
         }
 
-        // Card color: clear unknown values (non-destructive — matches `size` handling)
-        if (rib.cardColor !== undefined && rib.cardColor !== null && !isRibCardColorKey(rib.cardColor)) {
-          delete rib.cardColor;
+        // Card color: normalize legacy aliases (amber→orange) and clear unknown
+        // values (non-destructive — matches `size` handling).
+        if (rib.cardColor !== undefined && rib.cardColor !== null) {
+          const resolved = resolveCardColorKey(rib.cardColor);
+          if (resolved) rib.cardColor = resolved;
+          else delete rib.cardColor;
         }
 
         // Release allocations
@@ -327,10 +330,15 @@ export function validateProduct(data: unknown): Product {
   if (d.cardColorLabels && typeof d.cardColorLabels === 'object') {
     const clean: Record<string, string> = {};
     for (const [key, val] of Object.entries(d.cardColorLabels)) {
-      if (!isRibCardColorKey(key)) continue;
+      const resolvedKey = resolveCardColorKey(key);  // normalizes legacy amber→orange
+      if (!resolvedKey) continue;
       if (typeof val !== 'string') continue;
       const trimmed = val.trim().slice(0, MAX_LABEL);
-      if (trimmed.length > 0) clean[key] = trimmed;
+      if (trimmed.length === 0) continue;
+      // A current-key label always wins over one inherited from a legacy alias.
+      if (isRibCardColorKey(key) || clean[resolvedKey] === undefined) {
+        clean[resolvedKey] = trimmed;
+      }
     }
     d.cardColorLabels = clean;
   } else if (d.cardColorLabels !== undefined) {

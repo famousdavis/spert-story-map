@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Product, ProductUpdater } from '../types';
 import { useStorage } from '../lib/StorageProvider';
 import { parseDate } from '../lib/formatDate';
+import { migrateCardColors } from '../lib/ribCardColors';
 
 const MAX_UNDO = 30;
 
@@ -51,7 +52,7 @@ export function useProduct(productId: string) {
       .then(data => {
         if (cancelled) return;
         setState({
-          product: data,
+          product: migrateCardColors(data),
           lastSaved: data ? parseDate(data.updatedAt) : null,
           loading: false,
         });
@@ -100,7 +101,7 @@ export function useProduct(productId: string) {
         if (!remoteProduct) return;
         setState(prev => ({
           ...prev,
-          product: remoteProduct,
+          product: migrateCardColors(remoteProduct),
           lastSaved: parseDate(remoteProduct.updatedAt),
         }));
         // Don't clear undo stack — user may still want to undo local changes
