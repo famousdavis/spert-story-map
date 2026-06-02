@@ -247,7 +247,7 @@ describe('validateProduct', () => {
     const data = minimal({
       cardColorLabels: {
         rose: 'Defer for discussion',
-        amber: '  Maybe not needed  ',
+        violet: '  Maybe not needed  ',  // trimmed
         emerald: '',          // empty after trim → dropped
         sky: 123,             // non-string → dropped
         notacolor: 'nope',    // unknown key → dropped
@@ -256,7 +256,7 @@ describe('validateProduct', () => {
     const result = validateProduct(data);
     expect(result.cardColorLabels).toEqual({
       rose: 'Defer for discussion',
-      amber: 'Maybe not needed',
+      violet: 'Maybe not needed',
     });
   });
 
@@ -273,6 +273,30 @@ describe('validateProduct', () => {
     expect(result.cardColorLabels).toEqual({ rose: 'ok' });
     expect(Object.prototype.hasOwnProperty.call(result.cardColorLabels, '__proto__')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(result.cardColorLabels, 'constructor')).toBe(false);
+  });
+
+  it('migrates a legacy amber color label to orange', () => {
+    const data = minimal({ cardColorLabels: { amber: 'Deferred' } });
+    const result = validateProduct(data);
+    expect(result.cardColorLabels).toEqual({ orange: 'Deferred' });
+  });
+
+  it('prefers an existing orange label over a legacy amber one', () => {
+    const data = minimal({ cardColorLabels: { amber: 'old', orange: 'new' } });
+    const result = validateProduct(data);
+    expect(result.cardColorLabels).toEqual({ orange: 'new' });
+  });
+
+  it('migrates a legacy amber cardColor to orange on a rib', () => {
+    const data = minimal({
+      themes: [{
+        id: 't1', name: 'T', backboneItems: [{
+          id: 'b1', name: 'B', ribItems: [{ id: 'r1', name: 'R1', cardColor: 'amber' }],
+        }],
+      }],
+    });
+    const result = validateProduct(data);
+    expect(result.themes[0].backboneItems[0].ribItems[0].cardColor).toBe('orange');
   });
 
   // --- _changeLog ---

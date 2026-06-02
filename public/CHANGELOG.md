@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.38.0 (2026-06-02)
+
+Card color palette fix — the gold "amber" flag was too close to yellow to tell apart.
+
+**Amber replaced with a true orange**
+
+- **The card color palette is now red / orange / yellow / green / blue / purple / gray.** The previous "amber" swatch rendered as a gold tone almost identical to yellow, which made two color-coded meanings hard to distinguish in the legend and on cards (reported during a live sizing session). Amber has been replaced with a clearly distinct orange, so every pair in the 7-color palette is now unmistakable. (The green option — emerald — was always there; it only shows in the legend once you apply it to a card.)
+- **Your existing amber cards become orange automatically — nothing is lost.** Any card you'd already flagged amber is migrated to orange on load, and the legend label you typed for amber carries over to orange. The conversion is idempotent and applies in both local and cloud storage, as well as on JSON import (legacy amber files normalize to orange). If a project somehow had both an amber and an orange label, the orange one wins.
+- **Under the hood.** `ribCardColors.ts` now exports a `LEGACY_CARD_COLOR_ALIASES` map (`amber → orange`), a `resolveCardColorKey` helper, and a pure idempotent `migrateCardColors(product)` that rewrites rib `cardColor` flags and `cardColorLabels` keys. It runs at the two `useProduct` state boundaries (initial load + cloud echo) and inside `validateProduct` for imports. Alias lookups are own-property-guarded so `constructor` / `__proto__` keys can't resolve to prototype members. The Tailwind classes for amber elsewhere (e.g. the Sizing tab's "L" size-column header) are unrelated and unchanged.
+
 ## Version 0.37.0 (2026-06-02)
 
 A dynamic color legend for the Map and Sizing tabs, plus a fix for modals closing when you drag outside them.
