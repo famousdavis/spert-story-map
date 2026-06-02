@@ -242,6 +242,39 @@ describe('validateProduct', () => {
     expect(result.releaseCardOrder['bad']).toBeUndefined();
   });
 
+  // --- cardColorLabels ---
+  it('keeps valid color labels and drops unknown keys / non-strings / empties', () => {
+    const data = minimal({
+      cardColorLabels: {
+        rose: 'Defer for discussion',
+        amber: '  Maybe not needed  ',
+        emerald: '',          // empty after trim → dropped
+        sky: 123,             // non-string → dropped
+        notacolor: 'nope',    // unknown key → dropped
+      },
+    });
+    const result = validateProduct(data);
+    expect(result.cardColorLabels).toEqual({
+      rose: 'Defer for discussion',
+      amber: 'Maybe not needed',
+    });
+  });
+
+  it('caps color labels at the max length', () => {
+    const data = minimal({ cardColorLabels: { violet: 'x'.repeat(200) } });
+    const result = validateProduct(data);
+    expect(result.cardColorLabels.violet.length).toBe(80);
+  });
+
+  it('strips dangerous keys from cardColorLabels', () => {
+    const labels = JSON.parse('{"rose":"ok","__proto__":"hack","constructor":"hack2"}');
+    const data = minimal({ cardColorLabels: labels });
+    const result = validateProduct(data);
+    expect(result.cardColorLabels).toEqual({ rose: 'ok' });
+    expect(Object.prototype.hasOwnProperty.call(result.cardColorLabels, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result.cardColorLabels, 'constructor')).toBe(false);
+  });
+
   // --- _changeLog ---
   it('accepts valid changelog', () => {
     const data = minimal({

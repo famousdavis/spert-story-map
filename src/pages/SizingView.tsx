@@ -19,6 +19,7 @@ import SizingFilterPanel from '../components/sizing/SizingFilterPanel';
 import SizingRibModal from '../components/sizing/SizingRibModal';
 import type { SizingRibModalSaveInput, SizingRibModalCreateInput } from '../components/sizing/SizingRibModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import CardColorLegend from '../components/ui/CardColorLegend';
 import type { OutletContextValue } from '../types';
 
 export default function SizingView() {
@@ -255,6 +256,8 @@ export default function SizingView() {
       </MapCanvas>
 
       <DragGhost dragState={dragState} cells={layout.cells} zoom={zoom} />
+
+      <CardColorLegend product={product} onLabelChange={mutations.setCardColorLabel} />
 
       {dragLabel && (
         <div className="absolute top-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">

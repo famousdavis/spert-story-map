@@ -147,6 +147,13 @@ export interface Product {
   releaseCardOrder?: Record<string, string[]>;
   sizingCardOrder?: Record<string, string[]>;
 
+  /**
+   * User-defined meanings for the card color flags, shared across the Map and
+   * Sizing tabs. Keyed by RibCardColorKey (e.g. 'rose', 'amber'); value is the
+   * label shown in the color legend. Only colors actually in use are surfaced.
+   */
+  cardColorLabels?: Record<string, string>;
+
   // Academic integrity metadata
   _originRef?: string;
   _storageRef?: string;

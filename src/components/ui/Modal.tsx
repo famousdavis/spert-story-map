@@ -19,6 +19,12 @@ interface ModalProps {
 
 export default function Modal({ open, onClose, title, children, wide = false }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  // Track whether the pointer press *started* on the overlay itself. A `click`
+  // dispatches on the common ancestor of the mousedown/mouseup targets, so a drag
+  // that begins inside the card (resizing a textarea, selecting text) but releases
+  // on the backdrop would otherwise resolve its click to the overlay and close us.
+  // Gating on press-origin prevents that — only a true backdrop press-and-release closes.
+  const pressedOnOverlay = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +59,11 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      onMouseDown={(e) => { pressedOnOverlay.current = e.target === overlayRef.current; }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current && pressedOnOverlay.current) onClose();
+        pressedOnOverlay.current = false;
+      }}
     >
       <div className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl ${wide ? 'w-full max-w-2xl' : 'w-full max-w-md'} max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
