@@ -16,6 +16,7 @@ import useMapLayout from '../components/storymap/useMapLayout';
 import useMapKeyboard from '../components/storymap/useMapKeyboard';
 import useMapHandlers from '../components/storymap/useMapHandlers';
 import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
+import CardColorLegend from '../components/ui/CardColorLegend';
 import type { OutletContextValue } from '../types';
 
 export default function StoryMapView() {
@@ -225,6 +226,9 @@ export default function StoryMapView() {
 
       {/* Drag ghost (follows cursor during rib drags) */}
       <DragGhost dragState={dragState} cells={layout.cells} zoom={zoom} />
+
+      {/* Color-flag legend (bottom-right; auto-hides when no card is colored) */}
+      <CardColorLegend product={product} onLabelChange={mutations.setCardColorLabel} />
 
       {/* Drag indicator badge */}
       {dragLabel && (

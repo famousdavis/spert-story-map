@@ -14,6 +14,7 @@ import { isRibCardColorKey } from './ribCardColors';
 
 const MAX_STRING = 1000;      // Max length for name/description fields
 const MAX_MEMO = 2000;        // Max length for memo/comment fields
+const MAX_LABEL = 80;         // Max length for card-color legend labels
 const MAX_THEMES = 100;
 const MAX_BACKBONES = 200;
 const MAX_RIBS = 5000;
@@ -64,6 +65,7 @@ const KNOWN_PRODUCT_FIELDS = new Set([
   'id', 'name', 'description', 'createdAt', 'updatedAt',
   'schemaVersion', 'sizeMapping', 'releases', 'sprints',
   'sprintCadenceWeeks', 'themes', 'releaseCardOrder', 'sizingCardOrder',
+  'cardColorLabels',
   '_originRef', '_changeLog',
   // Export-time fields (stripped after validation by importProductFromJSON)
   '_storageRef', '_exportedBy', '_exportedById',
@@ -316,6 +318,23 @@ export function validateProduct(data: unknown): Product {
       }
       d.sizingCardOrder[key] = val.filter(id => isValidId(id));
     }
+  }
+
+  // --- cardColorLabels ---
+  // Keep only known color keys mapped to non-empty strings. Building a fresh
+  // object (rather than mutating in place) drops any prototype-polluting or
+  // unknown keys for free, since isRibCardColorKey gates the allowlist.
+  if (d.cardColorLabels && typeof d.cardColorLabels === 'object') {
+    const clean: Record<string, string> = {};
+    for (const [key, val] of Object.entries(d.cardColorLabels)) {
+      if (!isRibCardColorKey(key)) continue;
+      if (typeof val !== 'string') continue;
+      const trimmed = val.trim().slice(0, MAX_LABEL);
+      if (trimmed.length > 0) clean[key] = trimmed;
+    }
+    d.cardColorLabels = clean;
+  } else if (d.cardColorLabels !== undefined) {
+    delete d.cardColorLabels;
   }
 
   // --- _changeLog ---

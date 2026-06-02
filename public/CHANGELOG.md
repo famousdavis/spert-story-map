@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 0.37.0 (2026-06-02)
+
+A dynamic color legend for the Map and Sizing tabs, plus a fix for modals closing when you drag outside them.
+
+**Card color legend (Map + Sizing tabs)**
+
+- **A legend now appears when you color-code cards, and you can name each color.** During sizing exercises you may use card colors to mean different things — e.g. one color for "defer for later discussion," another for "might not be needed at all." A small legend now floats in the bottom-right corner of both the Map and Sizing tabs, listing every color currently applied to at least one card with an editable text field next to each. Type the meaning of a color once and it shows in the legend on both tabs.
+- **Shared across tabs.** Labels are stored on the project (`cardColorLabels`), so a label you set on the Sizing tab appears on the Map tab and vice-versa. Edit-in-place: click a label, type, and it commits on blur (or Enter). Escape reverts the current edit.
+- **Dynamic and self-hiding.** The legend only lists colors actually in use — color a card and its row appears; remove the last card of a color and that row disappears. When no card is colored at all, the legend is hidden entirely. It's collapsible (click the × to shrink it to a small "Legend" pill; click the pill to expand), and the open/collapsed state is remembered per project as you navigate between tabs.
+- **Under the hood.** New shared `CardColorLegend` component in `src/components/ui/`, rendered as a sibling of the canvas so it stays fixed in the corner instead of panning/zooming with the map. Labels are committed via a new `setCardColorLabel` mutation and buffered with `useBufferedField` so cloud-sync echoes can't scramble mid-type input. The new field is allowlisted and sanitized in `validateProduct` (known color keys only, non-empty strings, capped at 80 chars, prototype-pollution keys rejected).
+
+**Bug fix — modals no longer close when a drag ends outside them**
+
+- **Resizing the Notes box or selecting text in a modal no longer makes the modal vanish.** In the Sizing tab's Edit dialog (and every other modal), if you grabbed the Notes textarea's resize handle and dragged past the edge of the dialog, or started selecting text inside a field and released the mouse button outside the dialog, the whole modal would disappear — losing your resize or your selection. The cause: a browser `click` event fires on the nearest common ancestor of where the mouse went *down* and *up*, so a drag that started inside the card but ended on the dark backdrop resolved its click to the backdrop and triggered "click outside to close." The shared `Modal` now tracks where the press *started* and only closes when both the press and release happen on the backdrop itself. Resized boxes keep their shape and text selections survive a release outside the modal. Fixed once in `Modal.tsx`, so it applies to every dialog in the app.
+
 ## Version 0.36.1 (2026-05-28)
 
 Bug fix — Sizing tab insertion indicator was rendering in the wrong vertical position.

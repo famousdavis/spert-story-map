@@ -562,6 +562,22 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     return newId;
   }, [updateProduct]);
 
+  /**
+   * Set (or clear) the user-defined label for a card color flag. Stored at the
+   * product level so the Map and Sizing tabs share one set of meanings. An empty
+   * label removes the entry. No changelog entry — this is UI metadata, not a
+   * structural operation (mirrors how updateRib's cardColor changes aren't logged).
+   */
+  const setCardColorLabel = useCallback((colorKey: string, label: string) => {
+    updateProduct(prev => {
+      const next: Record<string, string> = { ...(prev.cardColorLabels || {}) };
+      const trimmed = label.trim();
+      if (trimmed) next[colorKey] = trimmed;
+      else delete next[colorKey];
+      return { ...prev, cardColorLabels: next };
+    });
+  }, [updateProduct]);
+
   const deleteRibs = useCallback((entries: { ribId: string }[]) => {
     if (!entries.length) return;
     updateProduct(prev => {
@@ -611,6 +627,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     deleteRibs,
     splitRib,
     cloneRib,
+    setCardColorLabel,
     moveItem,
   };
 }

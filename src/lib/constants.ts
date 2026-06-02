@@ -37,3 +37,10 @@ export const CATEGORIES = {
  * cap covering description, allocation memo, progress comment, and notes.
  */
 export const NOTES_MAX = 2000;
+
+/**
+ * Max length of a card-color legend label (textarea/input cap, UI layer).
+ * The validation layer (validateProduct.ts:MAX_LABEL) enforces the same bound
+ * defensively on import.
+ */
+export const CARD_COLOR_LABEL_MAX = 40;
