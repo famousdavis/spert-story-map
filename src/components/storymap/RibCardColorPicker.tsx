@@ -66,6 +66,11 @@ export default function RibCardColorPicker({ anchor, current, onSelect, onClose 
       style={{ left, top, width: POPOVER_WIDTH }}
       role="dialog"
       aria-label="Choose card color"
+      // Stop clicks (incl. on the popover's padding/dead-space) from bubbling through the
+      // React tree to the host card — which would otherwise open the Map detail panel or
+      // the Sizing edit modal behind the picker. Outside-close uses mousedown, so this
+      // click guard doesn't interfere with dismissal.
+      onClick={(e) => e.stopPropagation()}
     >
       <button
         type="button"

@@ -13,6 +13,7 @@ import {
   isRibCardColorKey,
   type RibCardColorKey,
 } from '../../lib/ribCardColors';
+import { isInteractiveChild } from '../../lib/domHelpers';
 import type { Size, Category, ReleaseAllocation } from '../../types';
 
 interface CellData {
@@ -58,7 +59,11 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
 
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
 
-  const handleGripPointerDown = (e: React.PointerEvent) => {
+  const handleCardPointerDown = (e: React.PointerEvent) => {
+    // Whole card is the drag surface (the grip is gone). Bail on interactive children
+    // (swatch/clone/delete buttons, inline-edit input) and while renaming inline.
+    if (editing) return;
+    if (isInteractiveChild(e.target as HTMLElement)) return;
     e.stopPropagation();
     e.preventDefault();
     if (onDragStart) onDragStart(e, cell);
@@ -92,7 +97,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
       ref={triggerRef}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`absolute rounded border text-left select-none transition-colors ${baseBg} group cursor-pointer px-2 py-1.5 overflow-hidden`}
+      className={`absolute rounded border text-left select-none transition-colors ${baseBg} group cursor-grab active:cursor-grabbing px-2 py-1.5 overflow-hidden`}
       style={{
         left: cell.x,
         top: cell.y,
@@ -100,41 +105,18 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
         height: cell.height,
         zIndex: isDragging ? 50 : undefined,
       }}
+      onPointerDown={handleCardPointerDown}
       onClick={(e) => {
         e.stopPropagation();
-        if (!editing) onClick(cell, e);
+        if (!editing && !isInteractiveChild(e.target as HTMLElement)) onClick(cell, e);
       }}
       data-rib-id={cell.id}
       data-backbone-id={cell.backboneId}
       data-theme-id={cell.themeId}
       data-release-id={cell.releaseId || ''}
     >
-      <div className="grid grid-cols-[auto_1fr_auto] gap-x-1 h-full">
-        {/* Left column: drag grip + color swatch */}
-        <div className="flex flex-col items-center gap-1 pt-0.5 flex-shrink-0">
-          <span
-            className="text-sm leading-none text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing select-none"
-            onPointerDown={handleGripPointerDown}
-            title="Drag to move"
-          >
-            ⠿
-          </span>
-          {onSetCardColor && (
-            <button
-              type="button"
-              className={`w-3 h-3 rounded-full border opacity-0 group-hover:opacity-100 transition-opacity ${
-                cardColorKey
-                  ? `${RIB_CARD_COLOR_SWATCH[cardColorKey]} border-gray-400 dark:border-gray-500`
-                  : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-gray-500 dark:hover:border-gray-300'
-              }`}
-              onClick={handleSwatchClick}
-              title="Card color"
-              aria-label="Card color"
-            />
-          )}
-        </div>
-
-        {/* Middle column: name (top) + points/percentage (bottom) */}
+      <div className="grid grid-cols-[1fr_auto] gap-x-1 h-full">
+        {/* Main column: name (top) + points/percentage (bottom) */}
         <div className="flex flex-col justify-between min-w-0 gap-0.5">
           <div className="flex items-start gap-1 min-w-0">
             {editing ? (
@@ -170,9 +152,22 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
           </div>
         </div>
 
-        {/* Right column: clone + delete (top) + Core/Non-Core (bottom) */}
+        {/* Right rail: color swatch + clone + delete (top) + Core/Non-Core (bottom) */}
         <div className="flex flex-col justify-between items-end flex-shrink-0 gap-0.5">
-          <div className="flex flex-col items-end gap-0.5 -mr-0.5">
+          <div className="flex items-center gap-1 -mr-0.5">
+            {onSetCardColor && (
+              <button
+                type="button"
+                className={`w-3 h-3 rounded-full border opacity-0 group-hover:opacity-100 transition-opacity ${
+                  cardColorKey
+                    ? `${RIB_CARD_COLOR_SWATCH[cardColorKey]} border-gray-400 dark:border-gray-500`
+                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-gray-500 dark:hover:border-gray-300'
+                }`}
+                onClick={handleSwatchClick}
+                title="Card color"
+                aria-label="Card color"
+              />
+            )}
             {onClone && (
               <button
                 className="leading-none text-blue-300 hover:text-blue-600 dark:text-blue-400/50 dark:hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"

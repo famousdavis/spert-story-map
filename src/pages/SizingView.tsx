@@ -78,6 +78,19 @@ export default function SizingView() {
     setPan,
   });
 
+  // Suppress the click-to-open that would otherwise fire right after a drag (mirrors
+  // StoryMapView). The click check reads this synchronously on pointerup; the clear
+  // runs on a 100ms timer.
+  const recentDragRef = useRef(false);
+  useEffect(() => {
+    if (dragState?.isDragging) {
+      recentDragRef.current = true;
+    } else if (recentDragRef.current) {
+      const t = setTimeout(() => { recentDragRef.current = false; }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [dragState]);
+
   // Auto-fit on first render once map dimensions are known
   useEffect(() => {
     if (didAutoFit.current) return;
@@ -125,6 +138,13 @@ export default function SizingView() {
   const [editingCell, setEditingCell] = useState<SizingCell | null>(null);
 
   const handleRibEdit = useCallback((cell: SizingCell) => {
+    setEditingCell(cell);
+  }, []);
+
+  // Single-click on a card body opens the editor (parity with the Map tab), unless a
+  // drag just finished.
+  const handleRibClick = useCallback((cell: SizingCell) => {
+    if (recentDragRef.current) return;
     setEditingCell(cell);
   }, []);
 
@@ -248,6 +268,7 @@ export default function SizingView() {
           mapSizeRef={mapSizeRef}
           dragState={dragState}
           onDragStart={handleDragStart}
+          onRibClick={handleRibClick}
           onRibEdit={handleRibEdit}
           onRibSplit={handleRibSplit}
           onRibDelete={handleRibDelete}
