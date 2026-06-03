@@ -5,6 +5,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useProductMutations } from '../hooks/useProductMutations';
+import { useSessionState } from '../hooks/useSessionState';
+import { stripOrphans, bulkNextCollapsed, pruneSelection } from '../components/storymap/collapseHelpers';
 import MapCanvas from '../components/storymap/MapCanvas';
 import MapContent from '../components/storymap/MapContent';
 import RibDetailPanel from '../components/storymap/RibDetailPanel';
@@ -22,7 +24,8 @@ import type { OutletContextValue } from '../types';
 export default function StoryMapView() {
   const { product, updateProduct, undo, redo } = useOutletContext<OutletContextValue>();
   const mutations = useProductMutations(updateProduct);
-  const layout = useMapLayout(product);
+  const [collapsedIds, setCollapsedIds] = useSessionState<string[]>(`collapsed-releases:${product.id}`, []);
+  const layout = useMapLayout(product, collapsedIds);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [selectedRibId, setSelectedRibId] = useState(null);
@@ -64,6 +67,54 @@ export default function StoryMapView() {
       return () => clearTimeout(t);
     }
   }, [dragState]);
+
+  // --- Collapsible release lanes ---
+
+  const allReleaseIds = useMemo(() => (product.releases ?? []).map(r => r.id), [product.releases]);
+  const allCollapsed = allReleaseIds.length > 0 && allReleaseIds.every(id => collapsedIds.includes(id));
+
+  // Drop stale collapsed ids whose release no longer exists.
+  useEffect(() => {
+    const valid = new Set(allReleaseIds);
+    const next = stripOrphans(collapsedIds, valid);
+    if (next.length !== collapsedIds.length) setCollapsedIds(next);
+  }, [allReleaseIds, collapsedIds, setCollapsedIds]);
+
+  const handleToggleCollapse = useCallback((id: string) => {
+    setCollapsedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }, [setCollapsedIds]);
+
+  const handleBulkCollapse = useCallback(() => {
+    setCollapsedIds(prev => bulkNextCollapsed(allReleaseIds, prev));
+  }, [allReleaseIds, setCollapsedIds]);
+
+  // Drop-only auto-expand: when a rib is dropped into a collapsed lane, expand it. The drop
+  // target is read from dragState (fresh via deps); the expand is dispatched in the same
+  // handler as the commit, so they batch into one render (no momentary hidden card). Escape
+  // runs cancelDrag (not this), so a cancelled drag never expands.
+  const handleDragEndExpand = useCallback(() => {
+    const dropTarget = (dragState?.isDragging && dragState.dragType === 'rib')
+      ? dragState.targetReleaseId
+      : undefined;
+    handleDragEnd();
+    if (dropTarget != null) {
+      setCollapsedIds(prev => prev.includes(dropTarget) ? prev.filter(id => id !== dropTarget) : prev);
+    }
+  }, [dragState, handleDragEnd, setCollapsedIds]);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- reconcile selection to cell visibility after a collapse/bulk/delete reflow; both setters are guarded and converge */
+  // Close a zombie panel selection when its rib is no longer visible (collapse / bulk / delete).
+  useEffect(() => {
+    if (selectedRibId && !selectedRib) setSelectedRibId(null);
+  }, [selectedRibId, selectedRib]);
+
+  // Prune multi-select to ids that still resolve to a visible cell.
+  useEffect(() => {
+    const visible = new Set(layout.cells.map(c => c.id));
+    const pruned = pruneSelection(selectedIds, visible);
+    if (pruned) setSelectedIds(pruned);
+  }, [selectedIds, layout.cells]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleRibClick = useCallback((ribData, e) => {
     // Don't open detail panel if we just finished dragging
@@ -168,8 +219,18 @@ export default function StoryMapView() {
         onFit={handleFit}
         dragState={dragState}
         onDragMove={handleDragMove}
-        onDragEnd={handleDragEnd}
+        onDragEnd={handleDragEndExpand}
         layoutCells={layout.cells}
+        overlayControls={product.releases.length >= 2 ? (
+          <button
+            type="button"
+            onClick={handleBulkCollapse}
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 px-2.5 py-1.5"
+            title="Collapse all release lanes except Unassigned"
+          >
+            {allCollapsed ? 'Expand all' : 'Collapse releases'}
+          </button>
+        ) : undefined}
       >
         <MapContent
           layout={layout}
@@ -198,6 +259,7 @@ export default function StoryMapView() {
           onBackboneDragStart={handleBackboneDragStart}
           onThemeDragStart={handleThemeDragStart}
           onReleaseDragStart={handleReleaseDragStart}
+          onToggleCollapse={handleToggleCollapse}
           selectedIds={selectedIds}
           editingRibId={selectedRibId}
         />

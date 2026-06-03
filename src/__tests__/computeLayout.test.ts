@@ -16,6 +16,7 @@ import {
   RIGHT_LABEL_WIDTH,
   MIN_LANE_HEIGHT,
   ADD_BUTTON_RESERVED,
+  COLLAPSED_LANE_HEIGHT,
 } from '../components/storymap/useMapLayout';
 
 function makeRib(id, allocations = []) {
@@ -385,5 +386,120 @@ describe('computeLayout', () => {
     // Rib cell still placed correctly for b3
     expect(result.cells).toHaveLength(1);
     expect(result.cells[0].backboneId).toBe('b3');
+  });
+});
+
+describe('computeLayout — collapsed release lanes', () => {
+  const bodyTop = THEME_HEIGHT + BACKBONE_HEIGHT;
+
+  function productWithTwoReleases() {
+    return makeProduct({
+      themes: [
+        makeTheme('t1', [
+          makeBackbone('b1', [
+            makeRib('r1', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]),
+            makeRib('r2', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]),
+            makeRib('r3', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]),
+          ]),
+        ]),
+      ],
+      releases: [
+        { id: 'rel-1', name: 'Release 1', order: 1 },
+        { id: 'rel-2', name: 'Release 2', order: 2 },
+      ],
+    });
+  }
+
+  it('back-compat: single-arg call behaves as before (no collapse)', () => {
+    const product = productWithTwoReleases();
+    const a = computeLayout(product);
+    const b = computeLayout(product, []);
+    expect(a.totalHeight).toBe(b.totalHeight);
+    expect(a.releaseLanes[0].height).toBe(b.releaseLanes[0].height);
+    expect(a.releaseLanes[0].collapsed).toBe(false);
+  });
+
+  it('collapsed lane gets COLLAPSED_LANE_HEIGHT, emits no cells, no gap buttons', () => {
+    const product = productWithTwoReleases();
+    const result = computeLayout(product, ['rel-1']);
+
+    const lane = result.releaseLanes.find((l: { releaseId: string }) => l.releaseId === 'rel-1');
+    expect(lane.collapsed).toBe(true);
+    expect(lane.height).toBe(COLLAPSED_LANE_HEIGHT);
+
+    // No cells for the collapsed release
+    expect(result.cells.some((c: { releaseId: string | null }) => c.releaseId === 'rel-1')).toBe(false);
+    // No gap (+ Rib) buttons for the collapsed release
+    expect(result.gapButtons.some((g: { releaseId: string | null }) => g.releaseId === 'rel-1')).toBe(false);
+  });
+
+  it('cardCount is the SUM across columns (not max)', () => {
+    const product = makeProduct({
+      themes: [
+        makeTheme('t1', [
+          // Column A: 3 ribs in rel-1; Column B: 1 rib in rel-1 → cardCount 4, height from max 3
+          makeBackbone('bA', [
+            makeRib('a1', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]),
+            makeRib('a2', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]),
+            makeRib('a3', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]),
+          ]),
+          makeBackbone('bB', [
+            makeRib('b1', [{ releaseId: 'rel-1', percentage: 100, memo: '' }]),
+          ]),
+        ]),
+      ],
+      releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
+    });
+    const result = computeLayout(product);
+    const lane = result.releaseLanes[0];
+    expect(lane.cardCount).toBe(4);
+    // Height uses the tallest column (3 ribs), not the total count
+    const expectedHeight = 3 * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED;
+    expect(lane.height).toBe(Math.max(expectedHeight, MIN_LANE_HEIGHT));
+  });
+
+  it('collapsing a lane shifts downstream lanes up and shrinks totalHeight', () => {
+    const product = productWithTwoReleases();
+    const open = computeLayout(product);
+    const collapsed = computeLayout(product, ['rel-1']);
+
+    const rel1Open = open.releaseLanes[0].height;
+    const saved = rel1Open - COLLAPSED_LANE_HEIGHT;
+    expect(saved).toBeGreaterThan(0);
+
+    // rel-2 (downstream) and the unassigned lane both move up by the saved height
+    expect(collapsed.releaseLanes[1].y).toBe(open.releaseLanes[1].y - saved);
+    expect(collapsed.unassignedLane.y).toBe(open.unassignedLane.y - saved);
+    expect(collapsed.totalHeight).toBe(open.totalHeight - saved);
+
+    // First collapsed lane still starts at bodyTop
+    expect(collapsed.releaseLanes[0].y).toBe(bodyTop);
+  });
+
+  it('a partial-allocation rib still renders in the open lane when its other lane is collapsed', () => {
+    const product = makeProduct({
+      themes: [
+        makeTheme('t1', [
+          makeBackbone('b1', [
+            makeRib('r1', [
+              { releaseId: 'rel-1', percentage: 60, memo: '' },
+              { releaseId: 'rel-2', percentage: 40, memo: '' },
+            ]),
+          ]),
+        ]),
+      ],
+      releases: [
+        { id: 'rel-1', name: 'Release 1', order: 1 },
+        { id: 'rel-2', name: 'Release 2', order: 2 },
+      ],
+    });
+    const result = computeLayout(product, ['rel-1']); // collapse rel-1 only
+
+    // No cell in the collapsed lane, but the rib's rel-2 cell survives
+    expect(result.cells.some((c: { releaseId: string | null }) => c.releaseId === 'rel-1')).toBe(false);
+    expect(result.cells.some((c: { id: string; releaseId: string | null }) => c.id === 'r1' && c.releaseId === 'rel-2')).toBe(true);
+    // Collapsed lane's cardCount still counts its allocation
+    const lane = result.releaseLanes.find((l: { releaseId: string }) => l.releaseId === 'rel-1');
+    expect(lane.cardCount).toBe(1);
   });
 });

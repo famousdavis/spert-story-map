@@ -44,6 +44,7 @@ interface MapContentProps {
   onBackboneDragStart: (e: React.PointerEvent, column: any) => void;
   onThemeDragStart: (e: React.PointerEvent, themeSpan: any) => void;
   onReleaseDragStart?: (e: React.PointerEvent, lane: any) => void;
+  onToggleCollapse: (releaseId: string) => void;
   selectedIds?: Set<string>;
   /** ID of the rib whose detail panel is open — visually anchored as "selected" so the
    * user can see which card the edit panel is attached to. */
@@ -57,7 +58,7 @@ export default function MapContent({
   onDeleteTheme, onDeleteBackbone, onDeleteRib, onCloneRib, onSetCardColor, onDeleteRelease,
   onAddTheme, onAddBackbone, onAddRib, onAddRibToRelease, onAddReleaseAfter,
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
-  selectedIds, editingRibId,
+  onToggleCollapse, selectedIds, editingRibId,
 }: MapContentProps) {
   const { columns, themeSpans, releaseLanes, cells, unassignedLane, gapButtons, totalWidth, totalHeight } = layout;
 
@@ -168,6 +169,8 @@ export default function MapContent({
           isFirst={i === 0}
           isDropTarget={highlightReleaseId === lane.releaseId}
           isDragging={isReleaseDrag && dragState.releaseId === lane.releaseId}
+          collapsed={lane.collapsed || false}
+          onToggleCollapse={onToggleCollapse}
           onRename={onRenameRelease}
           onAddReleaseAfter={onAddReleaseAfter}
           onDeleteRelease={onDeleteRelease}
