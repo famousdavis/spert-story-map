@@ -21,15 +21,18 @@ const MIN_LANE_HEIGHT = 72;
 // hover button has a real cell to live in — even in the longest column, which
 // would otherwise be sized exactly to its rib stack with no room below.
 const ADD_BUTTON_RESERVED = 24;
+// Height of a collapsed release lane — just enough for the mirrored label row.
+const COLLAPSED_LANE_HEIGHT = 30;
 
-export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT, ADD_BUTTON_RESERVED };
+export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT, ADD_BUTTON_RESERVED, COLLAPSED_LANE_HEIGHT };
 
-export default function useMapLayout(product: Product) {
-  return useMemo(() => computeLayout(product), [product]);
+export default function useMapLayout(product: Product, collapsedReleaseIds: string[] = []) {
+  return useMemo(() => computeLayout(product, collapsedReleaseIds), [product, collapsedReleaseIds]);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- layout return type is complex and frequently evolving; explicit interface would be over-engineering
-export function computeLayout(product: Product): any {
+export function computeLayout(product: Product, collapsedReleaseIds: string[] = []): any {
+  const collapsedSet = new Set(collapsedReleaseIds);
   const themes = product.themes || [];
   const releases = [...(product.releases || [])].sort((a, b) => a.order - b.order);
 
@@ -138,20 +141,27 @@ export function computeLayout(product: Product): any {
 
   for (const release of releases) {
     let maxRibs = 0;
+    let cardCount = 0; // total ribs in this release across all columns (shown in collapsed header)
     for (let ci = 0; ci < totalColumns; ci++) {
       const key = `${release.id}:${ci}`;
       const count = ribsByRelCol[key]?.length || 0;
+      cardCount += count;
       if (count > maxRibs) maxRibs = count;
     }
-    const height = Math.max(
-      maxRibs > 0 ? maxRibs * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED : 0,
-      MIN_LANE_HEIGHT
-    );
+    const collapsed = collapsedSet.has(release.id);
+    const height = collapsed
+      ? COLLAPSED_LANE_HEIGHT
+      : Math.max(
+          maxRibs > 0 ? maxRibs * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED : 0,
+          MIN_LANE_HEIGHT
+        );
     releaseLanes.push({
       releaseId: release.id,
       releaseName: release.name,
       y: currentY,
       height,
+      collapsed,
+      cardCount,
     });
     currentY += height;
   }
@@ -191,6 +201,7 @@ export function computeLayout(product: Product): any {
   };
 
   for (const lane of releaseLanes) {
+    if (lane.collapsed) continue; // collapsed lanes render no cells
     for (const col of columns) {
       const key = `${lane.releaseId}:${col.colIdx}`;
       const ribs = ribsByRelCol[key];
@@ -234,6 +245,7 @@ export function computeLayout(product: Product): any {
   const gapButtons = [];
 
   for (const lane of releaseLanes) {
+    if (lane.collapsed) continue; // no "+ Rib" affordance in a collapsed lane
     for (const col of columns) {
       const key = `${lane.releaseId}:${col.colIdx}`;
       const ribCount = ribsByRelCol[key]?.length || 0;

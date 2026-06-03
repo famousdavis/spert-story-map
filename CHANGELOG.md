@@ -1,5 +1,29 @@
 # Changelog
 
+## Version 0.39.0 (2026-06-03)
+
+Cards now move the same way on both the Map and Sizing tabs, and release lanes on the Map can be collapsed.
+
+**Unified card gesture (Map + Sizing tabs)**
+
+- **Click a card to open it; click-and-hold anywhere to move it — identical on both tabs.** Previously the Map tab required grabbing a small "⠿" handle to move a card, while the Sizing tab let you drag from anywhere but had no click action. Now both behave the same: a single click opens the card's editor (the detail panel on the Map, the edit dialog on Sizing), and pressing and dragging anywhere on the card body moves it. You no longer have to remember which tab you're on to know how a card behaves.
+- **The Map card grip is gone, and the layout was tidied to fit more of the title.** With whole-card dragging, the drag handle was redundant, so it's been removed. The color swatch moved to the top-right corner alongside the clone and delete icons, freeing the left column so longer rib names show a little more before truncating.
+- **Locked Sizing cards are now clickable to edit.** Cards with progress still can't be dragged (to protect historical points/percentage math), but you can now click one to open its editor and adjust the name, description, category, or notes.
+- An 8px click-vs-drag threshold keeps a normal click from being mistaken for a move, and a click immediately after a drag won't accidentally open the editor. Inline double-click-to-rename on Map cards still works (a sloppy double-click that drifts more than 8px becomes a move instead — undo with Ctrl+Z).
+
+**Collapsible release lanes (Map tab)**
+
+- **Collapse a release lane to hide its cards; expand it to show them again.** Each release label now has a ▸/▾ toggle. When you're populating later releases, collapse the earlier ones you've already filled so the Unassigned lane sits right under the backbone column headers — making it far easier to line up unassigned items with the right backbone without scanning past everything.
+- **A collapsed lane shows its name and card count** (e.g. "Release 2 (12)") so you still know what's inside at a glance.
+- **A "Collapse releases" / "Expand all" button** in the top-right controls collapses every release lane at once (the Unassigned lane always stays open). It appears only when you have two or more releases.
+- **Drag-and-drop still works with collapsed lanes:** drop a card onto a collapsed lane and it automatically expands so you can see where the card landed. The "+ Release" and delete controls are hidden on a collapsed lane — expand it first to use them. Collapsing a lane closes the detail panel if its card was open.
+- Collapse state is remembered per project as you move between tabs (it resets when you close the browser).
+
+**Under the hood**
+
+- A shared `isInteractiveChild` helper (`src/lib/domHelpers.ts`) gates both tabs' card gestures so presses on buttons, the inline-edit field, or the kebab menu never start a drag or open the editor. The color-picker popover now stops click propagation, fixing a latent case where picking a color could also open the card behind it.
+- Map layout (`computeLayout`) takes an optional list of collapsed release ids; collapsed lanes get a fixed 30px height and emit no cells or "+ Rib" buttons, and the existing cumulative-Y layout reflows everything below automatically. Drop-to-expand reads the drop target from the live drag state and batches the expand with the move (no flicker); selection cleanup and the bulk toggle are small pure helpers (`collapseHelpers.ts`). New unit tests cover the gesture guard, the collapse helpers, and the collapsed-lane layout math.
+
 ## Version 0.38.0 (2026-06-02)
 
 Card color palette fix — the gold "amber" flag was too close to yellow to tell apart.

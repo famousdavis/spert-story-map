@@ -12,6 +12,7 @@ import {
   isRibCardColorKey,
   type RibCardColorKey,
 } from '../../lib/ribCardColors';
+import { isInteractiveChild } from '../../lib/domHelpers';
 import { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, HEADER_HEIGHT, ZONE_GAP, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
 import type { Size, Category } from '../../types';
 
@@ -70,6 +71,7 @@ interface SizingContentProps {
   mapSizeRef: React.MutableRefObject<{ width: number; height: number }>;
   dragState: SizingDragState | null;
   onDragStart: (e: React.PointerEvent, cell: SizingCell) => void;
+  onRibClick: (cell: SizingCell) => void;
   onRibEdit: (cell: SizingCell) => void;
   onRibSplit: (cell: SizingCell) => void;
   onRibDelete: (cell: SizingCell) => void;
@@ -99,7 +101,7 @@ function colLetter(idx: number): string {
   return s;
 }
 
-export default function SizingContent({ layout, mapSizeRef, dragState, onDragStart, onRibEdit, onRibSplit, onRibDelete, onSetCardColor }: SizingContentProps) {
+export default function SizingContent({ layout, mapSizeRef, dragState, onDragStart, onRibClick, onRibEdit, onRibSplit, onRibDelete, onSetCardColor }: SizingContentProps) {
   const { sizeColumns, unsizedZone, unsizedCount, unsizedRows, unsizedGridCols, sizeColumnsY, cells, totalWidth, totalHeight } = layout;
 
   // Report map dimensions for auto-fit
@@ -226,6 +228,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
           key={cell.id}
           cell={cell}
           onDragStart={onDragStart}
+          onRibClick={onRibClick}
           isDragging={isDragging && dragRibId === cell.id}
           onEdit={onRibEdit}
           onSplit={onRibSplit}
@@ -260,6 +263,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
 interface SizingRibCellProps {
   cell: SizingCell;
   onDragStart: (e: React.PointerEvent, cell: SizingCell) => void;
+  onRibClick: (cell: SizingCell) => void;
   isDragging: boolean;
   onEdit: (cell: SizingCell) => void;
   onSplit: (cell: SizingCell) => void;
@@ -267,7 +271,7 @@ interface SizingRibCellProps {
   onSetCardColor?: (themeId: string, backboneId: string, ribId: string, color: RibCardColorKey | undefined) => void;
 }
 
-function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelete, onSetCardColor }: SizingRibCellProps) {
+function SizingRibCell({ cell, onDragStart, onRibClick, isDragging, onEdit, onSplit, onDelete, onSetCardColor }: SizingRibCellProps) {
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const locked = cell.locked;
   const cardColorKey: RibCardColorKey | undefined = isRibCardColorKey(cell.cardColor) ? cell.cardColor : undefined;
@@ -308,11 +312,18 @@ function SizingRibCell({ cell, onDragStart, isDragging, onEdit, onSplit, onDelet
             : locked
               ? 'border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/50'
               : 'border-gray-200 bg-white hover:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500'
-      } ${locked ? '' : 'cursor-grab active:cursor-grabbing'} px-2 py-1.5 overflow-hidden`}
+      } ${locked ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} px-2 py-1.5 overflow-hidden`}
       onPointerDown={locked ? undefined : (e) => {
+        if (isInteractiveChild(e.target as HTMLElement)) return;
         e.stopPropagation();
         e.preventDefault();
         onDragStart(e, cell);
+      }}
+      onClick={(e) => {
+        // Single-click opens the editor (parity with the Map tab). Excludes the kebab,
+        // the color-picker (its root stops propagation), and any future control.
+        if (isInteractiveChild(e.target as HTMLElement)) return;
+        onRibClick(cell);
       }}
       style={{
         left: cell.x,

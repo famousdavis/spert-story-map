@@ -12,6 +12,8 @@ interface ReleaseLane {
   releaseName: string;
   y: number;
   height: number;
+  collapsed?: boolean;
+  cardCount?: number;
 }
 
 interface ReleaseDividerProps {
@@ -20,6 +22,8 @@ interface ReleaseDividerProps {
   isFirst: boolean;
   isDropTarget: boolean;
   isDragging: boolean;
+  collapsed: boolean;
+  onToggleCollapse: (releaseId: string) => void;
   onRename: (releaseId: string, name: string) => void;
   onAddReleaseAfter?: (releaseId: string) => void;
   onDeleteRelease?: (releaseId: string) => void;
@@ -30,6 +34,7 @@ interface ReleaseDividerProps {
 
 export default function ReleaseDivider({
   lane, totalWidth, isFirst, isDropTarget, isDragging,
+  collapsed, onToggleCollapse,
   onRename, onAddReleaseAfter, onDeleteRelease, hasAllocations,
   onClick, onReleaseDragStart,
 }: ReleaseDividerProps) {
@@ -115,6 +120,21 @@ export default function ReleaseDivider({
     ? 'text-blue-700 bg-blue-200 dark:text-blue-200 dark:bg-blue-800'
     : 'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40 dark:hover:bg-blue-900/60';
 
+  // Collapse/expand toggle — rendered in both mirrored label areas. Must be pointer-events-auto
+  // (the label container is pointer-events-none); stopPropagation keeps the click off the canvas.
+  const chevron = (
+    <button
+      type="button"
+      className="pointer-events-auto flex-shrink-0 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-xs leading-none mt-1 mr-0.5 select-none"
+      aria-expanded={!collapsed}
+      aria-label={collapsed ? `Expand ${lane.releaseName}` : `Collapse ${lane.releaseName}`}
+      onClick={(e) => { e.stopPropagation(); onToggleCollapse(lane.releaseId); }}
+      title={collapsed ? 'Expand release' : 'Collapse release'}
+    >
+      {collapsed ? '▸' : '▾'}
+    </button>
+  );
+
   return (
     <>
       {/* Lane background — highlight when drop target, dim when dragging */}
@@ -142,6 +162,7 @@ export default function ReleaseDivider({
         className="absolute flex items-start pt-2 px-2 pointer-events-none"
         style={{ top: lane.y, left: 0, width: LANE_LABEL_WIDTH, height: lane.height }}
       >
+        {chevron}
         {leftEditing ? (
           <input
             ref={leftInputRef}
@@ -154,6 +175,17 @@ export default function ReleaseDivider({
             onClick={e => e.stopPropagation()}
             className="pointer-events-auto text-xs font-semibold text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-gray-800/80 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-full border-0"
           />
+        ) : collapsed ? (
+          <span
+            className={`pointer-events-auto text-xs font-semibold px-1.5 py-0.5 rounded cursor-pointer flex items-baseline min-w-0 flex-1 ${labelClasses}`}
+            data-release-id={lane.releaseId}
+            onClick={handleLeftClick}
+            onDoubleClick={handleLeftDoubleClick}
+            title="Click for details · Double-click to rename"
+          >
+            <span className="truncate">{lane.releaseName}</span>
+            <span className="flex-shrink-0 ml-1 font-normal opacity-70">({lane.cardCount ?? 0})</span>
+          </span>
         ) : (
           <span
             className={`pointer-events-auto text-xs font-semibold px-2 py-1 rounded break-words max-w-full cursor-pointer ${labelClasses}`}
@@ -166,7 +198,7 @@ export default function ReleaseDivider({
           </span>
         )}
         {/* Drag grip */}
-        {onReleaseDragStart && !leftEditing && (
+        {onReleaseDragStart && !leftEditing && !collapsed && (
           <span
             className="pointer-events-auto text-sm leading-none text-blue-300 hover:text-blue-500 dark:text-blue-600 dark:hover:text-blue-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 ml-1 select-none"
             onPointerDown={handleGripPointerDown}
@@ -177,8 +209,8 @@ export default function ReleaseDivider({
         )}
       </div>
 
-      {/* Left bottom buttons: + Release and × */}
-      {onAddReleaseAfter && (
+      {/* Left bottom buttons: + Release and × (hidden on collapsed lanes — no room) */}
+      {!collapsed && onAddReleaseAfter && (
         <button
           className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
           style={{ left: 8, top: bottomBtnY }}
@@ -188,7 +220,7 @@ export default function ReleaseDivider({
           + Release
         </button>
       )}
-      {onDeleteRelease && (
+      {!collapsed && onDeleteRelease && (
         <button
           ref={leftDeleteTriggerRef as React.Ref<HTMLButtonElement>}
           onMouseEnter={leftDeleteOnMouseEnter}
@@ -213,6 +245,7 @@ export default function ReleaseDivider({
         className="absolute flex items-start pt-2 px-2 pointer-events-none"
         style={{ top: lane.y, left: rightLabelX, width: RIGHT_LABEL_WIDTH, height: lane.height }}
       >
+        {chevron}
         {rightEditing ? (
           <input
             ref={rightInputRef}
@@ -225,6 +258,17 @@ export default function ReleaseDivider({
             onClick={e => e.stopPropagation()}
             className="pointer-events-auto text-xs font-semibold text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-gray-800/80 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 w-full border-0"
           />
+        ) : collapsed ? (
+          <span
+            className={`pointer-events-auto text-xs font-semibold px-1.5 py-0.5 rounded cursor-pointer flex items-baseline min-w-0 flex-1 ${labelClasses}`}
+            data-release-id={lane.releaseId}
+            onClick={handleRightClick}
+            onDoubleClick={handleRightDoubleClick}
+            title="Click for details · Double-click to rename"
+          >
+            <span className="truncate">{lane.releaseName}</span>
+            <span className="flex-shrink-0 ml-1 font-normal opacity-70">({lane.cardCount ?? 0})</span>
+          </span>
         ) : (
           <span
             className={`pointer-events-auto text-xs font-semibold px-2 py-1 rounded break-words max-w-full cursor-pointer ${labelClasses}`}
@@ -237,7 +281,7 @@ export default function ReleaseDivider({
           </span>
         )}
         {/* Drag grip */}
-        {onReleaseDragStart && !rightEditing && (
+        {onReleaseDragStart && !rightEditing && !collapsed && (
           <span
             className="pointer-events-auto text-sm leading-none text-blue-300 hover:text-blue-500 dark:text-blue-600 dark:hover:text-blue-400 cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 ml-1 select-none"
             onPointerDown={handleGripPointerDown}
@@ -248,8 +292,8 @@ export default function ReleaseDivider({
         )}
       </div>
 
-      {/* Right bottom buttons: + Release and × */}
-      {onAddReleaseAfter && (
+      {/* Right bottom buttons: + Release and × (hidden on collapsed lanes — no room) */}
+      {!collapsed && onAddReleaseAfter && (
         <button
           className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
           style={{ left: rightLabelX + 8, top: bottomBtnY }}
@@ -259,7 +303,7 @@ export default function ReleaseDivider({
           + Release
         </button>
       )}
-      {onDeleteRelease && (
+      {!collapsed && onDeleteRelease && (
         <button
           ref={rightDeleteTriggerRef as React.Ref<HTMLButtonElement>}
           onMouseEnter={rightDeleteOnMouseEnter}
