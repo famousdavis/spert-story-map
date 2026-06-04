@@ -25,11 +25,13 @@ interface MapCanvasProps {
   dragState: any;
   onDragMove?: (e: React.PointerEvent) => void;
   onDragEnd?: (e: React.PointerEvent) => void;
+  /** Fired when the user clicks empty canvas (a press-release that didn't pan) — used to deselect. */
+  onBackgroundClick?: () => void;
   overlayControls?: React.ReactNode;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children, dragState, onDragMove, onDragEnd, overlayControls }: MapCanvasProps) {
+export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children, dragState, onDragMove, onDragEnd, onBackgroundClick, overlayControls }: MapCanvasProps) {
   const containerRef = useRef(null);
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
@@ -111,12 +113,17 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
       if (onDragEnd) onDragEnd(e);
       return;
     }
-    if (isPanningRef.current && panDistanceRef.current >= 8) {
-      dismissHint();
+    if (isPanningRef.current) {
+      if (panDistanceRef.current >= 8) {
+        dismissHint();
+      } else if (onBackgroundClick) {
+        // A press-release on empty canvas that didn't pan = a click → deselect.
+        onBackgroundClick();
+      }
     }
     isPanningRef.current = false;
     setIsPanning(false);
-  }, [dragState, onDragEnd, dismissHint]);
+  }, [dragState, onDragEnd, dismissHint, onBackgroundClick]);
 
   // Keyboard shortcuts
   useEffect(() => {
