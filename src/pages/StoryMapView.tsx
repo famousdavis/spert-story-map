@@ -93,13 +93,16 @@ export default function StoryMapView() {
   // handler as the commit, so they batch into one render (no momentary hidden card). Escape
   // runs cancelDrag (not this), so a cancelled drag never expands.
   const handleDragEndExpand = useCallback(() => {
-    const dropTarget = (dragState?.isDragging && dragState.dragType === 'rib')
-      ? dragState.targetReleaseId
-      : undefined;
+    const isRibDrag = dragState?.isDragging && dragState.dragType === 'rib';
+    const dropTarget = isRibDrag ? dragState.targetReleaseId : undefined;
+    // A bulk move carries the selection set on dragState; deselect the group once it lands
+    // so the user isn't stuck with a lingering selection (re-select to move again).
+    const wasBulkMove = isRibDrag && dragState.selectedIds && dragState.selectedIds.size > 0;
     handleDragEnd();
     if (dropTarget != null) {
       setCollapsedIds(prev => prev.includes(dropTarget) ? prev.filter(id => id !== dropTarget) : prev);
     }
+    if (wasBulkMove) setSelectedIds(new Set());
   }, [dragState, handleDragEnd, setCollapsedIds]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- reconcile selection to cell visibility after a collapse/bulk/delete reflow; both setters are guarded and converge */
@@ -150,6 +153,15 @@ export default function StoryMapView() {
   }, []);
 
   const handleCloseDetail = useCallback(() => {
+    setSelectedRibId(null);
+    setSelectedReleaseId(null);
+    setIsNewRib(false);
+  }, []);
+
+  // Clicking empty canvas deselects everything — the escape hatch for a multi-selection
+  // (and any open detail panel) without having to click another card.
+  const handleBackgroundDeselect = useCallback(() => {
+    setSelectedIds(new Set());
     setSelectedRibId(null);
     setSelectedReleaseId(null);
     setIsNewRib(false);
@@ -220,6 +232,7 @@ export default function StoryMapView() {
         dragState={dragState}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEndExpand}
+        onBackgroundClick={handleBackgroundDeselect}
         layoutCells={layout.cells}
         overlayControls={product.releases.length >= 2 ? (
           <button

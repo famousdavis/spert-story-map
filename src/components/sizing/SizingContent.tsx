@@ -13,6 +13,7 @@ import {
   type RibCardColorKey,
 } from '../../lib/ribCardColors';
 import { isInteractiveChild } from '../../lib/domHelpers';
+import { RIB_NAME_TOOLTIP_DELAY } from '../../lib/constants';
 import { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, HEADER_HEIGHT, ZONE_GAP, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
 import type { Size, Category } from '../../types';
 
@@ -275,7 +276,7 @@ function SizingRibCell({ cell, onDragStart, onRibClick, isDragging, onEdit, onSp
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const locked = cell.locked;
   const cardColorKey: RibCardColorKey | undefined = isRibCardColorKey(cell.cardColor) ? cell.cardColor : undefined;
-  const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(cell.name);
+  const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(cell.name, RIB_NAME_TOOLTIP_DELAY);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
 

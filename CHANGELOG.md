@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.39.1 (2026-06-03)
+
+Two small Map/Sizing usability fixes.
+
+**Less eager card tooltips**
+
+- **The full-name tooltip on a rib card now waits until you actually dwell, instead of popping the instant your pointer passes over.** The hover delay before a card's full-name tooltip appears was increased from 200ms to 500ms on **both** the Map and Sizing tabs, so sweeping the pointer across cards no longer flashes tooltips you didn't ask for. Other tooltips (e.g. the release delete button's) keep their original quick timing.
+
+**Clearing a multi-selection**
+
+- **Moving a group of selected cards now deselects them once the move lands.** Previously a multi-selection stayed highlighted after a drag, and the only way to clear it was to click a different card. After a bulk move the group is automatically deselected.
+- **Click any empty spot on the Map to deselect.** Clicking the empty canvas now clears the current selection (and closes the detail panel) — a general escape hatch so you can drop a selection without moving it, and the mouse equivalent of the Escape key (which already cleared the selection).
+
 ## Version 0.39.0 (2026-06-03)
 
 Cards now move the same way on both the Map and Sizing tabs, and release lanes on the Map can be collapsed.

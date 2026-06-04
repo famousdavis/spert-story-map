@@ -44,3 +44,10 @@ export const NOTES_MAX = 2000;
  * defensively on import.
  */
 export const CARD_COLOR_LABEL_MAX = 40;
+
+/**
+ * Hover delay (ms) before a rib card's full-name tooltip appears, on both the Map
+ * and Sizing tabs. Deliberately longer than `useTooltip`'s 200ms default so that
+ * sweeping the pointer across cards doesn't flash tooltips — the user must dwell.
+ */
+export const RIB_NAME_TOOLTIP_DELAY = 500;
