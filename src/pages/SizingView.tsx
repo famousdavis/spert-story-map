@@ -151,9 +151,11 @@ export default function SizingView() {
   const handleEditSave = useCallback((updates: SizingRibModalSaveInput) => {
     if (!editingCell) return;
     // Locked-state size-omission boundary: when the original cell was locked,
-    // strip `size` from the mutation payload so historical points/percent math is preserved.
+    // strip `size` from the mutation payload so historical points/percent math is
+    // preserved. cardColor is kept — color is an organizational flag, independent
+    // of work state, and stays editable on locked cards (matches the kebab picker).
     const payload = editingCell.locked
-      ? { name: updates.name, description: updates.description, category: updates.category, notes: updates.notes }
+      ? { name: updates.name, description: updates.description, category: updates.category, notes: updates.notes, cardColor: updates.cardColor }
       : updates;
     mutations.updateRib(editingCell.themeId, editingCell.backboneId, editingCell.id, payload);
   }, [editingCell, mutations]);
@@ -181,6 +183,7 @@ export default function SizingView() {
       size: input.size,
       description: input.description,
       notes: input.notes,
+      cardColor: input.cardColor,
     });
   }, [mutations]);
 

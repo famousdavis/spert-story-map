@@ -672,6 +672,18 @@ describe('addNamedRibToProduct', () => {
     expect(rib.order).toBe(1);
   });
 
+  it('applies optional cardColor when provided', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'b1', 'new-uuid', { name: 'Colored', cardColor: 'rose' });
+    expect(result.themes[0].backboneItems[0].ribItems[0].cardColor).toBe('rose');
+  });
+
+  it('omits the cardColor key when not provided', () => {
+    const product = emptyProduct();
+    const result = addNamedRibToProduct(product, 't1', 'b1', 'new-uuid', { name: 'Plain' });
+    expect(result.themes[0].backboneItems[0].ribItems[0]).not.toHaveProperty('cardColor');
+  });
+
   it("changelog entry has op: 'add', entity: 'rib'", () => {
     const product = emptyProduct();
     const result = addNamedRibToProduct(product, 't1', 'b1', 'new-uuid', { name: 'X' });
