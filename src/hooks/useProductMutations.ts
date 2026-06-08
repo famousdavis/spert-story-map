@@ -33,7 +33,7 @@ export function addNamedRibToProduct(
   themeId: string,
   backboneId: string,
   newId: string,
-  attrs: { name: string; category?: 'core' | 'non-core'; size?: RibItem['size']; description?: string; notes?: string },
+  attrs: { name: string; category?: 'core' | 'non-core'; size?: RibItem['size']; description?: string; notes?: string; cardColor?: RibItem['cardColor'] },
 ): Product {
   let didAdd = false;
 
@@ -53,6 +53,9 @@ export function addNamedRibToProduct(
           releaseAllocations: [],
           progressHistory: [],
           notes: attrs.notes ?? '',
+          // Only set cardColor when provided, so a colorless rib stays free of the key
+          // (mirrors cloneRibInProduct).
+          ...(attrs.cardColor !== undefined ? { cardColor: attrs.cardColor } : {}),
         };
         didAdd = true;
         return { ...b, ribItems: [...b.ribItems, newRib] };
@@ -555,7 +558,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
   const addNamedRib = useCallback((
     themeId: string,
     backboneId: string,
-    attrs: { name: string; category?: 'core' | 'non-core'; size?: RibItem['size']; description?: string; notes?: string },
+    attrs: { name: string; category?: 'core' | 'non-core'; size?: RibItem['size']; description?: string; notes?: string; cardColor?: RibItem['cardColor'] },
   ) => {
     const newId = crypto.randomUUID();
     updateProduct(prev => addNamedRibToProduct(prev, themeId, backboneId, newId, attrs));

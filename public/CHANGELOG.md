@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.39.3 (2026-06-08)
+
+A Sizing-tab convenience for card colors.
+
+**Set a card's color from the Edit dialog**
+
+- **The "Edit Rib Item" dialog on the Sizing tab now has a Card Color picker**, so you can recolor a card while you're already editing its name, size, or notes — no need to close the dialog and reopen the card's "⋮" menu just to change the color. The color you pick is staged along with your other edits and applied when you click Save (and reverted if you discard). The "⋮ → Color…" menu shortcut on each card still works exactly as before.
+- **The same picker also appears when adding a card with the "+ Rib" button**, so you can set a color as you create it.
+- **Colors stay editable on locked cards** (cards with recorded progress). Color is an organizational flag, independent of work status, so it remains changeable even though the size stays locked to protect historical points math.
+
 ## Version 0.39.2 (2026-06-04)
 
 A small Dashboard icon fix.

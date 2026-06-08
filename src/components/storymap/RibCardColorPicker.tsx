@@ -2,14 +2,10 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  RIB_CARD_COLOR_KEYS,
-  RIB_CARD_COLOR_SWATCH,
-  RIB_CARD_COLOR_LABEL,
-  type RibCardColorKey,
-} from '../../lib/ribCardColors';
+import CardColorSwatchRow from '../ui/CardColorSwatchRow';
+import { type RibCardColorKey } from '../../lib/ribCardColors';
 
 interface RibCardColorPickerProps {
   /** Pointer-coords of the swatch button (used to anchor the popover). */
@@ -62,7 +58,7 @@ export default function RibCardColorPicker({ anchor, current, onSelect, onClose 
   return createPortal(
     <div
       ref={ref}
-      className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-1.5 flex items-center gap-1"
+      className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-1.5"
       style={{ left, top, width: POPOVER_WIDTH }}
       role="dialog"
       aria-label="Choose card color"
@@ -72,35 +68,8 @@ export default function RibCardColorPicker({ anchor, current, onSelect, onClose 
       // click guard doesn't interfere with dismissal.
       onClick={(e) => e.stopPropagation()}
     >
-      <button
-        type="button"
-        className={`w-4 h-4 rounded-full border ${
-          current === undefined
-            ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-500/50'
-            : 'border-gray-300 dark:border-gray-600 hover:border-gray-500 dark:hover:border-gray-400'
-        } bg-white dark:bg-gray-900 relative flex items-center justify-center`}
-        onClick={() => { onSelect(undefined); onClose(); }}
-        title="Clear color"
-        aria-label="Clear color"
-      >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 dark:text-gray-500" aria-hidden="true">
-          <line x1="5" y1="5" x2="19" y2="19"></line>
-        </svg>
-      </button>
-      {RIB_CARD_COLOR_KEYS.map(key => (
-        <button
-          key={key}
-          type="button"
-          className={`w-4 h-4 rounded-full border ${
-            current === key
-              ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-500/50'
-              : 'border-gray-300 dark:border-gray-600 hover:scale-110'
-          } ${RIB_CARD_COLOR_SWATCH[key]} transition-transform`}
-          onClick={() => { onSelect(key); onClose(); }}
-          title={RIB_CARD_COLOR_LABEL[key]}
-          aria-label={`Set color to ${RIB_CARD_COLOR_LABEL[key]}`}
-        />
-      ))}
+      {/* Selecting also dismisses the popover — that's the picker's contract. */}
+      <CardColorSwatchRow current={current} onSelect={(color) => { onSelect(color); onClose(); }} />
     </div>,
     document.body,
   );

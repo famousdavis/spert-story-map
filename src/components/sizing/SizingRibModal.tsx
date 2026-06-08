@@ -5,7 +5,9 @@
 import { useState, useEffect, useMemo, useId } from 'react';
 import Modal from '../ui/Modal';
 import SizePicker from '../ui/SizePicker';
+import CardColorSwatchRow from '../ui/CardColorSwatchRow';
 import { NOTES_MAX } from '../../lib/constants';
+import { isRibCardColorKey, type RibCardColorKey } from '../../lib/ribCardColors';
 import type { Product, Category, Size, RibItem, Theme, Backbone } from '../../types';
 
 export type SizingRibModalMode =
@@ -20,6 +22,7 @@ export interface SizingRibModalCreateInput {
   size: Size;
   description: string;
   notes: string;
+  cardColor: RibCardColorKey | undefined;
 }
 
 export interface SizingRibModalSaveInput {
@@ -28,6 +31,7 @@ export interface SizingRibModalSaveInput {
   category: Category;
   size: Size;          // ignored by caller when locked
   notes: string;
+  cardColor: RibCardColorKey | undefined;  // honored even when locked
 }
 
 export interface SizingRibModalProps {
@@ -97,11 +101,15 @@ export default function SizingRibModal({
     mode.kind === 'edit' && resolved ? (resolved.rib.size ?? null) : null);
   const [notes, setNotes] = useState<string>(() =>
     mode.kind === 'edit' && resolved ? (resolved.rib.notes ?? '') : '');
+  const [cardColor, setCardColor] = useState<RibCardColorKey | undefined>(() =>
+    mode.kind === 'edit' && resolved && isRibCardColorKey(resolved.rib.cardColor)
+      ? resolved.rib.cardColor
+      : undefined);
 
   // Snapshot the initial form values once at mount; we compare against this to detect
   // unsaved changes. Using lazy useState (never updated) instead of useRef so the values
   // can be accessed during render under React 19's react-hooks/refs rule.
-  const [initial] = useState({ themeId, backboneId, name, description, category, size, notes });
+  const [initial] = useState({ themeId, backboneId, name, description, category, size, notes, cardColor });
 
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
   const baseId = useId();
@@ -129,6 +137,7 @@ export default function SizingRibModal({
     category !== initial.category ||
     size !== initial.size ||
     notes !== initial.notes ||
+    cardColor !== initial.cardColor ||
     themeId !== initial.themeId ||
     effectiveBackboneId !== initial.backboneId;
 
@@ -156,15 +165,18 @@ export default function SizingRibModal({
         size,
         description,
         notes,
+        cardColor,
       });
     } else {
       // Modal always sends size in payload; SizingView is the size-omission boundary when locked.
+      // cardColor is always sent — color is allowed on locked cards (it's an organizational flag).
       onSave?.({
         name: trimmedName,
         description,
         category,
         size,
         notes,
+        cardColor,
       });
     }
     return true;
@@ -344,6 +356,10 @@ export default function SizingRibModal({
               onChange={(s) => setSize(s || null)}
             />
           )}
+        </Field>
+
+        <Field label="Card Color">
+          <CardColorSwatchRow current={cardColor} onSelect={setCardColor} />
         </Field>
 
         <Field label="Notes">
