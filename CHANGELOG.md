@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.39.2 (2026-06-04)
+
+A small Dashboard icon fix.
+
+**Clearer "Share" icon**
+
+- **The Share button on each project card now uses a person-with-a-plus icon** instead of the old upload-box shape, which was easy to mistake for an import/upload action. The new icon matches the Share icon used in SPERT Forecaster, so sharing looks consistent across the SPERT Suite. (Shown only in cloud mode, to the project owner — unchanged.)
+
 ## Version 0.39.1 (2026-06-03)
 
 Two small Map/Sizing usability fixes.
