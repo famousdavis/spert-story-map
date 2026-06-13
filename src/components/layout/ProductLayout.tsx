@@ -16,6 +16,8 @@ import { Footer } from '../../pages/ChangelogView';
 import { useAiConnectivity } from '../../hooks/useAiConnectivity';
 import { isFirebaseAvailable } from '../../lib/firebase';
 import { AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION } from '../../lib/aiConstants';
+import ConsentModal from '../ConnectAI/ConsentModal';
+import ConnectPanel from '../ConnectAI/ConnectPanel';
 
 const tabs = [
   { path: 'structure', label: 'Structure', icon: '◫' },
@@ -38,28 +40,38 @@ export default function ProductLayout() {
   const location = useLocation();
   const isCanvasView = /\/(storymap|sizing)(\/|$)/.test(location.pathname);
 
-  // PR 3: only destructure what this PR uses. stopSession, changePermissions,
-  // and the consent/panel UI arrive in PR 4. Called before the null-check
-  // early returns below so the Rules of Hooks hold (product may be null).
-  const { sessionState, startSession } = useAiConnectivity(product, updateProduct);
+  // Called before the null-check early returns below so the Rules of Hooks
+  // hold (product may be null during initial load).
+  const { sessionState, startSession, stopSession, changePermissions } =
+    useAiConnectivity(product, updateProduct);
+  const [showAiConsent, setShowAiConsent] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
 
-  // PR 3: simplified handler — reconnect resumes silently; first-connect calls
-  // startSession(false) directly (PR 4 replaces the else branch with the
-  // consent modal). The button is gated on VITE_AI_ENABLED, so this is
-  // dev-only until PR 4 removes the gate.
+  // Active session → open the panel. Otherwise: if consent is current and a
+  // session id is stored, resume silently and open the panel; a first-time
+  // user gets the consent modal.
   const handleConnectAiClick = useCallback(() => {
-    if (sessionState.sessionActive) return;
+    if (sessionState.sessionActive) { setShowAiPanel(true); return; }
     const stored = (() => {
       try { return JSON.parse(localStorage.getItem(AI_CONSENT_KEY) ?? 'null') as { version?: number; read?: boolean } | null; }
       catch { return null; }
     })();
     const sessionId = localStorage.getItem(AI_SESSION_ID_KEY);
     if (stored?.version === AI_CONSENT_VERSION && sessionId) {
-      startSession((stored.read as boolean) ?? false).catch(console.error);
+      startSession((stored.read as boolean) ?? false)
+        .then(ok => { if (ok) setShowAiPanel(true); })
+        .catch(console.error);
     } else {
-      startSession(false).catch(console.error);
+      setShowAiConsent(true);
     }
   }, [sessionState.sessionActive, startSession]);
+
+  // Consent modal "Connect": start the session, then swap to the panel.
+  const handleConsentConnect = useCallback(async (consentRead: boolean) => {
+    const ok = await startSession(consentRead);
+    if (ok) { setShowAiConsent(false); setShowAiPanel(true); }
+    return ok;
+  }, [startSession]);
 
   useEffect(() => {
     if (!driver) return;
@@ -130,7 +142,7 @@ export default function ProductLayout() {
                   Saved {formatRelativeTime(lastSaved)}
                 </span>
               )}
-              {isFirebaseAvailable && import.meta.env.VITE_AI_ENABLED === 'true' && (
+              {isFirebaseAvailable && (
                 <button onClick={handleConnectAiClick}
                   title={sessionState.sessionActive ? 'AI session active' : 'Connect an AI assistant'}
                   className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
@@ -147,7 +159,6 @@ export default function ProductLayout() {
                   {sessionState.sessionActive ? 'AI' : 'Connect AI'}
                 </button>
               )}
-              {/* PR 4: mount ConsentModal + ConnectPanel here; remove the VITE_AI_ENABLED gate */}
               <button
                 onClick={() => setShowSettings(true)}
                 title="App Settings"
@@ -207,6 +218,18 @@ export default function ProductLayout() {
       {!isCanvasView && <Footer />}
 
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+      <ConsentModal
+        open={showAiConsent}
+        onClose={() => setShowAiConsent(false)}
+        onConnect={handleConsentConnect}
+      />
+      <ConnectPanel
+        open={showAiPanel}
+        onClose={() => setShowAiPanel(false)}
+        sessionState={sessionState}
+        onChangePermissions={changePermissions}
+        onDisconnect={stopSession}
+      />
     </div>
   );
 }

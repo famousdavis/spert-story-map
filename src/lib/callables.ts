@@ -89,3 +89,16 @@ export async function callResendInvite(input: ResendInviteInput): Promise<Resend
   )(input);
   return r.data;
 }
+
+/**
+ * Mints a single-use WORD-NNNN pairing code for an AI session. `sessionId`
+ * is the anonymous-session capability token created by useAiConnectivity.
+ */
+export async function callGeneratePairingCode(
+  sessionId: string,
+): Promise<{ code: string; expiresAt: string }> {
+  const r = await httpsCallable<{ sessionId: string }, { code: string; expiresAt: string }>(
+    requireFunctions(), 'generatePairingCode',
+  )({ sessionId });
+  return r.data;
+}

@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.40.0 (2026-06-13)
+
+Connect an AI assistant to build your story map.
+
+**New: "Connect AI"**
+
+- **A new "Connect AI" button in the project header pairs your AI chatbot (ChatGPT, Claude, and others) with SPERT Story Map so it can build a story map for you.** Click Connect AI, choose what the assistant may do, and you'll get a short pairing code (like `CRANE-7842`) plus a ready-to-paste prompt for your chatbot. The assistant asks what product you're planning and which modeling approach fits *before* building anything — then themes, backbones, and rib items appear on your map as it works.
+- **You control access.** Write Mode (the assistant can add structure to the project you have open) is required; Read Mode (the assistant can see your current map for context) is optional and off by default. Toggle Read Mode any time from the session panel, or Disconnect to end the session immediately.
+- **Privacy-conscious.** Pairing codes are single-use and expire after 15 minutes; the assistant only ever works on the project you have open, with only the permissions you grant. See the in-app AI privacy notice for details.
+
 ## Version 0.39.3 (2026-06-08)
 
 A Sizing-tab convenience for card colors.
