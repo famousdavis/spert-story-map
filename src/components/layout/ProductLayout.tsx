@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { NavLink, Link, useParams, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useProduct } from '../../hooks/useProduct';
 import { useStorage } from '../../lib/StorageProvider';
@@ -13,6 +13,9 @@ import StorageStatusPill from '../ui/StorageStatusPill';
 import AppSettingsModal from '../settings/AppSettingsModal';
 import FirstRunBanner from '../ui/FirstRunBanner';
 import { Footer } from '../../pages/ChangelogView';
+import { useAiConnectivity } from '../../hooks/useAiConnectivity';
+import { isFirebaseAvailable } from '../../lib/firebase';
+import { AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION } from '../../lib/aiConstants';
 
 const tabs = [
   { path: 'structure', label: 'Structure', icon: '◫' },
@@ -34,6 +37,29 @@ export default function ProductLayout() {
   const { theme, toggleTheme, isDark } = useDarkMode();
   const location = useLocation();
   const isCanvasView = /\/(storymap|sizing)(\/|$)/.test(location.pathname);
+
+  // PR 3: only destructure what this PR uses. stopSession, changePermissions,
+  // and the consent/panel UI arrive in PR 4. Called before the null-check
+  // early returns below so the Rules of Hooks hold (product may be null).
+  const { sessionState, startSession } = useAiConnectivity(product, updateProduct);
+
+  // PR 3: simplified handler — reconnect resumes silently; first-connect calls
+  // startSession(false) directly (PR 4 replaces the else branch with the
+  // consent modal). The button is gated on VITE_AI_ENABLED, so this is
+  // dev-only until PR 4 removes the gate.
+  const handleConnectAiClick = useCallback(() => {
+    if (sessionState.sessionActive) return;
+    const stored = (() => {
+      try { return JSON.parse(localStorage.getItem(AI_CONSENT_KEY) ?? 'null') as { version?: number; read?: boolean } | null; }
+      catch { return null; }
+    })();
+    const sessionId = localStorage.getItem(AI_SESSION_ID_KEY);
+    if (stored?.version === AI_CONSENT_VERSION && sessionId) {
+      startSession((stored.read as boolean) ?? false).catch(console.error);
+    } else {
+      startSession(false).catch(console.error);
+    }
+  }, [sessionState.sessionActive, startSession]);
 
   useEffect(() => {
     if (!driver) return;
@@ -104,6 +130,24 @@ export default function ProductLayout() {
                   Saved {formatRelativeTime(lastSaved)}
                 </span>
               )}
+              {isFirebaseAvailable && import.meta.env.VITE_AI_ENABLED === 'true' && (
+                <button onClick={handleConnectAiClick}
+                  title={sessionState.sessionActive ? 'AI session active' : 'Connect an AI assistant'}
+                  className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                    sessionState.sessionActive
+                      ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20'
+                      : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+                  }`}
+                >
+                  {sessionState.sessionActive && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      sessionState.aiConnected ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
+                    }`} />
+                  )}
+                  {sessionState.sessionActive ? 'AI' : 'Connect AI'}
+                </button>
+              )}
+              {/* PR 4: mount ConsentModal + ConnectPanel here; remove the VITE_AI_ENABLED gate */}
               <button
                 onClick={() => setShowSettings(true)}
                 title="App Settings"

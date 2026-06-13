@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useCallback } from 'react';
-import type { Product, Theme, Backbone, RibItem } from '../types';
+import type { Product, Theme, Backbone, RibItem, ColorKey } from '../types';
 import { calculateNextSprintEndDate } from '../lib/progressMutations';
 import { DEFAULT_THEME_COLOR_KEYS } from '../lib/themeColors';
 import { appendChangeLogEntry } from '../lib/storage';
@@ -43,6 +43,7 @@ export function addNamedRibToProduct(
       ...t,
       backboneItems: t.backboneItems.map(b => {
         if (b.id !== backboneId) return b;
+        if (b.ribItems.some(r => r.id === newId)) return b; // idempotency: no-op if rib already exists
         const newRib: RibItem = {
           id: newId,
           name: attrs.name,
@@ -633,4 +634,51 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     setCardColorLabel,
     moveItem,
   };
+}
+
+/** Pure, idempotent: no-op if a theme with this ID already exists. */
+export function addNamedThemeToProduct(
+  prev: Product,
+  newId: string,
+  attrs: { name: string; color?: ColorKey },
+): Product {
+  if (prev.themes.some(t => t.id === newId)) return prev;
+  const next = {
+    ...prev,
+    themes: [...prev.themes, {
+      id: newId,
+      name: attrs.name,
+      order: prev.themes.length + 1,
+      // noUncheckedIndexedAccess makes the index access ColorKey | undefined,
+      // which is assignable to the optional color field (mirrors addTheme).
+      color: attrs.color ?? DEFAULT_THEME_COLOR_KEYS[prev.themes.length % DEFAULT_THEME_COLOR_KEYS.length],
+      backboneItems: [],
+    }],
+  };
+  return { ...next, _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'theme', id: newId }) };
+}
+
+/** Pure, idempotent: no-op if a backbone with this ID already exists in the theme. */
+export function addNamedBackboneToProduct(
+  prev: Product,
+  themeId: string,
+  newId: string,
+  attrs: { name: string; description?: string },
+): Product {
+  const theme = prev.themes.find(t => t.id === themeId);
+  if (!theme) return prev;
+  if (theme.backboneItems.some(b => b.id === newId)) return prev;
+  const next = {
+    ...prev,
+    themes: prev.themes.map(t =>
+      t.id !== themeId ? t : {
+        ...t,
+        backboneItems: [...t.backboneItems, {
+          id: newId, name: attrs.name, description: attrs.description ?? '',
+          order: t.backboneItems.length + 1, ribItems: [],
+        }],
+      }
+    ),
+  };
+  return { ...next, _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'backbone', id: newId }) };
 }
