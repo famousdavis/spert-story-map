@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Product } from '../types';
-import { applyAiOp, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
+import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
 
 function makeProduct(): Product {
   return {
@@ -110,5 +110,272 @@ describe('computeSafePrefix', () => {
     const { safeOps, nextSeq } = computeSafePrefix(makeProduct(), []);
     expect(safeOps.length).toBe(0);
     expect(nextSeq).toBe(0);
+  });
+});
+
+// ── Helper ─────────────────────────────────────────────────────────────────
+function makeProductWithContent(): Product {
+  let p = makeProduct();
+  p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'Theme' });
+  p = applyAiOp(p, 'create_backbone', {
+    themeId: 't1', backboneId: 'b1',
+    name: 'Backbone', description: 'Original desc',
+  });
+  p = applyAiOp(p, 'create_rib', {
+    themeId: 't1', backboneId: 'b1', ribId: 'r1',
+    name: 'Rib', category: 'core',
+  });
+  return p;
+}
+
+// ── update_theme ──────────────────────────────────────────────────────────
+describe('applyAiOp — update_theme', () => {
+  it('updates name and appends a changelog entry', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_theme', { themeId: 't1', name: 'New Theme' });
+    expect(next.themes[0]?.name).toBe('New Theme');
+    const log = next._changeLog ?? [];
+    const last = log[log.length - 1];
+    expect(last?.op).toBe('update');
+    expect(last?.entity).toBe('theme');
+    expect(last?.id).toBe('t1');
+    expect(last?.source).toBe('ai');
+  });
+  it('is ref-equal no-op when themeId does not match', () => {
+    const p = makeProductWithContent();
+    expect(applyAiOp(p, 'update_theme', { themeId: 'ghost', name: 'X' })).toBe(p);
+  });
+  it('is ref-equal no-op when name is absent', () => {
+    const p = makeProductWithContent();
+    expect(applyAiOp(p, 'update_theme', { themeId: 't1' })).toBe(p);
+  });
+});
+
+// ── update_backbone ───────────────────────────────────────────────────────
+describe('applyAiOp — update_backbone', () => {
+  it('updates name only, preserves description', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_backbone', {
+      themeId: 't1', backboneId: 'b1', name: 'New Backbone',
+    });
+    expect(next.themes[0]?.backboneItems[0]?.name).toBe('New Backbone');
+    expect(next.themes[0]?.backboneItems[0]?.description).toBe('Original desc');
+  });
+  it('updates description only, preserves name', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_backbone', {
+      themeId: 't1', backboneId: 'b1', description: 'New desc',
+    });
+    expect(next.themes[0]?.backboneItems[0]?.name).toBe('Backbone');
+    expect(next.themes[0]?.backboneItems[0]?.description).toBe('New desc');
+  });
+  it('updates both name and description', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_backbone', {
+      themeId: 't1', backboneId: 'b1', name: 'N', description: 'D',
+    });
+    expect(next.themes[0]?.backboneItems[0]?.name).toBe('N');
+    expect(next.themes[0]?.backboneItems[0]?.description).toBe('D');
+  });
+  it('appends a changelog entry', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_backbone', {
+      themeId: 't1', backboneId: 'b1', name: 'N',
+    });
+    const log = next._changeLog ?? [];
+    const last = log[log.length - 1];
+    expect(last?.op).toBe('update');
+    expect(last?.entity).toBe('backbone');
+    expect(last?.id).toBe('b1');
+    expect(last?.source).toBe('ai');
+  });
+  it('is ref-equal no-op when no fields provided', () => {
+    const p = makeProductWithContent();
+    expect(
+      applyAiOp(p, 'update_backbone', { themeId: 't1', backboneId: 'b1' })
+    ).toBe(p);
+  });
+  it('is ref-equal no-op when backboneId does not match', () => {
+    const p = makeProductWithContent();
+    expect(
+      applyAiOp(p, 'update_backbone', { themeId: 't1', backboneId: 'ghost', name: 'N' })
+    ).toBe(p);
+  });
+});
+
+// ── update_rib ────────────────────────────────────────────────────────────
+describe('applyAiOp — update_rib', () => {
+  it('updates name only, other fields unchanged', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'New Rib',
+    });
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.name).toBe('New Rib');
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.category).toBe('core');
+  });
+  it('updates size on an unlocked rib', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', size: 'M',
+    });
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBe('M');
+  });
+  it('silently ignores size on a locked (in-progress) rib', () => {
+    let p = makeProduct();
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    // Inject a rib with progress directly (tests the lock guard, not the
+    // progress-recording machinery).
+    const ribWithProgress = {
+      id: 'r1', name: 'Rib', description: '', order: 1, size: null,
+      category: 'core' as const,
+      releaseAllocations: [],
+      progressHistory: [{ sprintId: 's1', releaseId: 'rel1', percentComplete: 50 }],
+    };
+    p = {
+      ...p,
+      themes: p.themes.map(t => ({
+        ...t,
+        backboneItems: t.backboneItems.map(b => ({
+          ...b, ribItems: [...b.ribItems, ribWithProgress],
+        })),
+      })),
+    };
+    const next = applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', size: 'L',
+    });
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBeNull();
+  });
+  it('handles missing progressHistory (null guard)', () => {
+    // Imported/hand-edited products may have progressHistory absent.
+    let p = makeProduct();
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    const ribNoProgress = {
+      id: 'r1', name: 'Rib', description: '', order: 1, size: null,
+      category: 'core' as const,
+      releaseAllocations: [],
+      progressHistory: undefined as unknown as [],
+    };
+    p = {
+      ...p,
+      themes: p.themes.map(t => ({
+        ...t,
+        backboneItems: t.backboneItems.map(b => ({
+          ...b, ribItems: [...b.ribItems, ribNoProgress],
+        })),
+      })),
+    };
+    // Must not throw; size should apply (undefined treated as empty = not locked).
+    expect(() =>
+      applyAiOp(p, 'update_rib', {
+        themeId: 't1', backboneId: 'b1', ribId: 'r1', size: 'S',
+      })
+    ).not.toThrow();
+    const next = applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', size: 'S',
+    });
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBe('S');
+  });
+  it('clears size to null on an unlocked rib', () => {
+    const p = makeProductWithContent();
+    const sized = applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', size: 'L',
+    });
+    const cleared = applyAiOp(sized, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', size: null,
+    });
+    expect(cleared.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBeNull();
+  });
+  it('appends a changelog entry', () => {
+    const p = makeProductWithContent();
+    const next = applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R',
+    });
+    const log = next._changeLog ?? [];
+    const last = log[log.length - 1];
+    expect(last?.op).toBe('update');
+    expect(last?.entity).toBe('rib');
+    expect(last?.id).toBe('r1');
+    expect(last?.source).toBe('ai');
+  });
+  it('is ref-equal no-op when no fields provided', () => {
+    const p = makeProductWithContent();
+    expect(
+      applyAiOp(p, 'update_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1' })
+    ).toBe(p);
+  });
+  it('is ref-equal no-op when ribId does not match', () => {
+    const p = makeProductWithContent();
+    expect(
+      applyAiOp(p, 'update_rib', {
+        themeId: 't1', backboneId: 'b1', ribId: 'ghost', name: 'N',
+      })
+    ).toBe(p);
+  });
+});
+
+// ── applyDrainOps ─────────────────────────────────────────────────────────
+describe('applyDrainOps', () => {
+  it('applies ops in document order and returns final product + nextSeq', () => {
+    const p = makeProduct();
+    const drainOps: AiOpDoc[] = [
+      { seq: 1, op: 'create_theme', payload: { themeId: 't1', name: 'T' } },
+      { seq: 2, op: 'create_backbone',
+        payload: { themeId: 't1', backboneId: 'b1', name: 'B' } },
+      { seq: 3, op: 'create_rib',
+        payload: { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R' } },
+    ];
+    const { product: next, nextSeq } = applyDrainOps(p, drainOps);
+    expect(nextSeq).toBe(3);
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.name).toBe('R');
+  });
+  it('recovers ops that were no-ops due to missing preconditions', () => {
+    // Simulate: create_theme was in the null window (never applied).
+    // create_backbone arrived post-window as a no-op (theme missing).
+    const base = makeProduct();
+    const afterNoOp = applyAiOp(base, 'create_backbone', {
+      themeId: 't1', backboneId: 'b1', name: 'B',
+    });
+    expect(afterNoOp).toBe(base); // confirmed: no theme t1 → ref-equal no-op
+    const { product: drained } = applyDrainOps(afterNoOp, [
+      { seq: 1, op: 'create_theme', payload: { themeId: 't1', name: 'T' } },
+      { seq: 2, op: 'create_backbone',
+        payload: { themeId: 't1', backboneId: 'b1', name: 'B' } },
+    ]);
+    expect(drained.themes.length).toBe(1);
+    expect(drained.themes[0]?.backboneItems[0]?.name).toBe('B');
+  });
+  it('re-applying already-applied create ops is idempotent', () => {
+    let built = makeProduct();
+    built = applyAiOp(built, 'create_theme', { themeId: 't1', name: 'T' });
+    built = applyAiOp(built, 'create_backbone', {
+      themeId: 't1', backboneId: 'b1', name: 'B',
+    });
+    const { product: drained } = applyDrainOps(built, [
+      { seq: 1, op: 'create_theme', payload: { themeId: 't1', name: 'T' } },
+      { seq: 2, op: 'create_backbone',
+        payload: { themeId: 't1', backboneId: 'b1', name: 'B' } },
+    ]);
+    expect(drained.themes.length).toBe(1);
+    expect(drained.themes[0]?.backboneItems.length).toBe(1);
+  });
+  it('returns original product ref and nextSeq 0 for an empty ops array', () => {
+    const p = makeProduct();
+    const { product: next, nextSeq } = applyDrainOps(p, []);
+    expect(next).toBe(p);
+    expect(nextSeq).toBe(0);
+  });
+  it('advances cursor past unknown ops (default: logs warn, returns prev, does not throw)', () => {
+    // Unknown ops are folded into safeOps (default case never throws).
+    // nextSeq advances to the unknown op's seq — permanently skipping it
+    // from the listener's perspective. This is the correct behavior for
+    // version-skew; it reinforces why SM #86 must deploy before LP #52.
+    const p = makeProductWithContent();
+    const { product: next, nextSeq } = applyDrainOps(p, [
+      { seq: 7, op: 'frobnicate', payload: {} },
+    ]);
+    expect(nextSeq).toBe(7); // cursor advances past unknown op
+    expect(next.themes.length).toBe(p.themes.length); // state unchanged
   });
 });

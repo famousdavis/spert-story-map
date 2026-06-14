@@ -6,14 +6,14 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import {
   collection, doc, query, orderBy, where,
   onSnapshot, updateDoc, setDoc, deleteDoc,
-  serverTimestamp, getDoc,
+  serverTimestamp, getDoc, getDocs,
 } from 'firebase/firestore';
 import type { QuerySnapshot, DocumentData, DocumentSnapshot, FirestoreError } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functionsInstance, isFirebaseAvailable } from '../lib/firebase';
 import { APP_VERSION } from '../lib/version';
 import type { Product, ProductUpdater } from '../types';
-import { applyAiOp, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
+import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
 import {
   AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION, AI_LAST_SEQ_PREFIX,
 } from '../lib/aiConstants';
@@ -90,6 +90,12 @@ export function useAiConnectivity(
   // path — resetting there would defeat the cap).
   const opRetryCountRef = useRef(0);
   const sessionRetryCountRef = useRef(0);
+  // D5 null-product window recovery. highestSeenSeqRef tracks the max op seq
+  // ever delivered; inNullWindowRef + preNullWindowSeqRef capture the cursor
+  // at the moment ops first arrive while productRef.current is null.
+  const highestSeenSeqRef = useRef(0);
+  const inNullWindowRef = useRef(false);
+  const preNullWindowSeqRef = useRef(0);
 
   useEffect(() => { productRef.current = product; }, [product]);
   useEffect(() => { consentReadRef.current = sessionState.consentRead; }, [sessionState.consentRead]);
@@ -105,6 +111,9 @@ export function useAiConnectivity(
     activeSessionIdRef.current = null;
     opRetryCountRef.current = 0;
     sessionRetryCountRef.current = 0;
+    highestSeenSeqRef.current = 0;
+    inNullWindowRef.current = false;
+    preNullWindowSeqRef.current = 0;
   }, []);
 
   // ── Snapshot writer ─────────────────────────────────────────────────────────
@@ -153,11 +162,29 @@ export function useAiConnectivity(
       opRetryCountRef.current = 0; // successful delivery resets the error streak
       const candidates: AiOpDoc[] = snapshot.docChanges()
         .filter(c => c.type === 'added')
-        .map(c => ({ seq: c.doc.data().seq as number, op: c.doc.data().op as string, payload: c.doc.data().payload as unknown }))
+        .map(c => ({
+          seq: c.doc.data().seq as number,
+          op: c.doc.data().op as string,
+          payload: c.doc.data().payload as unknown,
+        }))
         .sort((a, b) => a.seq - b.seq);
       if (!candidates.length) return;
+      // Always advance the high-water mark before the null-product guard.
+      // noUncheckedIndexedAccess: candidates.length > 0 confirmed above.
+      const lastCandidate = candidates[candidates.length - 1]; // AiOpDoc | undefined
+      if (lastCandidate !== undefined && lastCandidate.seq > highestSeenSeqRef.current) {
+        highestSeenSeqRef.current = lastCandidate.seq;
+      }
       const current = productRef.current;
-      if (!current) return;
+      if (!current) {
+        // Null-product window. Capture the floor once (lastSeq is stable
+        // during the window — never advances while product is null).
+        if (!inNullWindowRef.current) {
+          inNullWindowRef.current = true;
+          preNullWindowSeqRef.current = getLastSeq(sessionId);
+        }
+        return;
+      }
       const toProcess = candidates.filter(o => o.seq > getLastSeq(sessionId));
       if (!toProcess.length) return;
       const { safeOps, nextSeq } = computeSafePrefix(current, toProcess);
@@ -239,12 +266,95 @@ export function useAiConnectivity(
   useEffect(() => { resubscribeOpsRef.current = resubscribeOps; }, [resubscribeOps]);
   useEffect(() => { resubscribeSessionRef.current = resubscribeSession; }, [resubscribeSession]);
 
-  // ── Re-subscribe ops listener on product change ──────────────────────────────
+  // ── Re-subscribe ops listener on product change (D5: null-window drain) ───
   useEffect(() => {
     const sessionId = activeSessionIdRef.current;
-    if (!productRef.current || !sessionId || !opsUnsubRef.current) return;
+    // Guard: product and session must exist.
+    // !opsUnsubRef.current is intentionally absent. Two reasons:
+    //   1. The drain branch sets opsUnsubRef.current = null before going async;
+    //      if this effect re-fires during the drain, it must still reach
+    //      resubscribeOps to re-establish the listener.
+    //   2. The !sessionId guard covers the "no active session" case
+    //      (activeSessionIdRef.current is null when no session is live).
+    if (!productRef.current || !sessionId) return;
+    const wasInNullWindow = inNullWindowRef.current;
+    const nullFloor = preNullWindowSeqRef.current;
+    const drainCeiling = highestSeenSeqRef.current;
+    inNullWindowRef.current = false;
+    preNullWindowSeqRef.current = 0;
+    if (wasInNullWindow && drainCeiling > nullFloor && db) {
+      // Detach old listener BEFORE getDocs. Ops arriving during the async
+      // window are persisted; post-drain resubscription picks them up from
+      // the correct cursor.
+      opsUnsubRef.current?.();
+      opsUnsubRef.current = null;
+      let completed = false;
+      let cancelled = false;
+      // timedOut: set when the fallback fires first. Signals the later
+      // getDocs .then to skip re-draining (the timeout already resubscribed
+      // and the new listener will deliver null-window ops normally from
+      // getLastSeq = nullFloor). Without this flag, a slow-but-settling
+      // getDocs would re-apply the drain range a second time and double-log
+      // 'update' changelog entries.
+      let timedOut = false;
+      // Fallback: if getDocs never settles (network partition), re-establish
+      // the listener within 5 s rather than leaving the session deaf.
+      // Session guard: prevents zombie listener if stopSession fires mid-drain
+      // (localTeardown nulls activeSessionIdRef; check prevents resubscribing
+      // into a torn-down session).
+      const drainTimerId = setTimeout(() => {
+        if (!completed && !cancelled && activeSessionIdRef.current === sessionId && db) {
+          timedOut = true;
+          resubscribeOps(sessionId);
+        }
+      }, 5000);
+      const drainQuery = query(
+        collection(db, 'anonymous_sessions', sessionId, 'ops'),
+        where('seq', '>', nullFloor),
+        where('seq', '<=', drainCeiling),
+        orderBy('seq', 'asc'),
+      );
+      getDocs(drainQuery).then(snap => {
+        clearTimeout(drainTimerId);
+        completed = true;
+        // cancelled: effect cleanup fired (deps changed).
+        // timedOut: fallback already resubscribed; new listener delivers ops.
+        // Either way: skip the drain apply to avoid double-application.
+        if (cancelled || timedOut) return;
+        // Session guard: stopSession may have fired during getDocs.
+        if (activeSessionIdRef.current !== sessionId || !db) return;
+        const drainOps: AiOpDoc[] = snap.docs
+          .map(d => ({
+            seq: d.data().seq as number,
+            op: d.data().op as string,
+            payload: d.data().payload as unknown,
+          }))
+          .sort((a, b) => a.seq - b.seq);
+        if (drainOps.length && productRef.current) {
+          // nextSeq is product-state-independent for Phase-1 vocabulary (see
+          // applyDrainOps JSDoc). Safe to compute against productRef.current
+          // as a proxy for the functional update's seq value.
+          const { nextSeq } = applyDrainOps(productRef.current, drainOps);
+          updateProduct(prev => applyDrainOps(prev, drainOps).product);
+          if (nextSeq > getLastSeq(sessionId)) {
+            setLastSeq(sessionId, nextSeq);
+          }
+        }
+        resubscribeOps(sessionId);
+      }).catch(() => {
+        clearTimeout(drainTimerId);
+        completed = true;
+        if (!cancelled && !timedOut && activeSessionIdRef.current === sessionId && db) {
+          resubscribeOps(sessionId);
+        }
+      });
+      return () => {
+        cancelled = true;
+        clearTimeout(drainTimerId);
+      };
+    }
     resubscribeOps(sessionId);
-  }, [product?.id, resubscribeOps]);
+  }, [product?.id, resubscribeOps, updateProduct]);
 
   // ── Heartbeat ────────────────────────────────────────────────────────────────
   const startHeartbeat = useCallback((sessionId: string) => {
@@ -383,6 +493,10 @@ export function useAiConnectivity(
       // ── Fresh-create path ────────────────────────────────────────────────
       if (prevConsentRead === null) {
         setLastSeq(sessionId, 0);
+        // Reset D5 refs so a fresh session starts with no null-window state.
+        highestSeenSeqRef.current = 0;
+        inNullWindowRef.current = false;
+        preNullWindowSeqRef.current = 0;
         const freshRef = doc(db, 'anonymous_sessions', sessionId);
         try {
           await setDoc(freshRef, {
