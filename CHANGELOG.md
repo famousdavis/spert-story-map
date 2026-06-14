@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.41.3 (2026-06-13)
+
+A capacity bump for AI-built story maps.
+
+**More backbones per theme**
+
+- **The Connect AI assistant can now create up to 10 backbones per theme** when building a map from scratch (previously 5). The limits on themes (5) and rib items per backbone (10) are unchanged, so a single AI-built map can now span up to 500 rib items. Existing maps and the build flow are otherwise unchanged.
+
 ## Version 0.41.2 (2026-06-13)
 
 A footer link addition.

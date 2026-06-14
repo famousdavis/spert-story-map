@@ -39,8 +39,8 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     case 'bulk_import': {
       if (!Array.isArray(p.themes) || p.themes.length === 0) return prev;
       // Apply all addNamed* helpers. Each call appends a per-entity 'add'
-      // entry to the accumulating next._changeLog. After 250 ribs,
-      // next._changeLog can hold 250+ entries.
+      // entry to the accumulating next._changeLog. After 500 ribs,
+      // next._changeLog can hold 500+ entries.
       let next = prev;
       for (const theme of (p.themes as unknown[])) {
         if (!theme || typeof theme !== 'object') continue;
@@ -66,7 +66,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       // Changelog idempotency: if all addNamed* were no-ops, next === prev.
       if (next === prev) return prev;
       // CRITICAL — changelog collapse:
-      // next._changeLog now has 250+ 'add' entries from the helpers above.
+      // next._changeLog now has 500+ 'add' entries from the helpers above.
       // We MUST use `prev` (not `next`) as the base for appendChangeLogEntry,
       // so the final _changeLog = prev._changeLog + one 'import' entry. The
       // spread { ...next, _changeLog } overrides next._changeLog with this
