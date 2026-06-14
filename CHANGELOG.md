@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.41.2 (2026-06-13)
+
+A footer link addition.
+
+**AI Privacy Notice link**
+
+- **Added an "AI Privacy Notice" link to the footer**, alongside the existing Terms of Service, Privacy Policy, and License links. It points to the SPERT Suite AI privacy notice, which covers the Connect AI feature.
+
 ## Version 0.41.1 (2026-06-13)
 
 A Connect AI prompt refinement.
