@@ -28,7 +28,8 @@ export type ChangeLogOp =
   | 'import'
   | 'cloud-migration'
   | 'duplicate'
-  | 'split';
+  | 'split'
+  | 'update';
 
 export type ChangeLogEntity =
   | 'product'

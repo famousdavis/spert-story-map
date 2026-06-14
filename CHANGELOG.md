@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.41.0 (2026-06-13)
+
+The Connect AI assistant can now refine an existing story map, not just build one from scratch.
+
+**New: AI-assisted editing**
+
+- **Your connected AI assistant can now make targeted changes to a map you've already started** — rename a theme, update a backbone's name or description, or revise a rib item's name, description, category, notes, or size. Previously the assistant could only build a complete map in one pass; now it can adjust individual items as you refine your plan together. Turn on Read Mode so the assistant can see your current structure before it edits.
+- **Sizing is protected on work in progress.** If a rib item already has recorded progress, the assistant won't change its size — the same safeguard the Sizing tab uses — so your historical points and forecast math stay intact. Names, descriptions, and notes remain editable.
+
+**Reliability**
+
+- **More reliable sync while the app is loading** — structure the assistant sends before your project finishes opening is now applied correctly once it's ready.
+
 ## Version 0.40.0 (2026-06-13)
 
 Connect an AI assistant to build your story map.
