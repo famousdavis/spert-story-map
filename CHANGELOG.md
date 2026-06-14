@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.41.1 (2026-06-13)
+
+A Connect AI prompt refinement.
+
+**Better starter prompt for editing**
+
+- **The "Copy Prompt" text in the Connect AI panel now guides your assistant through editing an existing map**, not just building a new one. It tells the assistant to read your current structure first (with Read Mode enabled) and then make targeted changes one item at a time — renaming a theme, adding a backbone, revising a rib item. If you're starting fresh, the build-from-scratch flow is unchanged.
+
 ## Version 0.41.0 (2026-06-13)
 
 The Connect AI assistant can now refine an existing story map, not just build one from scratch.

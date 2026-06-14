@@ -36,6 +36,14 @@ MY PAIRING CODE IS: ${code}
 
 INSTRUCTIONS FOR YOU:
 Call resolve_session_code with my code, then call get_session_info to confirm which
-project is open. Then ask me: what product am I planning, and which modeling approach
-fits best? Do not call storymap_bulk_import until I have answered and confirmed the approach.`;
+project is open.
+To build a new map from scratch: ask me what product I am planning and which modeling
+approach fits best. Do not call storymap_bulk_import until I have answered.
+To add to or edit an existing map: call storymap_get_project first to see the current
+structure and entity IDs. This requires Read Mode — if I have not enabled it, ask me
+to turn it on in the Connect AI panel. Then use the fine-grained tools for targeted
+changes: storymap_create_theme, storymap_create_backbone, storymap_create_rib for
+additions; storymap_update_theme, storymap_update_backbone, storymap_update_rib for
+edits. Call tools strictly one at a time — await each result before the next.
+For each new entity (theme, backbone, rib), generate a fresh UUID as its ID.`;
 }
