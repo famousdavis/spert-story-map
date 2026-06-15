@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.41.7 (2026-06-15)
+
+A Connect AI compatibility fix for more AI assistants.
+
+**Connect AI now works with assistants that build maps step by step**
+
+- **Fixed an issue where some AI assistants would fail when building a whole story map at once.** A few assistants — such as Microsoft Copilot Chat — couldn't handle the fast "build the entire map in one shot" request and stopped with an error partway through. The "Copy Prompt" instructions now tell the assistant to fall back to building the map one piece at a time (the theme, then each backbone, then each story) whenever the all-at-once path isn't supported by that assistant.
+- **The fast path is still the default.** Assistants that support it keep building maps in a single step; only the ones that need it switch to the step-by-step approach, and they do so automatically. Either way you end up with the same finished map.
+
 ## Version 0.41.6 (2026-06-15)
 
 A quicker way to rename a project.
