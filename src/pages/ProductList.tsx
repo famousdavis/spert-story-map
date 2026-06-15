@@ -243,6 +243,17 @@ export default function ProductList() {
     refresh();
   };
 
+  const handleRename = async (id, name) => {
+    if (!driver) return;
+    // Load fresh so we persist the real product, not the enriched list summary
+    // (which carries derived totals). saveProductImmediate bumps updatedAt and,
+    // in cloud mode, merges only changed fields — never owner/members.
+    const product = await driver.loadProduct(id);
+    if (!product) return;
+    await driver.saveProductImmediate({ ...product, name });
+    refresh();
+  };
+
   const handleExport = async (id) => {
     if (!driver) return;
     const product = await driver.loadProduct(id);
@@ -428,6 +439,7 @@ export default function ProductList() {
                   isDragging={dragId === p.id}
                   isDropTarget={dropBeforeId === p.id}
                   onNavigate={() => navigate(`/product/${p.id}/structure`)}
+                  onRename={newName => handleRename(p.id, newName)}
                   onShare={() => setShareTarget({ id: p.id, name: p.name })}
                   onExport={() => handleExport(p.id)}
                   onDuplicate={() => handleDuplicate(p.id)}
