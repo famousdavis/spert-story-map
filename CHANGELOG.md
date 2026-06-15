@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.41.4 (2026-06-14)
+
+A Connect AI reliability fix.
+
+**More reliable AI session pairing**
+
+- **Fixed an issue where some AI assistants would stop partway through building a map and ask you for a new pairing code.** The "Copy Prompt" instructions now make clear that the assistant should claim your session only once, at the start of the conversation. The pairing code is single-use, and some assistants were re-checking it before each step and treating the expected failure as an expired session. Your session now stays active for the entire conversation, so the build continues uninterrupted.
+
 ## Version 0.41.3 (2026-06-13)
 
 A capacity bump for AI-built story maps.
