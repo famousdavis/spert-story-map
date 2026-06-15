@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.41.8 (2026-06-15)
+
+A stronger Connect AI prompt for assistants that build maps step by step.
+
+**Clearer guidance for Microsoft Copilot Chat and larger maps**
+
+- **The "Copy Prompt" instructions are now more direct for assistants that can't build a whole map in one shot.** Assistants such as Microsoft Copilot Chat are now told to skip the all-at-once method from the start and build the map piece by piece — instead of trying the fast path, hitting an error, and recovering. They're also told never to retry the all-at-once method after it errors.
+- **Added guidance for maps that are too big for a single import.** The fast all-at-once method supports up to 5 themes, 10 backbones per theme, and 10 stories per backbone. If your map is larger, the assistant will either ask you to trim it to fit or switch to building it piece by piece — and it will never silently drop part of your map to squeeze it in.
+
 ## Version 0.41.7 (2026-06-15)
 
 A Connect AI compatibility fix for more AI assistants.

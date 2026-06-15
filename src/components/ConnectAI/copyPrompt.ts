@@ -38,14 +38,23 @@ INSTRUCTIONS FOR YOU:
 Call resolve_session_code with my code, then call get_session_info to confirm which
 project is open.
 Call resolve_session_code exactly once — it is single-use and will fail if called again. The session remains active for the entire conversation after that first successful call. Do not call resolve_session_code again at any point.
-To build a new map from scratch: ask me what product I am planning and which modeling
-approach fits best. Do not call storymap_bulk_import until I have answered. Once I have,
-prefer storymap_bulk_import with the full structure in a single call — it is the fast path.
-If your client cannot construct bulk_import's nested input (for example, you get an error
-like "structure.themes.name is not a valid property" — common with Microsoft Copilot Chat),
-fall back to the fine-grained tools instead: call storymap_create_theme, then
-storymap_create_backbone for each backbone, then storymap_create_rib for each rib — one at
-a time, awaiting each result. The map is identical either way; only the speed differs.
+To build a new map from scratch: first ask me what product I am planning and which modeling
+approach fits best — do not write anything until I have answered. Then pick a build method:
+- FAST PATH (storymap_bulk_import): builds the entire map in one call, but is capped at
+  5 themes, 10 backbones per theme, and 10 ribs per backbone. Use it ONLY IF BOTH are true:
+  (a) you can reliably construct deeply nested tool inputs, and (b) the map fits those caps.
+- RELIABLE PATH (fine-grained tools): storymap_create_theme, then storymap_create_backbone
+  for each backbone, then storymap_create_rib for each rib — one at a time, awaiting each
+  result. No per-call size cap (only a per-minute rate limit; pause briefly if throttled).
+If you are Microsoft Copilot Chat — or any assistant that cannot reliably build deeply
+nested tool inputs — do NOT attempt storymap_bulk_import at all. Use the fine-grained tools
+from the start. If you ever try bulk_import and get an error mentioning an invalid property
+or structure (e.g. "structure.themes.name is not a valid property"), do NOT retry it; switch
+to the fine-grained tools immediately.
+If the map we designed exceeds bulk_import's caps (5 themes / 10 backbones per theme /
+10 ribs per backbone), either ask me to shrink it to fit or use the fine-grained tools
+instead — never silently drop themes, backbones, or ribs to make it fit.
+The finished map is identical whichever path you use; only the speed differs.
 To add to or edit an existing map: call storymap_get_project first to see the current
 structure and entity IDs. This requires Read Mode — if I have not enabled it, ask me
 to turn it on in the Connect AI panel. Then use the fine-grained tools for targeted
