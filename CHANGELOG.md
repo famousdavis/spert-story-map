@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.41.5 (2026-06-14)
+
+A documentation refresh on the About page.
+
+**New: Connect AI guide + updated Quick Reference Guide**
+
+- **Added a "Connect AI Guide" download to the About page**, just below the Quick Reference Guide. It's a printable walkthrough of pairing a compatible AI assistant with your story map to build and edit structure in real time.
+- **Refreshed the Quick Reference Guide PDF** with the latest features and workflow.
+
 ## Version 0.41.4 (2026-06-14)
 
 A Connect AI reliability fix.

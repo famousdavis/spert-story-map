@@ -52,6 +52,22 @@ export default function AboutView() {
           </a>
         </Section>
 
+        {/* Connect AI Guide */}
+        <Section title="Connect AI Guide">
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-3">
+            Pair a compatible AI assistant with your story map to build and edit
+            structure in real time. Download the Connect AI guide to get started.
+          </p>
+          <a
+            href="/SPERTStoryMap_Connect_AI_Guide.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Open Connect AI Guide (PDF)
+          </a>
+        </Section>
+
         {/* Your Data & Security */}
         <Section title="Your Data & Security">
           <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-2">
