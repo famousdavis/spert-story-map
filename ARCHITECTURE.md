@@ -75,7 +75,7 @@ src/
 │   │   └── DataSection.tsx           # Per-project import (parseImportFile + updateProduct) and export buttons
 │   ├── product/
 │   │   ├── CreateProjectModal.tsx    # New-project create dialog
-│   │   ├── ProjectCard.tsx           # Card on the project list homepage
+│   │   ├── ProjectCard.tsx           # Project list card (inline rename via pencil/double-click, export, duplicate, delete)
 │   │   ├── ShareDialog.tsx           # Cloud-mode project sharing dialog
 │   │   └── ImportPreviewSection.tsx  # Homepage import preview UI: phase rendering + decision rows + result banner
 │   ├── progress/

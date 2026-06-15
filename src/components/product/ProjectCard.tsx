@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { parseDate } from '../../lib/formatDate';
 
 interface ProjectSummary {
@@ -22,6 +22,7 @@ interface ProjectCardProps {
   isDragging: boolean;
   isDropTarget: boolean;
   onNavigate: () => void;
+  onRename: (name: string) => void;
   onShare: () => void;
   onExport: () => void;
   onDuplicate: () => void;
@@ -32,6 +33,11 @@ interface ProjectCardProps {
   onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
+// Delay (ms) before a single click on the title navigates — long enough to let
+// a double-click (which opens inline rename) cancel the pending navigation.
+// Mirrors the click/double-click disambiguation used by release labels on the map.
+const NAVIGATE_CLICK_DELAY = 200;
+
 export default function ProjectCard({
   product: p,
   isShared,
@@ -40,6 +46,7 @@ export default function ProjectCard({
   isDragging,
   isDropTarget,
   onNavigate,
+  onRename,
   onShare,
   onExport,
   onDuplicate,
@@ -49,9 +56,85 @@ export default function ProjectCard({
   onDrop,
   onDragEnd,
 }: ProjectCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(p.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const clickTimerRef = useRef<number | null>(null);
+
+  // Mirror the external name into the draft only when NOT editing, so a list
+  // refresh arriving mid-edit can't overwrite the user's in-progress text.
+  /* eslint-disable react-hooks/set-state-in-effect -- intentional external→local sync */
+  useEffect(() => {
+    if (!editing) setDraft(p.name);
+  }, [p.name, editing]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  // Clear any pending navigate timer on unmount.
+  useEffect(() => () => {
+    if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+  }, []);
+
+  const cancelPendingNavigate = () => {
+    if (clickTimerRef.current) {
+      window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+  };
+
+  const handleTitleClick = () => {
+    // Defer navigation so a follow-up double-click can cancel it and rename instead.
+    cancelPendingNavigate();
+    clickTimerRef.current = window.setTimeout(() => {
+      clickTimerRef.current = null;
+      onNavigate();
+    }, NAVIGATE_CLICK_DELAY);
+  };
+
+  const startEditing = () => {
+    cancelPendingNavigate();
+    setEditing(true);
+  };
+
+  const commit = () => {
+    setEditing(false);
+    const next = draft.trim();
+    // Reject empty/unchanged names — the not-editing sync effect reverts the draft.
+    if (next && next !== p.name) onRename(next);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      commit();
+    } else if (e.key === 'Escape') {
+      setDraft(p.name);
+      setEditing(false);
+    }
+  };
+
+  // Metadata row is shared between the navigate button and the editing layout so
+  // the card height stays stable when toggling into rename mode.
+  const meta = (
+    <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+      <span>{p.totalItems} {p.totalItems === 1 ? 'item' : 'items'}</span>
+      <span>{p.totalPoints} pts</span>
+      {p.unsized > 0 && (
+        <span className="text-amber-600 dark:text-amber-400">{p.unsized} unsized</span>
+      )}
+      <span>{Math.round(p.pctComplete)}% complete</span>
+      <span>Updated {(parseDate(p.updatedAt) || new Date()).toLocaleDateString()}</span>
+    </div>
+  );
+
   return (
     <div
-      draggable
+      draggable={!editing}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -69,28 +152,38 @@ export default function ProjectCard({
           className="flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 mr-3 mt-0.5 select-none"
           title="Drag to reorder"
         >⠿</span>
-        <button
-          onClick={onNavigate}
-          className="text-left flex-1"
-        >
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-            {p.name}
-            {isShared && (
-              <span className="ml-2 inline-block text-[10px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full align-middle">
-                Shared
-              </span>
-            )}
-          </h3>
-          <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <span>{p.totalItems} {p.totalItems === 1 ? 'item' : 'items'}</span>
-            <span>{p.totalPoints} pts</span>
-            {p.unsized > 0 && (
-              <span className="text-amber-600 dark:text-amber-400">{p.unsized} unsized</span>
-            )}
-            <span>{Math.round(p.pctComplete)}% complete</span>
-            <span>Updated {(parseDate(p.updatedAt) || new Date()).toLocaleDateString()}</span>
+        {editing ? (
+          <div className="flex-1 min-w-0">
+            <input
+              ref={inputRef}
+              name="projectName"
+              type="text"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={handleKeyDown}
+              aria-label="Project name"
+              className="w-full text-base font-semibold border border-blue-400 dark:border-blue-500 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            />
+            {meta}
           </div>
-        </button>
+        ) : (
+          <button
+            onClick={handleTitleClick}
+            onDoubleClick={startEditing}
+            className="text-left flex-1 min-w-0"
+          >
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              {p.name}
+              {isShared && (
+                <span className="ml-2 inline-block text-[10px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full align-middle">
+                  Shared
+                </span>
+              )}
+            </h3>
+            {meta}
+          </button>
+        )}
         <div className="flex items-center gap-1">
           {isCloudMode && isOwner && (
             <button
@@ -126,6 +219,17 @@ export default function ProjectCard({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="9" y="9" width="13" height="13" rx="2" />
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
+          <button
+            onClick={startEditing}
+            className="p-1.5 rounded text-gray-400 transition-colors hover:text-amber-600 hover:bg-amber-50 dark:hover:text-amber-400 dark:hover:bg-amber-900/20"
+            title="Rename"
+            aria-label="Rename project"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
             </svg>
           </button>
           <button

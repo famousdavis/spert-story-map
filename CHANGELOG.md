@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.41.6 (2026-06-15)
+
+A quicker way to rename a project.
+
+**Rename projects right from the project list**
+
+- **Added a rename (pencil) button to each project card**, between the Duplicate and Delete icons. Click it to make the project's name editable right where it sits.
+- **You can also just double-click a project's name** to start renaming — whichever feels more natural.
+- **To save, click away from the box** (or press Enter); press Escape to cancel. An empty name is ignored, so you can't accidentally blank one out. Renaming was previously tucked away under a project's Settings tab — that still works too, but you no longer have to go looking for it.
+
 ## Version 0.41.5 (2026-06-14)
 
 A documentation refresh on the About page.
