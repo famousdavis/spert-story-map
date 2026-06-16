@@ -5,6 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Product } from '../types';
 import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
+import { addNamedReleaseToProduct } from '../hooks/useProductMutations';
+import { buildAiSnapshot } from '../lib/aiSnapshot';
 
 function makeProduct(): Product {
   return {
@@ -125,6 +127,20 @@ function makeProductWithContent(): Product {
     themeId: 't1', backboneId: 'b1', ribId: 'r1',
     name: 'Rib', category: 'core',
   });
+  return p;
+}
+
+// Module-scope builder for Phase 2 tests.
+// Uses addNamedReleaseToProduct (pure, Task 2) for the release,
+// and existing Phase 1 applyAiOp calls for structure.
+// Must be at module scope — consumed by allocate_rib, unassign_rib, drain,
+// and buildAiSnapshot describe blocks.
+function makeProductWithRelease(): Product {
+  let p = makeProduct();
+  p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+  p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+  p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'Rib' });
   return p;
 }
 
@@ -377,5 +393,245 @@ describe('applyDrainOps', () => {
     ]);
     expect(nextSeq).toBe(7); // cursor advances past unknown op
     expect(next.themes.length).toBe(p.themes.length); // state unchanged
+  });
+});
+
+// ── create_release ────────────────────────────────────────────────────────
+describe('applyAiOp — create_release', () => {
+  it('creates a release with correct id, name, order, and empty description', () => {
+    const next = applyAiOp(makeProduct(), 'create_release', { releaseId: 'rel-1', name: 'R1' });
+    expect(next.releases).toHaveLength(1);
+    expect(next.releases[0]).toMatchObject({ id: 'rel-1', name: 'R1', order: 1, description: '' });
+    expect(next.releases[0]).not.toHaveProperty('targetDate');
+  });
+
+  it('is idempotent on duplicate releaseId — ref-equal, no second log entry', () => {
+    const p = applyAiOp(makeProduct(), 'create_release', { releaseId: 'rel-1', name: 'R1' });
+    const logLen = (p._changeLog ?? []).length;
+    const again = applyAiOp(p, 'create_release', { releaseId: 'rel-1', name: 'R1' });
+    expect(again).toBe(p);
+    expect((again._changeLog ?? []).length).toBe(logLen);
+  });
+
+  it('no-op on missing releaseId, empty releaseId, or missing name', () => {
+    const p = makeProduct();
+    expect(applyAiOp(p, 'create_release', {})).toBe(p);
+    expect(applyAiOp(p, 'create_release', { releaseId: 'rel-1' })).toBe(p);
+    expect(applyAiOp(p, 'create_release', { name: 'R1' })).toBe(p);
+    expect(applyAiOp(p, 'create_release', { releaseId: '', name: 'R1' })).toBe(p);
+  });
+
+  it('changelog: op:add, entity:release, id correct, no source field', () => {
+    const next = applyAiOp(makeProduct(), 'create_release', { releaseId: 'rel-1', name: 'R1' });
+    const log = next._changeLog ?? [];
+    const entry = log[log.length - 1]!;
+    expect(entry.op).toBe('add');
+    expect(entry.entity).toBe('release');
+    expect(entry.id).toBe('rel-1');
+    expect(entry).not.toHaveProperty('source');
+  });
+});
+
+// ── allocate_rib ──────────────────────────────────────────────────────────
+describe('applyAiOp — allocate_rib', () => {
+  it('allocates an unallocated, unlocked rib 100% to the release', () => {
+    const next = applyAiOp(makeProductWithRelease(), 'allocate_rib',
+      { ribId: 'r1', releaseId: 'rel-1' });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]);
+  });
+
+  it('[CRITICAL] no-op when release does not exist — ref-equal, no orphan allocation', () => {
+    const p = makeProductWithRelease();
+    const next = applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'ghost' });
+    expect(next).toBe(p);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toHaveLength(0);
+  });
+
+  it('no-op on locked rib', () => {
+    const p = makeProductWithRelease();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
+    ];
+    expect(applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' })).toBe(p);
+  });
+
+  it('no-op on already-allocated rib (additive guard)', () => {
+    const once = applyAiOp(makeProductWithRelease(), 'allocate_rib',
+      { ribId: 'r1', releaseId: 'rel-1' });
+    expect(applyAiOp(once, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' })).toBe(once);
+  });
+
+  it('no-op on missing or empty ribId / releaseId', () => {
+    const p = makeProductWithRelease();
+    expect(applyAiOp(p, 'allocate_rib', {})).toBe(p);
+    expect(applyAiOp(p, 'allocate_rib', { ribId: 'r1' })).toBe(p);
+    expect(applyAiOp(p, 'allocate_rib', { releaseId: 'rel-1' })).toBe(p);
+  });
+
+  it('changelog: op:update, entity:rib, source:ai', () => {
+    const next = applyAiOp(makeProductWithRelease(), 'allocate_rib',
+      { ribId: 'r1', releaseId: 'rel-1' });
+    const log = next._changeLog ?? [];
+    expect(log[log.length - 1]).toMatchObject(
+      { op: 'update', entity: 'rib', id: 'r1', source: 'ai' }
+    );
+  });
+});
+
+// ── unassign_rib ──────────────────────────────────────────────────────────
+describe('applyAiOp — unassign_rib', () => {
+  it('clears allocations from an allocated, unlocked rib', () => {
+    let p = makeProductWithRelease();
+    p = applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' });
+    const next = applyAiOp(p, 'unassign_rib', { ribId: 'r1' });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);
+  });
+
+  it('is idempotent: unassigning an unassigned rib returns ref-equal', () => {
+    let p = makeProductWithRelease();
+    p = applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' });
+    const once = applyAiOp(p, 'unassign_rib', { ribId: 'r1' });
+    expect(applyAiOp(once, 'unassign_rib', { ribId: 'r1' })).toBe(once);
+  });
+
+  it('no-op on locked rib', () => {
+    let p = makeProductWithRelease();
+    p = applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' });
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
+    ];
+    expect(applyAiOp(p, 'unassign_rib', { ribId: 'r1' })).toBe(p);
+  });
+
+  it('no-op on missing or empty ribId', () => {
+    const p = makeProductWithRelease();
+    expect(applyAiOp(p, 'unassign_rib', {})).toBe(p);
+    expect(applyAiOp(p, 'unassign_rib', { ribId: '' })).toBe(p);
+  });
+});
+
+// ── Drain / no-throw — Phase 2 ────────────────────────────────────────────
+describe('applyDrainOps — Phase 2 ops', () => {
+  it('computeSafePrefix includes all three new ops (all no-throw)', () => {
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'create_release', payload: { releaseId: 'rel-1', name: 'R1' } },
+      { seq: 2, op: 'allocate_rib', payload: { ribId: 'r1', releaseId: 'rel-1' } },
+      { seq: 3, op: 'unassign_rib', payload: { ribId: 'r1' } },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(makeProductWithRelease(), ops);
+    expect(safeOps).toHaveLength(3);
+    expect(nextSeq).toBe(3);
+  });
+
+  it('create_release then allocate_rib in drain order: allocation lands', () => {
+    let p = makeProduct();
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R' });
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'create_release', payload: { releaseId: 'rel-1', name: 'R1' } },
+      { seq: 2, op: 'allocate_rib', payload: { ribId: 'r1', releaseId: 'rel-1' } },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(2);
+    expect(result.releases).toHaveLength(1);
+    expect(result.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]);
+  });
+
+  it('create_release: re-applying the same drain is ref-equal (idempotency)', () => {
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'create_release', payload: { releaseId: 'rel-1', name: 'R1' } },
+    ];
+    const { product: once } = applyDrainOps(makeProduct(), ops);
+    expect(once.releases).toHaveLength(1);
+    const { product: twice } = applyDrainOps(once, ops);
+    expect(twice).toBe(once);
+  });
+
+  it('allocate_rib before create_release: no-op but cursor advances (accepted ordering risk)', () => {
+    const p = makeProduct();
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'allocate_rib', payload: { ribId: 'r1', releaseId: 'rel-1' } },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(1);
+    expect(result).toBe(p);
+  });
+
+  it('re-applying allocate_rib drain is ref-equal (no duplicate changelog)', () => {
+    const p = makeProductWithRelease();
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'allocate_rib', payload: { ribId: 'r1', releaseId: 'rel-1' } },
+    ];
+    const { product: once } = applyDrainOps(p, ops);
+    const { product: twice } = applyDrainOps(once, ops);
+    expect(twice).toBe(once);
+  });
+});
+
+// ── buildAiSnapshot ───────────────────────────────────────────────────────
+describe('buildAiSnapshot', () => {
+  it('includes releases sorted by order ascending', () => {
+    let p = makeProduct();
+    p = addNamedReleaseToProduct(p, 'rel-a', { name: 'RA' });
+    p = addNamedReleaseToProduct(p, 'rel-b', { name: 'RB' });
+    p.releases[0]!.order = 2;
+    p.releases[1]!.order = 1;
+    const snap = buildAiSnapshot(p);
+    expect(snap.releases[0]?.id).toBe('rel-b');
+    expect(snap.releases[1]?.id).toBe('rel-a');
+  });
+
+  it('releases do not include targetDate or description', () => {
+    const p = addNamedReleaseToProduct(makeProduct(), 'rel-1', { name: 'R1' });
+    const snap = buildAiSnapshot(p);
+    expect(snap.releases[0]).not.toHaveProperty('targetDate');
+    expect(snap.releases[0]).not.toHaveProperty('description');
+  });
+
+  it('per-rib releaseIds is empty for an unallocated rib', () => {
+    const snap = buildAiSnapshot(makeProductWithRelease());
+    expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseIds).toEqual([]);
+  });
+
+  it('per-rib locked is false when no progress', () => {
+    const snap = buildAiSnapshot(makeProductWithRelease());
+    expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!.locked).toBe(false);
+  });
+
+  it('per-rib releaseIds contains the allocated release id', () => {
+    let p = makeProductWithRelease();
+    p = applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' });
+    const snap = buildAiSnapshot(p);
+    expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseIds).toEqual(['rel-1']);
+  });
+
+  it('per-rib releaseIds exposes both ids for a split allocation', () => {
+    let p = makeProductWithRelease();
+    p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [
+      { releaseId: 'rel-1', percentage: 60 },
+      { releaseId: 'rel-2', percentage: 40 },
+    ];
+    const snap = buildAiSnapshot(p);
+    expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseIds).toEqual(['rel-1', 'rel-2']);
+  });
+
+  it('per-rib locked is true when any progress entry has percentComplete > 0', () => {
+    const p = makeProductWithRelease();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
+    ];
+    expect(buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.locked).toBe(true);
+  });
+
+  it('result round-trips through JSON without data loss', () => {
+    let p = makeProductWithRelease();
+    p = applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' });
+    const snap = buildAiSnapshot(p);
+    const rt = JSON.parse(JSON.stringify(snap)) as typeof snap;
+    expect(rt).toEqual(snap);
   });
 });

@@ -3,7 +3,12 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect, vi } from 'vitest';
-import { splitRibInProduct, addNamedRibToProduct, cloneRibInProduct } from '../hooks/useProductMutations';
+import {
+  splitRibInProduct, addNamedRibToProduct, cloneRibInProduct,
+  addNamedReleaseToProduct, allocateRibInProduct, unassignRibInProduct,
+  addNamedThemeToProduct, addNamedBackboneToProduct,
+} from '../hooks/useProductMutations';
+import type { Product, ReleaseAllocation } from '../types';
 
 // Mock crypto.randomUUID
 let uuidCounter = 0;
@@ -709,5 +714,207 @@ describe('addNamedRibToProduct', () => {
     const product = emptyProduct();
     const result = addNamedRibToProduct(product, 't1', 'wrong-bb', 'new-uuid', { name: 'X' });
     expect(result).toBe(product);
+  });
+});
+
+// ── Phase 2 builders (module scope; function declarations hoist) ────────────
+// Full Product builder for Phase 2 tests.
+// Named makeFreshProduct to avoid collision with the file's existing makeProduct({ themes = [] } = {}).
+function makeFreshProduct(): Product {
+  return {
+    id: 'p1', name: 'Test', description: '',
+    createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    schemaVersion: 2, sizeMapping: [], releases: [], sprints: [],
+    themes: [], _changeLog: [],
+  };
+}
+
+// One release (rel-1) + one unlocked, unallocated rib (rib-1).
+// Base for all allocate/unassign tests.
+function makeAllocProduct(): Product {
+  let p = makeFreshProduct();
+  p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+  p = addNamedThemeToProduct(p, 't1', { name: 'T' });
+  p = addNamedBackboneToProduct(p, 't1', 'b1', { name: 'B' });
+  p = addNamedRibToProduct(p, 't1', 'b1', 'rib-1', { name: 'Rib' });
+  return p;
+}
+
+// rib-1 already 100%-allocated to rel-1.
+function makeUnassignProduct(): Product {
+  return allocateRibInProduct(makeAllocProduct(), 'rib-1', 'rel-1');
+}
+
+describe('addNamedReleaseToProduct', () => {
+  it('adds a release with correct id, name, order, and empty description', () => {
+    const next = addNamedReleaseToProduct(makeFreshProduct(), 'rel-1', { name: 'R1' });
+    expect(next.releases).toHaveLength(1);
+    expect(next.releases[0]).toMatchObject({ id: 'rel-1', name: 'R1', order: 1, description: '' });
+    expect(next.releases[0]).not.toHaveProperty('targetDate');
+  });
+
+  it('increments order correctly when releases already exist', () => {
+    const p = addNamedReleaseToProduct(makeFreshProduct(), 'rel-1', { name: 'R1' });
+    const next = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    expect(next.releases).toHaveLength(2);
+    expect(next.releases[1]?.order).toBe(2);
+  });
+
+  it('is idempotent: duplicate id returns prev ref-equal with no second log entry', () => {
+    const p = addNamedReleaseToProduct(makeFreshProduct(), 'rel-1', { name: 'R1' });
+    const logLen = (p._changeLog ?? []).length;
+    const again = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1 again' });
+    expect(again).toBe(p);
+    expect((again._changeLog ?? []).length).toBe(logLen);
+  });
+
+  it('appends exactly one changelog entry: op:add, entity:release, no source', () => {
+    const p = makeFreshProduct();
+    const next = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+    const log = next._changeLog ?? [];
+    expect(log).toHaveLength((p._changeLog ?? []).length + 1);
+    const entry = log[log.length - 1]!;
+    expect(entry.op).toBe('add');
+    expect(entry.entity).toBe('release');
+    expect(entry.id).toBe('rel-1');
+    expect(entry).not.toHaveProperty('source');
+  });
+});
+
+describe('allocateRibInProduct', () => {
+  it('allocates an unallocated, unlocked rib 100% to the release', () => {
+    const next = allocateRibInProduct(makeAllocProduct(), 'rib-1', 'rel-1');
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]);
+  });
+
+  it('appends one changelog entry: op:update, entity:rib, source:ai', () => {
+    const next = allocateRibInProduct(makeAllocProduct(), 'rib-1', 'rel-1');
+    const log = next._changeLog ?? [];
+    expect(log[log.length - 1]).toMatchObject({ op: 'update', entity: 'rib', id: 'rib-1', source: 'ai' });
+  });
+
+  it('is idempotent: second call returns first ref-equal (additive skip)', () => {
+    const once = allocateRibInProduct(makeAllocProduct(), 'rib-1', 'rel-1');
+    expect(allocateRibInProduct(once, 'rib-1', 'rel-1')).toBe(once);
+  });
+
+  it('[CRITICAL] skips when the release does not exist — no orphan allocation', () => {
+    const p = makeAllocProduct();
+    const next = allocateRibInProduct(p, 'rib-1', 'ghost-id');
+    expect(next).toBe(p);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toHaveLength(0);
+  });
+
+  it('skips a locked rib — returns prev ref-equal', () => {
+    const p = makeAllocProduct();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
+    ];
+    expect(allocateRibInProduct(p, 'rib-1', 'rel-1')).toBe(p);
+  });
+
+  it('skips an already-allocated rib (additive guard) — returns prev ref-equal', () => {
+    let p = makeAllocProduct();
+    p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [
+      { releaseId: 'rel-2', percentage: 100 },
+    ];
+    const next = allocateRibInProduct(p, 'rib-1', 'rel-1');
+    expect(next).toBe(p);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-2', percentage: 100 }]);
+  });
+
+  it('additive guard also protects a split allocation (60/40)', () => {
+    let p = makeAllocProduct();
+    p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [
+      { releaseId: 'rel-1', percentage: 60 },
+      { releaseId: 'rel-2', percentage: 40 },
+    ];
+    expect(allocateRibInProduct(p, 'rib-1', 'rel-1')).toBe(p);
+  });
+
+  it('returns prev ref-equal when ribId is not found', () => {
+    const p = makeAllocProduct();
+    expect(allocateRibInProduct(p, 'ghost-rib', 'rel-1')).toBe(p);
+  });
+
+  it('does not touch releaseCardOrder', () => {
+    let p = makeAllocProduct();
+    p = { ...p, releaseCardOrder: { 'rel-1': ['other-rib'] } };
+    const next = allocateRibInProduct(p, 'rib-1', 'rel-1');
+    expect(next.releaseCardOrder).toEqual({ 'rel-1': ['other-rib'] });
+  });
+
+  it('handles undefined releaseAllocations on a hand-edited rib without throwing', () => {
+    const p = makeAllocProduct();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations =
+      undefined as unknown as ReleaseAllocation[];
+    expect(() => allocateRibInProduct(p, 'rib-1', 'rel-1')).not.toThrow();
+  });
+});
+
+describe('unassignRibInProduct', () => {
+  it('clears releaseAllocations on an allocated, unlocked rib', () => {
+    const next = unassignRibInProduct(makeUnassignProduct(), 'rib-1');
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);
+  });
+
+  it('appends one changelog entry: op:update, entity:rib, source:ai', () => {
+    const next = unassignRibInProduct(makeUnassignProduct(), 'rib-1');
+    const log = next._changeLog ?? [];
+    expect(log[log.length - 1]).toMatchObject({ op: 'update', entity: 'rib', id: 'rib-1', source: 'ai' });
+  });
+
+  it('cleans releaseCardOrder — removes ribId from all column buckets', () => {
+    let p = makeUnassignProduct();
+    p = { ...p, releaseCardOrder: { 'rel-1': ['rib-1', 'other'], 'rel-2': ['rib-1'] } };
+    const next = unassignRibInProduct(p, 'rib-1');
+    expect(next.releaseCardOrder!['rel-1']).toEqual(['other']);
+    expect(next.releaseCardOrder!['rel-2']).toEqual([]);
+  });
+
+  it('is idempotent: second call returns first ref-equal', () => {
+    const once = unassignRibInProduct(makeUnassignProduct(), 'rib-1');
+    expect(unassignRibInProduct(once, 'rib-1')).toBe(once);
+  });
+
+  it('skips a locked rib — returns prev ref-equal', () => {
+    const p = makeUnassignProduct();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
+    ];
+    expect(unassignRibInProduct(p, 'rib-1')).toBe(p);
+  });
+
+  it('clears all allocations on a split-allocated rib', () => {
+    let p = makeAllocProduct();
+    p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [
+      { releaseId: 'rel-1', percentage: 60 },
+      { releaseId: 'rel-2', percentage: 40 },
+    ];
+    expect(unassignRibInProduct(p, 'rib-1').themes[0]!.backboneItems[0]!.ribItems[0]!
+      .releaseAllocations).toEqual([]);
+  });
+
+  it('returns prev ref-equal when ribId is not found', () => {
+    const p = makeUnassignProduct();
+    expect(unassignRibInProduct(p, 'ghost-rib')).toBe(p);
+  });
+
+  it('handles undefined releaseCardOrder without throwing', () => {
+    const p = { ...makeUnassignProduct(), releaseCardOrder: undefined };
+    expect(() => unassignRibInProduct(p, 'rib-1')).not.toThrow();
+  });
+
+  it('does not touch progressHistory on an unlocked rib', () => {
+    const p = makeUnassignProduct();
+    const history = [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 0, comment: 'note' }];
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = history;
+    const next = unassignRibInProduct(p, 'rib-1');
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory).toEqual(history);
   });
 });

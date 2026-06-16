@@ -7,11 +7,12 @@ import type { Product, Theme, Backbone, RibItem, ColorKey } from '../types';
 import { calculateNextSprintEndDate } from '../lib/progressMutations';
 import { DEFAULT_THEME_COLOR_KEYS } from '../lib/themeColors';
 import { appendChangeLogEntry } from '../lib/storage';
+import { isRibLocked } from '../lib/ribHelpers';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
 /** Remove deleted rib IDs from releaseCardOrder. */
-function cleanCardOrder(cardOrder: Record<string, string[]> | undefined, ribIds: Set<string>) {
+export function cleanCardOrder(cardOrder: Record<string, string[]> | undefined, ribIds: Set<string>) {
   if (!cardOrder || ribIds.size === 0) return cardOrder;
   const cleaned: Record<string, string[]> = {};
   for (const [col, ids] of Object.entries(cardOrder)) {
@@ -681,4 +682,136 @@ export function addNamedBackboneToProduct(
     ),
   };
   return { ...next, _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'backbone', id: newId }) };
+}
+
+/**
+ * Pure transformation: append a named release with a pre-minted ID.
+ * No-op if a release with this ID already exists (idempotent).
+ *
+ * order = prev.releases.length + 1 (append-at-end; AI cannot position releases).
+ * description is set to '' (consistent with addRelease).
+ * targetDate is intentionally omitted (AI must not set dates).
+ * No source:'ai' on the changelog entry — matches create_theme/backbone/rib pattern.
+ *
+ * @no-throw — safe for use in the drain path.
+ */
+export function addNamedReleaseToProduct(
+  prev: Product,
+  newId: string,
+  attrs: { name: string },
+): Product {
+  if (prev.releases.some(r => r.id === newId)) return prev;
+  const next = {
+    ...prev,
+    releases: [
+      ...prev.releases,
+      {
+        id: newId,
+        name: attrs.name,
+        description: '',
+        order: prev.releases.length + 1,
+        // targetDate intentionally omitted
+      },
+    ],
+  };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'release', id: newId }),
+  };
+}
+
+/**
+ * Pure transformation: allocate a rib 100% to a release.
+ * Addresses ribs by ID alone (global search; no themeId/backboneId needed).
+ *
+ * Guards (all return prev ref-equal, never throw):
+ *   1. Release does not exist → prev (prevents orphan allocations).
+ *   2. Rib not found → prev.
+ *   3. Rib is locked → prev.
+ *   4. Rib has any existing allocation → prev (additive; protects user splits).
+ *
+ * Does NOT update releaseCardOrder (matches updateRibAllocation / addRibToRelease precedent).
+ *
+ * @no-throw — safe for use in the drain path.
+ */
+export function allocateRibInProduct(
+  prev: Product,
+  ribId: string,
+  releaseId: string,
+): Product {
+  // Guard 1: release must exist — prevents orphan allocations
+  if (!prev.releases.some(r => r.id === releaseId)) return prev;
+
+  let didUpdate = false;
+  const themes = prev.themes.map(t => ({
+    ...t,
+    backboneItems: t.backboneItems.map(b => ({
+      ...b,
+      ribItems: b.ribItems.map(r => {
+        if (r.id !== ribId) return r;
+        if (isRibLocked(r)) return r;                          // Guard 3
+        if ((r.releaseAllocations ?? []).length > 0) return r; // Guard 4
+        didUpdate = true;
+        return { ...r, releaseAllocations: [{ releaseId, percentage: 100 }] };
+      }),
+    })),
+  }));
+
+  if (!didUpdate) return prev;
+  const next = { ...prev, themes };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, {
+      op: 'update', entity: 'rib', id: ribId, source: 'ai',
+    }),
+  };
+}
+
+/**
+ * Pure transformation: remove all release allocations from a rib.
+ * Addresses ribs by ID alone (global search; no themeId/backboneId needed).
+ *
+ * Guards (all return prev ref-equal, never throw):
+ *   1. Rib not found → prev.
+ *   2. Rib is locked → prev.
+ *   3. Rib already unassigned (releaseAllocations.length === 0) → prev (idempotent).
+ *
+ * On actual mutation:
+ *   - Sets releaseAllocations to [].
+ *   - Calls cleanCardOrder to strip ribId from all releaseCardOrder buckets (hygiene).
+ *   - Does NOT touch progressHistory.
+ *
+ * @no-throw — safe for use in the drain path.
+ */
+export function unassignRibInProduct(
+  prev: Product,
+  ribId: string,
+): Product {
+  let didUpdate = false;
+  const themes = prev.themes.map(t => ({
+    ...t,
+    backboneItems: t.backboneItems.map(b => ({
+      ...b,
+      ribItems: b.ribItems.map(r => {
+        if (r.id !== ribId) return r;
+        if (isRibLocked(r)) return r;                           // Guard 2
+        if ((r.releaseAllocations ?? []).length === 0) return r; // Guard 3
+        didUpdate = true;
+        return { ...r, releaseAllocations: [] };
+      }),
+    })),
+  }));
+
+  if (!didUpdate) return prev;
+  const next = {
+    ...prev,
+    themes,
+    releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, new Set([ribId])),
+  };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, {
+      op: 'update', entity: 'rib', id: ribId, source: 'ai',
+    }),
+  };
 }

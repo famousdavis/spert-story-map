@@ -14,6 +14,7 @@ import { db, functionsInstance, isFirebaseAvailable } from '../lib/firebase';
 import { APP_VERSION } from '../lib/version';
 import type { Product, ProductUpdater } from '../types';
 import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
+import { buildAiSnapshot } from '../lib/aiSnapshot';
 import {
   AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION, AI_LAST_SEQ_PREFIX,
 } from '../lib/aiConstants';
@@ -123,18 +124,7 @@ export function useAiConnectivity(
     const sessionId = activeSessionIdRef.current;
     const p = productRef.current;
     const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const compact = {
-      id: p.id, name: p.name, description: p.description,
-      themes: p.themes.map(t => ({
-        id: t.id, name: t.name,
-        backboneItems: t.backboneItems.map(b => ({
-          id: b.id, name: b.name,
-          ribItems: b.ribItems.map(r => ({
-            id: r.id, name: r.name, category: r.category, description: r.description,
-          })),
-        })),
-      })),
-    };
+    const compact = buildAiSnapshot(p);
     const byteSize = new TextEncoder().encode(JSON.stringify(compact)).length;
     if (byteSize > 900_000) {
       console.warn('[AI] Snapshot exceeds 900 KB — skipping.');

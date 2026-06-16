@@ -3,7 +3,8 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { forEachRib, reduceRibs } from '../lib/ribHelpers';
+import { forEachRib, reduceRibs, isRibLocked } from '../lib/ribHelpers';
+import type { ProgressEntry } from '../types';
 
 const product = {
   themes: [
@@ -84,5 +85,31 @@ describe('reduceRibs', () => {
   it('returns initial value for empty product', () => {
     const result = reduceRibs({ themes: [] }, (sum) => sum + 1, 42);
     expect(result).toBe(42);
+  });
+});
+
+describe('isRibLocked', () => {
+  it('returns false for an empty progressHistory', () => {
+    expect(isRibLocked({ progressHistory: [] })).toBe(false);
+  });
+  it('returns false when percentComplete is 0', () => {
+    expect(isRibLocked({
+      progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: 0 } as ProgressEntry],
+    })).toBe(false);
+  });
+  it('returns false when percentComplete is null', () => {
+    expect(isRibLocked({
+      progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: null } as ProgressEntry],
+    })).toBe(false);
+  });
+  it('returns true when any entry has percentComplete > 0', () => {
+    expect(isRibLocked({
+      progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: 50 } as ProgressEntry],
+    })).toBe(true);
+  });
+  it('returns false when progressHistory is absent (hand-edited rib)', () => {
+    // as unknown as ProgressEntry[] — established no-any pattern (aiOps.test.ts:258)
+    const noHistory = { progressHistory: undefined as unknown as ProgressEntry[] };
+    expect(isRibLocked(noHistory)).toBe(false);
   });
 });
