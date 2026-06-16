@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.43.0 (2026-06-15)
+
+Connect AI can now size your stories — not just build and plan them.
+
+**Connect AI: assign t-shirt sizes to stories**
+
+- **Your AI assistant can now assign a t-shirt size to each unsized story** through Connect AI, as an optional step after the map is built. Ask it to size your stories and it reads your project's size scale, then sizes each story from its name and description.
+- **It uses your size scale, not a generic one.** The assistant sizes against the exact labels and point values you defined in Settings — whether that's the default XS–XXXL or your own custom labels. If you haven't defined any sizes yet, it will tell you to set them up first.
+- **Sizing is opt-in and additive.** The assistant only sizes when you explicitly ask, and it never changes a story that already has a size. Re-running is safe; already-sized stories are simply skipped. To change or clear a size, use the Sizing board in the app.
+- **Stories already in progress are protected.** A story with recorded progress has its size frozen — the assistant can't change it, and neither can the Sizing board, so historical progress math stays intact.
+- **The "Copy Prompt" instructions now include a sizing section** so a compatible assistant knows exactly how to size safely.
+
+> Note: the AI sizing tool becomes available once the Connect AI service update is deployed. Until then, building, editing, and release planning work as before; asking for sizing may report that a tool is unavailable.
+
 ## Version 0.42.0 (2026-06-15)
 
 Connect AI can now help plan releases — not just build the map.
