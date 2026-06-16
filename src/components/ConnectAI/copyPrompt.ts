@@ -61,5 +61,46 @@ to turn it on in the Connect AI panel. Then use the fine-grained tools for targe
 changes: storymap_create_theme, storymap_create_backbone, storymap_create_rib for
 additions; storymap_update_theme, storymap_update_backbone, storymap_update_rib for
 edits. Call tools strictly one at a time — await each result before the next.
-For each new entity (theme, backbone, rib), generate a fresh UUID as its ID.`;
+For each new entity (theme, backbone, rib), generate a fresh UUID as its ID.
+
+RELEASE PLANNING (separate step — only when the user explicitly asks):
+Release planning is an optional second phase. Build and confirm the map structure first.
+Only proceed with releases after the user asks you to.
+
+COUNTING RELEASES: Ask the user how many releases they want and what to name them. Never
+infer a release count from the map structure or the product description.
+
+ORDERING DISCIPLINE — CRITICAL: Create all releases first, then allocate. Do not interleave.
+Reason: storymap_allocate_rib silently skips if the target release doesn't yet exist — there
+is no error, so you will not know the allocation was lost. Create every release (await each
+result before the next), then allocate ribs to them.
+
+READ MODE:
+- storymap_create_release does NOT require Read Mode (like create_theme, you only need a
+  name and a UUID; you don't need to read the current map state).
+- storymap_allocate_rib and storymap_unassign_rib REQUIRE Read Mode. Call storymap_get_project
+  first to obtain rib IDs and each rib's releaseIds and locked state. If Read Mode is off,
+  ask the user to enable it in the Connect AI panel before proceeding.
+
+RE-RUN / ADDITIVE SEMANTICS:
+- storymap_allocate_rib skips any rib that already has an allocation. It never overwrites.
+  Re-running is safe; already-allocated ribs are simply skipped.
+- To MOVE a rib to a different release: call storymap_unassign_rib first, then
+  storymap_allocate_rib.
+- storymap_unassign_rib removes all of a rib's allocations (skips locked ribs; no-op if
+  already unassigned).
+
+CONSTRAINTS:
+- Whole-rib, single-release, 100% only. You cannot split a rib across releases.
+  If the user wants a split, direct them to the Release Planning board in the app.
+- Locked ribs (in progress) cannot be allocated or unassigned. If a rib has locked: true
+  in storymap_get_project, tell the user — it must be changed manually.
+- Never set a target date. Do not include targetDate in any create_release call.
+- If a rib's releaseIds has more than one entry (a percentage split set by the user),
+  warn the user before calling storymap_unassign_rib — it removes the rib from ALL
+  releases, not just one.
+
+RELEASE IDs: Generate a fresh UUID for each new release (same rule as for themes, backbones, ribs).
+
+If throttled (rate limit), pause briefly before retrying — same rule as fine-grained map-building.`;
 }

@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.42.0 (2026-06-15)
+
+Connect AI can now help plan releases — not just build the map.
+
+**Connect AI: create releases and assign stories to them**
+
+- **Your AI assistant can now create releases and place stories into them** through Connect AI, as an optional second phase after the story map structure is built. Ask it to plan releases once your map is ready, and it can add the releases you want and assign whole stories to each one.
+- **Release planning is opt-in and additive.** The assistant only touches releases when you explicitly ask. It creates every release first, then assigns stories — and it never overwrites a story that is already assigned. Re-running is safe; already-assigned stories are simply skipped.
+- **One story, one release, 100%.** From Connect AI a story goes entirely into a single release. Splitting a story across releases by percentage stays a manual action on the Release Planning board.
+- **Stories already in progress are protected.** A story with recorded progress cannot be reassigned or unassigned by the assistant — it must be changed manually, so historical progress math stays intact.
+- **The "Copy Prompt" instructions now include a release-planning section** so a compatible assistant knows exactly how to drive this safely.
+
+> Note: the AI release-planning tools become available once the Connect AI service update is deployed. Until then, building and editing the map works as before; asking for release planning may report that a tool is unavailable.
+
 ## Version 0.41.8 (2026-06-15)
 
 A stronger Connect AI prompt for assistants that build maps step by step.

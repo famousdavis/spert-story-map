@@ -7,8 +7,12 @@ import {
   addNamedThemeToProduct,
   addNamedBackboneToProduct,
   addNamedRibToProduct,
+  addNamedReleaseToProduct,
+  allocateRibInProduct,
+  unassignRibInProduct,
 } from '../hooks/useProductMutations';
 import { appendChangeLogEntry } from './storage';
+import { isRibLocked } from './ribHelpers';
 
 export interface AiOpDoc { seq: number; op: string; payload: unknown; }
 
@@ -145,9 +149,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
             // with sprint progress. Corrupting doneValue = points × delta-percent
             // breaks historical Forecaster math. The ?? [] guard handles
             // hand-edited/imported products where progressHistory may be absent.
-            const locked = (r.progressHistory ?? []).some(
-              e => (e.percentComplete ?? 0) > 0
-            );
+            const locked = isRibLocked(r);
             return {
               ...r,
               ...(p.name !== undefined && { name: p.name as string }),
@@ -170,6 +172,24 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
           op: 'update', entity: 'rib', id: p.ribId as string, source: 'ai',
         }),
       };
+    }
+    case 'create_release': {
+      // Payload: { releaseId: string, name: string }
+      if (typeof p.releaseId !== 'string' || !p.releaseId) return prev;
+      if (typeof p.name !== 'string' || !p.name) return prev;
+      return addNamedReleaseToProduct(prev, p.releaseId as string, { name: p.name as string });
+    }
+    case 'allocate_rib': {
+      // Payload: { ribId: string, releaseId: string }
+      // No themeId/backboneId — global rib lookup inside allocateRibInProduct
+      if (typeof p.ribId !== 'string' || !p.ribId) return prev;
+      if (typeof p.releaseId !== 'string' || !p.releaseId) return prev;
+      return allocateRibInProduct(prev, p.ribId as string, p.releaseId as string);
+    }
+    case 'unassign_rib': {
+      // Payload: { ribId: string }
+      if (typeof p.ribId !== 'string' || !p.ribId) return prev;
+      return unassignRibInProduct(prev, p.ribId as string);
     }
     default:
       console.warn(`[AI] Unknown op "${op}" — no-op.`);

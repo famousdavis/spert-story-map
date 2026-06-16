@@ -39,3 +39,14 @@ export function reduceRibs<T>(
   });
   return acc;
 }
+
+/**
+ * A rib is locked when any progress entry has percentComplete > 0.
+ * Locked ribs must not be re-allocated or unassigned by AI ops.
+ * Same predicate used by update_rib in aiOps.ts.
+ *
+ * @no-throw — safe for use in the drain path.
+ */
+export function isRibLocked(rib: Pick<RibItem, 'progressHistory'>): boolean {
+  return (rib.progressHistory ?? []).some(e => (e.percentComplete ?? 0) > 0);
+}
