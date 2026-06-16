@@ -44,8 +44,10 @@ approach fits best — do not write anything until I have answered. Then pick a 
   5 themes, 10 backbones per theme, and 10 ribs per backbone. Use it ONLY IF BOTH are true:
   (a) you can reliably construct deeply nested tool inputs, and (b) the map fits those caps.
 - RELIABLE PATH (fine-grained tools): storymap_create_theme, then storymap_create_backbone
-  for each backbone, then storymap_create_rib for each rib — one at a time, awaiting each
-  result. No per-call size cap (only a per-minute rate limit; pause briefly if throttled).
+  for each backbone, then storymap_create_rib for each rib — one at a time — await each
+  result and immediately call the next, all within the same response. Do not stop to
+  narrate progress between calls. No per-call size cap (only a per-minute rate limit;
+  pause briefly if throttled).
 If you are Microsoft Copilot Chat — or any assistant that cannot reliably build deeply
 nested tool inputs — do NOT attempt storymap_bulk_import at all. Use the fine-grained tools
 from the start. If you ever try bulk_import and get an error mentioning an invalid property
@@ -60,7 +62,10 @@ structure and entity IDs. This requires Read Mode — if I have not enabled it, 
 to turn it on in the Connect AI panel. Then use the fine-grained tools for targeted
 changes: storymap_create_theme, storymap_create_backbone, storymap_create_rib for
 additions; storymap_update_theme, storymap_update_backbone, storymap_update_rib for
-edits. Call tools strictly one at a time — await each result before the next.
+edits. Call tools sequentially — await each result and immediately call the next within
+the same response. Do not pause between calls to report progress. Complete the full
+sequence before summarizing. Only stop mid-sequence if a tool returns an error or a
+structural mismatch requires user input.
 For each new entity (theme, backbone, rib), generate a fresh UUID as its ID.
 
 RELEASE PLANNING (separate step — only when the user explicitly asks):
@@ -73,7 +78,7 @@ infer a release count from the map structure or the product description.
 ORDERING DISCIPLINE — CRITICAL: Create all releases first, then allocate. Do not interleave.
 Reason: storymap_allocate_rib silently skips if the target release doesn't yet exist — there
 is no error, so you will not know the allocation was lost. Create every release (await each
-result before the next), then allocate ribs to them.
+result before the next, all within the same response), then allocate ribs to them.
 
 READ MODE:
 - storymap_create_release does NOT require Read Mode (like create_theme, you only need a
@@ -102,6 +107,47 @@ CONSTRAINTS:
 
 RELEASE IDs: Generate a fresh UUID for each new release (same rule as for themes, backbones, ribs).
 
+BULK TOOLS (preferred when working with many ribs at once):
+Use bulk tools when allocating or sizing more than a handful of ribs — they collapse N
+round-trips into one call. This is critical for AI clients that yield to the user between
+tool calls.
+
+WHEN TO USE BULK:
+- Allocating or sizing more than a handful of ribs → use storymap_bulk_allocate /
+  storymap_bulk_size instead of repeated storymap_allocate_rib / storymap_size_rib.
+- Creating multiple releases at once → use storymap_bulk_create_releases.
+- A single targeted change (one rib, one action) → individual tools are fine.
+
+BULK RELEASE PLANNING (two calls total):
+1. storymap_bulk_create_releases — Does NOT require Read Mode. Provide an array of
+   {releaseId, name} objects; generate a fresh UUID per releaseId. Await the result.
+2. storymap_bulk_allocate — Requires Read Mode (call storymap_get_project first for
+   ribIds, releaseIds, and locked state). Provide an array of {ribId, releaseId} objects.
+Same ordering rule as the individual tools: releases must exist before you allocate.
+An allocation silently skips if its target release does not yet exist.
+
+BULK SIZING:
+storymap_bulk_size — Requires Read Mode (call storymap_get_project first for ribIds,
+current size, locked state, and sizeMapping). Provide {ribId, size} objects; use only
+labels from sizeMapping.
+
+READ MODE SUMMARY:
+- storymap_bulk_create_releases: does NOT require Read Mode.
+- storymap_bulk_allocate / storymap_bulk_size: REQUIRE Read Mode.
+
+ADDITIVE / RE-RUN SEMANTICS (all three bulk tools):
+- storymap_bulk_create_releases skips duplicate releaseIds.
+- storymap_bulk_allocate skips ribs that are locked, already allocated, or whose
+  target release does not exist.
+- storymap_bulk_size skips ribs that are locked, already validly sized, or whose
+  size label is not in sizeMapping.
+Re-running any bulk call is safe. Verify results by calling storymap_get_project after —
+the tool response confirms the call was queued, not which entries applied.
+
+CHUNKING:
+- More than 500 ribs to allocate or size → split into bulk calls of ≤500 each.
+- More than 50 releases to create → split into calls of ≤50 each.
+
 SIZING (separate step — only when the user explicitly asks):
 Sizing assigns a t-shirt size to each rib item. Build and confirm the map structure first.
 Only proceed with sizing after the user explicitly asks you to.
@@ -115,9 +161,9 @@ invent labels or assume the seven defaults (XS/S/M/L/XL/XXL/XXXL) — this proje
 entirely different labels. An unknown label is silently skipped with no error: you will not
 know the size was lost. Always read sizeMapping first.
 
-For sizing, always use storymap_size_rib — not storymap_update_rib. The update_rib size
-field bypasses sizeMapping validation and can create invalid sizes for projects with custom
-size labels.
+For sizing multiple ribs, use storymap_bulk_size (one call). For a single rib, use
+storymap_size_rib. Never use storymap_update_rib for sizing — it bypasses sizeMapping
+validation and can create invalid sizes for projects with custom size labels.
 
 If sizeMapping is empty, stop and tell the user to define t-shirt sizes in the app's Settings
 tab before sizing can proceed.

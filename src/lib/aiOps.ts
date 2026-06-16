@@ -138,6 +138,10 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
         p.name === undefined && p.description === undefined &&
         p.category === undefined && p.notes === undefined && p.size === undefined
       ) return prev;
+      // Build a valid-label set once, pre-walk. Mirrors sizeRibInProduct Guard 1.
+      // Null is the clear sentinel — always allowed through regardless of sizeMapping.
+      // Non-null values not in this product's sizeMapping are silently dropped.
+      const validSizeSet = new Set<string>((prev.sizeMapping ?? []).map(m => m.label));
       let didUpdate = false;
       const themes = prev.themes.map(t => {
         if (t.id !== p.themeId) return t;
@@ -158,7 +162,12 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
               ...(p.category !== undefined && { category: p.category as 'core' | 'non-core' }),
               ...(p.notes !== undefined && { notes: p.notes as string }),
               // Size silently dropped for locked ribs; other fields still apply.
-              ...(!locked && p.size !== undefined && { size: p.size as Size }),
+              // Also dropped when a non-null label is absent from sizeMapping
+              // (null is the clear sentinel and always passes).
+              ...(!locked && p.size !== undefined && (
+                p.size === null ||
+                (typeof p.size === 'string' && validSizeSet.has(p.size))
+              ) && { size: p.size as Size }),
             };
           });
           return { ...b, ribItems };
@@ -199,6 +208,74 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       if (typeof p.ribId !== 'string' || !p.ribId) return prev;
       if (typeof p.size !== 'string' || !p.size) return prev;
       return sizeRibInProduct(prev, p.ribId as string, p.size as string);
+    }
+    // ── Phase 4 — bulk ops ─────────────────────────────────────────────────────
+    case 'bulk_create_releases': {
+      // Payload: { releases: Array<{ releaseId: string, name: string }> }
+      // No Read Mode required — AI supplies its own UUIDs (same as create_release).
+      // @no-throw — safe in drain path.
+      if (!Array.isArray(p.releases) || p.releases.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.releases as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const e = raw as { releaseId?: unknown; name?: unknown };
+        if (typeof e.releaseId !== 'string' || !e.releaseId) continue;
+        if (typeof e.name !== 'string' || !e.name) continue;
+        next = addNamedReleaseToProduct(next, e.releaseId, { name: e.name });
+      }
+      if (next === prev) return prev;
+      // Collapse N helper-appended entries to one using `prev` (not `next`) as base.
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'add', entity: 'release', source: 'ai',
+        }),
+      };
+    }
+    case 'bulk_allocate': {
+      // Payload: { allocations: Array<{ ribId: string, releaseId: string }> }
+      // Read Mode required — AI reads ribIds from storymap_get_project.
+      // Inherits all 4 allocateRibInProduct guards.
+      // @no-throw — safe in drain path.
+      if (!Array.isArray(p.allocations) || p.allocations.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.allocations as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const e = raw as { ribId?: unknown; releaseId?: unknown };
+        if (typeof e.ribId !== 'string' || !e.ribId) continue;
+        if (typeof e.releaseId !== 'string' || !e.releaseId) continue;
+        next = allocateRibInProduct(next, e.ribId, e.releaseId);
+      }
+      if (next === prev) return prev;
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'update', entity: 'rib', source: 'ai',
+        }),
+      };
+    }
+    case 'bulk_size': {
+      // Payload: { sizes: Array<{ ribId: string, size: string }> }
+      // Read Mode required — AI reads ribIds and sizeMapping from storymap_get_project.
+      // sizeRibInProduct Guard 1 (label membership) is the real size validator.
+      // Inherits all 4 sizeRibInProduct guards.
+      // @no-throw — safe in drain path.
+      if (!Array.isArray(p.sizes) || p.sizes.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.sizes as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const e = raw as { ribId?: unknown; size?: unknown };
+        if (typeof e.ribId !== 'string' || !e.ribId) continue;
+        if (typeof e.size !== 'string' || !e.size) continue;
+        next = sizeRibInProduct(next, e.ribId, e.size);
+      }
+      if (next === prev) return prev;
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'update', entity: 'rib', source: 'ai',
+        }),
+      };
     }
     default:
       console.warn(`[AI] Unknown op "${op}" — no-op.`);

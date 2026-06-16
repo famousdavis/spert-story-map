@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.44.0 (2026-06-16)
+
+Allocate and size large story maps in bulk — one call instead of hundreds.
+
+**Connect AI: bulk tools for release planning and sizing**
+
+- **New: storymap_bulk_create_releases** — creates all your named releases in a single call; no Read Mode needed.
+- **New: storymap_bulk_allocate** — assigns batches of stories to releases in one call. Already-allocated and in-progress stories are skipped. Read Mode required.
+- **New: storymap_bulk_size** — sizes a whole map in one call. Already-sized and in-progress stories are skipped. Validates every label against your size scale. Read Mode required.
+- **Improved: Connect AI prompt** — now chains tool calls back-to-back within a single response, without stopping to narrate between them.
+- **Improved: size validation in AI manual updates** — storymap_update_rib now validates size labels against your project's size scale.
+
+> Note: the three new bulk tools become available once the Connect AI service update is deployed. If a bulk tool is unavailable, fall back to the individual tools.
+
 ## Version 0.43.0 (2026-06-15)
 
 Connect AI can now size your stories — not just build and plan them.
