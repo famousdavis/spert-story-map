@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useCallback } from 'react';
-import type { Product, Theme, Backbone, RibItem, ColorKey } from '../types';
+import type { Product, Theme, Backbone, RibItem, ColorKey, Size } from '../types';
 import { calculateNextSprintEndDate } from '../lib/progressMutations';
 import { DEFAULT_THEME_COLOR_KEYS } from '../lib/themeColors';
 import { appendChangeLogEntry } from '../lib/storage';
@@ -808,6 +808,60 @@ export function unassignRibInProduct(
     themes,
     releaseCardOrder: cleanCardOrder(prev.releaseCardOrder, new Set([ribId])),
   };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, {
+      op: 'update', entity: 'rib', id: ribId, source: 'ai',
+    }),
+  };
+}
+
+/**
+ * Pure transformation: assign a t-shirt size to an unsized rib.
+ * Addresses ribs by ID alone (global search; no themeId/backboneId needed).
+ *
+ * Guards (all return prev ref-equal, never throw):
+ *   1. size not in product.sizeMapping → prev (rejects unknown labels; prevents orphan sizes).
+ *      Pre-walk check; uses ?? [] so an absent sizeMapping stays no-throw.
+ *   2. Rib not found → prev (via didUpdate flag).
+ *   3. Rib is locked → prev (mirrors the Sizing UI lock, CLAUDE.md #26).
+ *   4. Rib already has a valid size → prev (additive; never overwrites).
+ *      Form B: r.size && labelSet.has(r.size). Matches useSizingLayout.ts:118's definition
+ *      of "unsized" (falsy OR not-in-mapping). Handles both null and the empty-string value
+ *      validateProduct.ts:225 writes for orphan sizes on import.
+ *
+ * Does NOT update sizingCardOrder (matches allocateRibInProduct / addRibToRelease precedent).
+ * AI-sized ribs render at the end of their size column via the sort-position Infinity fallback.
+ *
+ * @no-throw — safe for use in the drain path (two-call coupling, aiOps.ts:209–231).
+ */
+export function sizeRibInProduct(
+  prev: Product,
+  ribId: string,
+  size: string,
+): Product {
+  // Guard 1: size must be a valid label in this product's mapping.
+  // Built pre-walk and reused for Guard 4 inside the walk.
+  const labelSet = new Set((prev.sizeMapping ?? []).map(m => m.label));
+  if (!labelSet.has(size)) return prev;
+
+  let didUpdate = false;
+  const themes = prev.themes.map(t => ({
+    ...t,
+    backboneItems: t.backboneItems.map(b => ({
+      ...b,
+      ribItems: b.ribItems.map(r => {
+        if (r.id !== ribId) return r;
+        if (isRibLocked(r)) return r;                        // Guard 3
+        if (r.size && labelSet.has(r.size)) return r;        // Guard 4: Form B
+        didUpdate = true;
+        return { ...r, size: size as Size };
+      }),
+    })),
+  }));
+
+  if (!didUpdate) return prev;
+  const next = { ...prev, themes };
   return {
     ...next,
     _changeLog: appendChangeLogEntry(next, {

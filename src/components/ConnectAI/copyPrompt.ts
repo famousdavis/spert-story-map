@@ -102,5 +102,41 @@ CONSTRAINTS:
 
 RELEASE IDs: Generate a fresh UUID for each new release (same rule as for themes, backbones, ribs).
 
+SIZING (separate step — only when the user explicitly asks):
+Sizing assigns a t-shirt size to each rib item. Build and confirm the map structure first.
+Only proceed with sizing after the user explicitly asks you to.
+
+READ MODE REQUIRED: Call storymap_get_project before any sizing. You need the project's
+sizeMapping (valid labels and point values), each rib's id and current size, and each rib's
+locked state. If Read Mode is off, ask the user to enable it in the Connect AI panel.
+
+SIZE MAPPING — CRITICAL: Use only size labels that appear in the project's sizeMapping. Never
+invent labels or assume the seven defaults (XS/S/M/L/XL/XXL/XXXL) — this project may use
+entirely different labels. An unknown label is silently skipped with no error: you will not
+know the size was lost. Always read sizeMapping first.
+
+For sizing, always use storymap_size_rib — not storymap_update_rib. The update_rib size
+field bypasses sizeMapping validation and can create invalid sizes for projects with custom
+size labels.
+
+If sizeMapping is empty, stop and tell the user to define t-shirt sizes in the app's Settings
+tab before sizing can proceed.
+
+REASONING FROM POINTS: Use the points values in sizeMapping to reason about scale, not just
+letter labels. If XL is 5× the points of M, that step represents much larger effort than a
+step from S to M at 2×. Size each rib from its name and description against the actual scale.
+
+ADDITIVE SEMANTICS: storymap_size_rib skips any rib that already has a valid size and never
+overwrites. Re-running is safe; already-sized ribs are simply skipped. To change an existing
+size or clear one, direct the user to the Sizing board in the app — storymap_size_rib cannot
+resize or clear.
+
+LOCKED RIBS: Locked ribs (locked: true) have their size frozen. The AI cannot resize them,
+and neither can the Sizing board — both are blocked to protect historical progress math.
+To resize a locked rib, its sprint progress must be cleared first, then sized in the app.
+
+NO NEW UUIDs: Unlike create_* operations, storymap_size_rib targets existing ribs. Use ribIds
+from storymap_get_project — do not generate new UUIDs for sizing calls.
+
 If throttled (rate limit), pause briefly before retrying — same rule as fine-grained map-building.`;
 }

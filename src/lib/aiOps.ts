@@ -10,6 +10,7 @@ import {
   addNamedReleaseToProduct,
   allocateRibInProduct,
   unassignRibInProduct,
+  sizeRibInProduct,              // ← Phase 3
 } from '../hooks/useProductMutations';
 import { appendChangeLogEntry } from './storage';
 import { isRibLocked } from './ribHelpers';
@@ -190,6 +191,14 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       // Payload: { ribId: string }
       if (typeof p.ribId !== 'string' || !p.ribId) return prev;
       return unassignRibInProduct(prev, p.ribId as string);
+    }
+    case 'size_rib': {
+      // Payload: { ribId: string, size: string }
+      // typeof guards reject non-string payloads (mirrors allocate_rib, aiOps.ts:185–186).
+      // sizeMapping validation, lock guard, and Form B additive guard are in sizeRibInProduct.
+      if (typeof p.ribId !== 'string' || !p.ribId) return prev;
+      if (typeof p.size !== 'string' || !p.size) return prev;
+      return sizeRibInProduct(prev, p.ribId as string, p.size as string);
     }
     default:
       console.warn(`[AI] Unknown op "${op}" — no-op.`);

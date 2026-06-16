@@ -144,6 +144,28 @@ function makeProductWithRelease(): Product {
   return p;
 }
 
+// Module-scope builder for Phase 3 tests.
+// IMPORTANT: makeProduct() uses sizeMapping:[] — size_rib calls against it
+// no-op via Guard 1 (no valid labels). This matters most for tests that assert
+// ref-equal no-ops: the fixture must have a real mapping so Guard 1 is bypassable
+// and the rib-walk guards are reachable.
+function makeProductWithSizing(): Product {
+  const p: Product = {
+    ...makeProduct(),
+    sizeMapping: [
+      { label: 'S', points: 10 },
+      { label: 'M', points: 20 },
+      { label: 'L', points: 40 },
+    ],
+  };
+  let result = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+  result = applyAiOp(result, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+  result = applyAiOp(result, 'create_rib', {
+    themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'Rib',
+  });
+  return result;
+}
+
 // ── update_theme ──────────────────────────────────────────────────────────
 describe('applyAiOp — update_theme', () => {
   it('updates name and appends a changelog entry', () => {
@@ -511,6 +533,101 @@ describe('applyAiOp — unassign_rib', () => {
   });
 });
 
+// ── size_rib ──────────────────────────────────────────────────────────────
+describe('applyAiOp — size_rib', () => {
+  it('sizes an unsized, unlocked rib to a valid label', () => {
+    const next = applyAiOp(makeProductWithSizing(), 'size_rib', { ribId: 'r1', size: 'M' });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBe('M');
+  });
+
+  it('appends changelog {op:update, entity:rib, id, source:ai}', () => {
+    const next = applyAiOp(makeProductWithSizing(), 'size_rib', { ribId: 'r1', size: 'M' });
+    const log = next._changeLog ?? [];
+    expect(log[log.length - 1]).toMatchObject({
+      op: 'update', entity: 'rib', id: 'r1', source: 'ai',
+    });
+  });
+
+  it('[additive] no-op when rib already has a valid size — ref-equal', () => {
+    const sized = applyAiOp(makeProductWithSizing(), 'size_rib', { ribId: 'r1', size: 'M' });
+    // Form B: already validly sized → skip, even to a different valid label.
+    expect(applyAiOp(sized, 'size_rib', { ribId: 'r1', size: 'L' })).toBe(sized);
+  });
+
+  it('[CRITICAL] no-op when label not in sizeMapping — ref-equal', () => {
+    const p = makeProductWithSizing(); // mapping is {S, M, L}
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'XL' })).toBe(p);       // enum label absent from mapping
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'GIGANTIC' })).toBe(p); // invented label
+  });
+
+  it('no-op when rib is locked — ref-equal', () => {
+    const p = makeProductWithSizing();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel1', percentComplete: 50 },
+    ];
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' })).toBe(p);
+  });
+
+  it('no-op on missing/empty/non-string ribId or size', () => {
+    const p = makeProductWithSizing();
+    expect(applyAiOp(p, 'size_rib', {})).toBe(p);
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1' })).toBe(p);
+    expect(applyAiOp(p, 'size_rib', { size: 'M' })).toBe(p);
+    expect(applyAiOp(p, 'size_rib', { ribId: '', size: 'M' })).toBe(p);
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: '' })).toBe(p);
+    expect(applyAiOp(p, 'size_rib', { ribId: 123 as unknown as string, size: 'M' })).toBe(p);
+  });
+
+  it('no-op when ribId matches no rib — ref-equal', () => {
+    const p = makeProductWithSizing();
+    expect(applyAiOp(p, 'size_rib', { ribId: 'ghost', size: 'M' })).toBe(p);
+  });
+
+  it('[EDGE] rib with size "" (post-import orphan clear) is sizeable — Form B treats it as unsized', () => {
+    // validateProduct.ts:225 persists orphan sizes as '' not null.
+    // Form B: '' is falsy → not "already validly sized" → sizeable.
+    // A guard of !== null would skip this rib despite the UI showing it as unsized.
+    const p = makeProductWithSizing();
+    (p.themes[0]!.backboneItems[0]!.ribItems[0]! as Record<string, unknown>).size = '';
+    const next = applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBe('M');
+  });
+
+  it('[EDGE] custom (non-enum) label succeeds; enum label absent from mapping fails', () => {
+    // Proves validation is against product.sizeMapping at runtime, not the Size union.
+    let p: Product = {
+      ...makeProduct(),
+      sizeMapping: [{ label: 'Tiny', points: 1 }, { label: 'Huge', points: 100 }],
+    };
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R' });
+    expect(
+      applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'Tiny' })
+        .themes[0]!.backboneItems[0]!.ribItems[0]!.size,
+    ).toBe('Tiny');
+    // 'M' is in the Size enum but NOT in this product's mapping → no-op
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' })).toBe(p);
+  });
+
+  it('[EDGE] no-op when sizeMapping is absent — ref-equal, no throw', () => {
+    // sizeMapping is required by the type but can be absent on hand-edited products.
+    // The ?? [] guard in sizeRibInProduct must prevent a throw.
+    const p = makeProductWithSizing();
+    (p as Record<string, unknown>).sizeMapping = undefined;
+    expect(() => applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' })).not.toThrow();
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' })).toBe(p);
+  });
+
+  it('is idempotent: second identical call is ref-equal (no duplicate changelog entry)', () => {
+    const once = applyAiOp(makeProductWithSizing(), 'size_rib', { ribId: 'r1', size: 'S' });
+    const logLen = (once._changeLog ?? []).length;
+    const twice = applyAiOp(once, 'size_rib', { ribId: 'r1', size: 'S' });
+    expect(twice).toBe(once);
+    expect((twice._changeLog ?? []).length).toBe(logLen);
+  });
+});
+
 // ── Drain / no-throw — Phase 2 ────────────────────────────────────────────
 describe('applyDrainOps — Phase 2 ops', () => {
   it('computeSafePrefix includes all three new ops (all no-throw)', () => {
@@ -568,6 +685,58 @@ describe('applyDrainOps — Phase 2 ops', () => {
     const { product: once } = applyDrainOps(p, ops);
     const { product: twice } = applyDrainOps(once, ops);
     expect(twice).toBe(once);
+  });
+});
+
+// ── Drain / no-throw — Phase 3 ────────────────────────────────────────────
+describe('applyDrainOps — Phase 3 (size_rib)', () => {
+  it('computeSafePrefix includes size_rib (no-throw — satisfies drain two-call coupling)', () => {
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'size_rib', payload: { ribId: 'r1', size: 'M' } },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(makeProductWithSizing(), ops);
+    expect(safeOps).toHaveLength(1);
+    expect(nextSeq).toBe(1);
+  });
+
+  it('create_rib then size_rib in drain order: size lands', () => {
+    let p: Product = { ...makeProduct(), sizeMapping: [{ label: 'M', points: 20 }] };
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'create_rib', payload: { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R' } },
+      { seq: 2, op: 'size_rib', payload: { ribId: 'r1', size: 'M' } },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(2);
+    expect(result.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBe('M');
+  });
+
+  it('re-applying size_rib drain is ref-equal (idempotency, no duplicate changelog)', () => {
+    const p = makeProductWithSizing();
+    const ops: AiOpDoc[] = [{ seq: 1, op: 'size_rib', payload: { ribId: 'r1', size: 'M' } }];
+    const { product: once } = applyDrainOps(p, ops);
+    expect(once.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBe('M');
+    const { product: twice } = applyDrainOps(once, ops);
+    expect(twice).toBe(once);
+  });
+
+  it('size_rib with invalid label in drain: no-op, cursor advances', () => {
+    const ops: AiOpDoc[] = [
+      { seq: 5, op: 'size_rib', payload: { ribId: 'r1', size: 'INVALID' } },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(makeProductWithSizing(), ops);
+    expect(nextSeq).toBe(5);
+    expect(result.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBeNull();
+  });
+
+  it('size_rib on absent sizeMapping in drain: no-op, no throw, cursor advances', () => {
+    const p = makeProductWithSizing();
+    (p as Record<string, unknown>).sizeMapping = undefined;
+    const ops: AiOpDoc[] = [{ seq: 1, op: 'size_rib', payload: { ribId: 'r1', size: 'M' } }];
+    expect(() => applyDrainOps(p, ops)).not.toThrow();
+    const { nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(1);
   });
 });
 
@@ -633,5 +802,85 @@ describe('buildAiSnapshot', () => {
     const snap = buildAiSnapshot(p);
     const rt = JSON.parse(JSON.stringify(snap)) as typeof snap;
     expect(rt).toEqual(snap);
+  });
+
+  // ── Phase 3 additions ─────────────────────────────────────────────────────
+  it('top-level sizeMapping is present and sorted by points ascending', () => {
+    const p: Product = {
+      ...makeProduct(),
+      sizeMapping: [
+        { label: 'L', points: 40 },
+        { label: 'S', points: 10 },
+        { label: 'M', points: 20 },
+      ],
+    };
+    expect(buildAiSnapshot(p).sizeMapping).toEqual([
+      { label: 'S', points: 10 },
+      { label: 'M', points: 20 },
+      { label: 'L', points: 40 },
+    ]);
+  });
+
+  it('sizeMapping is [] for a product with empty sizeMapping (not omitted)', () => {
+    const snap = buildAiSnapshot(makeProduct()); // makeProduct() has sizeMapping:[]
+    expect(snap.sizeMapping).toEqual([]);
+    expect(snap).toHaveProperty('sizeMapping');
+  });
+
+  it('[EDGE] sizeMapping is [] and no throw for absent sizeMapping', () => {
+    // ?? [] guard in buildAiSnapshot covers hand-edited products.
+    const p = makeProduct();
+    (p as Record<string, unknown>).sizeMapping = undefined;
+    expect(() => buildAiSnapshot(p)).not.toThrow();
+    expect(buildAiSnapshot(p).sizeMapping).toEqual([]);
+  });
+
+  it('per-rib size is null for an unsized rib', () => {
+    expect(
+      buildAiSnapshot(makeProductWithSizing()).themes[0]!.backboneItems[0]!.ribItems[0]!.size,
+    ).toBeNull();
+  });
+
+  it('per-rib size reflects label after sizing', () => {
+    const p = applyAiOp(makeProductWithSizing(), 'size_rib', { ribId: 'r1', size: 'M' });
+    expect(
+      buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.size,
+    ).toBe('M');
+  });
+
+  it('[EDGE] per-rib size is null for a rib with size "" (empty-string orphan)', () => {
+    const p = makeProductWithSizing();
+    (p.themes[0]!.backboneItems[0]!.ribItems[0]! as Record<string, unknown>).size = '';
+    expect(
+      buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.size,
+    ).toBeNull();
+  });
+
+  it('[EDGE] per-rib size is null for an orphan-size rib (label absent from mapping)', () => {
+    const p = makeProductWithSizing(); // mapping is {S, M, L}
+    (p.themes[0]!.backboneItems[0]!.ribItems[0]! as Record<string, unknown>).size = 'XXL';
+    expect(
+      buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.size,
+    ).toBeNull();
+  });
+
+  it('snapshot size:null reflects what size_rib will see as unsized (unlocked rib)', () => {
+    // For an unsized, unlocked rib: snapshot reports null AND size_rib acts.
+    // Full agreement also requires locked:false (locked unsized ribs have null
+    // in snapshot but size_rib does not act on them — Guard 3).
+    const p = makeProductWithSizing();
+    const ribSnap = buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(ribSnap.size).toBeNull();
+    expect(ribSnap.locked).toBe(false);
+    expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' })).not.toBe(p); // acted
+  });
+
+  it('JSON round-trip extended: sizeMapping and per-rib size survive JSON parse', () => {
+    const p = applyAiOp(makeProductWithSizing(), 'size_rib', { ribId: 'r1', size: 'L' });
+    const snap = buildAiSnapshot(p);
+    const rt = JSON.parse(JSON.stringify(snap)) as typeof snap;
+    expect(rt).toEqual(snap);
+    expect(rt.sizeMapping).toEqual(snap.sizeMapping);
+    expect(rt.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBe('L');
   });
 });

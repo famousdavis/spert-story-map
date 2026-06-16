@@ -12,11 +12,17 @@ import { isRibLocked } from './ribHelpers';
  * Phase 2 additions over the Phase 1 compact:
  *   - releases: sorted by order; id/name/order only (no targetDate, no description)
  *   - ribItems: include releaseIds[] and locked boolean
+ *
+ * Phase 3 additions:
+ *   - sizeMapping: sorted by points ascending; label/points only
+ *   - ribItems: include size (string | null); orphan/empty sizes normalized to null
+ *     to match useSizingLayout.ts:118's definition of "unsized"
  */
 export interface AiSnapshot {
   id: string;
   name: string;
   description: string;
+  sizeMapping: Array<{ label: string; points: number }>;  // ← Phase 3
   releases: Array<{ id: string; name: string; order: number }>;
   themes: Array<{
     id: string;
@@ -29,6 +35,7 @@ export interface AiSnapshot {
         name: string;
         category: string;
         description: string;
+        size: string | null;         // ← Phase 3 (valid-label-or-null; '' and orphans → null)
         releaseIds: string[];
         locked: boolean;
       }>;
@@ -48,10 +55,16 @@ export interface AiSnapshot {
  * @pure — no side effects; testable without Firebase or React.
  */
 export function buildAiSnapshot(p: Product): AiSnapshot {
+  // Valid-label set used for per-rib size normalization below.
+  const sizeLabels = new Set((p.sizeMapping ?? []).map(m => m.label));
   return {
     id: p.id,
     name: p.name,
     description: p.description,
+    sizeMapping: (p.sizeMapping ?? [])                               // ← Phase 3
+      .slice()
+      .sort((a, b) => a.points - b.points)
+      .map(m => ({ label: m.label, points: m.points })),
     releases: p.releases
       .slice()
       .sort((a, b) => a.order - b.order)
@@ -67,6 +80,7 @@ export function buildAiSnapshot(p: Product): AiSnapshot {
           name: r.name,
           category: r.category,
           description: r.description,
+          size: (r.size && sizeLabels.has(r.size)) ? r.size : null,  // ← Phase 3
           releaseIds: (r.releaseAllocations ?? []).map(a => a.releaseId),
           locked: isRibLocked(r),
         })),
