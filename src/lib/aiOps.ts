@@ -277,6 +277,31 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
         }),
       };
     }
+    // ── Phase 5 — bulk unassign ──────────────────────────────────────────────
+    case 'bulk_unassign': {
+      // Payload: { ribIds: string[] }
+      // Read Mode required — AI reads ribIds (+ locked state) from storymap_get_project.
+      // Loops unassignRibInProduct per entry. Inherits all 3 guards:
+      //   1. rib not found → prev ref-equal
+      //   2. rib is locked → prev ref-equal
+      //   3. rib already unassigned → prev ref-equal
+      // @no-throw — safe in drain path.
+      if (!Array.isArray(p.ribIds) || p.ribIds.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.ribIds as unknown[]) {
+        if (typeof raw !== 'string' || !raw) continue;
+        next = unassignRibInProduct(next, raw);
+      }
+      if (next === prev) return prev;
+      // Changelog collapse: discard N per-rib entries; replace with one summary entry.
+      // CRITICAL — base is `prev` not `next` (see CLAUDE.md #51).
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'update', entity: 'rib', source: 'ai',
+        }),
+      };
+    }
     default:
       console.warn(`[AI] Unknown op "${op}" — no-op.`);
       return prev;

@@ -92,8 +92,10 @@ RE-RUN / ADDITIVE SEMANTICS:
   Re-running is safe; already-allocated ribs are simply skipped.
 - To MOVE a rib to a different release: call storymap_unassign_rib first, then
   storymap_allocate_rib.
-- storymap_unassign_rib removes all of a rib's allocations (skips locked ribs; no-op if
-  already unassigned).
+- To MOVE many ribs at once: call storymap_bulk_unassign (all the ribIds), then
+  storymap_bulk_allocate. Both require Read Mode.
+- storymap_unassign_rib and storymap_bulk_unassign remove ALL of a rib's allocations
+  (skip locked ribs; no-op if already unassigned).
 
 CONSTRAINTS:
 - Whole-rib, single-release, 100% only. You cannot split a rib across releases.
@@ -102,19 +104,20 @@ CONSTRAINTS:
   in storymap_get_project, tell the user — it must be changed manually.
 - Never set a target date. Do not include targetDate in any create_release call.
 - If a rib's releaseIds has more than one entry (a percentage split set by the user),
-  warn the user before calling storymap_unassign_rib — it removes the rib from ALL
-  releases, not just one.
+  warn the user before calling storymap_unassign_rib or including that rib in a
+  storymap_bulk_unassign batch — both remove the rib from ALL its releases, not just one.
 
 RELEASE IDs: Generate a fresh UUID for each new release (same rule as for themes, backbones, ribs).
 
 BULK TOOLS (preferred when working with many ribs at once):
-Use bulk tools when allocating or sizing more than a handful of ribs — they collapse N
+Use bulk tools when allocating, sizing, or unassigning more than a handful of ribs — they collapse N
 round-trips into one call. This is critical for AI clients that yield to the user between
 tool calls.
 
 WHEN TO USE BULK:
-- Allocating or sizing more than a handful of ribs → use storymap_bulk_allocate /
-  storymap_bulk_size instead of repeated storymap_allocate_rib / storymap_size_rib.
+- Allocating, sizing, or unassigning more than a handful of ribs → use
+  storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign instead of
+  repeated individual tool calls.
 - Creating multiple releases at once → use storymap_bulk_create_releases.
 - A single targeted change (one rib, one action) → individual tools are fine.
 
@@ -133,19 +136,20 @@ labels from sizeMapping.
 
 READ MODE SUMMARY:
 - storymap_bulk_create_releases: does NOT require Read Mode.
-- storymap_bulk_allocate / storymap_bulk_size: REQUIRE Read Mode.
+- storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign: REQUIRE Read Mode.
 
-ADDITIVE / RE-RUN SEMANTICS (all three bulk tools):
+ADDITIVE / RE-RUN SEMANTICS (all four bulk tools):
 - storymap_bulk_create_releases skips duplicate releaseIds.
 - storymap_bulk_allocate skips ribs that are locked, already allocated, or whose
   target release does not exist.
 - storymap_bulk_size skips ribs that are locked, already validly sized, or whose
   size label is not in sizeMapping.
+- storymap_bulk_unassign skips ribs that are locked or already unassigned.
 Re-running any bulk call is safe. Verify results by calling storymap_get_project after —
 the tool response confirms the call was queued, not which entries applied.
 
 CHUNKING:
-- More than 500 ribs to allocate or size → split into bulk calls of ≤500 each.
+- More than 500 ribs to allocate, size, or unassign → split into bulk calls of ≤500 each.
 - More than 50 releases to create → split into calls of ≤50 each.
 
 SIZING (separate step — only when the user explicitly asks):
