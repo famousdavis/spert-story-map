@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.45.0 (2026-06-17)
+
+Unassign stories from releases in bulk — one call instead of hundreds.
+
+**Connect AI: bulk unassign for re-planning**
+
+- **New: storymap_bulk_unassign** — removes all release allocations from a batch of stories in one call. Already-unassigned and in-progress stories are skipped. Read Mode required.
+- **Improved: Connect AI prompt** — the move-ribs workflow now has a bulk path: storymap_bulk_unassign then storymap_bulk_allocate.
+
+> Note: storymap_bulk_unassign becomes available once the Connect AI service update is deployed. Until then, use individual storymap_unassign_rib calls.
+
 ## Version 0.44.0 (2026-06-16)
 
 Allocate and size large story maps in bulk — one call instead of hundreds.

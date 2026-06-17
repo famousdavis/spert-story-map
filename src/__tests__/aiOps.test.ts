@@ -226,6 +226,42 @@ function makeProductWithSizingMultiRib(): Product {
   })) })) };
 }
 
+/**
+ * One release + three ribs in varying states for bulk_unassign tests.
+ *   r1 — allocated + unlocked (happy-path: should clear)
+ *   r2 — allocated + locked   (Guard 2 isolation: should skip)
+ *   r3 — unallocated          (Guard 3 isolation: should skip — already unassigned)
+ *
+ * Build order for r2: allocate FIRST (while unlocked), THEN inject progressHistory.
+ * Reason: allocateRibInProduct Guard 3 blocks re-allocation of a locked rib — doing
+ * lock-then-allocate silently produces locked+unallocated, which is the wrong state.
+ */
+function makeProductForBulkUnassign(): Product {
+  let p = makeProduct();
+  p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+  p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+  p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'Rib1' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r2', name: 'Rib2' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r3', name: 'Rib3' });
+  p = allocateRibInProduct(p, 'r1', 'rel-1');
+  p = allocateRibInProduct(p, 'r2', 'rel-1');
+  // Lock r2 after allocation.
+  return {
+    ...p,
+    themes: p.themes.map(t => ({
+      ...t,
+      backboneItems: t.backboneItems.map(b => ({
+        ...b,
+        ribItems: b.ribItems.map(r => r.id !== 'r2' ? r : {
+          ...r,
+          progressHistory: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 }],
+        }),
+      })),
+    })),
+  };
+}
+
 // ── update_theme ──────────────────────────────────────────────────────────
 describe('applyAiOp — update_theme', () => {
   it('updates name and appends a changelog entry', () => {
@@ -1251,6 +1287,112 @@ describe('applyAiOp — bulk_size', () => {
   });
 });
 
+// ── bulk_unassign ─────────────────────────────────────────────────────────
+describe('applyAiOp — bulk_unassign', () => {
+  it('clears allocations from an allocated, unlocked rib', () => {
+    const p = makeProductForBulkUnassign();
+    const next = applyAiOp(p, 'bulk_unassign', { ribIds: ['r1'] });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);
+  });
+  it('mixed batch: only the allocated-unlocked rib clears; locked / unassigned / ghost skip', () => {
+    const p = makeProductForBulkUnassign();
+    const next = applyAiOp(p, 'bulk_unassign', { ribIds: ['r1', 'r2', 'r3', 'ghost'] });
+    expect(next).not.toBe(p);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);    // r1 cleared
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[1]!.releaseAllocations).toHaveLength(1); // r2 locked → unchanged
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[2]!.releaseAllocations).toEqual([]);    // r3 already empty
+  });
+  it('all-skip batch is a ref-equal no-op', () => {
+    const p = makeProductForBulkUnassign();
+    expect(applyAiOp(p, 'bulk_unassign', { ribIds: ['r2', 'r3', 'ghost'] })).toBe(p);
+  });
+  it('no-op on empty / non-array / non-string entries', () => {
+    const p = makeProductForBulkUnassign();
+    expect(applyAiOp(p, 'bulk_unassign', { ribIds: [] })).toBe(p);
+    expect(applyAiOp(p, 'bulk_unassign', { ribIds: 'r1' })).toBe(p);
+    expect(applyAiOp(p, 'bulk_unassign', { ribIds: [null] })).toBe(p);
+    expect(applyAiOp(p, 'bulk_unassign', { ribIds: [''] })).toBe(p);
+    expect(applyAiOp(p, 'bulk_unassign', {})).toBe(p);
+  });
+  it('partial batch (1 applies, 1 locked-skip) → exactly 1 changelog entry', () => {
+    const p = makeProductForBulkUnassign();
+    const prevLen = (p._changeLog ?? []).length;
+    // r1 applies; r2 is locked and skips.
+    const next = applyAiOp(p, 'bulk_unassign', { ribIds: ['r1', 'r2'] });
+    expect(next).not.toBe(p);
+    expect((next._changeLog ?? []).length).toBe(prevLen + 1);
+  });
+  it('N→1 collapse: 2 fresh unassignments → exactly 1 changelog entry', () => {
+    let p = makeProduct();
+    p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R1' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r2', name: 'R2' });
+    p = allocateRibInProduct(p, 'r1', 'rel-1');
+    p = allocateRibInProduct(p, 'r2', 'rel-1');
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_unassign', { ribIds: ['r1', 'r2'] });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[1]!.releaseAllocations).toEqual([]);
+    expect((next._changeLog ?? []).length).toBe(prevLen + 1);
+  });
+  it('changelog: op:update, entity:rib, source:ai, no id field', () => {
+    const next = applyAiOp(makeProductForBulkUnassign(), 'bulk_unassign', { ribIds: ['r1'] });
+    const log = next._changeLog ?? [];
+    const entry = log[log.length - 1]!;
+    expect(entry.op).toBe('update');
+    expect(entry.entity).toBe('rib');
+    expect(entry.source).toBe('ai');
+    expect(entry.id).toBeUndefined();
+  });
+  it('idempotency: second identical call is ref-equal', () => {
+    const first = applyAiOp(makeProductForBulkUnassign(), 'bulk_unassign', { ribIds: ['r1'] });
+    expect(applyAiOp(first, 'bulk_unassign', { ribIds: ['r1'] })).toBe(first);
+  });
+  it('releaseCardOrder: unassigned rib is stripped from all release buckets', () => {
+    let p = makeProductForBulkUnassign();
+    p = { ...p, releaseCardOrder: { 'rel-1': ['r1', 'r2'] } };
+    const next = applyAiOp(p, 'bulk_unassign', { ribIds: ['r1'] });
+    expect(next.releaseCardOrder!['rel-1']).not.toContain('r1'); // r1 stripped
+    expect(next.releaseCardOrder!['rel-1']).toContain('r2');     // r2 locked → stays
+  });
+  it('[Guard isolation] locked+allocated rib is NOT cleared — Guard 2 isolates lock', () => {
+    const p = makeProductForBulkUnassign();
+    const next = applyAiOp(p, 'bulk_unassign', { ribIds: ['r2'] });
+    expect(next).toBe(p); // all-skip → ref-equal
+    expect(p.themes[0]!.backboneItems[0]!.ribItems[1]!.releaseAllocations).toHaveLength(1);
+  });
+  it('[multi-release] rib allocated to 2 releases has ALL allocations cleared', () => {
+    // Construct a rib with a user-set percentage split (bypasses allocateRibInProduct Guard 4).
+    let p = makeProduct();
+    p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+    p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R1' });
+    p = {
+      ...p,
+      themes: p.themes.map(t => ({
+        ...t,
+        backboneItems: t.backboneItems.map(b => ({
+          ...b,
+          ribItems: b.ribItems.map(r => r.id !== 'r1' ? r : {
+            ...r,
+            releaseAllocations: [
+              { releaseId: 'rel-1', percentage: 60 },
+              { releaseId: 'rel-2', percentage: 40 },
+            ],
+          }),
+        })),
+      })),
+    };
+    const next = applyAiOp(p, 'bulk_unassign', { ribIds: ['r1'] });
+    // Both allocations cleared — this is the behavior the copyPrompt warning is about.
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);
+  });
+});
+
 // ── Drain / no-throw — Phase 4 bulk ops ───────────────────────────────────
 describe('applyDrainOps — Phase 4 bulk ops', () => {
   it('no-op bulk payloads still advance the cursor without throwing', () => {
@@ -1297,5 +1439,53 @@ describe('applyDrainOps — Phase 4 bulk ops', () => {
     const { product: result, nextSeq } = applyDrainOps(makeProductWithSizing(), ops);
     expect(nextSeq).toBe(5);
     expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBeNull();
+  });
+});
+
+// ── Drain / no-throw — Phase 5 (bulk_unassign) ───────────────────────────
+describe('applyDrainOps — Phase 5 (bulk_unassign)', () => {
+  it('computeSafePrefix includes bulk_unassign (no-throw)', () => {
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'bulk_unassign', payload: { ribIds: ['ghost'] } },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(makeProduct(), ops);
+    expect(safeOps).toHaveLength(1);
+    expect(nextSeq).toBe(1);
+  });
+  it('bulk_allocate then bulk_unassign in drain: ribs end unallocated (move workflow)', () => {
+    let p = makeProduct();
+    p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R' });
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'bulk_allocate', payload: { allocations: [{ ribId: 'r1', releaseId: 'rel-1' }] } },
+      { seq: 2, op: 'bulk_unassign', payload: { ribIds: ['r1'] } },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(2);
+    expect(result.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);
+  });
+  it('re-applying bulk_unassign drain is ref-equal (idempotency)', () => {
+    let p = makeProduct();
+    p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R' });
+    p = allocateRibInProduct(p, 'r1', 'rel-1');
+    const ops: AiOpDoc[] = [{ seq: 1, op: 'bulk_unassign', payload: { ribIds: ['r1'] } }];
+    const { product: once } = applyDrainOps(p, ops);
+    expect(once.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([]);
+    const { product: twice } = applyDrainOps(once, ops);
+    expect(twice).toBe(once);
+  });
+  it('all-invalid bulk_unassign in drain: cursor advances, product unchanged', () => {
+    const p = makeProduct();
+    const ops: AiOpDoc[] = [
+      { seq: 7, op: 'bulk_unassign', payload: { ribIds: ['ghost'] } },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(7);
+    expect(result).toBe(p);
   });
 });
