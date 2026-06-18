@@ -16,37 +16,12 @@ import type { Product, ProductUpdater } from '../types';
 import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
 import { buildAiSnapshot } from '../lib/aiSnapshot';
 import {
-  AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION, AI_LAST_SEQ_PREFIX,
+  AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION,
 } from '../lib/aiConstants';
-
-// ── Module-level helpers ────────────────────────────────────────────────────
-function getLastSeq(sessionId: string): number {
-  const n = parseInt(localStorage.getItem(AI_LAST_SEQ_PREFIX + sessionId) ?? '0', 10);
-  return Number.isFinite(n) ? n : 0;
-}
-function setLastSeq(sessionId: string, seq: number): void {
-  localStorage.setItem(AI_LAST_SEQ_PREFIX + sessionId, String(seq));
-}
-function clearLastSeq(sessionId: string): void {
-  localStorage.removeItem(AI_LAST_SEQ_PREFIX + sessionId);
-}
-/**
- * Safe JSON parse for the AI consent localStorage value. Used in
- * changePermissions only. writeSnapshot reads consentReadRef (not
- * localStorage). ProductLayout.tsx inlines its own safe-parse IIFE.
- */
-function safeParseConsent(raw: string | null): { version?: number; read?: boolean; write?: boolean } | null {
-  if (!raw) return null;
-  try { return JSON.parse(raw) as { version?: number; read?: boolean; write?: boolean }; }
-  catch { return null; }
-}
-function buildOpsQuery(sessionId: string, afterSeq: number) {
-  return query(
-    collection(db!, 'anonymous_sessions', sessionId, 'ops'),
-    where('seq', '>', afterSeq),
-    orderBy('seq', 'asc'),
-  );
-}
+import { SESSIONS_COL } from '../lib/firestoreCollections';
+import {
+  getLastSeq, setLastSeq, clearLastSeq, safeParseConsent, buildOpsQuery,
+} from './aiConnectivityUtils';
 
 // ── Public types ────────────────────────────────────────────────────────────
 export interface AiSessionState {
@@ -130,7 +105,7 @@ export function useAiConnectivity(
       console.warn('[AI] Snapshot exceeds 900 KB — skipping.');
       return;
     }
-    setDoc(doc(db, 'anonymous_sessions', sessionId, 'snapshot', 'current'),
+    setDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current'),
       { product: compact, updatedAt: serverTimestamp(), expiresAt: exp },
     ).catch(err => console.error('[AI] Snapshot write failed:', err));
   }, []);
@@ -250,7 +225,7 @@ export function useAiConnectivity(
     if (!db) return;
     sessionUnsubRef.current?.();
     const { onNext, onError } = makeSessionHandlers(sessionId);
-    sessionUnsubRef.current = onSnapshot(doc(db, 'anonymous_sessions', sessionId), onNext, onError);
+    sessionUnsubRef.current = onSnapshot(doc(db, SESSIONS_COL, sessionId), onNext, onError);
   }, [makeSessionHandlers]);
 
   useEffect(() => { resubscribeOpsRef.current = resubscribeOps; }, [resubscribeOps]);
@@ -299,7 +274,7 @@ export function useAiConnectivity(
         }
       }, 5000);
       const drainQuery = query(
-        collection(db, 'anonymous_sessions', sessionId, 'ops'),
+        collection(db, SESSIONS_COL, sessionId, 'ops'),
         where('seq', '>', nullFloor),
         where('seq', '<=', drainCeiling),
         orderBy('seq', 'asc'),
@@ -352,7 +327,7 @@ export function useAiConnectivity(
     const fire = async () => {
       if (!db || activeSessionIdRef.current !== sessionId) return;
       try {
-        await updateDoc(doc(db, 'anonymous_sessions', sessionId), {
+        await updateDoc(doc(db, SESSIONS_COL, sessionId), {
           browserConnectedAt: serverTimestamp(),
           lastActiveAt: serverTimestamp(),
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -375,7 +350,7 @@ export function useAiConnectivity(
   useEffect(() => {
     const onVisible = () => {
       if (!document.hidden && activeSessionIdRef.current && db) {
-        updateDoc(doc(db, 'anonymous_sessions', activeSessionIdRef.current), {
+        updateDoc(doc(db, SESSIONS_COL, activeSessionIdRef.current), {
           browserConnectedAt: serverTimestamp(), openProductId: productRef.current?.id ?? null,
         }).catch(() => {});
       }
@@ -386,7 +361,7 @@ export function useAiConnectivity(
 
   useEffect(() => {
     if (!db || !activeSessionIdRef.current || !product?.id) return;
-    updateDoc(doc(db, 'anonymous_sessions', activeSessionIdRef.current), {
+    updateDoc(doc(db, SESSIONS_COL, activeSessionIdRef.current), {
       openProductId: product.id, lastActiveAt: serverTimestamp(),
     }).catch(() => {});
   }, [product?.id]);
@@ -395,7 +370,7 @@ export function useAiConnectivity(
   const teardown = useCallback(async (sessionId: string) => {
     localTeardown();
     if (db) {
-      deleteDoc(doc(db, 'anonymous_sessions', sessionId, 'snapshot', 'current')).catch(() => {});
+      deleteDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
     }
     if (functionsInstance) {
       httpsCallable(functionsInstance, 'teardownAiSession')({ sessionId })
@@ -415,7 +390,7 @@ export function useAiConnectivity(
       let prevConsentRead: boolean | null = null;
       if (storedId) {
         let snap: Awaited<ReturnType<typeof getDoc>>;
-        try { snap = await getDoc(doc(db, 'anonymous_sessions', storedId)); }
+        try { snap = await getDoc(doc(db, SESSIONS_COL, storedId)); }
         catch (err) { console.error('[AI] Session check failed:', err); return false; }
         if (snap.exists()) {
           const d = snap.data();
@@ -441,7 +416,7 @@ export function useAiConnectivity(
         version: AI_CONSENT_VERSION, date: new Date().toISOString(), write: true, read: consentRead,
       }));
       activeSessionIdRef.current = sessionId;
-      const sessionRef = doc(db, 'anonymous_sessions', sessionId);
+      const sessionRef = doc(db, SESSIONS_COL, sessionId);
       // ── Resume path ──────────────────────────────────────────────────────
       if (prevConsentRead !== null) {
         try {
@@ -450,7 +425,7 @@ export function useAiConnectivity(
             lastActiveAt: serverTimestamp(), browserConnectedAt: serverTimestamp(), expiresAt: exp,
           });
           if (prevConsentRead && !consentRead) {
-            deleteDoc(doc(db, 'anonymous_sessions', sessionId, 'snapshot', 'current')).catch(() => {});
+            deleteDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
           }
         } catch (err: unknown) {
           const code = (err as { code?: string })?.code;
@@ -470,7 +445,7 @@ export function useAiConnectivity(
               version: AI_CONSENT_VERSION, date: new Date().toISOString(), write: true, read: true,
             }));
             if (db) {
-              deleteDoc(doc(db, 'anonymous_sessions', sessionId, 'snapshot', 'current')).catch(() => {});
+              deleteDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
             }
             console.error('[AI] Consent downgrade write failed; aborting resume:', err);
             activeSessionIdRef.current = null;
@@ -487,7 +462,7 @@ export function useAiConnectivity(
         highestSeenSeqRef.current = 0;
         inNullWindowRef.current = false;
         preNullWindowSeqRef.current = 0;
-        const freshRef = doc(db, 'anonymous_sessions', sessionId);
+        const freshRef = doc(db, SESSIONS_COL, sessionId);
         try {
           await setDoc(freshRef, {
             createdAt: serverTimestamp(), lastActiveAt: serverTimestamp(), expiresAt: exp,
@@ -529,7 +504,7 @@ export function useAiConnectivity(
   const changePermissions = useCallback(async (consentRead: boolean): Promise<boolean> => {
     if (!db || !activeSessionIdRef.current) return false;
     try {
-      await updateDoc(doc(db, 'anonymous_sessions', activeSessionIdRef.current), {
+      await updateDoc(doc(db, SESSIONS_COL, activeSessionIdRef.current), {
         consentRead, lastActiveAt: serverTimestamp(),
       });
     } catch (err) {
@@ -544,7 +519,7 @@ export function useAiConnectivity(
     } else {
       if (snapshotTimerRef.current) { clearTimeout(snapshotTimerRef.current); snapshotTimerRef.current = null; }
       if (activeSessionIdRef.current) {
-        deleteDoc(doc(db, 'anonymous_sessions', activeSessionIdRef.current, 'snapshot', 'current')).catch(() => {});
+        deleteDoc(doc(db, SESSIONS_COL, activeSessionIdRef.current, 'snapshot', 'current')).catch(() => {});
       }
     }
     return true;

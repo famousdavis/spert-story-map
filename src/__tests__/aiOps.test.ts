@@ -9,7 +9,7 @@ import {
   addNamedReleaseToProduct,
   allocateRibInProduct,
   sizeRibInProduct,
-} from '../hooks/useProductMutations';
+} from '../lib/productTransforms';
 import { buildAiSnapshot } from '../lib/aiSnapshot';
 
 function makeProduct(): Product {

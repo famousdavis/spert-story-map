@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product } from '../types';
+import type { Workbook, Cell, FillPattern, CellValue } from 'exceljs';
 import { forEachRib } from './ribHelpers';
 import {
   getRibItemPoints,
@@ -24,8 +25,7 @@ const THEME_FILL_COLORS: Record<string, string> = {
 };
 const DEFAULT_FILL_COLOR = 'FFF3F4F6';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function argbFill(argb: string): any {
+function argbFill(argb: string): FillPattern {
   return { type: 'pattern', pattern: 'solid', fgColor: { argb } };
 }
 
@@ -47,8 +47,11 @@ function safeCell(v: unknown): unknown {
   return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promise<any> {
+// ExcelJS is supplied by the dynamically-imported module (see downloadExcelExport).
+// Its module bag has no clean static type at this boundary, so the parameter stays
+// `any`; everything it produces is re-annotated (Workbook / Cell) below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamically-imported ExcelJS module bag, typed at the call boundary
+export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promise<Workbook> {
   const workbook = new ExcelJS.Workbook();
 
   // ── Sheet 1: Rib Items ────────────────────────────────────────────────────
@@ -76,8 +79,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     'Theme', 'Backbone', 'Rib Item', 'Category', 'Size', 'Points', '% Complete', 'Release(s)', 'Notes',
   ]);
   headerRow.font = { bold: true };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  headerRow.eachCell((cell: any) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
+  headerRow.eachCell((cell: Cell) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
   ws1.views = [{ state: 'frozen', ySplit: 3 }];
 
   // Build release lookup: id → { name, order }
@@ -94,9 +96,9 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
       const groupRow = ws1.addRow([]);
       const rowNum: number = groupRow.number;
       ws1.mergeCells(rowNum, 1, rowNum, 9);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cell: any = ws1.getCell(rowNum, 1);
-      cell.value = safeCell(theme.name);
+      const cell: Cell = ws1.getCell(rowNum, 1);
+      // safeCell returns unknown (formula-injection guard); ExcelJS wants CellValue.
+      cell.value = safeCell(theme.name) as CellValue;
       cell.font = { bold: true };
       cell.fill = argbFill(THEME_FILL_COLORS[theme.color ?? ''] ?? DEFAULT_FILL_COLOR);
     }
@@ -134,13 +136,11 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     ]);
 
     // Notes cell: wrap text, anchor to top (column 9)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const notesCell: any = dataRow.getCell(9);
+    const notesCell: Cell = dataRow.getCell(9);
     notesCell.alignment = { wrapText: true, vertical: 'top' };
 
     // % Complete cell: percentage format + conditional fill (column 7)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pctCell: any = dataRow.getCell(7);
+    const pctCell: Cell = dataRow.getCell(7);
     pctCell.numFmt = '0%';
     if (pct === 100) {
       pctCell.fill = argbFill('FFD1FAE5'); // light green
@@ -171,8 +171,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     'Release', 'Total Points', '% Complete', 'Core Points', 'Non-Core Points', 'Target Date',
   ]);
   relHeader.font = { bold: true };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  relHeader.eachCell((cell: any) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
+  relHeader.eachCell((cell: Cell) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
   ws2.views = [{ state: 'frozen', ySplit: 3 }];
 
   const sortedReleases = product.releases.slice().sort((a, b) => a.order - b.order);
@@ -196,7 +195,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
 
 export async function downloadExcelExport(product: Product): Promise<void> {
   // Dynamic import keeps ExcelJS (~1 MB) out of the initial bundle
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic import interop: module shape varies by default/namespace
   const mod = await import('exceljs') as any;
   const ExcelJS = mod.default ?? mod;
   const workbook = await buildExcelWorkbook(product, ExcelJS);

@@ -24,6 +24,7 @@ import {
 import { denormalizeLastFirst } from './auth-name';
 import { sanitizeForFirestore } from './firestoreUtils';
 import { INVITATIONS_ENABLED } from './featureFlags';
+import { PROFILES_COL } from './firestoreCollections';
 import type { SpertModelsChangedDetail } from '../types';
 
 /**
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           // Per-app profile (Lesson 29: sentinel merged after sanitize)
           await setDoc(
-            doc(db, 'spertstorymap_profiles', firebaseUser.uid),
+            doc(db, PROFILES_COL, firebaseUser.uid),
             { ...sanitizeForFirestore(profilePayload), updatedAt: serverTimestamp() },
             { merge: true },
           );

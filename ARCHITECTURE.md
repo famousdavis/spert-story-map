@@ -36,7 +36,9 @@ src/
 │   ├── calculations.ts              # Pure computation functions (points, progress, stats)
 │   ├── progressMutations.ts         # Shared progress tracking helpers (update, remove, comment)
 │   ├── settingsMutations.ts         # Pure cascade deletion (release, sprint) + releaseHasAllocations
-│   ├── ribHelpers.ts                # forEachRib / reduceRibs traversal utilities
+│   ├── ribHelpers.ts                # forEachRib / reduceRibs / isRibLocked / computeRibSiblingName
+│   ├── productTransforms.ts         # Pure (prev:Product)=>Product transforms shared by useProductMutations + aiOps
+│   ├── firestoreCollections.ts      # Centralized Firestore collection-name constants (PROJECTS/PROFILES/SETTINGS/SESSIONS)
 │   ├── themeColors.ts               # Centralized 8-color palette for themes (solid, light, dot, swatch)
 │   ├── exportForForecaster.ts       # Pure transformation: Story Map → SPERT Release Forecaster import format
 │   ├── exportForExcel.ts            # Excel export: buildExcelWorkbook (pure, testable) + downloadExcelExport (dynamic import)
@@ -45,7 +47,8 @@ src/
 │
 ├── hooks/
 │   ├── useProduct.ts                 # Load/save product state with debounced persistence
-│   ├── useProductMutations.ts        # Reusable CRUD for theme/backbone/rib hierarchy
+│   ├── useProductMutations.ts        # Reusable CRUD hook (pure transforms live in lib/productTransforms.ts)
+│   ├── aiConnectivityUtils.ts        # Pure helpers for useAiConnectivity (seq cursor, consent parse, ops query)
 │   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag)
 │   ├── useImportState.ts             # State machine for multi-project import (idle/preview/applying/done/error)
 │   └── useDarkMode.ts                # Theme toggle hook (localStorage + system preference)

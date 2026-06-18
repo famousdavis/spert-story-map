@@ -7,7 +7,7 @@ import {
   splitRibInProduct, addNamedRibToProduct, cloneRibInProduct,
   addNamedReleaseToProduct, allocateRibInProduct, unassignRibInProduct,
   addNamedThemeToProduct, addNamedBackboneToProduct,
-} from '../hooks/useProductMutations';
+} from '../lib/productTransforms';
 import type { Product, ReleaseAllocation } from '../types';
 
 // Mock crypto.randomUUID

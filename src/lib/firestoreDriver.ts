@@ -24,9 +24,7 @@ import { migrateToV2 } from './storage';
 import { sanitizeForFirestore } from './firestoreUtils';
 import { callRevokeInvite, callResendInvite } from './callables';
 import type { PendingInvite } from '../types';
-
-const PROJECTS_COL = 'spertstorymap_projects';
-const SETTINGS_COL = 'spertstorymap_settings';
+import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 
 /** Remove Firestore-only fields from product data. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety

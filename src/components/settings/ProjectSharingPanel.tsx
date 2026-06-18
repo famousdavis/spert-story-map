@@ -13,9 +13,7 @@ import { parseBulkEmails, mapInvitationError } from '../../lib/invitationErrors'
 import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import type { PendingInvite, SendInvitationEmailResult, StorageDriver } from '../../types';
-
-const PROJECTS_COL = 'spertstorymap_projects';
-const PROFILES_COL = 'spertstorymap_profiles';
+import { PROJECTS_COL, PROFILES_COL } from '../../lib/firestoreCollections';
 
 /**
  * Project sharing UI — only renders in cloud mode for the project owner.

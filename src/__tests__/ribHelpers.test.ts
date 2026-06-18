@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { forEachRib, reduceRibs, isRibLocked } from '../lib/ribHelpers';
+import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName } from '../lib/ribHelpers';
 import type { ProgressEntry } from '../types';
 
 const product = {
@@ -111,5 +111,47 @@ describe('isRibLocked', () => {
     // as unknown as ProgressEntry[] — established no-any pattern (aiOps.test.ts:258)
     const noHistory = { progressHistory: undefined as unknown as ProgressEntry[] };
     expect(isRibLocked(noHistory)).toBe(false);
+  });
+});
+
+describe('computeRibSiblingName', () => {
+  // ── Clone (keepOriginal=true): original never renamed ──────────────────────
+  it('clones an unsuffixed name to (1)', () => {
+    expect(computeRibSiblingName([{ name: 'Foo' }], 'Foo', true))
+      .toEqual({ originalName: 'Foo', newName: 'Foo (1)' });
+  });
+
+  it('clones to (2) when (1) already exists', () => {
+    expect(computeRibSiblingName([{ name: 'Foo' }, { name: 'Foo (1)' }], 'Foo', true))
+      .toEqual({ originalName: 'Foo', newName: 'Foo (2)' });
+  });
+
+  it('clones an already-suffixed name without renaming the original', () => {
+    expect(computeRibSiblingName([{ name: 'Foo (2)' }], 'Foo (2)', true))
+      .toEqual({ originalName: 'Foo (2)', newName: 'Foo (3)' });
+  });
+
+  // ── Split (keepOriginal=false) ─────────────────────────────────────────────
+  it('splits an unsuffixed name into (1) and (2)', () => {
+    expect(computeRibSiblingName([{ name: 'Foo' }], 'Foo', false))
+      .toEqual({ originalName: 'Foo (1)', newName: 'Foo (2)' });
+  });
+
+  it('splits a suffixed sibling without renaming it, avoiding collisions', () => {
+    // siblings [Foo (1), Foo (2)]; split Foo (1) → keeps Foo (1), new Foo (3)
+    expect(computeRibSiblingName(
+      [{ name: 'Foo (1)' }, { name: 'Foo (2)' }], 'Foo (1)', false,
+    )).toEqual({ originalName: 'Foo (1)', newName: 'Foo (3)' });
+  });
+
+  it('splits a lone suffixed name, keeping it and appending the next number', () => {
+    expect(computeRibSiblingName([{ name: 'Foo (1)' }], 'Foo (1)', false))
+      .toEqual({ originalName: 'Foo (1)', newName: 'Foo (2)' });
+  });
+
+  // ── Regex-special prefix: verifies escapedPrefix ───────────────────────────
+  it('handles a prefix containing regex metacharacters', () => {
+    expect(computeRibSiblingName([{ name: 'Cost ($)' }], 'Cost ($)', true))
+      .toEqual({ originalName: 'Cost ($)', newName: 'Cost ($) (1)' });
   });
 });
