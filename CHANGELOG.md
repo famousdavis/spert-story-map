@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.46.1 (2026-06-18)
+
+Internal code-quality refactor — no functional or behavioral changes.
+
+**Maintenance: module extraction and type hardening**
+
+- **Refactor:** Pure product-transform functions moved into a dedicated
+  `productTransforms` module shared by the mutation hook and the Connect AI op
+  applier; Firestore collection names centralized; Connect AI connectivity helpers
+  split into a separately tested module.
+- **Internal:** Stronger Excel-export types, a shared rib-naming helper for
+  split/clone, and assorted consistency fixes. No changes to your data, the storage
+  format, or Connect AI behavior.
+
 ## Version 0.46.0 (2026-06-17)
 
 Enrich and update story map cards in bulk — one call instead of hundreds.

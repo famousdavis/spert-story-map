@@ -11,7 +11,7 @@ import {
   allocateRibInProduct,
   unassignRibInProduct,
   sizeRibInProduct,              // ← Phase 3
-} from '../hooks/useProductMutations';
+} from './productTransforms';
 import { appendChangeLogEntry } from './storage';
 import { isRibLocked } from './ribHelpers';
 

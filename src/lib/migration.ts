@@ -20,9 +20,7 @@ import {
   appendChangeLogEntry,
 } from './storage';
 import { sanitizeForFirestore } from './firestoreUtils';
-
-const PROJECTS_COL = 'spertstorymap_projects';
-const SETTINGS_COL = 'spertstorymap_settings';
+import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 
 /**
  * Test Firestore connectivity by reading the user's settings doc.
