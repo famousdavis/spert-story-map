@@ -110,14 +110,16 @@ CONSTRAINTS:
 RELEASE IDs: Generate a fresh UUID for each new release (same rule as for themes, backbones, ribs).
 
 BULK TOOLS (preferred when working with many ribs at once):
-Use bulk tools when allocating, sizing, or unassigning more than a handful of ribs — they collapse N
-round-trips into one call. This is critical for AI clients that yield to the user between
-tool calls.
+Use bulk tools when allocating, sizing, unassigning, or updating rib content (description,
+category, notes) — they collapse N round-trips into one call. This is critical for AI
+clients that yield to the user between tool calls.
 
 WHEN TO USE BULK:
 - Allocating, sizing, or unassigning more than a handful of ribs → use
   storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign instead of
   repeated individual tool calls.
+- Updating description, category, or notes on more than a handful of ribs → use
+  storymap_bulk_update_ribs instead of repeated storymap_update_rib calls.
 - Creating multiple releases at once → use storymap_bulk_create_releases.
 - A single targeted change (one rib, one action) → individual tools are fine.
 
@@ -136,21 +138,42 @@ labels from sizeMapping.
 
 READ MODE SUMMARY:
 - storymap_bulk_create_releases: does NOT require Read Mode.
-- storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign: REQUIRE Read Mode.
+- storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign
+  / storymap_bulk_update_ribs: REQUIRE Read Mode.
 
-ADDITIVE / RE-RUN SEMANTICS (all four bulk tools):
+ADDITIVE / RE-RUN SEMANTICS (all five bulk tools):
 - storymap_bulk_create_releases skips duplicate releaseIds.
 - storymap_bulk_allocate skips ribs that are locked, already allocated, or whose
   target release does not exist.
 - storymap_bulk_size skips ribs that are locked, already validly sized, or whose
   size label is not in sizeMapping.
 - storymap_bulk_unassign skips ribs that are locked or already unassigned.
-Re-running any bulk call is safe. Verify results by calling storymap_get_project after —
-the tool response confirms the call was queued, not which entries applied.
+- storymap_bulk_update_ribs REPLACES description, category, and notes when provided;
+  omitted fields are left unchanged. It does NOT skip locked ribs for text edits —
+  you can update a rib that is in progress. Re-running writes the same values again
+  (not ref-equal; appends one additional changelog entry each time).
+Re-running the other four bulk calls is safe and ref-equal. Verify results by calling
+storymap_get_project after — the tool response confirms the call was queued, not which
+entries applied. Note: storymap_get_project does not return notes values; description
+and category can be verified that way, but notes cannot.
 
 CHUNKING:
-- More than 500 ribs to allocate, size, or unassign → split into bulk calls of ≤500 each.
+- More than 500 ribs to allocate, size, unassign, or update → split into bulk calls of ≤500 each.
 - More than 50 releases to create → split into calls of ≤50 each.
+
+BULK CONTENT UPDATES (description, category, notes):
+storymap_bulk_update_ribs — Requires Read Mode (call storymap_get_project first for
+ribIds). Provide an array of {ribId, description?, category?, notes?} objects. Only
+the fields you include are updated; omitted fields are left exactly as they are. An
+empty string "" clears a field. No size or name field — use storymap_bulk_size for
+sizing and storymap_update_rib for renaming. Locked ribs (in progress) can still have
+their description, category, and notes updated. Max 500 per call.
+
+NOTE ON NOTES: storymap_get_project does not return existing notes values, so you
+cannot read notes before writing. When you write notes via storymap_bulk_update_ribs,
+you are replacing whatever the user has there, unseen. Use this tool to set notes
+content you are confident should replace the existing value — not to append to or
+extend notes you have not read.
 
 SIZING (separate step — only when the user explicitly asks):
 Sizing assigns a t-shirt size to each rib item. Build and confirm the map structure first.
@@ -168,6 +191,8 @@ know the size was lost. Always read sizeMapping first.
 For sizing multiple ribs, use storymap_bulk_size (one call). For a single rib, use
 storymap_size_rib. Never use storymap_update_rib for sizing — it bypasses sizeMapping
 validation and can create invalid sizes for projects with custom size labels.
+For updating description, category, or notes on multiple ribs, use
+storymap_bulk_update_ribs (one call) instead of repeated storymap_update_rib calls.
 
 If sizeMapping is empty, stop and tell the user to define t-shirt sizes in the app's Settings
 tab before sizing can proceed.
