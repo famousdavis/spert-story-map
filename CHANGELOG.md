@@ -1,5 +1,22 @@
 # Changelog
 
+## Version 0.46.0 (2026-06-17)
+
+Enrich and update story map cards in bulk — one call instead of hundreds.
+
+**Connect AI: bulk update rib descriptions, categories, and notes**
+
+- **New: storymap_bulk_update_ribs** — updates the description, category, and notes
+  fields of multiple rib items in one call. Fields you omit are left unchanged; an
+  empty string clears a field. Locked (in-progress) ribs can still have their text
+  fields updated. Read Mode required.
+- **Improved: Connect AI prompt** — new BULK CONTENT UPDATES section explains replace
+  semantics for text fields, including the note that existing notes values are not
+  readable via storymap_get_project.
+
+> Note: storymap_bulk_update_ribs becomes available once the Connect AI service update
+> is deployed. Until then, use individual storymap_update_rib calls for text edits.
+
 ## Version 0.45.0 (2026-06-17)
 
 Unassign stories from releases in bulk — one call instead of hundreds.

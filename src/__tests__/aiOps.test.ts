@@ -1489,3 +1489,326 @@ describe('applyDrainOps — Phase 5 (bulk_unassign)', () => {
     expect(result).toBe(p);
   });
 });
+
+// Module-scope builder for Phase 6 bulk_update_ribs tests.
+// r1: unlocked, description:'Desc1', notes:'Notes1', category:'core'
+// r2: LOCKED (percentComplete:50), description:'Desc2', notes:'', category:'non-core'
+// r3: unlocked, description:'', notes:'', category:'core'  (blank-slate rib)
+function makeProductForBulkUpdateRibs(): Product {
+  let p = makeProduct();
+  p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+  p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+  p = applyAiOp(p, 'create_rib', {
+    themeId: 't1', backboneId: 'b1', ribId: 'r1',
+    name: 'Rib1', description: 'Desc1', notes: 'Notes1', category: 'core',
+  });
+  p = applyAiOp(p, 'create_rib', {
+    themeId: 't1', backboneId: 'b1', ribId: 'r2',
+    name: 'Rib2', description: 'Desc2', notes: '', category: 'non-core',
+  });
+  p = applyAiOp(p, 'create_rib', {
+    themeId: 't1', backboneId: 'b1', ribId: 'r3',
+    name: 'Rib3', description: '', notes: '', category: 'core',
+  });
+  // Lock r2: any progressHistory entry with percentComplete > 0.
+  return {
+    ...p,
+    themes: p.themes.map(t => ({
+      ...t,
+      backboneItems: t.backboneItems.map(b => ({
+        ...b,
+        ribItems: b.ribItems.map(r => r.id !== 'r2' ? r : {
+          ...r,
+          progressHistory: [
+            { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 },
+          ],
+        }),
+      })),
+    })),
+  };
+}
+
+// ── bulk_update_ribs ──────────────────────────────────────────────────────
+describe('applyAiOp — bulk_update_ribs', () => {
+  // Guard / skip cases
+  it('is ref-equal no-op for empty updates array', () => {
+    const p = makeProductForBulkUpdateRibs();
+    expect(applyAiOp(p, 'bulk_update_ribs', { updates: [] })).toBe(p);
+  });
+  it('is ref-equal no-op for missing updates key', () => {
+    const p = makeProductForBulkUpdateRibs();
+    expect(applyAiOp(p, 'bulk_update_ribs', {})).toBe(p);
+  });
+  it('skips a non-object entry and applies valid entries', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [null, { ribId: 'r1', description: 'Updated' }],
+    });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.description)
+      .toBe('Updated');
+  });
+  it('skips an entry with missing ribId', () => {
+    const p = makeProductForBulkUpdateRibs();
+    expect(applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ description: 'Orphan' }],
+    })).toBe(p);
+  });
+  it('skips an entry with a ribId that does not exist in the product', () => {
+    const p = makeProductForBulkUpdateRibs();
+    expect(applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'ghost', description: 'X' }],
+    })).toBe(p);
+  });
+  it('skips a per-entry all-undefined-fields entry (no-op guard)', () => {
+    // A bare {ribId} with no text fields must not dirty the product.
+    const p = makeProductForBulkUpdateRibs();
+    expect(applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1' }],
+    })).toBe(p);
+  });
+  // Per-field undefined-means-skip
+  it('updates description only; notes and category untouched', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', description: 'New desc' }],
+    });
+    const r1 = next.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(r1.description).toBe('New desc');
+    expect(r1.notes).toBe('Notes1');      // untouched
+    expect(r1.category).toBe('core');     // untouched
+  });
+  it('updates notes only; description and category untouched', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', notes: 'New notes' }],
+    });
+    const r1 = next.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(r1.notes).toBe('New notes');
+    expect(r1.description).toBe('Desc1'); // untouched
+    expect(r1.category).toBe('core');     // untouched
+  });
+  it('updates category core→non-core; description and notes untouched', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', category: 'non-core' }],
+    });
+    const r1 = next.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(r1.category).toBe('non-core');
+    expect(r1.description).toBe('Desc1'); // untouched
+    expect(r1.notes).toBe('Notes1');      // untouched
+  });
+  it('updates category non-core→core (exercises the "core" branch of the enum guard)', () => {
+    // r2 is non-core; this exercises the === 'core' branch of the guard.
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r2', category: 'core' }],
+    });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[1]!.category).toBe('core');
+  });
+  it('updates all three text fields in one entry', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', description: 'D', category: 'non-core', notes: 'N' }],
+    });
+    const r1 = next.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(r1.description).toBe('D');
+    expect(r1.category).toBe('non-core');
+    expect(r1.notes).toBe('N');
+  });
+  // Empty-string clear
+  it('clears description to empty string when "" is provided', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', description: '' }],
+    });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.description).toBe('');
+  });
+  it('clears notes to empty string when "" is provided', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', notes: '' }],
+    });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.notes).toBe('');
+  });
+  // Category guard
+  it('silently drops an invalid category value; other fields still apply', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', category: 'invalid', description: 'New' }],
+    });
+    const r1 = next.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(r1.category).toBe('core');    // unchanged — invalid value dropped
+    expect(r1.description).toBe('New'); // still applied
+  });
+  it('invalid-category-only entry produces one changelog entry (accepted wart)', () => {
+    // didUpdate fires on ribId match before the category guard drops 'bogus',
+    // so the product is rebuilt and one summary entry is appended even though
+    // no field changed. Mirrors update_rib:472 accepted wart. (CLAUDE.md #54)
+    const p = makeProductForBulkUpdateRibs();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', category: 'bogus' }],
+    });
+    expect(next).not.toBe(p);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.category).toBe('core');
+    expect((next._changeLog ?? []).length).toBe(prevLen + 1);
+  });
+  it('non-string description/notes are dropped; wart fires (both type guards exercised)', () => {
+    // description:42 and notes:false pass the all-undefined check (they are !== undefined)
+    // but fail the typeof === 'string' guards, so neither field is applied.
+    // didUpdate still fires on ribId match → product rebuilt, one entry appended (wart).
+    const p = makeProductForBulkUpdateRibs();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{ ribId: 'r1', description: 42, notes: false }],
+    });
+    expect(next).not.toBe(p);                                               // wart: new object
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.description)
+      .toBe('Desc1');                                                        // unchanged
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.notes)
+      .toBe('Notes1');                                                       // unchanged
+    expect((next._changeLog ?? []).length).toBe(prevLen + 1);               // wart: one entry
+  });
+  // Locked rib
+  it('updates description, category, and notes on a LOCKED rib', () => {
+    // r2 is locked (percentComplete:50). Text fields must still apply —
+    // the key differentiator from storymap_size_rib / storymap_bulk_size.
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [{
+        ribId: 'r2',
+        description: 'Locked updated',
+        category: 'core',
+        notes: 'AC details here',
+      }],
+    });
+    const r2 = next.themes[0]!.backboneItems[0]!.ribItems[1]!;
+    expect(r2.description).toBe('Locked updated');
+    expect(r2.category).toBe('core');
+    expect(r2.notes).toBe('AC details here');
+    expect(r2.progressHistory[0]!.percentComplete).toBe(50); // locked state unchanged
+  });
+  // Multi-rib and mixed-batch
+  it('updates multiple ribs in one call', () => {
+    // This test guards the load-bearing `next.themes.map` source: if the map source
+    // were `prev.themes`, only the last entry's update would survive (r1 would be lost).
+    const p = makeProductForBulkUpdateRibs();
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [
+        { ribId: 'r1', description: 'D1', notes: 'N1' },
+        { ribId: 'r3', description: 'D3', notes: 'N3' },
+      ],
+    });
+    const ribs = next.themes[0]!.backboneItems[0]!.ribItems;
+    expect(ribs[0]!.description).toBe('D1');
+    expect(ribs[0]!.notes).toBe('N1');
+    expect(ribs[2]!.description).toBe('D3');
+    expect(ribs[2]!.notes).toBe('N3');
+    expect(ribs[1]!.description).toBe('Desc2'); // r2 untouched
+  });
+  it('mixed batch: valid entry applies, ghost entry skipped; one changelog entry', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [
+        { ribId: 'r1', description: 'X' },   // matches → applies
+        { ribId: 'ghost', description: 'Y' }, // no such rib → skip
+      ],
+    });
+    expect(next).not.toBe(p);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.description).toBe('X');
+    expect((next._changeLog ?? []).length).toBe(prevLen + 1);
+  });
+  // Changelog collapse
+  it('collapses N rib updates to exactly one changelog entry (no id field)', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_update_ribs', {
+      updates: [
+        { ribId: 'r1', description: 'D1' },
+        { ribId: 'r3', description: 'D3' },
+      ],
+    });
+    const log = next._changeLog ?? [];
+    expect(log.length).toBe(prevLen + 1);
+    const last = log[log.length - 1]!;
+    expect(last.op).toBe('update');
+    expect(last.entity).toBe('rib');
+    expect(last.source).toBe('ai');
+    expect(last.id).toBeUndefined();
+  });
+  // All-skip ref-equality
+  it('is ref-equal when all entries have no matching ribId', () => {
+    const p = makeProductForBulkUpdateRibs();
+    expect(applyAiOp(p, 'bulk_update_ribs', {
+      updates: [
+        { ribId: 'ghost1', description: 'X' },
+        { ribId: 'ghost2', description: 'Y' },
+      ],
+    })).toBe(p);
+  });
+});
+
+// ── Drain / no-throw — Phase 6 (bulk_update_ribs) ─────────────────────────
+describe('applyDrainOps — Phase 6 (bulk_update_ribs)', () => {
+  it('computeSafePrefix includes bulk_update_ribs (no-throw)', () => {
+    const ops: AiOpDoc[] = [
+      {
+        seq: 1,
+        op: 'bulk_update_ribs',
+        payload: { updates: [{ ribId: 'ghost', description: 'X' }] },
+      },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(makeProduct(), ops);
+    expect(safeOps).toHaveLength(1);
+    expect(nextSeq).toBe(1);
+  });
+  it('bulk_update_ribs in drain applies and advances cursor', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const ops: AiOpDoc[] = [
+      {
+        seq: 3,
+        op: 'bulk_update_ribs',
+        payload: { updates: [{ ribId: 'r1', description: 'Drained' }] },
+      },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(3);
+    expect(result.themes[0]!.backboneItems[0]!.ribItems[0]!.description)
+      .toBe('Drained');
+  });
+  it('re-applying bulk_update_ribs drain is NOT ref-equal (replace semantics)', () => {
+    // Unlike additive bulk ops, re-applying is NOT ref-equal: the ribId match fires
+    // didUpdate regardless of value, rebuilding the product and appending one entry.
+    // Consequence: unlike additive ops, a null-window re-application overwrites the
+    // current field values rather than being a no-op. (CLAUDE.md #54)
+    const p = makeProductForBulkUpdateRibs();
+    const ops: AiOpDoc[] = [
+      {
+        seq: 1,
+        op: 'bulk_update_ribs',
+        payload: { updates: [{ ribId: 'r1', description: 'X' }] },
+      },
+    ];
+    const { product: once } = applyDrainOps(p, ops);
+    expect(once.themes[0]!.backboneItems[0]!.ribItems[0]!.description).toBe('X');
+    const { product: twice } = applyDrainOps(once, ops);
+    expect(twice.themes[0]!.backboneItems[0]!.ribItems[0]!.description).toBe('X');
+    expect(twice).not.toBe(once);                              // not ref-equal
+    const onceLen = (once._changeLog ?? []).length;
+    expect((twice._changeLog ?? []).length).toBe(onceLen + 1); // appends one entry
+  });
+  it('all-ghost bulk_update_ribs in drain: cursor advances, product ref-equal', () => {
+    const p = makeProductForBulkUpdateRibs();
+    const ops: AiOpDoc[] = [
+      {
+        seq: 9,
+        op: 'bulk_update_ribs',
+        payload: { updates: [{ ribId: 'ghost', description: 'X' }] },
+      },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(9);
+    expect(result).toBe(p);
+  });
+});

@@ -302,6 +302,85 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
         }),
       };
     }
+    // ── Phase 6 — bulk text-field update ────────────────────────────────────
+    case 'bulk_update_ribs': {
+      // Payload: { updates: Array<{ ribId, description?, category?, notes? }> }
+      // Read Mode required — AI reads ribIds from storymap_get_project.
+      // Text fields REPLACE when present (incl. ''); undefined = skip field.
+      // No name, no size (excluded by contract).
+      // No locked-rib guard on text fields — only size is lock-gated (update_rib).
+      // Runtime category enum guard + cast: guard drops invalid values at runtime;
+      // cast satisfies tsc (without it, category widens to string → TS2322).
+      // Accepted wart: an entry where all fields fail their type/enum guards (e.g.
+      // category:'bogus' or description:42) sets didUpdate on ribId match and appends
+      // one summary entry for zero net change — mirrors update_rib:472. (CLAUDE.md #54)
+      // @no-throw — safe in drain path. Unlike additive bulk ops, re-application
+      // rewrites field values again (replace semantics) and is not state-idempotent.
+      if (!Array.isArray(p.updates) || p.updates.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.updates as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const e = raw as {
+          ribId?: unknown; description?: unknown;
+          category?: unknown; notes?: unknown;
+        };
+        if (typeof e.ribId !== 'string' || !e.ribId) continue;
+        // Per-entry all-fields-undefined skip: a bare {ribId} entry is a true no-op.
+        // Prevents spurious didUpdate + changelog churn (mirrors update_rib top guard
+        // aiOps.ts:137-140).
+        if (
+          e.description === undefined &&
+          e.category === undefined &&
+          e.notes === undefined
+        ) continue;
+        // Inline global-ribId walk (CLAUDE.md #54). No updateRibTextInProduct helper.
+        let didUpdate = false;
+        // LOAD-BEARING: map source is `next.themes`, not `prev.themes`.
+        // Using `prev.themes` as map source silently discards all prior entries in the
+        // batch — only the last matching entry's updates would survive. The multi-rib
+        // test ('updates multiple ribs in one call') catches this regression.
+        const themes = next.themes.map(t => ({
+          ...t,
+          backboneItems: t.backboneItems.map(b => ({
+            ...b,
+            ribItems: b.ribItems.map(r => {
+              if (r.id !== e.ribId) return r;
+              didUpdate = true;
+              return {
+                ...r,
+                // typeof guard prevents non-string values reaching product state on
+                // injection/drain paths (LP Zod guards the normal path).
+                ...(typeof e.description === 'string' && {
+                  description: e.description,
+                }),
+                // Runtime enum guard + cast (both required — see comment above).
+                ...(
+                  (e.category === 'core' || e.category === 'non-core') &&
+                  { category: e.category as 'core' | 'non-core' }
+                ),
+                ...(typeof e.notes === 'string' && {
+                  notes: e.notes,
+                }),
+              };
+            }),
+          })),
+        }));
+        // Guard next reassignment on actual ribId match so non-matching entries
+        // keep next ref-equal to prev, preserving the final idempotency check.
+        if (didUpdate) next = { ...next, themes };
+      }
+      if (next === prev) return prev;
+      // Changelog collapse: N updates → one summary entry.
+      // Base is `prev` (CLAUDE.md #51). For this inline-walk op,
+      // prev._changeLog === next._changeLog throughout (the walk never appends to
+      // _changeLog), so prev and next are equivalent — prev is used for consistency.
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'update', entity: 'rib', source: 'ai',
+        }),
+      };
+    }
     default:
       console.warn(`[AI] Unknown op "${op}" — no-op.`);
       return prev;
