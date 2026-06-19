@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.46.3 (2026-06-18)
+
+The changelog page now displays every entry in full.
+
+**Fix: changelog page rendering**
+
+- **Fixed: changelog rendering** — the version history page now renders the complete content of each entry. Previously, wrapped (multi-line) bullet text, deployment callout notes, indented sub-bullets, intro paragraphs, bold section headings, and inline code were silently omitted; all now display correctly. No changelog content was changed — only how it is rendered, plus a regression test so it stays fixed.
+
 ## Version 0.46.2 (2026-06-18)
 
 Security hardening — defense-in-depth improvements with no functional or behavioral changes for valid inputs.

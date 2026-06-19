@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
 import { TOS_URL, PRIVACY_POLICY_URL, LICENSE_URL } from '../lib/tosConstants';
@@ -44,54 +44,118 @@ export default function ChangelogView() {
   );
 }
 
-function MarkdownRenderer({ content }) {
+// Render inline **bold** and `code` spans within a line of changelog text.
+// Plain text outside those spans is returned verbatim (React escapes it).
+function renderInline(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let last = 0;
+  let k = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const tok = m[0];
+    if (tok.startsWith('**')) {
+      parts.push(<strong key={k++}>{tok.slice(2, -2)}</strong>);
+    } else {
+      parts.push(
+        <code key={k++} className="rounded bg-gray-100 px-1 py-0.5 text-[0.85em] dark:bg-gray-800">
+          {tok.slice(1, -1)}
+        </code>
+      );
+    }
+    last = regex.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+// Minimal block renderer for the CHANGELOG.md subset: headings (## / ###),
+// bullet lists (incl. 2-space-indented sub-bullets), hard-wrapped bullet
+// continuations (lines indented under a bullet), `>` blockquotes (consecutive
+// lines merged), and plain paragraphs / bold section headers. Blank lines
+// separate blocks. Exported for unit testing.
+export function MarkdownRenderer({ content }: { content: string }) {
   const lines = content.split('\n');
-  const elements = [];
-  let currentList = [];
+  const elements: ReactNode[] = [];
+  let listItems: { indent: number; text: string }[] = [];
+  let quoteLines: string[] = [];
+  let paraLines: string[] = [];
   let key = 0;
 
   const flushList = () => {
-    if (currentList.length > 0) {
-      elements.push(
-        <ul key={key++} className="list-disc pl-6 space-y-1 mb-6 text-sm text-gray-600 dark:text-gray-400">
-          {currentList.map((item, i) => <li key={i}>{item}</li>)}
-        </ul>
-      );
-      currentList = [];
-    }
+    if (listItems.length === 0) return;
+    const items = listItems;
+    listItems = [];
+    elements.push(
+      <ul key={key++} className="list-disc pl-6 space-y-1 mb-6 text-sm text-gray-600 dark:text-gray-400">
+        {items.map((it, i) => (
+          <li key={i} className={it.indent >= 2 ? 'ml-6' : ''}>{renderInline(it.text)}</li>
+        ))}
+      </ul>
+    );
   };
+  const flushQuote = () => {
+    if (quoteLines.length === 0) return;
+    const text = quoteLines.join(' ');
+    quoteLines = [];
+    elements.push(
+      <blockquote key={key++} className="border-l-4 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/40 pl-4 pr-3 py-2 mb-6 text-sm italic text-gray-600 dark:text-gray-400">
+        {renderInline(text)}
+      </blockquote>
+    );
+  };
+  const flushPara = () => {
+    if (paraLines.length === 0) return;
+    const text = paraLines.join(' ');
+    paraLines = [];
+    elements.push(
+      <p key={key++} className="text-sm text-gray-600 dark:text-gray-400 mb-4">{renderInline(text)}</p>
+    );
+  };
+  const flushAll = () => { flushList(); flushQuote(); flushPara(); };
 
   for (const line of lines) {
     if (line.startsWith('# ')) {
-      flushList();
+      flushAll();
       // Skip the top-level heading — we render our own
     } else if (line.startsWith('## ')) {
-      flushList();
+      flushAll();
       elements.push(
         <h2 key={key++} className="text-lg font-semibold text-blue-600 dark:text-blue-400 mt-8 mb-2">
-          {line.replace('## ', '')}
+          {line.slice(3)}
         </h2>
       );
     } else if (line.startsWith('### ')) {
-      flushList();
+      flushAll();
       elements.push(
         <h3 key={key++} className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-4 mb-1">
-          {line.replace('### ', '')}
+          {line.slice(4)}
         </h3>
       );
-    } else if (line.startsWith('- ')) {
-      const text = line.replace('- ', '');
-      const boldMatch = text.match(/^\*\*(.+?)\*\*(.*)$/);
-      if (boldMatch) {
-        currentList.push(<><strong>{boldMatch[1]}</strong>{boldMatch[2]}</>);
-      } else {
-        currentList.push(text);
-      }
-    } else if (line.trim() === '') {
+    } else if (line.startsWith('> ')) {
       flushList();
+      flushPara();
+      quoteLines.push(line.slice(2));
+    } else if (/^\s*- /.test(line)) {
+      flushQuote();
+      flushPara();
+      const trimmed = line.trimStart();
+      listItems.push({ indent: line.length - trimmed.length, text: trimmed.slice(2) });
+    } else if (line.trim() === '') {
+      flushAll();
+    } else if (/^\s+\S/.test(line) && listItems.length > 0) {
+      // Hard-wrapped continuation of the current bullet.
+      const prev = listItems[listItems.length - 1];
+      if (prev) prev.text += ' ' + line.trim();
+    } else {
+      // Plain paragraph line — intro text or a bold section header.
+      flushList();
+      flushQuote();
+      paraLines.push(line.trim());
     }
   }
-  flushList();
+  flushAll();
 
   return <>{elements}</>;
 }
