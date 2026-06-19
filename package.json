@@ -1,7 +1,7 @@
 {
   "name": "spert-story-map",
   "private": true,
-  "version": "0.46.3",
+  "version": "0.46.4",
   "type": "module",
   "engines": {
     "node": "22.x"
@@ -19,7 +19,7 @@
     "firebase": "^12.9.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.0",
+    "react-router-dom": "^7.16.0",
     "recharts": "^3.7.0"
   },
   "devDependencies": {
