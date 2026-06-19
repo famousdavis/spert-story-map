@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.46.5 (2026-06-19)
+
+Security maintenance — development-tooling dependency updates with no functional or behavioral changes.
+
+**Security: build and test tooling updates**
+
+- **Updated: vite 7.3.2** — the build tool and local development server was updated from 7.3.1 to 7.3.2 to close three security advisories that affect only the local development server: arbitrary file read via the dev-server WebSocket (GHSA-p9ff-h696-f583, High), a server.fs.deny access-control bypass via crafted query strings (GHSA-v2wj-q39q-566r, High), and a path-traversal issue in optimized-dependency .map handling (GHSA-4w7w-66w2-5vf9, Moderate). Vite is a development and build-time tool; these advisories have no impact on the deployed application or your data.
+- **Updated: vitest 4.1.4** — the test runner was updated from 4.0.18 to 4.1.4 to close a critical advisory in the Vitest UI server that allowed arbitrary file read and execution while that server is listening (GHSA-5xrq-8626-4rwp, Critical). Vitest runs only in the local test environment and is never part of the deployed application.
+- **Deferred:** Two remaining vite advisories (GHSA-fx2h-pf6j-xcff, High, and GHSA-v6wh-96g9-6wx3, Moderate) apply only to Windows development environments and are fixed in vite 7.3.5; that update is held until 7.3.5 clears the project's 60-day dependency-stability window and will ship in a follow-up release. No user-facing impact.
+- **Internal:** Both updates are drop-in; the full test suite (836 tests) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.46.4 (2026-06-19)
 
 Security maintenance — dependency update with no functional or behavioral changes.
