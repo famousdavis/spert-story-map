@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.46.2 (2026-06-18)
+
+Security hardening — defense-in-depth improvements with no functional or behavioral changes for valid inputs.
+
+**Security: HTTP response headers and Connect AI input validation**
+
+- **New: HTTP security headers** — production responses now send X-Frame-Options: SAMEORIGIN (clickjacking protection), X-Content-Type-Options: nosniff (MIME-sniffing protection), Referrer-Policy: strict-origin-when-cross-origin, and a restrictive Permissions-Policy that disables geolocation, microphone, and camera access.
+- **Hardened: Connect AI edit operations** — every field applied by a Connect AI build or edit operation (bulk import; create and update for themes, backbones, and rib items) is now strictly type-checked before it reaches your data, so a value of the wrong type or an invalid category is dropped rather than stored. This closes a defense-in-depth gap and also prevents an invalid category value from ever being written.
+- **Internal:** A full security review pass across authentication, sign-out and session teardown, local storage, import validation, the Connect AI surface, dependencies, and error handling; findings are tracked privately. No changes to your data, the storage format, or Connect AI behavior for valid inputs.
+
 ## Version 0.46.1 (2026-06-18)
 
 Internal code-quality refactor — no functional or behavioral changes.

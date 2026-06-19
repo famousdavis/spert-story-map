@@ -101,6 +101,86 @@ describe('applyAiOp — fine-grained ops', () => {
   });
 });
 
+describe('applyAiOp — payload type hardening (defense-in-depth)', () => {
+  // A product with one theme/backbone/rib, built through the create ops.
+  function seeded(): Product {
+    let p = makeProduct();
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R' });
+    return p;
+  }
+
+  it('create ops drop non-string required fields (no cast-laundering)', () => {
+    const prev = makeProduct();
+    expect(applyAiOp(prev, 'create_theme', { themeId: 't1', name: 42 })).toBe(prev);
+    expect(applyAiOp(prev, 'create_theme', { themeId: 't1' })).toBe(prev);
+    expect(applyAiOp(prev, 'create_theme', { themeId: { evil: 1 }, name: 'T' })).toBe(prev);
+  });
+
+  it('create_rib coerces non-string optional fields and invalid category', () => {
+    let p = makeProduct();
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'R',
+      description: 99, category: 'bogus', notes: { x: 1 },
+    });
+    const rib = p.themes[0]?.backboneItems[0]?.ribItems[0];
+    expect(rib?.description).toBe('');   // 99 dropped → default ''
+    expect(rib?.category).toBe('core');  // 'bogus' dropped → default 'core'
+    expect(rib?.notes).toBe('');         // object dropped → default ''
+  });
+
+  it('update_rib drops non-string fields and the invalid category enum', () => {
+    const p = seeded();
+    // All-invalid update applies nothing → ref-equal no-op.
+    expect(applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 42, category: 'bogus',
+    })).toBe(p);
+    // Mixed: the valid name applies; the invalid category is dropped.
+    const next = applyAiOp(p, 'update_rib', {
+      themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'New', category: 'bogus',
+    });
+    const rib = next.themes[0]?.backboneItems[0]?.ribItems[0];
+    expect(rib?.name).toBe('New');
+    expect(rib?.category).toBe('core');  // 'bogus' never written
+  });
+
+  it('update_theme / update_backbone drop non-string names', () => {
+    const p = seeded();
+    expect(applyAiOp(p, 'update_theme', { themeId: 't1', name: 42 })).toBe(p);
+    expect(applyAiOp(p, 'update_backbone', { themeId: 't1', backboneId: 'b1', name: 42 })).toBe(p);
+  });
+
+  it('bulk_import skips entities with non-string id/name, keeps valid siblings', () => {
+    const prev = makeProduct();
+    const mixed = {
+      themes: [
+        { themeId: 't1', name: 42, backbones: [] },               // bad name → skipped
+        { themeId: 't2', name: 'Good', backbones: [
+          { backboneId: 'b1', name: 'B', ribs: [
+            { ribId: 'r1', name: 'R1' },                          // valid
+            { ribId: 'r2', name: { x: 1 } },                      // bad name → skipped
+          ] },
+        ] },
+      ],
+    };
+    const next = applyAiOp(prev, 'bulk_import', mixed);
+    expect(next.themes.length).toBe(1);
+    expect(next.themes[0]?.name).toBe('Good');
+    expect(next.themes[0]?.backboneItems[0]?.ribItems.length).toBe(1);
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.name).toBe('R1');
+  });
+
+  it('bulk_import with all-invalid entities is a ref-equal no-op', () => {
+    const prev = makeProduct();
+    expect(applyAiOp(prev, 'bulk_import', {
+      themes: [{ themeId: 't1', name: 99, backbones: [] }],
+    })).toBe(prev);
+  });
+});
+
 describe('computeSafePrefix', () => {
   it('returns the full ops array for Phase 1 (all no-throw)', () => {
     const ops: AiOpDoc[] = [
