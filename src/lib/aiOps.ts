@@ -49,21 +49,31 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       let next = prev;
       for (const theme of (p.themes as unknown[])) {
         if (!theme || typeof theme !== 'object') continue;
-        const t = theme as { themeId: string; name: string; backbones: unknown[] };
+        const t = theme as { themeId?: unknown; name?: unknown; backbones?: unknown };
+        // typeof-guard every field reaching state (defense-in-depth for the drain
+        // path). A theme/backbone/rib with a non-string id or name is skipped, not
+        // created with a cast-laundered value.
+        if (typeof t.themeId !== 'string' || typeof t.name !== 'string') continue;
         if (!Array.isArray(t.backbones)) continue;
-        next = addNamedThemeToProduct(next, t.themeId, { name: t.name });
+        const themeId = t.themeId;
+        next = addNamedThemeToProduct(next, themeId, { name: t.name });
         for (const backbone of t.backbones) {
           if (!backbone || typeof backbone !== 'object') continue;
-          const b = backbone as { backboneId: string; name: string; description?: string; ribs: unknown[] };
+          const b = backbone as { backboneId?: unknown; name?: unknown; description?: unknown; ribs?: unknown };
+          if (typeof b.backboneId !== 'string' || typeof b.name !== 'string') continue;
           if (!Array.isArray(b.ribs)) continue;
-          next = addNamedBackboneToProduct(next, t.themeId, b.backboneId,
-            { name: b.name, description: b.description });
+          const backboneId = b.backboneId;
+          next = addNamedBackboneToProduct(next, themeId, backboneId,
+            { name: b.name, description: typeof b.description === 'string' ? b.description : undefined });
           for (const rib of b.ribs) {
             if (!rib || typeof rib !== 'object') continue;
-            const r = rib as { ribId: string; name: string; description?: string; category?: 'core' | 'non-core'; notes?: string };
-            next = addNamedRibToProduct(next, t.themeId, b.backboneId, r.ribId, {
-              name: r.name, description: r.description ?? '',
-              category: r.category ?? 'core', notes: r.notes ?? '',
+            const r = rib as { ribId?: unknown; name?: unknown; description?: unknown; category?: unknown; notes?: unknown };
+            if (typeof r.ribId !== 'string' || typeof r.name !== 'string') continue;
+            next = addNamedRibToProduct(next, themeId, backboneId, r.ribId, {
+              name: r.name,
+              description: typeof r.description === 'string' ? r.description : '',
+              category: r.category === 'core' || r.category === 'non-core' ? r.category : 'core',
+              notes: typeof r.notes === 'string' ? r.notes : '',
             });
           }
         }
@@ -81,23 +91,40 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
         _changeLog: appendChangeLogEntry(prev, { op: 'import', entity: 'product', source: 'ai' }),
       };
     }
-    case 'create_theme':
-      return addNamedThemeToProduct(prev, p.themeId as string, { name: p.name as string });
-    case 'create_backbone':
-      return addNamedBackboneToProduct(prev, p.themeId as string, p.backboneId as string,
-        { name: p.name as string, description: p.description as string | undefined });
-    case 'create_rib':
-      return addNamedRibToProduct(prev, p.themeId as string, p.backboneId as string, p.ribId as string, {
-        name: p.name as string, description: (p.description as string) ?? '',
-        category: (p.category as 'core' | 'non-core') ?? 'core', notes: (p.notes as string) ?? '',
+    case 'create_theme': {
+      // Defense-in-depth: payload field types are validated by the LP MCP Zod
+      // schema on the write path, but the D5 drain replays raw docs. typeof-guard
+      // every field reaching state so a non-string can never be cast-laundered.
+      if (typeof p.themeId !== 'string' || typeof p.name !== 'string') return prev;
+      return addNamedThemeToProduct(prev, p.themeId, { name: p.name });
+    }
+    case 'create_backbone': {
+      if (typeof p.themeId !== 'string' || typeof p.backboneId !== 'string' ||
+          typeof p.name !== 'string') return prev;
+      return addNamedBackboneToProduct(prev, p.themeId, p.backboneId,
+        { name: p.name, description: typeof p.description === 'string' ? p.description : undefined });
+    }
+    case 'create_rib': {
+      if (typeof p.themeId !== 'string' || typeof p.backboneId !== 'string' ||
+          typeof p.ribId !== 'string' || typeof p.name !== 'string') return prev;
+      return addNamedRibToProduct(prev, p.themeId, p.backboneId, p.ribId, {
+        name: p.name,
+        description: typeof p.description === 'string' ? p.description : '',
+        category: p.category === 'core' || p.category === 'non-core' ? p.category : 'core',
+        notes: typeof p.notes === 'string' ? p.notes : '',
       });
+    }
     case 'update_theme': {
-      if (p.name === undefined) return prev;
+      // typeof-guard (not just !== undefined) so a non-string name cannot be
+      // cast-laundered into state. Local capture keeps the narrowing across the
+      // .map closure (property narrowing on `p` does not survive closures).
+      if (typeof p.name !== 'string') return prev;
+      const name = p.name;
       let didUpdate = false;
       const themes = prev.themes.map(t => {
         if (t.id !== p.themeId) return t;
         didUpdate = true;
-        return { ...t, name: p.name as string };
+        return { ...t, name };
       });
       if (!didUpdate) return prev;
       const next = { ...prev, themes };
@@ -109,7 +136,9 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       };
     }
     case 'update_backbone': {
-      if (p.name === undefined && p.description === undefined) return prev;
+      const name = typeof p.name === 'string' ? p.name : undefined;
+      const description = typeof p.description === 'string' ? p.description : undefined;
+      if (name === undefined && description === undefined) return prev;
       let didUpdate = false;
       const themes = prev.themes.map(t => {
         if (t.id !== p.themeId) return t;
@@ -118,8 +147,8 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
           didUpdate = true;
           return {
             ...b,
-            ...(p.name !== undefined && { name: p.name as string }),
-            ...(p.description !== undefined && { description: p.description as string }),
+            ...(name !== undefined && { name }),
+            ...(description !== undefined && { description }),
           };
         });
         return { ...t, backboneItems };
@@ -134,9 +163,19 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       };
     }
     case 'update_rib': {
+      // typeof/enum-guard each field so a non-string (or invalid category) cannot
+      // be cast-laundered into state — this also closes the `category:'bogus'` write.
+      const name = typeof p.name === 'string' ? p.name : undefined;
+      const description = typeof p.description === 'string' ? p.description : undefined;
+      // Cast (not just narrow) to match the bulk_update_ribs pattern: an extracted
+      // local spread into the rib literal widens to `string` without the cast.
+      const category = p.category === 'core' || p.category === 'non-core'
+        ? p.category as 'core' | 'non-core'
+        : undefined;
+      const notes = typeof p.notes === 'string' ? p.notes : undefined;
       if (
-        p.name === undefined && p.description === undefined &&
-        p.category === undefined && p.notes === undefined && p.size === undefined
+        name === undefined && description === undefined &&
+        category === undefined && notes === undefined && p.size === undefined
       ) return prev;
       // Build a valid-label set once, pre-walk. Mirrors sizeRibInProduct Guard 1.
       // Null is the clear sentinel — always allowed through regardless of sizeMapping.
@@ -157,10 +196,10 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
             const locked = isRibLocked(r);
             return {
               ...r,
-              ...(p.name !== undefined && { name: p.name as string }),
-              ...(p.description !== undefined && { description: p.description as string }),
-              ...(p.category !== undefined && { category: p.category as 'core' | 'non-core' }),
-              ...(p.notes !== undefined && { notes: p.notes as string }),
+              ...(name !== undefined && { name }),
+              ...(description !== undefined && { description }),
+              ...(category !== undefined && { category }),
+              ...(notes !== undefined && { notes }),
               // Size silently dropped for locked ribs; other fields still apply.
               // Also dropped when a non-null label is absent from sizeMapping
               // (null is the clear sentinel and always passes).

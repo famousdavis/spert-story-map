@@ -16,6 +16,9 @@ dist-ssr
 CLAUDE.md
 .claude/
 
+# Local planning / critique artifacts (kept locally, not part of the repo)
+_planning/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
