@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.46.4 (2026-06-19)
+
+Security maintenance — dependency update with no functional or behavioral changes.
+
+**Security: routing library update**
+
+- **Updated: react-router-dom 7.16.0** — the application's routing library (react-router-dom and its react-router core) was updated from 7.13.1 to 7.16.0 to close a security vulnerability. This is a drop-in update with no changes to application behavior, navigation, or your data; the full test suite and production build pass unchanged.
+- **Internal:** The remaining dependency security advisories were reviewed; the affected packages are transitive dependencies with low practical exposure in this client-side app, and their updates are deferred to a future release pending the project's dependency-stability policy. No user-facing impact.
+
 ## Version 0.46.3 (2026-06-18)
 
 The changelog page now displays every entry in full.
