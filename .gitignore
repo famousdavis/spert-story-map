@@ -31,3 +31,5 @@ _planning/
 *.sw?
 * 2.*
 .vercel
+
+.audit-baseline.json

@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.46.6 (2026-06-26)
+
+Security maintenance — dependency updates with no intended behavioral changes.
+
+**Security: full lockfile regeneration**
+
+- **Lockfile regenerated** — a full regeneration of the dependency tree floats critical- and high-severity transitive advisories (the protobufjs and @grpc/grpc-js families) to their patched versions within the existing declared dependency ranges. This closes a critical protobufjs advisory and high-severity @grpc/grpc-js advisories with no intended behavioral changes.
+- **Updated: firebase 12.10.0 → 12.12.1** — a routine currency update included alongside the regeneration. Drop-in, with no intended behavioral changes.
+- **Internal:** All other direct dependencies are held at their previously installed versions via pre-pinning, so this release changes only the resolved transitive tree and firebase. The full test suite (33 files) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.46.5 (2026-06-19)
 
 Security maintenance — development-tooling dependency updates with no functional or behavioral changes.
