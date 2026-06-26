@@ -59,6 +59,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
   useEffect(() => {
     if (mode !== 'cloud' || !user || !productId || !db) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional load-state reset on dep change
     setOwnerStatus('loading');
 
     async function load() {
@@ -329,6 +330,7 @@ function InvitationSection({
   // INVITATIONS_ENABLED, so no flag check needed here.
   useEffect(() => {
     if (ownerStatus !== 'owner' || !driver) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional load-state reset on dep change
     setLoadingPending(true);
     driver.listPendingInvites(productId)
       .then(setPendingInvites)

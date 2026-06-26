@@ -141,7 +141,7 @@ export async function runLegacyMigration(): Promise<void> {
 
   // Fallback: timestamp lock. If another tab is mid-migration (lock <30s old),
   // wait it out by polling for the done marker.
-  let lockData: { ts: number } | null = null;
+  let lockData: { ts: number } | null;
   try {
     lockData = JSON.parse(localStorage.getItem(MIGRATION_LOCK_KEY) ?? 'null');
   } catch {
@@ -151,7 +151,7 @@ export async function runLegacyMigration(): Promise<void> {
     await new Promise<void>(resolve => {
       const interval = setInterval(() => {
         const done = localStorage.getItem(MIGRATION_DONE_KEY);
-        let cur: { ts: number } | null = null;
+        let cur: { ts: number } | null;
         try {
           cur = JSON.parse(localStorage.getItem(MIGRATION_LOCK_KEY) ?? 'null');
         } catch {

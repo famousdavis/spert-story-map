@@ -40,12 +40,12 @@ export function useTooltip(text: string, delay = 200): UseTooltipReturn {
   }, [delay]);
 
   const onMouseLeave = useCallback(() => {
-    clearTimeout(timerRef.current);
+    clearTimeout(timerRef.current ?? undefined);
     setVisible(false);
   }, []);
 
   // Cleanup on unmount
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => () => clearTimeout(timerRef.current ?? undefined), []);
 
   const tooltipEl = visible && text
     ? createPortal(

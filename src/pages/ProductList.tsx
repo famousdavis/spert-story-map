@@ -94,6 +94,7 @@ export default function ProductList() {
   }, [driver, mode]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh sets state; intentional on storage ready
     if (storageReady) refresh();
   }, [storageReady, refresh]);
 
@@ -101,6 +102,7 @@ export default function ProductList() {
   // driver swap). Each change is followed by exactly one refresh() call →
   // cloudDataLoaded=true; the briefly-disabled Import button is acceptable.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional hydration-flag reset on driver swap
     setCloudDataLoaded(false);
   }, [mode, driver]);
 
@@ -112,6 +114,7 @@ export default function ProductList() {
   useEffect(() => {
     const denied = (location.state as { productAccessDenied?: boolean } | null)?.productAccessDenied;
     if (denied) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot banner from router state
       setAccessDeniedMsg(true);
       // Clear the router state so a subsequent navigation (back/forward, link
       // click) doesn't re-trigger the banner on re-mount.
