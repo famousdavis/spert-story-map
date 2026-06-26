@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.46.9 (2026-06-26)
+
+Maintenance — routine dependency updates within the project's stability window, with no functional or behavioral changes.
+
+**Dependency updates**
+
+- **Updated: tailwindcss 4.2.1 → 4.2.4** — a routine patch update to the CSS engine, with @tailwindcss/vite updated to the same version (these two packages are released in lockstep). No styling or layout changes.
+- **Updated: globals 17.4.0 → 17.5.0** — a routine update to the ESLint global-identifier definitions used during linting.
+- **Internal:** The TypeScript React type definitions (@types/react, @types/react-dom) were reviewed and are already at their current stable versions, so no change was needed. The full test suite (33 files, 836 tests) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.46.8 (2026-06-26)
 
 Development tooling — test-environment and test-runner updates with no functional or behavioral changes.
