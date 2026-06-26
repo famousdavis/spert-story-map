@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.46.10 (2026-06-26)
+
+Infrastructure — adoption of the Node.js 24 LTS runtime, with no functional or behavioral changes.
+
+**Node.js runtime: 22 → 24 LTS**
+
+- **Adopted: Node.js 24 LTS** — the declared runtime was advanced to Node.js 24 LTS: `@types/node` updated from 25.5.0 to 24.12.2 (aligning the type definitions with the Node 24 LTS line), `engines.node` from 22.x to 24.x, and `.nvmrc` from 22 to 24. The Vercel build runtime is set to Node 24 to match. No application logic or runtime dependencies were changed; the full test suite and production build were validated on Node 24.
+- **Internal:** The full test suite (33 files, 836 tests) and the production build pass unchanged on Node 24, and linting is clean with zero warnings.
+
 ## Version 0.46.9 (2026-06-26)
 
 Maintenance — routine dependency updates within the project's stability window, with no functional or behavioral changes.
