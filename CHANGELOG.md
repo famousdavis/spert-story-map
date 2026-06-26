@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.46.8 (2026-06-26)
+
+Development tooling — test-environment and test-runner updates with no functional or behavioral changes.
+
+**Dependency updates: test environment and test runner**
+
+- **Updated: jsdom 26.1.0 → 29.1.0** — the browser-like DOM environment used by the test suite was updated across three major versions, which transitions its internal HTTP stack from ws to undici. This affects only the local/CI test environment and has no impact on the deployed application; no test logic was changed.
+- **Updated: vitest 4.1.4 → 4.1.5** — a minor update to the test runner.
+- **Internal:** The full test suite (33 files, 836 tests) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.46.7 (2026-06-26)
 
 Development tooling — major-version updates to the linter and TypeScript compiler, with small source adaptations for compatibility and no behavioral change.
