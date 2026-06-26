@@ -48,6 +48,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
 
   // Reset collapsed state when switching to a different rib
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on rib change
     setDescExpanded(Boolean(rib.description));
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only resets on rib change
   }, [rib.id]);

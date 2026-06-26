@@ -46,6 +46,7 @@ export default function ConnectPanel({
 
   // Fetch a fresh code when the panel opens with an active session.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchCode sets state; intentional fetch on open
     if (open && sessionId) fetchCode();
   }, [open, sessionId, fetchCode]);
 

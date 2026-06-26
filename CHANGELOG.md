@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.46.7 (2026-06-26)
+
+Development tooling — major-version updates to the linter and TypeScript compiler, with small source adaptations for compatibility and no behavioral change.
+
+**Dependency updates: linting and type system**
+
+- **Updated: eslint 9.39.4 → 10.2.1** — the linter was updated to its current major version, paired with @eslint/js 10.0.1 and eslint-plugin-react-hooks 7.1.1 (which adds eslint 10 peer support).
+- **Updated: typescript 5.9.3 → 6.0.3** — the TypeScript compiler was updated to its current major version, with typescript-eslint updated to 8.59.0 to lift the TypeScript 6 peer ceiling. The project's tsconfig target (ES2020) requires no compatibility workarounds, and the production build (esbuild) is unaffected by the compiler update.
+- **Source adaptations (no behavioral change):** the major-version updates surfaced new linter and compiler diagnostics, resolved without altering runtime behavior — pruned one now-unused eslint-disable directive, removed two redundant variable initializers flagged by eslint 10's no-useless-assignment rule, added seven targeted eslint-disable comments for intentional setState-in-effect patterns newly detected by eslint-plugin-react-hooks 7.1.1, adjusted a tooltip timer-handle type for TypeScript 6's stricter null/undefined distinction, and added an ambient module declaration (vite-env.d.ts) so TypeScript 6 resolves the side-effect CSS import.
+- **Internal:** A normalized type-check comparison confirms no new type-error sites after the update. The full test suite (33 files) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.46.6 (2026-06-26)
 
 Security maintenance — dependency updates with no intended behavioral changes.

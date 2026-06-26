@@ -28,11 +28,9 @@ export function useBufferedField(externalValue: string, onCommit: (v: string) =>
   // External → local sync, gated on focus state. setState-in-effect is the
   // whole point of this hook: a parent state change (cloud echo, undo/redo)
   // must propagate into the buffer when the user is not actively typing.
-  /* eslint-disable react-hooks/set-state-in-effect -- intentional buffered external→local sync */
   useEffect(() => {
     if (!isFocused.current) setLocalValue(externalValue);
   }, [externalValue]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleFocus = useCallback(() => {
     isFocused.current = true;
