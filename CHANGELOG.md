@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.46.11 (2026-06-30)
+
+User interface — a small visual refinement to the Story Map theme bar.
+
+**Theme bar rendered as a single contiguous block**
+
+- **Fixed: faint vertical lines inside the theme bar** — the subtle column divider guides on the Story Map previously ran the full height of the canvas, painting faint gray lines across the colored theme header and visually splitting it into per-backbone segments. The guides now begin just below the theme bar (at the backbone-header row), so each theme renders as one solid, contiguous filled rectangle spanning the backbones underneath it. The card-area guides are unchanged.
+- **Internal:** A one-line layout change in `MapContent.tsx` — the column divider now starts at `THEME_HEIGHT` instead of the canvas top. The full test suite (33 files, 836 tests) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.46.10 (2026-06-26)
 
 Infrastructure — adoption of the Node.js 24 LTS runtime, with no functional or behavioral changes.

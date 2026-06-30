@@ -196,9 +196,9 @@ export default function MapContent({
           className="absolute bg-gray-100"
           style={{
             left: col.x + col.width + 2,
-            top: 0,
+            top: THEME_HEIGHT,
             width: 1,
-            height: totalHeight,
+            height: totalHeight - THEME_HEIGHT,
           }}
         />
       ))}
