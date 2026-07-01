@@ -32,7 +32,7 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
 
   return (
     <div
-      className={`absolute ${color} rounded flex items-center gap-0.5 px-1 transition-shadow ${
+      className={`group absolute ${color} rounded flex items-center gap-0.5 px-1 transition-shadow ${
         isDragging ? 'opacity-50 ring-2 ring-blue-400' : ''
       } ${isDropTarget ? 'ring-2 ring-blue-400 shadow-md' : ''}`}
       style={{
@@ -76,7 +76,7 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
       )}
       {onDelete && (
         <button
-          className="text-[10px] leading-none opacity-30 hover:opacity-100 text-red-700 flex-shrink-0 ml-auto transition-opacity"
+          className="text-[10px] leading-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-900 text-red-700 flex-shrink-0 ml-auto transition-opacity"
           onClick={(e) => { e.stopPropagation(); onDelete(column.themeId, column.backboneId); }}
           title="Delete backbone"
         >

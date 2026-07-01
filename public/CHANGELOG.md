@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.46.12 (2026-06-30)
+
+User interface — a small visual refinement to the Story Map backbone headers.
+
+**Backbone delete control revealed on hover**
+
+- **Changed: the "×" delete control on each backbone header is now hidden until you hover over that backbone.** Previously every backbone displayed a faint, always-on "×", adding persistent visual clutter across the map. The control now fades in only when the pointer is over its backbone block — and still appears when focused via the keyboard, for accessibility — matching the reveal-on-hover pattern used elsewhere in the app. Delete behavior is unchanged.
+- **Internal:** A presentation-only change in `BackboneHeader.tsx` — the header container gained a `group` class and the button switched from `opacity-30 hover:opacity-100` to `opacity-0 group-hover:opacity-100 focus-visible:opacity-100`. No logic was touched. The full test suite (33 files, 836 tests) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.46.11 (2026-06-30)
 
 User interface — a small visual refinement to the Story Map theme bar.
