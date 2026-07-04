@@ -79,29 +79,57 @@ ORDERING DISCIPLINE — CRITICAL: Create all releases first, then allocate. Do n
 Reason: storymap_allocate_rib silently skips if the target release doesn't yet exist — there
 is no error, so you will not know the allocation was lost. Create every release (await each
 result before the next, all within the same response), then allocate ribs to them.
+Same rule for backbones: create a backbone before moving ribs into it — storymap_move_rib
+silently skips a target backbone that doesn't exist yet.
 
 READ MODE:
 - storymap_create_release does NOT require Read Mode (like create_theme, you only need a
   name and a UUID; you don't need to read the current map state).
-- storymap_allocate_rib and storymap_unassign_rib REQUIRE Read Mode. Call storymap_get_project
-  first to obtain rib IDs and each rib's releaseIds and locked state. If Read Mode is off,
-  ask the user to enable it in the Connect AI panel before proceeding.
+- storymap_allocate_rib, storymap_unassign_rib, and storymap_move_rib REQUIRE Read Mode.
+  Call storymap_get_project first to obtain rib IDs and each rib's releaseIds, locked, and
+  partial state. If Read Mode is off, ask the user to enable it in the Connect AI panel
+  before proceeding.
 
 RE-RUN / ADDITIVE SEMANTICS:
 - storymap_allocate_rib skips any rib that already has an allocation. It never overwrites.
   Re-running is safe; already-allocated ribs are simply skipped.
-- To MOVE a rib to a different release: call storymap_unassign_rib first, then
-  storymap_allocate_rib.
-- To MOVE many ribs at once: call storymap_bulk_unassign (all the ribIds), then
-  storymap_bulk_allocate. Both require Read Mode.
+- To MOVE a rib to a different release: use storymap_move_rib (one call — it replaces the
+  old unassign-then-allocate two-step). For a rib whose allocation is a percentage split
+  or a single partial allocation under 100%, the release change is skipped instead — call
+  storymap_unassign_rib first, then storymap_move_rib.
+- To MOVE many ribs at once: use storymap_bulk_move_ribs. The same split/partial rule
+  applies per entry. Both move tools require Read Mode.
 - storymap_unassign_rib and storymap_bulk_unassign remove ALL of a rib's allocations
   (skip locked ribs; no-op if already unassigned).
+
+MOVING RIB ITEMS:
+storymap_move_rib moves a rib to a different backbone, a different release, or both, in
+one call. The two changes apply independently — an invalid target for one never blocks
+the other. The target backbone may belong to ANY theme, not just the rib's current one.
+- Locked ribs (in progress): only the release change is blocked; the backbone change
+  still applies.
+- Split or partial allocations: if a rib's releaseIds has more than one entry (a split),
+  or partial is true in storymap_get_project (a single allocation under 100%), the
+  release change is skipped rather than overwritten. To actually reassign such a rib's
+  release, call storymap_unassign_rib first, then storymap_move_rib.
+- Check locked, releaseIds, and partial in storymap_get_project BEFORE calling to know
+  whether the release change will apply.
+- A moved rib lands at the END of its destination backbone; position cannot be specified.
+- Moving a rib between backbones may also drop it to the bottom of its release's column
+  on the Release Planning board, even though its release did not change — a known,
+  accepted cosmetic side effect, not a bug. Explain this if the user asks why their
+  board reordered.
+- After moving a rib, call storymap_get_project again before calling storymap_update_rib
+  on it — update_rib addresses a rib through its backbone, and the pre-move location
+  will no longer match, causing a silent no-op.
 
 CONSTRAINTS:
 - Whole-rib, single-release, 100% only. You cannot split a rib across releases.
   If the user wants a split, direct them to the Release Planning board in the app.
-- Locked ribs (in progress) cannot be allocated or unassigned. If a rib has locked: true
-  in storymap_get_project, tell the user — it must be changed manually.
+- Locked ribs (in progress) cannot be allocated or unassigned, and storymap_move_rib
+  skips their release change (their backbone CAN still be changed). If a rib has
+  locked: true in storymap_get_project, tell the user — its release assignment must be
+  changed manually.
 - Never set a target date. Do not include targetDate in any create_release call.
 - If a rib's releaseIds has more than one entry (a percentage split set by the user),
   warn the user before calling storymap_unassign_rib or including that rib in a
@@ -110,9 +138,9 @@ CONSTRAINTS:
 RELEASE IDs: Generate a fresh UUID for each new release (same rule as for themes, backbones, ribs).
 
 BULK TOOLS (preferred when working with many ribs at once):
-Use bulk tools when allocating, sizing, unassigning, or updating rib content (description,
-category, notes) — they collapse N round-trips into one call. This is critical for AI
-clients that yield to the user between tool calls.
+Use bulk tools when allocating, sizing, unassigning, moving, or updating rib content
+(description, category, notes) — they collapse N round-trips into one call. This is
+critical for AI clients that yield to the user between tool calls.
 
 WHEN TO USE BULK:
 - Allocating, sizing, or unassigning more than a handful of ribs → use
@@ -120,6 +148,9 @@ WHEN TO USE BULK:
   repeated individual tool calls.
 - Updating description, category, or notes on more than a handful of ribs → use
   storymap_bulk_update_ribs instead of repeated storymap_update_rib calls.
+- Redistributing many ribs across backbones or releases → use storymap_bulk_move_ribs.
+  Its array-of-objects payload is a shape Microsoft Copilot Chat cannot reliably
+  construct — if you are Copilot, use sequential storymap_move_rib calls instead.
 - Creating multiple releases at once → use storymap_bulk_create_releases.
 - A single targeted change (one rib, one action) → individual tools are fine.
 
@@ -139,15 +170,20 @@ labels from sizeMapping.
 READ MODE SUMMARY:
 - storymap_bulk_create_releases: does NOT require Read Mode.
 - storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign
-  / storymap_bulk_update_ribs: REQUIRE Read Mode.
+  / storymap_bulk_update_ribs / storymap_bulk_move_ribs: REQUIRE Read Mode.
 
-ADDITIVE / RE-RUN SEMANTICS (all five bulk tools):
+ADDITIVE / RE-RUN SEMANTICS (all six bulk tools):
 - storymap_bulk_create_releases skips duplicate releaseIds.
 - storymap_bulk_allocate skips ribs that are locked, already allocated, or whose
   target release does not exist.
 - storymap_bulk_size skips ribs that are locked, already validly sized, or whose
   size label is not in sizeMapping.
 - storymap_bulk_unassign skips ribs that are locked or already unassigned.
+- storymap_bulk_move_ribs REPLACES a rib's backbone and/or release allocation per entry.
+  Entries already at their target are skipped (no-op on re-run), but re-running can
+  overwrite a manual backbone or release change made since the first run — the same
+  caveat as storymap_bulk_update_ribs. Ineligible release changes (locked, split,
+  partial) are skipped per entry.
 - storymap_bulk_update_ribs REPLACES description, category, and notes when provided;
   omitted fields are left unchanged. It does NOT skip locked ribs for text edits —
   you can update a rib that is in progress. Re-running writes the same values again
@@ -158,7 +194,7 @@ entries applied. Note: storymap_get_project does not return notes values; descri
 and category can be verified that way, but notes cannot.
 
 CHUNKING:
-- More than 500 ribs to allocate, size, unassign, or update → split into bulk calls of ≤500 each.
+- More than 500 ribs to allocate, size, unassign, move, or update → split into bulk calls of ≤500 each.
 - More than 50 releases to create → split into calls of ≤50 each.
 
 BULK CONTENT UPDATES (description, category, notes):
