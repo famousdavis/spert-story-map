@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.47.1 (2026-07-03)
+
+Documentation — the Connect AI prompt now teaches assistants the new move capability. No data-model or behavior changes.
+
+**Connect AI: prompt guidance for moving rib items**
+
+- **Improved: Connect AI prompt** — the copyable AI instructions now route "move a rib"
+  requests through storymap_move_rib / storymap_bulk_move_ribs (one call, replacing the
+  old unassign-then-allocate two-step for eligible ribs), including a new MOVING RIB ITEMS
+  section covering: per-leg independence (backbone and release changes apply
+  independently), locked-rib behavior (backbone changes allowed, release changes blocked),
+  the split/partial pre-check via the snapshot's releaseIds and partial fields,
+  cross-theme backbone targets, create-backbones-before-moving ordering, a post-move
+  staleness warning for storymap_update_rib, honest re-run semantics for bulk moves, and
+  client guidance for the bulk tool's payload shape.
+- **Internal:** Prose-only change to `copyPrompt.ts`. The full test suite (33 files,
+  885 tests) and the production build pass unchanged, and linting is clean with zero
+  warnings.
+
 ## Version 0.47.0 (2026-07-03)
 
 Move story map cards with AI — relocate rib items across backbones and releases in one call.
