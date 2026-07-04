@@ -499,3 +499,154 @@ export function sizeRibInProduct(
     }),
   };
 }
+
+/**
+ * Pure transformation: move a rib to a different backbone and/or reassign its
+ * release allocation in one call. Addresses ribs by ID alone (global search;
+ * no themeId/backboneId needed). The target-backbone search is intentionally
+ * global ACROSS THEMES: a rib may move into a backbone belonging to a
+ * different theme than its own.
+ *
+ * The backbone leg (BB-*) and release leg (REL-*) are validated and applied
+ * INDEPENDENTLY: an invalid/skipped leg never blocks the other. If neither
+ * leg changes state, returns prev unchanged (ref-equal, no changelog entry).
+ *
+ * Guards (all return prev ref-equal, never throw):
+ *   CALL-1  neither targetBackboneId nor targetReleaseId provided → prev.
+ *   CALL-2  rib not found anywhere (global search) → prev.
+ *   BB-1    target backbone does not exist in any theme → backbone leg skipped.
+ *   BB-2    rib already in the target backbone → backbone leg skipped (idempotent).
+ *           (No lock guard on the backbone leg — backbone/theme membership
+ *           feeds no point/progress math.)
+ *   REL-1   targetReleaseId not provided → release leg inactive.
+ *   REL-2   target release does not exist → release leg skipped.
+ *   REL-3   rib is locked → release leg skipped (progress entries are
+ *           release-keyed; reassignment is not math-safe).
+ *   REL-4   current releaseAllocations are neither empty nor exactly one entry
+ *           at exactly 100% (a split, or a single sub-100% allocation) →
+ *           release leg skipped; protects hand-authored splits/partials from
+ *           silent flattening.
+ *   REL-5   sole 100% allocation already targets targetReleaseId → release leg
+ *           skipped (idempotent).
+ *   CALL-3  both requested legs skipped → prev.
+ *
+ * A currently-unassigned rib IS release-leg eligible — the leg doubles as
+ * "allocate from unassigned". The replace intentionally drops any existing
+ * allocation memo (matches allocateRibInProduct's write shape).
+ *
+ * Positioning is append-only: the moved rib lands at the end of the target
+ * backbone with order = ribItems.length + 1; no renumbering elsewhere.
+ *
+ * Both legs strip the rib from releaseCardOrder via cleanCardOrder (mirrors
+ * unassignRibInProduct — NOT allocateRibInProduct, which never touches it) so
+ * the rib renders at the end of its new column. NOTE: this also demotes the
+ * rib in its (unchanged) release's Release Planning column on a backbone-only
+ * move — an accepted, documented cross-view trade-off (CLAUDE.md #57), not a
+ * bug.
+ *
+ * @no-throw — safe for use in the drain path.
+ */
+export function moveRibInProduct(
+  prev: Product,
+  ribId: string,
+  targets: { targetBackboneId?: string; targetReleaseId?: string },
+): Product {
+  const { targetBackboneId, targetReleaseId } = targets;
+  if (!targetBackboneId && !targetReleaseId) return prev; // CALL-1
+
+  // Global rib lookup.
+  let foundThemeId: string | undefined;
+  let foundBackboneId: string | undefined;
+  let foundRib: RibItem | undefined;
+  for (const t of prev.themes) {
+    for (const b of t.backboneItems) {
+      const r = b.ribItems.find(x => x.id === ribId);
+      if (r) { foundThemeId = t.id; foundBackboneId = b.id; foundRib = r; break; }
+    }
+    if (foundRib) break;
+  }
+  if (!foundRib || !foundThemeId || !foundBackboneId) return prev; // CALL-2
+  // Consts for closure capture (let-narrowing does not survive callbacks).
+  const movedRib = foundRib;
+  const sourceThemeId = foundThemeId;
+  const sourceBackboneId = foundBackboneId;
+
+  // ── Backbone leg: BB-1, BB-2. Search is global across ALL themes. ──
+  let targetBackboneThemeId: string | undefined;
+  let backboneChanged = false;
+  if (targetBackboneId && targetBackboneId !== sourceBackboneId) {
+    for (const t of prev.themes) {
+      if (t.backboneItems.some(b => b.id === targetBackboneId)) {
+        targetBackboneThemeId = t.id; // may differ from sourceThemeId — intentional
+        break;
+      }
+    }
+    backboneChanged = targetBackboneThemeId !== undefined; // undefined ⇒ BB-1
+  }
+  // targetBackboneId === sourceBackboneId falls through with backboneChanged=false ⇒ BB-2
+
+  // ── Release leg: REL-1 .. REL-5 ──
+  const allocations = movedRib.releaseAllocations ?? [];
+  const sole = allocations.length === 1 ? allocations[0] : undefined;
+  const releaseEligible =
+    allocations.length === 0 || (sole !== undefined && sole.percentage === 100); // REL-4
+  const alreadyAtTarget =
+    sole !== undefined && sole.percentage === 100 && sole.releaseId === targetReleaseId; // REL-5
+  const targetReleaseExists =
+    !!targetReleaseId && prev.releases.some(r => r.id === targetReleaseId); // REL-2
+  const releaseChanged =
+    targetReleaseExists && !isRibLocked(movedRib) &&       // REL-3
+    releaseEligible && !alreadyAtTarget;
+  // targetReleaseId undefined ⇒ targetReleaseExists false ⇒ REL-1 (leg inactive)
+
+  if (!backboneChanged && !releaseChanged) return prev; // CALL-3
+
+  // ── Apply ──
+  let themes = prev.themes;
+  let releaseCardOrder = prev.releaseCardOrder;
+  if (backboneChanged && targetBackboneThemeId !== undefined) {
+    // Remove from the source backbone…
+    themes = themes.map(t =>
+      t.id !== sourceThemeId ? t : {
+        ...t,
+        backboneItems: t.backboneItems.map(b =>
+          b.id !== sourceBackboneId ? b : { ...b, ribItems: b.ribItems.filter(r => r.id !== ribId) }
+        ),
+      }
+    );
+    // …then append to the target backbone (order = new length + 1, append-only).
+    // Two sequential maps so a same-theme move sees the already-filtered source.
+    themes = themes.map(t =>
+      t.id !== targetBackboneThemeId ? t : {
+        ...t,
+        backboneItems: t.backboneItems.map(b =>
+          b.id !== targetBackboneId ? b : {
+            ...b,
+            ribItems: [...b.ribItems, { ...movedRib, order: b.ribItems.length + 1 }],
+          }
+        ),
+      }
+    );
+    releaseCardOrder = cleanCardOrder(releaseCardOrder, new Set([ribId]));
+  }
+  if (releaseChanged && targetReleaseId !== undefined) {
+    themes = themes.map(t => ({
+      ...t,
+      backboneItems: t.backboneItems.map(b => ({
+        ...b,
+        ribItems: b.ribItems.map(r =>
+          r.id !== ribId ? r : { ...r, releaseAllocations: [{ releaseId: targetReleaseId, percentage: 100 }] }
+        ),
+      })),
+    }));
+    releaseCardOrder = cleanCardOrder(releaseCardOrder, new Set([ribId]));
+  }
+
+  const next = { ...prev, themes, releaseCardOrder };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, {
+      op: 'update', entity: 'rib', id: ribId, source: 'ai',
+    }),
+  };
+}

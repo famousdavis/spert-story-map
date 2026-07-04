@@ -11,6 +11,7 @@ import {
   allocateRibInProduct,
   unassignRibInProduct,
   sizeRibInProduct,              // ← Phase 3
+  moveRibInProduct,              // ← Phase 7
 } from './productTransforms';
 import { appendChangeLogEntry } from './storage';
 import { isRibLocked } from './ribHelpers';
@@ -413,6 +414,56 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       // Base is `prev` (CLAUDE.md #51). For this inline-walk op,
       // prev._changeLog === next._changeLog throughout (the walk never appends to
       // _changeLog), so prev and next are equivalent — prev is used for consistency.
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'update', entity: 'rib', source: 'ai',
+        }),
+      };
+    }
+    // ── Phase 7 — move ──────────────────────────────────────────────────────
+    case 'move_rib': {
+      // Payload: { ribId: string, targetBackboneId?: string, targetReleaseId?: string }
+      // Global rib lookup inside moveRibInProduct; all CALL-*/BB-*/REL-* guards
+      // live there (per-leg independence, lock on release leg only, split/partial
+      // protection). Non-string target fields degrade to undefined rather than
+      // failing the call — a valid sibling leg still applies.
+      // @no-throw — safe in drain path.
+      if (typeof p.ribId !== 'string' || !p.ribId) return prev;
+      const targetBackboneId =
+        typeof p.targetBackboneId === 'string' && p.targetBackboneId
+          ? p.targetBackboneId : undefined;
+      const targetReleaseId =
+        typeof p.targetReleaseId === 'string' && p.targetReleaseId
+          ? p.targetReleaseId : undefined;
+      return moveRibInProduct(prev, p.ribId, { targetBackboneId, targetReleaseId });
+    }
+    case 'bulk_move_ribs': {
+      // Payload: { moves: Array<{ ribId, targetBackboneId?, targetReleaseId? }> }
+      // Read Mode required — AI reads ribIds/backboneIds/releaseIds/locked/partial
+      // from storymap_get_project. Delegation loop over moveRibInProduct; inherits
+      // every CALL-*/BB-*/REL-* guard per entry.
+      // Replay note: BB-2/REL-5 make an already-applied move ref-equal, so drain
+      // re-application is idempotent — but like bulk_update_ribs, a replay can
+      // overwrite a manual change made during the null window (replace semantics).
+      // @no-throw — safe in drain path.
+      if (!Array.isArray(p.moves) || p.moves.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.moves as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const e = raw as { ribId?: unknown; targetBackboneId?: unknown; targetReleaseId?: unknown };
+        if (typeof e.ribId !== 'string' || !e.ribId) continue;
+        const targetBackboneId =
+          typeof e.targetBackboneId === 'string' && e.targetBackboneId
+            ? e.targetBackboneId : undefined;
+        const targetReleaseId =
+          typeof e.targetReleaseId === 'string' && e.targetReleaseId
+            ? e.targetReleaseId : undefined;
+        next = moveRibInProduct(next, e.ribId, { targetBackboneId, targetReleaseId });
+      }
+      if (next === prev) return prev;
+      // Changelog collapse: N per-move entries → one summary entry.
+      // CRITICAL — base is `prev` not `next` (see CLAUDE.md #51).
       return {
         ...next,
         _changeLog: appendChangeLogEntry(prev, {
