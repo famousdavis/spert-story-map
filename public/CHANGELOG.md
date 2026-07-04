@@ -1,5 +1,34 @@
 # Changelog
 
+## Version 0.47.0 (2026-07-03)
+
+Move story map cards with AI — relocate rib items across backbones and releases in one call.
+
+**Connect AI: move rib items (browser-side capability)**
+
+- **New: move_rib operation** — moves a rib item to a different backbone and/or reassigns
+  its release allocation in a single operation. The two changes apply independently: an
+  invalid target for one never blocks the other, and the target backbone may belong to
+  any theme. Locked (in-progress) ribs can still change backbones, but their release
+  assignment is protected. A rib whose current allocation is a percentage split — or a
+  single allocation under 100% — keeps that allocation untouched; unassign it first to
+  replace it.
+- **New: bulk_move_ribs operation** — applies up to 500 moves in one call with per-entry
+  validation: an invalid entry is skipped without affecting the others, and the audit log
+  records one summary entry per batch.
+- **New: per-rib `partial` field in the AI project snapshot** — true when a rib has a
+  single release allocation under 100%, letting an AI client determine ahead of time
+  whether a move's release change will apply.
+- **Internal:** New pure transform `moveRibInProduct` in `productTransforms.ts` with
+  per-leg guard semantics; moved ribs append to the end of their destination backbone and
+  re-sort to the end of their release column on the Release Planning board. 49 new tests
+  (33 files, 885 tests), production build and lint clean, and no new type errors against
+  the strict-mode baseline.
+
+> Note: the storymap_move_rib and storymap_bulk_move_ribs tools become available once the
+> Connect AI service update is deployed. Until then, the existing unassign-then-allocate
+> workflow continues to work.
+
 ## Version 0.46.12 (2026-06-30)
 
 User interface — a small visual refinement to the Story Map backbone headers.

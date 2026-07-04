@@ -9,6 +9,7 @@ import {
   addNamedReleaseToProduct,
   allocateRibInProduct,
   sizeRibInProduct,
+  moveRibInProduct,
 } from '../lib/productTransforms';
 import { buildAiSnapshot } from '../lib/aiSnapshot';
 
@@ -1093,6 +1094,39 @@ describe('buildAiSnapshot', () => {
     expect(rt.sizeMapping).toEqual(snap.sizeMapping);
     expect(rt.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBe('L');
   });
+
+  // ── Phase 7 additions (D25: partial) ──────────────────────────────────────
+  it('per-rib partial is true for a single sub-100% allocation', () => {
+    const p = makeProductWithRelease();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [
+      { releaseId: 'rel-1', percentage: 60 },
+    ];
+    const rib = buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(rib.partial).toBe(true);
+    expect(rib.releaseIds).toEqual(['rel-1']); // indistinguishable from 100% without partial
+  });
+
+  it('per-rib partial is false for a single 100% allocation and for zero allocations', () => {
+    // Zero allocations (fresh fixture rib).
+    const unallocated = buildAiSnapshot(makeProductWithRelease());
+    expect(unallocated.themes[0]!.backboneItems[0]!.ribItems[0]!.partial).toBe(false);
+    // Single 100% allocation.
+    const p = applyAiOp(makeProductWithRelease(), 'allocate_rib',
+      { ribId: 'r1', releaseId: 'rel-1' });
+    expect(buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.partial).toBe(false);
+  });
+
+  it('per-rib partial is false for a split allocation (releaseIds carries that signal)', () => {
+    let p = makeProductWithRelease();
+    p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [
+      { releaseId: 'rel-1', percentage: 60 },
+      { releaseId: 'rel-2', percentage: 40 },
+    ];
+    const rib = buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(rib.partial).toBe(false);
+    expect(rib.releaseIds).toHaveLength(2); // the split signal
+  });
 });
 
 // ── bulk_create_releases ──────────────────────────────────────────────────
@@ -1886,6 +1920,465 @@ describe('applyDrainOps — Phase 6 (bulk_update_ribs)', () => {
         op: 'bulk_update_ribs',
         payload: { updates: [{ ribId: 'ghost', description: 'X' }] },
       },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(9);
+    expect(result).toBe(p);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 7 — move_rib / bulk_move_ribs
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Two themes / three backbones + two releases + five ribs in varying states
+ * for Phase 7 move tests.
+ *   t1: b1 (r1..r5), b2 (empty)
+ *   t2: b3 (empty)                              — cross-theme target (D22)
+ *   rel-1, rel-2
+ *   r1 — unlocked, unallocated                  (backbone / from-unassigned happy paths)
+ *   r2 — unlocked, single 100% → rel-1          (release reassignment happy path)
+ *   r3 — LOCKED,   single 100% → rel-1          (REL-3; backbone leg still applies)
+ *   r4 — unlocked, split 60/40 rel-1/rel-2      (REL-4 split)
+ *   r5 — unlocked, single 60% → rel-1           (REL-4 partial)
+ * Build order for r3: allocate FIRST (while unlocked), THEN inject progress —
+ * allocateRibInProduct Guard 3 blocks allocation on an already-locked rib.
+ */
+function makeProductForMove(): Product {
+  let p = makeProduct();
+  p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+  p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+  p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T1' });
+  p = applyAiOp(p, 'create_theme', { themeId: 't2', name: 'T2' });
+  p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B1' });
+  p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b2', name: 'B2' });
+  p = applyAiOp(p, 'create_backbone', { themeId: 't2', backboneId: 'b3', name: 'B3' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'Rib1' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r2', name: 'Rib2' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r3', name: 'Rib3' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r4', name: 'Rib4' });
+  p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r5', name: 'Rib5' });
+  p = allocateRibInProduct(p, 'r2', 'rel-1');
+  p = allocateRibInProduct(p, 'r3', 'rel-1');
+  // Lock r3 after allocation; inject r4's split and r5's partial directly.
+  return {
+    ...p,
+    themes: p.themes.map(t => ({
+      ...t,
+      backboneItems: t.backboneItems.map(b => ({
+        ...b,
+        ribItems: b.ribItems.map(r => {
+          if (r.id === 'r3') {
+            return {
+              ...r,
+              progressHistory: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 }],
+            };
+          }
+          if (r.id === 'r4') {
+            return {
+              ...r,
+              releaseAllocations: [
+                { releaseId: 'rel-1', percentage: 60 },
+                { releaseId: 'rel-2', percentage: 40 },
+              ],
+            };
+          }
+          if (r.id === 'r5') {
+            return { ...r, releaseAllocations: [{ releaseId: 'rel-1', percentage: 60 }] };
+          }
+          return r;
+        }),
+      })),
+    })),
+  };
+}
+
+/** Locate a rib anywhere in the product; returns its parent ids for placement asserts. */
+function locateRib(p: Product, ribId: string) {
+  for (const t of p.themes) {
+    for (const b of t.backboneItems) {
+      const rib = b.ribItems.find(r => r.id === ribId);
+      if (rib) return { themeId: t.id, backboneId: b.id, rib };
+    }
+  }
+  return undefined;
+}
+
+/** Seed a releaseCardOrder for the card-order strip tests (D12/D19/D24). */
+function withCardOrder(p: Product): Product {
+  return { ...p, releaseCardOrder: { 'rel-1': ['r2', 'r3', 'r5'], 'rel-2': ['r4'] } };
+}
+
+// ── moveRibInProduct — guards ─────────────────────────────────────────────
+describe('moveRibInProduct — guards (Phase 7)', () => {
+  it('[CALL-1] no targets provided is a ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r1', {})).toBe(p);
+  });
+  it('[CALL-2] unknown ribId is a ref-equal no-op even with valid targets', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'ghost',
+      { targetBackboneId: 'b2', targetReleaseId: 'rel-2' })).toBe(p);
+  });
+  it('[CALL-3] both legs skipped (BB-2 + REL-5) is a ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r2',
+      { targetBackboneId: 'b1', targetReleaseId: 'rel-1' })).toBe(p);
+  });
+  it('[BB-1] unknown targetBackboneId alone is a ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r1', { targetBackboneId: 'ghost' })).toBe(p);
+  });
+  it('[BB-2] targetBackboneId equal to the current backbone is a ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r1', { targetBackboneId: 'b1' })).toBe(p);
+  });
+  it('[REL-1] a backbone-only move leaves release allocations untouched', () => {
+    const p = makeProductForMove();
+    const next = moveRibInProduct(p, 'r2', { targetBackboneId: 'b2' });
+    expect(locateRib(next, 'r2')?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]);
+  });
+  it('[REL-2] unknown targetReleaseId alone is a ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r1', { targetReleaseId: 'ghost' })).toBe(p);
+  });
+  it('[REL-3] locked rib skips a release-only move (ref-equal)', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r3', { targetReleaseId: 'rel-2' })).toBe(p);
+  });
+  it('[REL-4] split allocation skips a release-only move (ref-equal)', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r4', { targetReleaseId: 'rel-2' })).toBe(p);
+  });
+  it('[REL-4] single sub-100% allocation to the SAME release skips (never bumped to 100)', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r5', { targetReleaseId: 'rel-1' })).toBe(p);
+  });
+  it('[REL-4] single sub-100% allocation to a DIFFERENT release skips (not flattened)', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r5', { targetReleaseId: 'rel-2' })).toBe(p);
+  });
+  it('[REL-5] sole 100% allocation already at target is a ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(moveRibInProduct(p, 'r2', { targetReleaseId: 'rel-1' })).toBe(p);
+  });
+  it('backbone-only happy path: rib leaves source, appends to target with order = length', () => {
+    const p = makeProductForMove();
+    const next = moveRibInProduct(p, 'r1', { targetBackboneId: 'b2' });
+    const b1 = next.themes[0]!.backboneItems[0]!;
+    const b2 = next.themes[0]!.backboneItems[1]!;
+    expect(b1.ribItems.some(r => r.id === 'r1')).toBe(false);
+    expect(b2.ribItems[b2.ribItems.length - 1]!.id).toBe('r1');
+    expect(b2.ribItems[b2.ribItems.length - 1]!.order).toBe(b2.ribItems.length);
+  });
+  it('release-only happy path from unassigned (D17): allocates 100% to target', () => {
+    const p = makeProductForMove();
+    const next = moveRibInProduct(p, 'r1', { targetReleaseId: 'rel-1' });
+    expect(locateRib(next, 'r1')?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]);
+    expect(locateRib(next, 'r1')?.backboneId).toBe('b1'); // backbone untouched
+  });
+  it('release-only happy path from 100%-elsewhere: replaces wholesale, drops memo (D18)', () => {
+    const p = makeProductForMove();
+    // Inject a memo on r2's existing allocation to prove the replace drops it.
+    p.themes[0]!.backboneItems[0]!.ribItems[1]!.releaseAllocations = [
+      { releaseId: 'rel-1', percentage: 100, memo: 'user note' },
+    ];
+    const next = moveRibInProduct(p, 'r2', { targetReleaseId: 'rel-2' });
+    expect(locateRib(next, 'r2')?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-2', percentage: 100 }]); // no memo property
+  });
+  it('both-legs happy path: backbone and release change in one call', () => {
+    const p = makeProductForMove();
+    const next = moveRibInProduct(p, 'r2',
+      { targetBackboneId: 'b2', targetReleaseId: 'rel-2' });
+    const loc = locateRib(next, 'r2');
+    expect(loc?.backboneId).toBe('b2');
+    expect(loc?.rib.releaseAllocations).toEqual([{ releaseId: 'rel-2', percentage: 100 }]);
+  });
+  it('per-field independence: invalid release + valid backbone → backbone still applies', () => {
+    const p = makeProductForMove();
+    const next = moveRibInProduct(p, 'r2',
+      { targetBackboneId: 'b2', targetReleaseId: 'ghost' });
+    const loc = locateRib(next, 'r2');
+    expect(loc?.backboneId).toBe('b2');
+    expect(loc?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]); // untouched
+  });
+  it('per-field independence: invalid backbone + valid release → release still applies', () => {
+    const p = makeProductForMove();
+    const next = moveRibInProduct(p, 'r2',
+      { targetBackboneId: 'ghost', targetReleaseId: 'rel-2' });
+    const loc = locateRib(next, 'r2');
+    expect(loc?.backboneId).toBe('b1'); // unmoved
+    expect(loc?.rib.releaseAllocations).toEqual([{ releaseId: 'rel-2', percentage: 100 }]);
+  });
+  it('locked rib + both targets: backbone applies, release skips, exactly one changelog entry', () => {
+    const p = makeProductForMove();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = moveRibInProduct(p, 'r3',
+      { targetBackboneId: 'b2', targetReleaseId: 'rel-2' });
+    const loc = locateRib(next, 'r3');
+    expect(loc?.backboneId).toBe('b2');                                       // D3: no lock on backbone leg
+    expect(loc?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]);                    // REL-3: release untouched
+    expect((next._changeLog ?? []).length).toBe(prevLen + 1);
+  });
+  it('cross-theme target backbone succeeds (D22)', () => {
+    const p = makeProductForMove();
+    const next = moveRibInProduct(p, 'r1', { targetBackboneId: 'b3' });
+    const loc = locateRib(next, 'r1');
+    expect(loc?.themeId).toBe('t2');
+    expect(loc?.backboneId).toBe('b3');
+    // Gone from the source backbone in the source theme.
+    expect(next.themes[0]!.backboneItems[0]!.ribItems.some(r => r.id === 'r1')).toBe(false);
+  });
+});
+
+// ── moveRibInProduct — card order (D12/D19/D24) ───────────────────────────
+describe('moveRibInProduct — card order (Phase 7)', () => {
+  it('backbone-only move strips the rib from all releaseCardOrder buckets', () => {
+    const p = withCardOrder(makeProductForMove());
+    const next = moveRibInProduct(p, 'r2', { targetBackboneId: 'b2' });
+    expect(next.releaseCardOrder!['rel-1']).toEqual(['r3', 'r5']);
+    expect(next.releaseCardOrder!['rel-2']).toEqual(['r4']);
+  });
+  it('[D24] backbone-only move strips the rib from its UNCHANGED release bucket (intentional)', () => {
+    // r2's release membership does not change, yet it is stripped from rel-1's
+    // bucket — demoting it to the bottom of its Release Planning column. This is
+    // the accepted cross-view trade-off documented in CLAUDE.md #57, not a bug.
+    const p = withCardOrder(makeProductForMove());
+    const next = moveRibInProduct(p, 'r2', { targetBackboneId: 'b2' });
+    expect(locateRib(next, 'r2')?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-1', percentage: 100 }]); // membership unchanged
+    expect(next.releaseCardOrder!['rel-1']).not.toContain('r2'); // bucket stripped anyway
+  });
+  it('release-only move strips the rib from releaseCardOrder', () => {
+    const p = withCardOrder(makeProductForMove());
+    const next = moveRibInProduct(p, 'r2', { targetReleaseId: 'rel-2' });
+    expect(next.releaseCardOrder!['rel-1']).toEqual(['r3', 'r5']);
+  });
+  it('both-legs move: rib absent from every bucket, sibling order preserved', () => {
+    const p = withCardOrder(makeProductForMove());
+    const next = moveRibInProduct(p, 'r2',
+      { targetBackboneId: 'b2', targetReleaseId: 'rel-2' });
+    for (const ids of Object.values(next.releaseCardOrder!)) {
+      expect(ids).not.toContain('r2');
+    }
+    expect(next.releaseCardOrder!['rel-1']).toEqual(['r3', 'r5']); // relative order kept
+    expect(next.releaseCardOrder!['rel-2']).toEqual(['r4']);
+  });
+  it('[CALL-3] no-op leaves releaseCardOrder reference-unchanged', () => {
+    const p = withCardOrder(makeProductForMove());
+    const next = moveRibInProduct(p, 'r2',
+      { targetBackboneId: 'b1', targetReleaseId: 'rel-1' });
+    expect(next).toBe(p);
+    expect(next.releaseCardOrder).toBe(p.releaseCardOrder);
+  });
+});
+
+// ── moveRibInProduct — changelog shape ────────────────────────────────────
+describe('moveRibInProduct — changelog shape (Phase 7)', () => {
+  it('a successful move appends exactly one entry with the rib id', () => {
+    const p = makeProductForMove();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = moveRibInProduct(p, 'r1', { targetBackboneId: 'b2' });
+    const log = next._changeLog ?? [];
+    expect(log.length).toBe(prevLen + 1);
+    const last = log[log.length - 1]!;
+    expect(last.op).toBe('update');
+    expect(last.entity).toBe('rib');
+    expect(last.id).toBe('r1');
+    expect(last.source).toBe('ai');
+  });
+  it('an all-skip call appends zero entries and returns prev ref-equal', () => {
+    const p = makeProductForMove();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = moveRibInProduct(p, 'r5', { targetReleaseId: 'rel-2' }); // REL-4 skip
+    expect(next).toBe(p);
+    expect((next._changeLog ?? []).length).toBe(prevLen);
+  });
+});
+
+// ── applyAiOp — move_rib ──────────────────────────────────────────────────
+describe('applyAiOp — move_rib', () => {
+  it('no-op on missing, empty, or non-string ribId', () => {
+    const p = makeProductForMove();
+    expect(applyAiOp(p, 'move_rib', { targetBackboneId: 'b2' })).toBe(p);
+    expect(applyAiOp(p, 'move_rib', { ribId: '', targetBackboneId: 'b2' })).toBe(p);
+    expect(applyAiOp(p, 'move_rib', { ribId: 42, targetBackboneId: 'b2' })).toBe(p);
+  });
+  it('delegates to the transform: backbone move applies', () => {
+    const p = makeProductForMove();
+    const next = applyAiOp(p, 'move_rib', { ribId: 'r1', targetBackboneId: 'b2' });
+    expect(locateRib(next, 'r1')?.backboneId).toBe('b2');
+  });
+  it('non-string targetBackboneId degrades to undefined; valid release leg still applies', () => {
+    const p = makeProductForMove();
+    const next = applyAiOp(p, 'move_rib',
+      { ribId: 'r1', targetBackboneId: 42, targetReleaseId: 'rel-1' });
+    const loc = locateRib(next, 'r1');
+    expect(loc?.backboneId).toBe('b1'); // unmoved
+    expect(loc?.rib.releaseAllocations).toEqual([{ releaseId: 'rel-1', percentage: 100 }]);
+  });
+  it('both targets non-string degrade to undefined → CALL-1 ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(applyAiOp(p, 'move_rib',
+      { ribId: 'r1', targetBackboneId: 42, targetReleaseId: null })).toBe(p);
+  });
+  it('ghost ribId passes through as a ref-equal no-op', () => {
+    const p = makeProductForMove();
+    expect(applyAiOp(p, 'move_rib', { ribId: 'ghost', targetBackboneId: 'b2' })).toBe(p);
+  });
+  it('changelog entry via the op carries the rib id and source ai', () => {
+    const p = makeProductForMove();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'move_rib', { ribId: 'r1', targetBackboneId: 'b2' });
+    const log = next._changeLog ?? [];
+    expect(log.length).toBe(prevLen + 1);
+    expect(log[log.length - 1]).toMatchObject({
+      op: 'update', entity: 'rib', id: 'r1', source: 'ai',
+    });
+  });
+});
+
+// ── applyAiOp — bulk_move_ribs ────────────────────────────────────────────
+describe('applyAiOp — bulk_move_ribs', () => {
+  it('is ref-equal no-op for an empty moves array', () => {
+    const p = makeProductForMove();
+    expect(applyAiOp(p, 'bulk_move_ribs', { moves: [] })).toBe(p);
+  });
+  it('is ref-equal no-op for missing or non-array moves', () => {
+    const p = makeProductForMove();
+    expect(applyAiOp(p, 'bulk_move_ribs', {})).toBe(p);
+    expect(applyAiOp(p, 'bulk_move_ribs', { moves: 'r1' })).toBe(p);
+  });
+  it('skips malformed entries (null / string / missing ribId) and applies valid siblings', () => {
+    const p = makeProductForMove();
+    const next = applyAiOp(p, 'bulk_move_ribs', {
+      moves: [null, 'junk', { targetBackboneId: 'b2' }, { ribId: 'r1', targetBackboneId: 'b2' }],
+    });
+    expect(locateRib(next, 'r1')?.backboneId).toBe('b2');
+  });
+  it('multi-entry happy path: two moves in one call', () => {
+    const p = makeProductForMove();
+    const next = applyAiOp(p, 'bulk_move_ribs', {
+      moves: [
+        { ribId: 'r1', targetBackboneId: 'b2' },
+        { ribId: 'r2', targetReleaseId: 'rel-2' },
+      ],
+    });
+    expect(locateRib(next, 'r1')?.backboneId).toBe('b2');
+    expect(locateRib(next, 'r2')?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-2', percentage: 100 }]);
+  });
+  it('per-entry skip does not affect siblings (ghost ribId + valid entry)', () => {
+    const p = makeProductForMove();
+    const next = applyAiOp(p, 'bulk_move_ribs', {
+      moves: [
+        { ribId: 'ghost', targetBackboneId: 'b2' },
+        { ribId: 'r1', targetBackboneId: 'b2' },
+      ],
+    });
+    expect(locateRib(next, 'r1')?.backboneId).toBe('b2');
+  });
+  it('entry with invalid targets is skipped silently; sibling applies', () => {
+    const p = makeProductForMove();
+    const next = applyAiOp(p, 'bulk_move_ribs', {
+      moves: [
+        { ribId: 'r1', targetBackboneId: 99 },       // degrades to no targets → CALL-1 skip
+        { ribId: 'r2', targetReleaseId: 'rel-2' },
+      ],
+    });
+    expect(locateRib(next, 'r1')?.backboneId).toBe('b1'); // unmoved
+    expect(locateRib(next, 'r2')?.rib.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-2', percentage: 100 }]);
+  });
+  it('all-skip batch is ref-equal (mixed skip reasons, no changelog entry)', () => {
+    const p = makeProductForMove();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_move_ribs', {
+      moves: [
+        { ribId: 'ghost', targetBackboneId: 'b2' },   // CALL-2
+        { ribId: 'r2', targetBackboneId: 'b1' },      // BB-2
+        { ribId: 'r4', targetReleaseId: 'rel-2' },    // REL-4 split
+        { ribId: 'r3', targetReleaseId: 'rel-2' },    // REL-3 locked
+      ],
+    });
+    expect(next).toBe(p);
+    expect((next._changeLog ?? []).length).toBe(prevLen);
+  });
+  it('collapses N moves to exactly one summary changelog entry (no id, prev-base)', () => {
+    const p = makeProductForMove();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_move_ribs', {
+      moves: [
+        { ribId: 'r1', targetBackboneId: 'b2' },
+        { ribId: 'r2', targetReleaseId: 'rel-2' },
+      ],
+    });
+    const log = next._changeLog ?? [];
+    expect(log.length).toBe(prevLen + 1); // prev-base collapse, not prevLen + 2
+    const last = log[log.length - 1]!;
+    expect(last.op).toBe('update');
+    expect(last.entity).toBe('rib');
+    expect(last.source).toBe('ai');
+    expect(last.id).toBeUndefined();
+  });
+  it('re-running the same bulk move is ref-equal (BB-2/REL-5 idempotence)', () => {
+    const p = makeProductForMove();
+    const moves = [
+      { ribId: 'r1', targetBackboneId: 'b2' },
+      { ribId: 'r2', targetReleaseId: 'rel-2' },
+    ];
+    const once = applyAiOp(p, 'bulk_move_ribs', { moves });
+    expect(once).not.toBe(p);
+    expect(applyAiOp(once, 'bulk_move_ribs', { moves })).toBe(once);
+  });
+});
+
+// ── Drain / no-throw — Phase 7 (move_rib / bulk_move_ribs) ────────────────
+describe('applyDrainOps — Phase 7 (move_rib / bulk_move_ribs)', () => {
+  it('computeSafePrefix includes both move ops (no-throw on ghost payloads)', () => {
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'move_rib', payload: { ribId: 'ghost', targetBackboneId: 'x' } },
+      { seq: 2, op: 'bulk_move_ribs', payload: { moves: [{ ribId: 'ghost' }] } },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(makeProduct(), ops);
+    expect(safeOps).toHaveLength(2);
+    expect(nextSeq).toBe(2);
+  });
+  it('move_rib in drain applies and advances cursor', () => {
+    const p = makeProductForMove();
+    const ops: AiOpDoc[] = [
+      { seq: 5, op: 'move_rib', payload: { ribId: 'r1', targetBackboneId: 'b2' } },
+    ];
+    const { product: result, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(5);
+    expect(locateRib(result, 'r1')?.backboneId).toBe('b2');
+  });
+  it('replaying an already-applied move drain is ref-equal with no duplicate entry', () => {
+    // BB-2/REL-5 make "already there" a ref-equal no-op — the favorable
+    // difference from bulk_update_ribs' replace-semantics replay profile.
+    const p = makeProductForMove();
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'move_rib',
+        payload: { ribId: 'r1', targetBackboneId: 'b2', targetReleaseId: 'rel-1' } },
+    ];
+    const { product: once } = applyDrainOps(p, ops);
+    expect(locateRib(once, 'r1')?.backboneId).toBe('b2');
+    const onceLen = (once._changeLog ?? []).length;
+    const { product: twice } = applyDrainOps(once, ops);
+    expect(twice).toBe(once);
+    expect((twice._changeLog ?? []).length).toBe(onceLen);
+  });
+  it('all-ghost bulk_move_ribs in drain: cursor advances, product ref-equal', () => {
+    const p = makeProductForMove();
+    const ops: AiOpDoc[] = [
+      { seq: 9, op: 'bulk_move_ribs',
+        payload: { moves: [{ ribId: 'ghost', targetBackboneId: 'b2' }] } },
     ];
     const { product: result, nextSeq } = applyDrainOps(p, ops);
     expect(nextSeq).toBe(9);
