@@ -468,6 +468,7 @@ export function useAiConnectivity(
             createdAt: serverTimestamp(), lastActiveAt: serverTimestamp(), expiresAt: exp,
             browserConnectedAt: serverTimestamp(), openProductId: product.id,
             consentWrite: true, consentRead, lastSeq: 0, appVersion: APP_VERSION,
+            appId: 'storymap',
             // aiLastSeenAt intentionally OMITTED: MCP-server-owned. Including
             // it fails the Firestore create rule's hasOnly check.
           });
