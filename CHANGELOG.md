@@ -1,5 +1,27 @@
 # Changelog
 
+## Version 0.48.0 (2026-07-16)
+
+User interface — the Story Map rib cards get a cleaner, roomier layout.
+
+**Rib card redesign: full-width names + a single actions menu**
+
+- **Changed: rib item names now use the card's full width.** Previously each card reserved a
+  fixed right-hand column for the Core/Non-Core label and a cluster of hover-only icons, which
+  narrowed the name on every line it wrapped to — even while those icons were invisible. The
+  card is now a single vertical stack: the name owns its own full-width row (wrapping to two
+  lines), with a compact footer row beneath it holding the size, points, allocation percentage,
+  and Core/Non-Core label.
+- **Changed: color, clone, and delete moved into a "⋮" actions menu.** The three separate
+  hover-only icons are replaced by a single kebab (⋮) menu offering Color…, Clone rib item, and
+  Delete… — the same pattern already used on the Sizing tab. The menu stays revealed on hover
+  and on keyboard focus, and remains visible while its color picker is open. Deleting still asks
+  for confirmation. Dragging, double-click-to-rename, and click-to-open-details are unchanged.
+- **Internal:** `RibCell.tsx` restructured from a two-column grid to a flex stack reusing the
+  shared `KebabMenu` component; the Story Map canvas's pan-exclusion selector now also ignores
+  the menu portal (`[role="menu"]`). The full test suite (33 files, 886 tests) and the
+  production build pass, and linting is clean with zero warnings.
+
 ## Version 0.47.1 (2026-07-03)
 
 Documentation — the Connect AI prompt now teaches assistants the new move capability. No data-model or behavior changes.
