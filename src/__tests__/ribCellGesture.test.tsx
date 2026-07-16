@@ -58,9 +58,9 @@ describe('RibCell gesture guards', () => {
     expect(onDragStart).toHaveBeenCalledTimes(1);
   });
 
-  it('does NOT arm a drag when pointerdown lands on the delete button', () => {
+  it('does NOT arm a drag when pointerdown lands on the kebab trigger', () => {
     const { onDragStart } = renderCell();
-    fireEvent.pointerDown(screen.getByTitle('Delete'));
+    fireEvent.pointerDown(screen.getByLabelText('Actions for My Rib'));
     expect(onDragStart).not.toHaveBeenCalled();
   });
 
@@ -70,9 +70,17 @@ describe('RibCell gesture guards', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('does NOT open the detail panel when a control button is clicked', () => {
+  it('does NOT open the detail panel when the kebab trigger is clicked, and the menu actually opens', () => {
+    const { onClick } = renderCell();
+    fireEvent.click(screen.getByLabelText('Actions for My Rib'));
+    expect(onClick).not.toHaveBeenCalled();
+    expect(screen.getByRole('menu')).toBeTruthy();
+  });
+
+  it('deletes via the kebab menu without opening the detail panel', () => {
     const { onClick, onDelete } = renderCell();
-    fireEvent.click(screen.getByTitle('Delete'));
+    fireEvent.click(screen.getByLabelText('Actions for My Rib'));
+    fireEvent.click(screen.getByText('Delete…'));
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onClick).not.toHaveBeenCalled();
   });

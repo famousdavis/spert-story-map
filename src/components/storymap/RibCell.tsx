@@ -7,9 +7,9 @@ import { SIZE_COLORS } from '../ui/SizePicker';
 import { useTooltip } from '../ui/Tooltip';
 import useInlineEdit from './useInlineEdit';
 import RibCardColorPicker from './RibCardColorPicker';
+import KebabMenu from '../ui/KebabMenu';
 import {
   RIB_CARD_COLOR_BG,
-  RIB_CARD_COLOR_SWATCH,
   isRibCardColorKey,
   type RibCardColorKey,
 } from '../../lib/ribCardColors';
@@ -59,10 +59,21 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
   const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(cell.name, RIB_NAME_TOOLTIP_DELAY);
 
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Suppress the hover tooltip while the kebab menu or color picker is open.
+  const handleMouseEnter = () => { if (!menuOpen && !pickerAnchor) onMouseEnter(); };
+
+  // When the kebab menu opens, also dismiss any active tooltip so it doesn't stick
+  // through the menu flow.
+  const handleMenuOpenChange = (open: boolean) => {
+    setMenuOpen(open);
+    if (open) onMouseLeave();
+  };
 
   const handleCardPointerDown = (e: React.PointerEvent) => {
     // Whole card is the drag surface (the grip is gone). Bail on interactive children
-    // (swatch/clone/delete buttons, inline-edit input) and while renaming inline.
+    // (the kebab trigger, its portal menu, and the inline-edit input) and while renaming inline.
     if (editing) return;
     if (isInteractiveChild(e.target as HTMLElement)) return;
     e.stopPropagation();
@@ -70,15 +81,15 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
     if (onDragStart) onDragStart(e, cell);
   };
 
-  const handleSwatchClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Dismiss any visible name-tooltip before opening the picker. The picker portal
-    // overlays part of the card, so the cursor never physically leaves the card's
-    // bounding box during picker interaction — mouseLeave never fires and the
-    // tooltip would otherwise stay stuck on top of the picker / for the rest of the
-    // session as the user moves between cards.
+  // Anchor the color picker off the card's own bounding rect — same convention
+  // SizingRibCell already uses — since a kebab menu item's onClick has no mouse
+  // event to read click coordinates from (unlike the old swatch button).
+  const handleColorMenuClick = () => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
     onMouseLeave();
-    setPickerAnchor({ x: e.clientX, y: e.clientY });
+    setPickerAnchor({ x: r.right - 156, y: r.bottom + 4 });
   };
 
   const baseBg = isDragging
@@ -93,10 +104,18 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
           ? `border-gray-200 ${RIB_CARD_COLOR_BG[cardColorKey]} hover:border-blue-400 dark:border-gray-700 dark:hover:border-blue-500`
           : 'border-gray-200 bg-white hover:border-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500';
 
+  // Covers both portals this card can open: the kebab's own dropdown, and the color
+  // picker a kebab item spawns. Either one being open must keep the trigger visible,
+  // because the pointer has to leave the card's hover box to reach either portal
+  // (both render outside the card's DOM subtree via createPortal), which would
+  // otherwise let group-hover revert the trigger to opacity-0 while its own popover
+  // is still on screen.
+  const kebabVisible = menuOpen || !!pickerAnchor;
+
   return (
     <div
       ref={triggerRef}
-      onMouseEnter={onMouseEnter}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={onMouseLeave}
       className={`absolute rounded border text-left select-none transition-colors ${baseBg} group cursor-grab active:cursor-grabbing px-2 py-1.5 overflow-hidden`}
       style={{
@@ -116,85 +135,58 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
       data-theme-id={cell.themeId}
       data-release-id={cell.releaseId || ''}
     >
-      <div className="grid grid-cols-[1fr_auto] gap-x-1 h-full">
-        {/* Main column: name (top) + points/percentage (bottom) */}
-        <div className="flex flex-col justify-between min-w-0 gap-0.5">
-          <div className="flex items-start gap-1 min-w-0">
-            {editing ? (
-              <input
-                ref={inputRef}
-                name="ribName"
-                type="text"
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onBlur={commit}
-                onKeyDown={handleKeyDown}
-                onClick={e => e.stopPropagation()}
-                className="text-xs leading-tight flex-1 font-medium bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 rounded px-1 py-0 outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-500 text-gray-900 dark:text-gray-100 min-w-0"
-              />
-            ) : (
-              <span
-                className="text-xs text-gray-800 dark:text-gray-200 leading-tight line-clamp-2 flex-1 min-w-0 font-medium"
-                onDoubleClick={startEditing}
-              >
-                {cell.name}
-              </span>
-            )}
-            {cell.size && (
-              <span className={`text-[10px] font-medium px-1 py-0.5 rounded flex-shrink-0 leading-none ${sizeColor}`}>
-                {cell.size}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px]">
-            {cell.points > 0 && <span className="text-gray-400 dark:text-gray-500">{cell.points}pts</span>}
-            {cell.isPartial && <span className="text-blue-600 dark:text-blue-400 font-medium">{cell.allocation.percentage}%</span>}
-            {allocWarning && <span className="text-amber-600 dark:text-amber-400 font-medium">{cell.allocTotal}%</span>}
-          </div>
-        </div>
+      <div className="flex flex-col justify-between gap-0.5 h-full">
+        {editing ? (
+          <input
+            ref={inputRef}
+            name="ribName"
+            type="text"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            onClick={e => e.stopPropagation()}
+            className="text-xs leading-tight font-medium bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 rounded px-1 py-0 outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-500 text-gray-900 dark:text-gray-100 w-full"
+          />
+        ) : (
+          <span
+            className="text-xs text-gray-800 dark:text-gray-200 leading-tight line-clamp-2 font-medium"
+            onDoubleClick={startEditing}
+          >
+            {cell.name}
+          </span>
+        )}
 
-        {/* Right rail: color swatch + clone + delete (top) + Core/Non-Core (bottom) */}
-        <div className="flex flex-col justify-between items-end flex-shrink-0 gap-0.5">
-          <div className="flex items-center gap-1 -mr-0.5">
-            {onSetCardColor && (
-              <button
-                type="button"
-                className={`w-3 h-3 rounded-full border opacity-0 group-hover:opacity-100 transition-opacity ${
-                  cardColorKey
-                    ? `${RIB_CARD_COLOR_SWATCH[cardColorKey]} border-gray-400 dark:border-gray-500`
-                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-gray-500 dark:hover:border-gray-300'
-                }`}
-                onClick={handleSwatchClick}
-                title="Card color"
-                aria-label="Card color"
-              />
-            )}
-            {onClone && (
-              <button
-                className="leading-none text-blue-300 hover:text-blue-600 dark:text-blue-400/50 dark:hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => { e.stopPropagation(); onClone(cell.themeId, cell.backboneId, cell.id); }}
-                title="Clone rib item"
-                aria-label="Clone rib item"
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              </button>
-            )}
-            {onDelete && (
-              <button
-                className="text-[11px] leading-none text-red-300 hover:text-red-600 dark:text-red-400/50 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => { e.stopPropagation(); onDelete(cell.themeId, cell.backboneId, cell.id); }}
-                title="Delete"
-              >
-                ×
-              </button>
-            )}
-          </div>
-          <span className={`text-[10px] leading-none ${cell.category === 'core' ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
+        {/* Footer: size + points/percentage + Core/Non-Core + actions, all in one row.
+            The name above now owns the full card width on both wrapped lines. Core/Non-Core
+            is the one flexible/truncating item (flex-1 min-w-0 truncate); everything else is
+            flex-shrink-0. See "Design decisions ratified in v2" for the worst-case width math
+            and why the kebab itself stays safe under realistic data. */}
+        <div className="flex items-center gap-1.5 text-[10px]">
+          {cell.size && (
+            <span className={`text-[10px] font-medium px-1 py-0.5 rounded flex-shrink-0 leading-none ${sizeColor}`}>
+              {cell.size}
+            </span>
+          )}
+          {cell.points > 0 && <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">{cell.points}pts</span>}
+          {cell.isPartial && <span className="text-blue-600 dark:text-blue-400 font-medium flex-shrink-0">{cell.allocation.percentage}%</span>}
+          {allocWarning && <span className="text-amber-600 dark:text-amber-400 font-medium flex-shrink-0">{cell.allocTotal}%</span>}
+          <span className={`flex-1 min-w-0 truncate text-right leading-none ${cell.category === 'core' ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
             {cell.category === 'core' ? 'Core' : 'Non-Core'}
           </span>
+          {(onSetCardColor || onClone || onDelete) && (
+            <div className={`flex-shrink-0 -mr-1 transition-opacity ${kebabVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
+              <KebabMenu
+                ariaLabel={`Actions for ${cell.name}`}
+                onOpenChange={handleMenuOpenChange}
+                items={[
+                  ...(onSetCardColor ? [{ label: 'Color…', onClick: handleColorMenuClick }] : []),
+                  ...(onClone ? [{ label: 'Clone rib item', onClick: () => onClone(cell.themeId, cell.backboneId, cell.id) }] : []),
+                  ...(onDelete ? [{ label: 'Delete…', onClick: () => onDelete(cell.themeId, cell.backboneId, cell.id), danger: true }] : []),
+                ]}
+              />
+            </div>
+          )}
         </div>
       </div>
       {!pickerAnchor && tooltipEl}
