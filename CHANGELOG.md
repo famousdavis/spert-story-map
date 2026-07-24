@@ -1,5 +1,22 @@
 # Changelog
 
+## Version 0.49.1 (2026-07-23)
+
+Documentation — the Connect AI prompt now teaches assistants the non-destructive notes-append tools. No data-model or behavior changes.
+
+**Connect AI: prompt guidance for appending rib notes**
+
+- **Improved: Connect AI prompt** — the copyable AI instructions now route "add a note"
+  requests through storymap_append_rib_note / storymap_bulk_append_rib_notes (which preserve
+  existing notes) and reserve the overwriting update tools (storymap_update_rib /
+  storymap_bulk_update_ribs) for explicit replace/rewrite/clear requests. Adds an
+  APPEND-vs-REPLACE decision guide with verb cues, the read-mode framing for the append
+  tools, the 2000-character-per-rib and 100-per-call caps, and honest not-idempotent re-run
+  semantics — and corrects the prior guidance that claimed storymap_get_project could not
+  return notes (it now does, when notesIncluded is true).
+- **Internal:** Prose-only change to `copyPrompt.ts`. The full test suite (33 files, 919
+  tests) and the production build pass unchanged, and linting is clean with zero warnings.
+
 ## Version 0.49.0 (2026-07-23)
 
 Add to rib notes with AI — append text without overwriting what you already wrote, and let the AI read notes to verify its work.
