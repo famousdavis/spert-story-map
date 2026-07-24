@@ -24,11 +24,24 @@ import { isRibLocked } from './ribHelpers';
  *     releaseIds.length > 1). Lets the AI derive move_rib's release-leg
  *     eligibility pre-call: the leg skips if locked, releaseIds.length > 1,
  *     or partial.
+ *
+ * Phase 8 additions:
+ *   - ribItems: include notes (string) — omitted when notesIncluded is false
+ *   - top-level notesIncluded (boolean) — always present in v0.49.0+; positive
+ *     marker so a snapshot's absence of notes is never load-bearing (D10)
+ *   - selectSnapshotForWrite: bounded variant selection (full/lean/skip, D8)
  */
 export interface AiSnapshot {
   id: string;
   name: string;
   description: string;
+  /**
+   * ← Phase 8 (D10). ALWAYS emitted by v0.49.0+. true -> every rib carries an
+   * authoritative `notes` string. false -> notes omitted for size; no rib has a
+   * `notes` field. ABSENT ENTIRELY -> written by a pre-0.49.0 bundle; make no
+   * assumption about notes. Never infer "included" from absence.
+   */
+  notesIncluded: boolean;
   sizeMapping: Array<{ label: string; points: number }>;  // ← Phase 3
   releases: Array<{ id: string; name: string; order: number }>;
   themes: Array<{
@@ -42,6 +55,7 @@ export interface AiSnapshot {
         name: string;
         category: string;
         description: string;
+        notes?: string;              // ← Phase 8 (present iff notesIncluded === true)
         size: string | null;         // ← Phase 3 (valid-label-or-null; '' and orphans → null)
         releaseIds: string[];
         locked: boolean;
@@ -65,15 +79,26 @@ export interface AiSnapshot {
  *             releaseIds this makes move_rib's release-leg eligibility fully
  *             derivable from the snapshot.
  *
+ * Phase 8 additions:
+ *   - ribItems: include notes (string) — omitted when notesIncluded is false
+ *   - top-level notesIncluded (boolean) — always present in v0.49.0+; positive
+ *     marker so a snapshot's absence of notes is never load-bearing (D10)
+ *   - selectSnapshotForWrite: bounded variant selection (full/lean/skip, D8)
+ *
  * @pure — no side effects; testable without Firebase or React.
  */
-export function buildAiSnapshot(p: Product): AiSnapshot {
+export function buildAiSnapshot(
+  p: Product,
+  opts?: { includeNotes?: boolean },
+): AiSnapshot {
+  const includeNotes = opts?.includeNotes ?? true;
   // Valid-label set used for per-rib size normalization below.
   const sizeLabels = new Set((p.sizeMapping ?? []).map(m => m.label));
   return {
     id: p.id,
     name: p.name,
     description: p.description,
+    notesIncluded: includeNotes,                                     // ← Phase 8 (always present)
     sizeMapping: (p.sizeMapping ?? [])                               // ← Phase 3
       .slice()
       .sort((a, b) => a.points - b.points)
@@ -96,6 +121,7 @@ export function buildAiSnapshot(p: Product): AiSnapshot {
             name: r.name,
             category: r.category,
             description: r.description,
+            ...(includeNotes && { notes: r.notes ?? '' }),   // ← Phase 8: normalize undefined -> ''
             size: (r.size && sizeLabels.has(r.size)) ? r.size : null,  // ← Phase 3
             releaseIds: allocations.map(a => a.releaseId),
             locked: isRibLocked(r),
@@ -105,4 +131,24 @@ export function buildAiSnapshot(p: Product): AiSnapshot {
       })),
     })),
   };
+}
+
+/**
+ * Choose the largest snapshot variant that fits `limit` bytes (D8). Full (with
+ * notes) if it fits; else lean (no notes, notesIncluded:false); else null
+ * (caller skips the write). `limit` is a parameter so unit tests force each rung
+ * with tiny limits instead of multi-hundred-KB fixtures.
+ * @pure
+ */
+export function selectSnapshotForWrite(
+  p: Product,
+  limit: number,
+): { snapshot: AiSnapshot | null; degraded: boolean } {
+  const byteLen = (v: unknown) =>
+    new TextEncoder().encode(JSON.stringify(v)).length;
+  const full = buildAiSnapshot(p, { includeNotes: true });
+  if (byteLen(full) <= limit) return { snapshot: full, degraded: false };
+  const lean = buildAiSnapshot(p, { includeNotes: false });
+  if (byteLen(lean) <= limit) return { snapshot: lean, degraded: true };
+  return { snapshot: null, degraded: true };
 }

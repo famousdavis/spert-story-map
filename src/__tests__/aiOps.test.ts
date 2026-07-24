@@ -10,8 +10,9 @@ import {
   allocateRibInProduct,
   sizeRibInProduct,
   moveRibInProduct,
+  appendRibNoteInProduct,
 } from '../lib/productTransforms';
-import { buildAiSnapshot } from '../lib/aiSnapshot';
+import { buildAiSnapshot, selectSnapshotForWrite } from '../lib/aiSnapshot';
 
 function makeProduct(): Product {
   return {
@@ -2383,5 +2384,300 @@ describe('applyDrainOps — Phase 7 (move_rib / bulk_move_ribs)', () => {
     const { product: result, nextSeq } = applyDrainOps(p, ops);
     expect(nextSeq).toBe(9);
     expect(result).toBe(p);
+  });
+});
+
+// ── Phase 8: appendRibNoteInProduct (transform) ──────────────────────────────
+describe('appendRibNoteInProduct', () => {
+  // makeProductWithContent has t1/b1/r1 (notes: ''). Seed r1's notes; pass
+  // undefined to model an imported/hand-edited rib with no notes field at all.
+  function withRibNotes(notes: string | undefined): Product {
+    const p = makeProductWithContent();
+    const rib = p.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    if (notes === undefined) delete rib.notes;   // absent — reads as undefined
+    else rib.notes = notes;
+    return p;
+  }
+  const ribNotesOf = (p: Product) => p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes;
+
+  it('appends to a rib with existing notes, blank-line separated', () => {
+    const p = withRibNotes('First line.');
+    const next = appendRibNoteInProduct(p, 'r1', 'Second line.');
+    expect(ribNotesOf(next)).toBe('First line.\n\nSecond line.');
+    // +1: the single-entity changelog entry carries id: ribId
+    const log = next._changeLog ?? [];
+    const last = log[log.length - 1];
+    expect(last?.op).toBe('update');
+    expect(last?.entity).toBe('rib');
+    expect(last?.id).toBe('r1');
+    expect(last?.source).toBe('ai');
+  });
+
+  it('sets notes directly when existing notes are "" (no leading separator)', () => {
+    const next = appendRibNoteInProduct(withRibNotes(''), 'r1', 'Only line.');
+    expect(ribNotesOf(next)).toBe('Only line.');
+  });
+
+  it('sets notes directly when notes is undefined (imported/hand-edited)', () => {
+    const next = appendRibNoteInProduct(withRibNotes(undefined), 'r1', 'Only line.');
+    expect(ribNotesOf(next)).toBe('Only line.');
+  });
+
+  it('strips trailing whitespace from existing notes before joining', () => {
+    const next = appendRibNoteInProduct(withRibNotes('First line.   \n\t '), 'r1', 'Second line.');
+    expect(ribNotesOf(next)).toBe('First line.\n\nSecond line.');
+  });
+
+  it('trims the incoming text', () => {
+    const next = appendRibNoteInProduct(withRibNotes('First.'), 'r1', '   Second.   ');
+    expect(ribNotesOf(next)).toBe('First.\n\nSecond.');
+  });
+
+  it('APP-1: whitespace-only text is ref-equal', () => {
+    const p = withRibNotes('First.');
+    expect(appendRibNoteInProduct(p, 'r1', '   \n\t ')).toBe(p);
+  });
+
+  it('APP-2: unknown ribId is ref-equal', () => {
+    const p = withRibNotes('First.');
+    expect(appendRibNoteInProduct(p, 'ghost', 'Second.')).toBe(p);
+  });
+
+  it('APP-3 over: result > NOTES_MAX is ref-equal, rib notes byte-identical', () => {
+    const base = 'x'.repeat(1990);
+    const p = withRibNotes(base);
+    const next = appendRibNoteInProduct(p, 'r1', 'y'.repeat(20)); // 1990 + 2 + 20 = 2012 > 2000
+    expect(next).toBe(p);
+    expect(ribNotesOf(next)).toBe(base);
+  });
+
+  it('APP-3 boundary: result === NOTES_MAX succeeds (empty base, 2000-char addition)', () => {
+    const addition = 'z'.repeat(2000);
+    const next = appendRibNoteInProduct(withRibNotes(''), 'r1', addition);
+    expect(next).not.toBe(withRibNotes(''));
+    expect(ribNotesOf(next)).toBe(addition);
+    expect(ribNotesOf(next)!.length).toBe(2000);
+  });
+
+  it('APP-3 boundary with separator: base + 2 + addition === NOTES_MAX succeeds', () => {
+    const base = 'a'.repeat(1000);
+    const addition = 'b'.repeat(998); // 1000 + 2 + 998 = 2000
+    const next = appendRibNoteInProduct(withRibNotes(base), 'r1', addition);
+    expect(ribNotesOf(next)!.length).toBe(2000);
+    expect(ribNotesOf(next)).toBe(`${base}\n\n${addition}`);
+  });
+
+  it('appends on a locked rib (D5: no lock guard)', () => {
+    const p = withRibNotes('First.');
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 },
+    ];
+    const next = appendRibNoteInProduct(p, 'r1', 'Second.');
+    expect(ribNotesOf(next)).toBe('First.\n\nSecond.');
+  });
+});
+
+// ── Phase 8: append_rib_note (op) ────────────────────────────────────────────
+describe('applyAiOp — append_rib_note', () => {
+  it('delegates and appends', () => {
+    const p = makeProductWithContent();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'First.';
+    const next = applyAiOp(p, 'append_rib_note', { ribId: 'r1', text: 'Second.' });
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.notes).toBe('First.\n\nSecond.');
+  });
+
+  it('non-string ribId is ref-equal', () => {
+    const p = makeProductWithContent();
+    expect(applyAiOp(p, 'append_rib_note', { ribId: 42, text: 'x' })).toBe(p);
+  });
+
+  it('non-string text is ref-equal', () => {
+    const p = makeProductWithContent();
+    expect(applyAiOp(p, 'append_rib_note', { ribId: 'r1', text: 42 })).toBe(p);
+  });
+});
+
+// ── Phase 8: bulk_append_rib_notes (op) ──────────────────────────────────────
+describe('applyAiOp — bulk_append_rib_notes', () => {
+  function twoRibs(): Product {
+    let p = makeProductWithContent(); // t1/b1/r1
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r2', name: 'Rib2' });
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'A1.';
+    p.themes[0]!.backboneItems[0]!.ribItems[1]!.notes = 'B1.';
+    return p;
+  }
+  const notesById = (p: Product, id: string) =>
+    p.themes[0]!.backboneItems[0]!.ribItems.find(r => r.id === id)!.notes;
+
+  it('appends to multiple ribs in one call', () => {
+    const next = applyAiOp(twoRibs(), 'bulk_append_rib_notes', {
+      notes: [{ ribId: 'r1', text: 'A2.' }, { ribId: 'r2', text: 'B2.' }],
+    });
+    expect(notesById(next, 'r1')).toBe('A1.\n\nA2.');
+    expect(notesById(next, 'r2')).toBe('B1.\n\nB2.');
+  });
+
+  it('N→1 changelog collapse: log grows by exactly one (catches prev-vs-next)', () => {
+    const p = twoRibs();
+    const prevLen = (p._changeLog ?? []).length;
+    const next = applyAiOp(p, 'bulk_append_rib_notes', {
+      notes: [{ ribId: 'r1', text: 'A2.' }, { ribId: 'r2', text: 'B2.' }],
+    });
+    expect((next._changeLog ?? []).length).toBe(prevLen + 1);
+  });
+
+  it('summary changelog entry has no id field', () => {
+    const next = applyAiOp(twoRibs(), 'bulk_append_rib_notes', {
+      notes: [{ ribId: 'r1', text: 'A2.' }, { ribId: 'r2', text: 'B2.' }],
+    });
+    const log = next._changeLog ?? [];
+    const last = log[log.length - 1];
+    expect(last?.op).toBe('update');
+    expect(last?.entity).toBe('rib');
+    expect(last?.source).toBe('ai');
+    expect(last?.id).toBeUndefined();
+  });
+
+  it('all-unknown-ribId batch is ref-equal, no changelog entry', () => {
+    const p = twoRibs();
+    const next = applyAiOp(p, 'bulk_append_rib_notes', {
+      notes: [{ ribId: 'ghost1', text: 'x' }, { ribId: 'ghost2', text: 'y' }],
+    });
+    expect(next).toBe(p);
+  });
+
+  it('malformed entries skipped, valid siblings apply', () => {
+    const next = applyAiOp(twoRibs(), 'bulk_append_rib_notes', {
+      notes: [null, { text: 'no ribId' }, { ribId: 'r1', text: 42 }, { ribId: 'r1', text: 'A2.' }],
+    });
+    expect(notesById(next, 'r1')).toBe('A1.\n\nA2.');
+    expect(notesById(next, 'r2')).toBe('B1.'); // untouched
+  });
+
+  it('mixed batch with one over-cap rib: that rib unchanged, others append', () => {
+    const p = twoRibs();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'x'.repeat(1995); // r1 near cap
+    const next = applyAiOp(p, 'bulk_append_rib_notes', {
+      notes: [{ ribId: 'r1', text: 'yyyyy' }, { ribId: 'r2', text: 'B2.' }], // r1: 1995+2+5>2000 skip
+    });
+    expect(notesById(next, 'r1')).toBe('x'.repeat(1995)); // unchanged
+    expect(notesById(next, 'r2')).toBe('B1.\n\nB2.');      // applied
+  });
+
+  it('not idempotent: same op twice yields the text twice (locks D2)', () => {
+    const op = { notes: [{ ribId: 'r1', text: 'A2.' }] };
+    const once = applyAiOp(twoRibs(), 'bulk_append_rib_notes', op);
+    const twice = applyAiOp(once, 'bulk_append_rib_notes', op);
+    expect(notesById(twice, 'r1')).toBe('A1.\n\nA2.\n\nA2.');
+  });
+
+  it('repeated ribId cumulative in array order', () => {
+    const next = applyAiOp(twoRibs(), 'bulk_append_rib_notes', {
+      notes: [{ ribId: 'r1', text: 'A2.' }, { ribId: 'r1', text: 'A3.' }],
+    });
+    expect(notesById(next, 'r1')).toBe('A1.\n\nA2.\n\nA3.');
+  });
+
+  it('position-dependent skip: first entry pushes near cap, second exceeds and skips', () => {
+    const p = twoRibs();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'a'.repeat(1000);
+    const first = 'b'.repeat(990);  // 1000 + 2 + 990 = 1992 (applies)
+    const second = 'c'.repeat(20);  // 1992 + 2 + 20 = 2014 > 2000 (skips)
+    const next = applyAiOp(p, 'bulk_append_rib_notes', {
+      notes: [{ ribId: 'r1', text: first }, { ribId: 'r1', text: second }],
+    });
+    expect(notesById(next, 'r1')).toBe(`${'a'.repeat(1000)}\n\n${first}`);
+  });
+});
+
+// ── Phase 8: buildAiSnapshot notes / notesIncluded ───────────────────────────
+describe('buildAiSnapshot — Phase 8 notes', () => {
+  it('includes notes per rib by default; top-level notesIncluded === true', () => {
+    const p = makeProductWithContent();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'Hello.';
+    const snap = buildAiSnapshot(p);
+    expect(snap.notesIncluded).toBe(true);
+    expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!.notes).toBe('Hello.');
+  });
+
+  it('normalizes absent notes to ""', () => {
+    const p = makeProductWithContent();
+    delete p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes;
+    const snap = buildAiSnapshot(p);
+    expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!.notes).toBe('');
+  });
+
+  it('{ includeNotes:false } omits every per-rib notes key', () => {
+    const p = makeProductWithContent();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'Hello.';
+    const snap = buildAiSnapshot(p, { includeNotes: false });
+    expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!).not.toHaveProperty('notes');
+  });
+
+  it('{ includeNotes:false } sets top-level notesIncluded === false', () => {
+    expect(buildAiSnapshot(makeProductWithContent(), { includeNotes: false }).notesIncluded).toBe(false);
+  });
+
+  it('notesIncluded always present (both default and lean builds)', () => {
+    expect(buildAiSnapshot(makeProductWithContent())).toHaveProperty('notesIncluded');
+    expect(buildAiSnapshot(makeProductWithContent(), { includeNotes: false }))
+      .toHaveProperty('notesIncluded');
+  });
+});
+
+// ── Phase 8: selectSnapshotForWrite (bounded selection) ──────────────────────
+describe('selectSnapshotForWrite', () => {
+  const byteLen = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
+
+  it('huge limit → full snapshot, degraded:false, notes present', () => {
+    const p = makeProductWithContent();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'Hello.';
+    const { snapshot, degraded } = selectSnapshotForWrite(p, 10_000_000);
+    expect(degraded).toBe(false);
+    expect(snapshot!.notesIncluded).toBe(true);
+    expect(snapshot!.themes[0]!.backboneItems[0]!.ribItems[0]!.notes).toBe('Hello.');
+  });
+
+  it('limit between lean and full → lean, degraded:true, notesIncluded:false', () => {
+    const p = makeProductWithContent();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'x'.repeat(500);
+    const fullLen = byteLen(buildAiSnapshot(p, { includeNotes: true }));
+    const leanLen = byteLen(buildAiSnapshot(p, { includeNotes: false }));
+    const limit = fullLen - 1;                 // full won't fit; lean will
+    expect(leanLen).toBeLessThanOrEqual(limit);
+    const { snapshot, degraded } = selectSnapshotForWrite(p, limit);
+    expect(degraded).toBe(true);
+    expect(snapshot!.notesIncluded).toBe(false);
+  });
+
+  it('limit below lean size → { snapshot:null, degraded:true }', () => {
+    const { snapshot, degraded } = selectSnapshotForWrite(makeProductWithContent(), 10);
+    expect(snapshot).toBeNull();
+    expect(degraded).toBe(true);
+  });
+});
+
+// ── Phase 8: drain / probe ───────────────────────────────────────────────────
+describe('Phase 8 drain / probe', () => {
+  it('applyDrainOps with an append_rib_note op applies it, returns right nextSeq', () => {
+    const p = makeProductWithContent();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'First.';
+    const ops: AiOpDoc[] = [
+      { seq: 7, op: 'append_rib_note', payload: { ribId: 'r1', text: 'Second.' } },
+    ];
+    const { product, nextSeq } = applyDrainOps(p, ops);
+    expect(nextSeq).toBe(7);
+    expect(product.themes[0]!.backboneItems[0]!.ribItems[0]!.notes).toBe('First.\n\nSecond.');
+  });
+
+  it('computeSafePrefix passes both new ops through (no-throw)', () => {
+    const p = makeProductWithContent();
+    const ops: AiOpDoc[] = [
+      { seq: 1, op: 'append_rib_note', payload: { ribId: 'r1', text: 'x' } },
+      { seq: 2, op: 'bulk_append_rib_notes', payload: { notes: [{ ribId: 'r1', text: 'y' }] } },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(p, ops);
+    expect(safeOps.length).toBe(2);
+    expect(nextSeq).toBe(2);
   });
 });
