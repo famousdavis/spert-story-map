@@ -6,6 +6,7 @@ import type { Product, RibItem, ColorKey, Size } from '../types';
 import { appendChangeLogEntry } from './storage';
 import { isRibLocked, computeRibSiblingName } from './ribHelpers';
 import { DEFAULT_THEME_COLOR_KEYS } from './themeColors';
+import { NOTES_MAX } from './constants';   // = 2000
 
 /**
  * Pure Product transformations shared by the React mutation hook
@@ -491,6 +492,75 @@ export function sizeRibInProduct(
   }));
 
   if (!didUpdate) return prev;
+  const next = { ...prev, themes };
+  return {
+    ...next,
+    _changeLog: appendChangeLogEntry(next, {
+      op: 'update', entity: 'rib', id: ribId, source: 'ai',
+    }),
+  };
+}
+
+/**
+ * Pure transformation: append text to a rib's notes, preserving existing
+ * content. Addresses ribs by ID alone (global search; no themeId/backboneId).
+ *
+ * Non-destructive counterpart to the `notes` field on update_rib /
+ * bulk_update_ribs (which REPLACE). Append exists because the AI cannot
+ * reliably read-modify-write a field it may not have read.
+ *
+ * Guards (all return prev ref-equal, never throw):
+ *   APP-1  text empty/whitespace-only after trim -> prev.
+ *   APP-2  rib not found (global search) -> prev, via didUpdate staying false.
+ *   APP-3  the JOINED result would exceed NOTES_MAX (2000) -> that rib is
+ *          SKIPPED, not truncated (D4). Boundary is INCLUSIVE: a result of
+ *          exactly NOTES_MAX applies (guard is strict `>`). Note the join adds
+ *          a 2-char "\n\n" separator when existing notes are non-empty, so the
+ *          effective room for `addition` on a non-empty rib is
+ *          NOTES_MAX - base.length - 2.
+ *
+ * No lock guard (D5). Separator (D3): existing notes have trailing whitespace
+ * stripped, then joined with "\n\n"; empty/absent notes yield the trimmed text
+ * alone.
+ *
+ * NOT IDEMPOTENT (D2): appending twice appends twice — deliberate, documented
+ * in the LP tool descriptions. Drain replay duplicates the text (unless the
+ * join would exceed NOTES_MAX, which skips that rib — so replay is only
+ * PARTIALLY idempotent); accepted (visible + hand-correctable, unlike the
+ * replace op's invisible re-assert).
+ *
+ * didUpdate is set ONLY on an actual append, NOT on ribId match — so a
+ * not-found or over-cap call is fully ref-equal with no changelog entry
+ * (avoids the update_rib/bulk_update_ribs wart of a spurious entry on match).
+ *
+ * @pure
+ * @no-throw
+ */
+export function appendRibNoteInProduct(
+  prev: Product,
+  ribId: string,
+  text: string,
+): Product {
+  const addition = text.trim();
+  if (!addition) return prev;                                   // APP-1
+
+  let didUpdate = false;
+  const themes = prev.themes.map(t => ({
+    ...t,
+    backboneItems: t.backboneItems.map(b => ({
+      ...b,
+      ribItems: b.ribItems.map(r => {
+        if (r.id !== ribId) return r;               // sibling skip (not the APP-2 outcome)
+        const base = (r.notes ?? '').replace(/\s+$/, '');
+        const joined = base ? `${base}\n\n${addition}` : addition;
+        if (joined.length > NOTES_MAX) return r;                // APP-3 (strict >)
+        didUpdate = true;
+        return { ...r, notes: joined };
+      }),
+    })),
+  }));
+
+  if (!didUpdate) return prev;                                  // APP-2 outcome
   const next = { ...prev, themes };
   return {
     ...next,

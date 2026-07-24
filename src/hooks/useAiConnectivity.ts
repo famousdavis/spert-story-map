@@ -14,7 +14,7 @@ import { db, functionsInstance, isFirebaseAvailable } from '../lib/firebase';
 import { APP_VERSION } from '../lib/version';
 import type { Product, ProductUpdater } from '../types';
 import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
-import { buildAiSnapshot } from '../lib/aiSnapshot';
+import { selectSnapshotForWrite } from '../lib/aiSnapshot';
 import {
   AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION,
 } from '../lib/aiConstants';
@@ -22,6 +22,9 @@ import { SESSIONS_COL } from '../lib/firestoreCollections';
 import {
   getLastSeq, setLastSeq, clearLastSeq, safeParseConsent, buildOpsQuery,
 } from './aiConnectivityUtils';
+
+/** Firestore doc limit is 1 MB; 900 KB leaves headroom for metadata. */
+const SNAPSHOT_BYTE_LIMIT = 900_000;
 
 // ── Public types ────────────────────────────────────────────────────────────
 export interface AiSessionState {
@@ -99,14 +102,18 @@ export function useAiConnectivity(
     const sessionId = activeSessionIdRef.current;
     const p = productRef.current;
     const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const compact = buildAiSnapshot(p);
-    const byteSize = new TextEncoder().encode(JSON.stringify(compact)).length;
-    if (byteSize > 900_000) {
-      console.warn('[AI] Snapshot exceeds 900 KB — skipping.');
+
+    // D8: degrade rather than skip. A skipped write leaves the PRIOR snapshot in
+    // place and stale -- the AI then reads outdated structure with no signal.
+    const { snapshot, degraded } = selectSnapshotForWrite(p, SNAPSHOT_BYTE_LIMIT);
+    if (!snapshot) {
+      console.warn('[AI] Snapshot exceeds budget even without notes -- skipping.');
       return;
     }
+    if (degraded) console.warn('[AI] Snapshot over budget with notes -- wrote lean.');
+
     setDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current'),
-      { product: compact, updatedAt: serverTimestamp(), expiresAt: exp },
+      { product: snapshot, updatedAt: serverTimestamp(), expiresAt: exp },
     ).catch(err => console.error('[AI] Snapshot write failed:', err));
   }, []);
 

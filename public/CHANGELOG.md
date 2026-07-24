@@ -1,5 +1,36 @@
 # Changelog
 
+## Version 0.49.0 (2026-07-23)
+
+Add to rib notes with AI — append text without overwriting what you already wrote, and let the AI read notes to verify its work.
+
+**Connect AI: non-destructive rib notes (browser-side capability)**
+
+- **New: append_rib_note operation** — adds text to a rib item's notes without touching the
+  existing content. The new text is appended after a blank line; the previous notes are always
+  preserved. This replaces the only prior path, which overwrote the whole field. An append that
+  would push a rib past the 2,000-character notes cap is skipped for that rib (never truncated
+  mid-sentence). Locked (in-progress) ribs can still have notes appended — notes carry no
+  scheduling math.
+- **New: bulk_append_rib_notes operation** — applies up to 100 note-appends in one call with
+  per-entry validation: a skipped entry (unknown rib, or one that would exceed the cap) never
+  affects the others, and the audit log records one summary entry per batch. Appending is not
+  idempotent — running the same call twice adds the text twice.
+- **New: rib notes in the AI project snapshot** — each rib now carries its `notes` in the
+  read-only snapshot (gated behind Read Mode, like the rest of the snapshot), so an AI client can
+  read existing notes before writing, verify an append landed, and gauge remaining length against
+  the cap. A positive top-level `notesIncluded` flag keeps the snapshot's contents unambiguous. On
+  very large maps the snapshot drops notes (rather than failing to update) to stay within storage
+  limits, signalled by `notesIncluded: false`.
+- **Internal:** new pure transforms `appendRibNoteInProduct` in `productTransforms.ts` and
+  `selectSnapshotForWrite` in `aiSnapshot.ts` (bounded full/lean/skip snapshot selection). 33 new
+  tests (33 files, 919 tests), production build and lint clean, and no new type errors against the
+  strict-mode baseline.
+
+> Note: the storymap_append_rib_note and storymap_bulk_append_rib_notes tools become available
+> once the Connect AI service update is deployed. Until then, the existing (overwriting) notes
+> update continues to work.
+
 ## Version 0.48.0 (2026-07-16)
 
 User interface — the Story Map rib cards get a cleaner, roomier layout.

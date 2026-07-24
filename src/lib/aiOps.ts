@@ -12,6 +12,7 @@ import {
   unassignRibInProduct,
   sizeRibInProduct,              // ← Phase 3
   moveRibInProduct,              // ← Phase 7
+  appendRibNoteInProduct,        // ← Phase 8
 } from './productTransforms';
 import { appendChangeLogEntry } from './storage';
 import { isRibLocked } from './ribHelpers';
@@ -464,6 +465,47 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       if (next === prev) return prev;
       // Changelog collapse: N per-move entries → one summary entry.
       // CRITICAL — base is `prev` not `next` (see CLAUDE.md #51).
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'update', entity: 'rib', source: 'ai',
+        }),
+      };
+    }
+    // -- Phase 8 -- non-destructive notes append -----------------------------
+    case 'append_rib_note': {
+      // Payload: { ribId: string, text: string }
+      // Does NOT require Read Mode to apply (D6). Guards live in the transform.
+      // @no-throw.
+      if (typeof p.ribId !== 'string' || !p.ribId) return prev;
+      if (typeof p.text !== 'string' || !p.text) return prev;
+      return appendRibNoteInProduct(prev, p.ribId, p.text);
+    }
+    case 'bulk_append_rib_notes': {
+      // Payload: { notes: Array<{ ribId: string, text: string }> }
+      // Array key `notes`, per-entry field `text` (D7). Delegation loop (NOT an
+      // inline walk) over appendRibNoteInProduct; inherits every APP-* guard.
+      // Cumulative: repeated ribIds append in array order, and an earlier entry
+      // can push a later same-rib entry over NOTES_MAX (that later entry skips)
+      // -- order-dependent by construction.
+      // Re-application is NOT ref-equal -- like bulk_update_ribs, but here
+      // because the text is appended again (unless the join would exceed
+      // NOTES_MAX, which skips that rib -- so replay is only partially
+      // idempotent), not because values are re-written.
+      // @no-throw.
+      if (!Array.isArray(p.notes) || p.notes.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.notes as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const e = raw as { ribId?: unknown; text?: unknown };
+        if (typeof e.ribId !== 'string' || !e.ribId) continue;
+        if (typeof e.text !== 'string' || !e.text) continue;
+        next = appendRibNoteInProduct(next, e.ribId, e.text);
+      }
+      if (next === prev) return prev;   // load-bearing: all-skip batch stays ref-equal
+      // N per-append entries -> ONE summary entry. Base is `prev` NOT `next`
+      // (the loop appended N entries into next._changeLog; using `next` here
+      // negates the N->1 collapse -- the single highest-probability bug).
       return {
         ...next,
         _changeLog: appendChangeLogEntry(prev, {
