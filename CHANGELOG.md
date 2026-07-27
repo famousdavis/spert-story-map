@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.49.2 (2026-07-26)
+
+Internal repository maintenance only. No functional, data, or interface changes — the app behaves identically to v0.49.1. Removes this repository's local copy of `firestore.rules`, along with the `firebase.json` whose only content was a pointer to it. Firestore security rules are deployed from the Firebase Console and mirrored in the SPERT® Suite landing-page repository, which is their single source of truth; the copy kept here was never deployed from and could only drift out of date. Neither file was ever bundled into the app, so cloud behaviour is unchanged. Version surfaces resynchronised: `package-lock.json` had been stranded at 0.46.10 while `package.json` read 0.49.1 — both now read 0.49.2.
+
 ## Version 0.49.1 (2026-07-23)
 
 Documentation — the Connect AI prompt now teaches assistants the non-destructive notes-append tools. No data-model or behavior changes.
