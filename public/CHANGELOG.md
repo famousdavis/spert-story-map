@@ -1,5 +1,47 @@
 # Changelog
 
+## Version 0.49.4 (2026-07-29)
+
+Licensing only — no functional, data, or interface changes. The app behaves identically to v0.49.3.
+The `LICENSE` file now reserves the SPERT® brand explicitly, and this repository's copy has been
+brought back into line with the rest of the suite.
+
+**Added: trademark reservation and modified-version marking**
+
+- **The license now reserves the brand.** It has always required that the original author
+  attribution be preserved, but it said nothing at all about the brand, which left room to read
+  the GNU GPL v3's redistribute-and-modify freedom as carrying the *name* along with the code.
+  That was never the intent. A new **Trademark Reservation** clause under GPL v3 §7(e) names
+  "SPERT", "Statistical PERT" and "Estimation Made Easy" as trademarks registered with the USPTO,
+  and "GanttApp" and "MyScrumBudget" as unregistered common-law marks, and grants no right to use
+  any of them — whether alone, in combination with other words such as "SPERT Suite", or as a logo.
+- **Modified versions must be renamed.** A companion clause under GPL v3 §7(c) requires any fork
+  to adopt a name that cannot reasonably be confused with those marks. Between them the two
+  clauses draw the line the license always meant to draw: the code is free to take, change and
+  redistribute, the author attribution has to travel with it, and the brand stays behind.
+- **Both clauses are non-removable.** They fall inside the categories GPL v3 Section 7 permits,
+  which matters — Section 7's closing paragraph lets a recipient strip any additional term that
+  falls *outside* that list, as a "further restriction". The section header and its opening
+  sentence now cite Section 7 rather than Section 7(b), because the terms draw on 7(b) for
+  attribution, 7(c) for renaming modified versions and 7(e) for the trademark reservation.
+
+**Fixed: this repository's license had drifted from the suite original**
+
+- **The heading carried a retired brand name.** Line 1 read "Statistical PERT® Software Suite" —
+  the pre-v1.4 name — rather than "SPERT® Suite". This is the drift that prompted the audit, first
+  spotted when following the GNU GPL v3 link out of SPERT Scheduler.
+- **The additional terms were an older, weaker wording.** This repository still carried the
+  original numbered `1.`/`2.` form of the attribution and UI-notice terms, predating the lettered
+  `a)`/`b)` rewrite. The older wording omitted two things of substance: the prohibition on
+  removing, obscuring or *replacing* the author attribution with another name, and the requirement
+  that the user-interface notice appear in a visible and accessible location with a link to the
+  original repository where feasible. Both are now present.
+- **The GNU GPL v3 text itself was already correct** — verbatim and complete — and is unchanged by
+  this release. The file is now a byte-for-byte copy of the canonical license in the SPERT® Suite
+  landing-page repository, which is its single source of truth, differing only in the project
+  repository URL on line 4. Of the nine suite repositories audited, only MyScrumBudget was an
+  exact copy beforehand.
+
 ## Version 0.49.3 (2026-07-28)
 
 Bug fix — the Share Project member list showed a raw internal account ID instead of a person's name or email address.
