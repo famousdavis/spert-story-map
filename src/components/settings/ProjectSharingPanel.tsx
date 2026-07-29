@@ -248,9 +248,29 @@ function MemberRow({ uid, role, isOwner, isSelf, onRemove, onRoleChange }: Membe
 
   useEffect(() => {
     if (!db) return;
-    getDoc(doc(db, PROFILES_COL, uid)).then(snap => {
-      if (snap.exists()) setProfile(snap.data());
+    const database = db;
+    let cancelled = false;
+
+    (async () => {
+      // Per-app profile first — written on this app's sign-in.
+      const appSnap = await getDoc(doc(database, PROFILES_COL, uid));
+      if (cancelled) return;
+      if (appSnap.exists()) {
+        setProfile(appSnap.data());
+        return;
+      }
+      // Fall back to the suite-wide mirror. A member added through the
+      // cross-app invitation Cloud Function is resolved BY their
+      // spertsuite_profiles doc, but has no per-app profile until they
+      // sign into Story Map specifically — the function only writes
+      // members.{uid}. Without this fallback the row renders a raw UID.
+      const suiteSnap = await getDoc(doc(database, 'spertsuite_profiles', uid));
+      if (!cancelled && suiteSnap.exists()) setProfile(suiteSnap.data());
+    })().catch(() => {
+      // Leave profile null; the row falls back to the uid, as before.
     });
+
+    return () => { cancelled = true; };
   }, [uid]);
 
   const displayName = profile?.displayName || profile?.email || uid;

@@ -1,5 +1,29 @@
 # Changelog
 
+## Version 0.49.3 (2026-07-28)
+
+Bug fix — the Share Project member list showed a raw internal account ID instead of a person's name or email address.
+
+**Fixed: member list rendered a raw account ID**
+
+- **Fixed: shared project members now show a name or email** — when someone was added to a
+  project through an emailed invitation, the member list could display a long string of
+  random-looking characters (for example `nT5V5xk8pcNHpHE7IjMxJtmQBPa2`) instead of their
+  name. This happened whenever the person had used another SPERT® Suite app but had never
+  personally signed into SPERT Story Map: the invitation system knew who they were, but
+  Story Map had no profile of its own to draw a name from, and fell back to showing the
+  raw identifier. The member list now falls back to the shared suite-wide profile, so the
+  name or email address appears immediately — including for members who were added before
+  this release. No action is needed and nothing has to be re-invited.
+- **Internal:** `MemberRow` in `ProjectSharingPanel.tsx` now reads `spertsuite_profiles/{uid}`
+  when `spertstorymap_profiles/{uid}` is absent. Both are written with the same payload by
+  `AuthProvider` on sign-in, and `firestore.rules` already permits `get` on the suite mirror
+  for any authenticated user, so no security-rules change was required. The lookup is
+  strictly a fallback — the per-app profile still wins, and the suite mirror is not read at
+  all when it is present. Guarded by a new four-case test file,
+  `src/__tests__/memberRowProfileFallback.test.tsx`; three of the four fail without the fix.
+  Full suite now 34 files / 923 tests, lint clean with zero warnings, production build passes.
+
 ## Version 0.49.2 (2026-07-26)
 
 Internal repository maintenance only. No functional, data, or interface changes — the app behaves identically to v0.49.1. Removes this repository's local copy of `firestore.rules`, along with the `firebase.json` whose only content was a pointer to it. Firestore security rules are deployed from the Firebase Console and mirrored in the SPERT® Suite landing-page repository, which is their single source of truth; the copy kept here was never deployed from and could only drift out of date. Neither file was ever bundled into the app, so cloud behaviour is unchanged. Version surfaces resynchronised: `package-lock.json` had been stranded at 0.46.10 while `package.json` read 0.49.1 — both now read 0.49.2.
