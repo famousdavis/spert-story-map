@@ -27,6 +27,7 @@ import {
   getSprintSummary,
   getReleaseProgressOverTime,
 } from '../lib/calculations';
+import type { Product, Theme, Backbone, RibItem, Release, Sprint, ReleaseAllocation, ProgressEntry, SizeMapping, Size, Category } from '../types';
 
 const SIZE_MAPPING = [
   { label: 'S', points: 10 },
@@ -34,10 +35,16 @@ const SIZE_MAPPING = [
   { label: 'L', points: 40 },
 ];
 
-function makeRib(id, { size = null, category = 'core', allocations = [], history = [] } = {}) {
+function makeRib(id: string, { size = null, category = 'core', allocations = [], history = [] }: {
+  size?: Size;
+  category?: Category;
+  allocations?: ReleaseAllocation[];
+  history?: ProgressEntry[];
+} = {}): RibItem {
   return {
     id,
     name: `Rib ${id}`,
+    description: '',
     size,
     category,
     releaseAllocations: allocations,
@@ -46,16 +53,33 @@ function makeRib(id, { size = null, category = 'core', allocations = [], history
   };
 }
 
-function makeBackbone(id, ribs = []) {
+function makeBackbone(id: string, ribs: RibItem[] = []): Backbone {
   return { id, name: `Backbone ${id}`, ribItems: ribs, order: 1 };
 }
 
-function makeTheme(id, backbones = []) {
+function makeTheme(id: string, backbones: Backbone[] = []): Theme {
   return { id, name: `Theme ${id}`, backboneItems: backbones, order: 1 };
 }
 
-function makeProduct({ themes = [], releases = [], sprints = [], sizeMapping = SIZE_MAPPING } = {}) {
-  return { themes, releases, sprints, sizeMapping, releaseCardOrder: {} };
+function makeProduct({ themes = [], releases = [], sprints = [], sizeMapping = SIZE_MAPPING }: {
+  themes?: Theme[];
+  releases?: Release[];
+  sprints?: Sprint[];
+  sizeMapping?: SizeMapping[];
+} = {}): Product {
+  return {
+    id: 'p1',
+    name: 'Test Product',
+    description: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    schemaVersion: 2,
+    themes,
+    releases,
+    sprints,
+    sizeMapping,
+    releaseCardOrder: {},
+  };
 }
 
 // --- getRibItemPoints ---

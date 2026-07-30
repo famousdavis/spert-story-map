@@ -4,22 +4,41 @@
 
 import { describe, it, expect } from 'vitest';
 import { moveRibToRelease, reorderRibInRelease, moveRibToBackbone, moveBackboneToTheme, reorderTheme, moveRib2D, moveRibs2D, transferAllocation } from '../components/storymap/mapMutations';
-import { computeLayout, CELL_HEIGHT, CELL_GAP, CELL_PAD } from '../components/storymap/useMapLayout';
+import { computeLayout, CELL_HEIGHT, CELL_GAP } from '../components/storymap/useMapLayout';
+import type { MapLayout } from '../components/storymap/useMapLayout';
 import { computeInsertIndex } from '../components/storymap/mapDragHelpers';
+import type { Product, ProductUpdater, Theme, Backbone, RibItem, Release, ReleaseAllocation } from '../types';
 
 // Helper: creates a minimal product with configurable themes/backbones/ribs
 function makeProduct({
   themes = [],
   releases = [],
   releaseCardOrder = {},
-} = {}) {
-  return { themes, releases, releaseCardOrder, sizeMapping: [] };
+}: {
+  themes?: Theme[];
+  releases?: Release[];
+  releaseCardOrder?: Record<string, string[]>;
+} = {}): Product {
+  return {
+    id: 'p1',
+    name: 'Test Product',
+    description: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    schemaVersion: 2,
+    sprints: [],
+    themes,
+    releases,
+    releaseCardOrder,
+    sizeMapping: [],
+  };
 }
 
-function makeRib(id, allocations = []) {
+function makeRib(id: string, allocations: ReleaseAllocation[] = []): RibItem {
   return {
     id,
     name: `Rib ${id}`,
+    description: '',
     releaseAllocations: allocations,
     size: null,
     category: 'core',
@@ -28,23 +47,25 @@ function makeRib(id, allocations = []) {
   };
 }
 
-function makeBackbone(id, ribs = []) {
+function makeBackbone(id: string, ribs: RibItem[] = []): Backbone {
   return { id, name: `Backbone ${id}`, ribItems: ribs, order: 1 };
 }
 
-function makeTheme(id, backbones = []) {
+function makeTheme(id: string, backbones: Backbone[] = []): Theme {
   return { id, name: `Theme ${id}`, backboneItems: backbones, order: 1 };
 }
 
 // Capture the result of an updateProduct call
-function captureUpdate(mutationFn, ...args) {
-  let result;
-  const fakeUpdate = (updater) => {
-    result = typeof updater === 'function' ? updater(args[0]) : updater;
+function captureUpdate(
+  mutationFn: (update: (updater: ProductUpdater) => void) => void,
+  product: Product,
+): Product {
+  let result: Product | undefined;
+  const fakeUpdate = (updater: ProductUpdater) => {
+    result = typeof updater === 'function' ? updater(product) : updater;
   };
-  // args[0] is the product, rest are mutation-specific args
-  // But mutations call updateProduct as first arg, so we adjust:
-  mutationFn(fakeUpdate, ...args.slice(1));
+  mutationFn(fakeUpdate);
+  if (!result) throw new Error('captureUpdate: mutation never called updateProduct');
   return result;
 }
 
@@ -913,7 +934,7 @@ describe('card order placement', () => {
 // the visual insertion indicator and the actual card placement.
 describe('end-to-end rib drag placement', () => {
   // Helper to extract cell Y positions for a backbone in a release from layout
-  function getCellOrder(layout, backboneId, releaseId) {
+  function getCellOrder(layout: MapLayout, backboneId: string, releaseId: string | null) {
     return layout.cells
       .filter(c => c.backboneId === backboneId && c.releaseId === releaseId)
       .sort((a, b) => a.y - b.y)
