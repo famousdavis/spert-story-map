@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useMemo } from 'react';
-import type { Product } from '../../types';
+import type { Product, Category, Size } from '../../types';
 import { forEachRib } from '../../lib/ribHelpers';
 import { getRibItemPoints, getRibItemPercentComplete } from '../../lib/calculations';
 
@@ -46,8 +46,69 @@ export const DEFAULT_SIZING_FILTER: SizingFilter = {
  * smaller than the minimum, layout falls back to the legacy 1-card-wide columns —
  * preserves back-compat for tests and SSR.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- layout return type is complex and frequently evolving; explicit interface would be over-engineering
-export function computeSizingLayout(product: Product, filter: SizingFilter = DEFAULT_SIZING_FILTER, targetWidth: number = 0): any {
+/** A t-shirt size column on the sizing board. */
+export interface SizingColumn {
+  label: string;
+  points: number;
+  colIdx: number;
+  x: number;
+  width: number;
+  count: number;
+}
+
+/**
+ * A rib projected for the sizing board. Deliberately NOT a RibItem — the board
+ * needs only these fields plus theme/backbone context and derived state.
+ */
+export interface SizingRib {
+  id: string;
+  name: string;
+  size: Size;
+  category: Category;
+  points: number;
+  themeId: string;
+  themeName: string;
+  backboneId: string;
+  backboneName: string;
+  percentComplete: number;
+  /** Progress > 0 — size editing is disabled to protect points x delta math. */
+  locked: boolean;
+  cardColor?: string;
+}
+
+/** A rib placed on the board with absolute geometry. */
+export interface SizingCell extends SizingRib {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sizeLabel: string | null;
+  zone: 'unsized' | 'sized';
+}
+
+/** The unsized grid zone above the size columns. */
+export interface SizingZone {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Everything the sizing board needs to render, in logical pixel space. */
+export interface SizingLayout {
+  sizeColumns: SizingColumn[];
+  unsizedZone: SizingZone;
+  unsizedCount: number;
+  unsizedRows: number;
+  sizeColumnsY: number;
+  cells: SizingCell[];
+  totalWidth: number;
+  totalHeight: number;
+  unsizedGridCols: number;
+  sizedSubColsByLabel: Record<string, number>;
+}
+
+export function computeSizingLayout(product: Product, filter: SizingFilter = DEFAULT_SIZING_FILTER, targetWidth: number = 0): SizingLayout {
   const sizeMapping = product.sizeMapping || [];
   const sizeLabels = new Set(sizeMapping.map(m => m.label));
 
@@ -80,8 +141,8 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
   }
 
   // 2. Gather all ribs
-  const unsizedRibs = [];
-  const sizedByLabel = new Map();
+  const unsizedRibs: SizingRib[] = [];
+  const sizedByLabel = new Map<string, SizingRib[]>();
   sizeMapping.forEach(m => sizedByLabel.set(m.label, []));
 
   forEachRib(product, (rib, { theme, backbone }) => {
@@ -118,17 +179,23 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
     if (!rib.size || !sizeLabels.has(rib.size)) {
       unsizedRibs.push(enriched);
     } else {
-      sizedByLabel.get(rib.size).push(enriched);
+      // sizedByLabel is seeded from the same sizeMapping as sizeLabels, so the
+      // bucket is always present once the label has passed the check above.
+      const bucket = sizedByLabel.get(rib.size);
+      if (bucket) bucket.push(enriched);
     }
   });
 
   // 3. Sort ribs by sizingCardOrder (if present)
   const cardOrder = product.sizingCardOrder || {};
-  const sortByCardOrder = (ribs, key) => {
+  const sortByCardOrder = (ribs: SizingRib[], key: string) => {
     const order = cardOrder[key];
     if (!order || order.length === 0) return ribs;
-    const posMap = {};
-    for (let i = 0; i < order.length; i++) posMap[order[i]] = i;
+    const posMap: Record<string, number> = {};
+    for (let i = 0; i < order.length; i++) {
+      const id = order[i];
+      if (id !== undefined) posMap[id] = i;
+    }
     return [...ribs].sort((a, b) => {
       const pa = posMap[a.id] ?? Infinity;
       const pb = posMap[b.id] ?? Infinity;
@@ -160,7 +227,7 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
   // 5. Place unsized cells in grid (positions relative to the canvas origin —
   // include the gutter + letter strip offsets so cells align with the column
   // letters and row numbers rendered around them).
-  const cells = [];
+  const cells: SizingCell[] = [];
   sortedUnsized.forEach((rib, i) => {
     const row = Math.floor(i / unsizedGridCols);
     const col = i % unsizedGridCols;

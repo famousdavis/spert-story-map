@@ -1,5 +1,36 @@
 # Changelog
 
+## Version 0.49.10 (2026-07-30)
+
+Type-annotation cleanup, fifth instalment — no functional, data, or interface changes. The app
+behaves identically to v0.49.9.
+
+The sizing board's layout engine now gets the same treatment the story map's received in v0.49.9,
+finishing that pair. The repository baseline moves from 1,945 to 1,931.
+
+The sizing engine's output — the size columns, the unsized grid, and every positioned card — is now
+described rather than merely produced, and the sizing board component reads that description instead
+of carrying its own.
+
+That last part turned out to matter more than expected. The board was already declaring what it
+thought the layout looked like, privately, and those private copies had fallen behind the engine:
+three fields the engine produces were missing from them entirely. Those absences were the direct
+cause of several of the board's own errors — it was reading fields its own description said did not
+exist. There is now one definition, owned by the engine, and the drift is structurally impossible.
+
+The sizing engine went from 13 errors to 0 and the board from 10 to 4.
+
+One test file moved the other way, from 50 to 55, and the increase is reported honestly rather than
+hidden. Describing the engine's output means the tests that read it are now checked too, and 25 of
+their assertions index into a list without first establishing that the element is there. Those are
+genuine gaps in the assertions, not noise, but the fix is a per-assertion judgement across the file
+and doing it mechanically would amount to switching the check off rather than satisfying it. They
+are left for the pass that handles that category properly. Twenty errors in the same file were
+resolved, so the file's own total rose by five while the repository total fell by fourteen.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming no
+production file in the repository regressed.
+
 ## Version 0.49.9 (2026-07-30)
 
 Type-annotation cleanup, fourth instalment — no functional, data, or interface changes. The app
