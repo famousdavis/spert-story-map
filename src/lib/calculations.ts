@@ -82,7 +82,10 @@ export function getRibReleaseProgress(ribItem: RibItem, releaseId: string): numb
   const entries = ribItem.progressHistory.filter(
     p => p.releaseId === releaseId && p.percentComplete !== null
   );
-  return entries.length > 0 ? entries[entries.length - 1].percentComplete! : 0;
+  const last = entries[entries.length - 1];
+  // The filter above keeps only non-null percentComplete, so `?? 0` is the
+  // empty-list case rather than a fallback for a real entry.
+  return last?.percentComplete ?? 0;
 }
 
 // --- Overall rib % (sum of per-release entries) ---
@@ -93,6 +96,7 @@ export function getRibItemPercentComplete(ribItem: RibItem): number {
   const realEntries = ribItem.progressHistory.filter(e => e.percentComplete !== null);
   if (realEntries.length === 0) return 0;
   const lastEntry = realEntries[realEntries.length - 1];
+  if (!lastEntry) return 0; // unreachable: realEntries.length was checked above
   return getRibItemPercentCompleteForSprint(ribItem, lastEntry.sprintId);
 }
 
@@ -204,8 +208,8 @@ export function getSizingDistribution(product: Product): Record<string, number> 
   dist['Unsized'] = 0;
 
   forEachRib(product, (rib) => {
-    if (rib.size && dist[rib.size] !== undefined) dist[rib.size]++;
-    else dist['Unsized']++;
+    const key = rib.size && dist[rib.size] !== undefined ? rib.size : 'Unsized';
+    dist[key] = (dist[key] ?? 0) + 1;
   });
   return dist;
 }

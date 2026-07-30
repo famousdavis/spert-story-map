@@ -29,9 +29,9 @@ export default function StoryMapView() {
   const layout = useMapLayout(product, collapsedIds);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [selectedRibId, setSelectedRibId] = useState(null);
-  const [selectedReleaseId, setSelectedReleaseId] = useState(null);
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [selectedRibId, setSelectedRibId] = useState<string | null>(null);
+  const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [isNewRib, setIsNewRib] = useState(false);
 
   // Derive selectedRib from layout so it stays in sync with product changes (e.g. renames)
@@ -40,7 +40,7 @@ export default function StoryMapView() {
     return layout.cells.find(c => c.id === selectedRibId) || null;
   }, [selectedRibId, layout.cells]);
   const mapSizeRef = useRef({ width: 0, height: 0 });
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const didAutoFit = useRef(false);
 
   const { dragState, dragPointerRef, handleDragStart, handleBackboneDragStart, handleThemeDragStart, handleReleaseDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({

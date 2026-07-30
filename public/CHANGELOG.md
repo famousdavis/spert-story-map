@@ -1,5 +1,40 @@
 # Changelog
 
+## Version 0.49.20 (2026-07-30)
+
+Type cleanup in the application code — no functional, data, or interface changes. The app behaves
+identically to v0.49.19.
+
+Application-code errors go from 121 to 82, and the repository baseline from 406 to 367. Seven files
+improved; five of them are now clean.
+
+Almost all of this release is one recurring shape. Throughout the codebase there are places that
+check a value exists and then use it a few lines later inside a callback — inside a list transform,
+or inside the function that produces the next version of a project. The check does not reach that
+far. In every one of those places the code was relying on a guard that did not actually cover the
+use.
+
+The most consequential instance was in the map's move-a-rib-between-columns logic. It confirmed it
+had found the rib, then, inside a transform, copied it into its new home. Because the check did not
+reach inside, the copy was of something the compiler still considered possibly missing — and the
+result was a rib with every field optional. That was the true source of three separate errors in the
+callers, which had looked unrelated. All such places now capture the checked value first.
+
+The same treatment was applied to: writing, clearing, and commenting on progress entries, which each
+read an existing entry out of a list before rewriting it; undo and redo, which take the top item off
+a stack; the sample project builder, which cross-references releases and sprints by position; and
+reordering releases by dragging.
+
+One case was more than tidying. The function that applies every change to a project accepted a
+transform to run against the current project, without establishing that a project had actually
+loaded yet. It cannot happen — nothing that calls it renders before loading finishes — but had it
+happened, the transform would have been handed nothing and failed on its first line. That path is
+now explicit and does nothing instead.
+
+All 934 tests pass, unchanged. No file in the repository regressed.
+
+Verified with the full ship gate.
+
 ## Version 0.49.19 (2026-07-30)
 
 Type cleanup in the Progress Tracking screen, plus new test coverage for it — no functional, data, or
