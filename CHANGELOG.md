@@ -1,5 +1,36 @@
 # Changelog
 
+## Version 0.49.8 (2026-07-30)
+
+Type-annotation cleanup, third instalment — no functional, data, or interface changes. The app
+behaves identically to v0.49.7.
+
+The Structure page goes from **48 errors to 4**, bringing the repository baseline from 2,108 to
+2,064. Across the three instalments so far the baseline has come down from 2,183 to 2,064, and the
+three largest concentrations of type debt in the codebase are now dealt with.
+
+Twenty-two never-annotated function parameters on this page are annotated, and the two states that
+drive its dialogs and drag-and-drop now have declared shapes. The delete confirmation previously
+carried an untyped object, so the code that reads it back to decide whether it is deleting a theme,
+a backbone item, or a rib item was unchecked; it is now described as three distinct alternatives, and
+the deletion logic reads the one it has rather than a merged shape where every identifier is
+optional. The collapsed-section map and the rib drag state are typed likewise.
+
+One real class of latent fragility was found and fixed. Two rib drag-and-drop handlers checked that
+a dragged item existed and then used it inside a nested callback, which is a place the check does not
+reach — so the code was relying on a guard that did not actually cover the use. This is now the
+explicit capture the rest of the codebase already uses for the same situation. No behaviour changed,
+because in practice the values were always present; the guard now genuinely guards.
+
+The 4 errors left all come from a single shared helper used to move an item up or down a list. It is
+written to accept any plain keyed object, which the project's own theme and backbone types do not
+satisfy, so every call reports a mismatch. The helper needs a narrower description of what it
+actually requires. That changes a signature shared across mutation code, so it is handled on its own
+rather than folded in here.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming exactly
+one file changed and every other file in the repository is unmoved.
+
 ## Version 0.49.7 (2026-07-30)
 
 Type-annotation cleanup, second instalment — no functional, data, or interface changes. The app

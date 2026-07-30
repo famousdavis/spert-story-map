@@ -11,19 +11,32 @@ import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, 
 import { reduceRibs } from '../lib/ribHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { THEME_COLOR_OPTIONS, getThemeColorClasses } from '../lib/themeColors';
-import type { OutletContextValue } from '../types';
+import type { OutletContextValue, RibItem } from '../types';
+
+/** What the ConfirmDialog is currently asking about. */
+type DeleteTarget =
+  | { type: 'theme'; themeId: string; name: string }
+  | { type: 'backbone'; themeId: string; backboneId: string; name: string }
+  | { type: 'rib'; themeId: string; backboneId: string; ribId: string; name: string };
+
+/** Structurally matches BackboneSection's own DragRibState. */
+interface DragRibState {
+  ribId: string;
+  themeId: string;
+  backboneId: string;
+}
 
 export default function StructureView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
-  const [collapsed, setCollapsed] = useState({});
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [colorPickerThemeId, setColorPickerThemeId] = useState(null);
-  const colorPickerRef = useRef(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [colorPickerThemeId, setColorPickerThemeId] = useState<string | null>(null);
+  const colorPickerRef = useRef<HTMLDivElement | null>(null);
 
   // Rib drag-to-reorder state
-  const [dragRib, setDragRib] = useState(null);
-  const [dropBeforeRib, setDropBeforeRib] = useState(null);
-  const dropBeforeRef = useRef(null);
+  const [dragRib, setDragRib] = useState<DragRibState | null>(null);
+  const [dropBeforeRib, setDropBeforeRib] = useState<string | null>(null);
+  const dropBeforeRef = useRef<string | null>(null);
 
   const mutations = useProductMutations(updateProduct);
   const { updateTheme, updateBackbone, updateRib, addTheme, addBackbone, addRib, moveItem } = mutations;
@@ -31,8 +44,8 @@ export default function StructureView() {
   // Close color picker on click outside
   useEffect(() => {
     if (!colorPickerThemeId) return;
-    const handler = (e) => {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+    const handler = (e: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
         setColorPickerThemeId(null);
       }
     };
@@ -40,30 +53,31 @@ export default function StructureView() {
     return () => document.removeEventListener('mousedown', handler);
   }, [colorPickerThemeId]);
 
-  const toggle = (id) => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggle = (id: string) => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
 
   const deleteItem = () => {
     if (!deleteTarget) return;
-    const { type, themeId, backboneId, ribId } = deleteTarget;
-    if (type === 'theme') mutations.deleteTheme(themeId);
-    else if (type === 'backbone') mutations.deleteBackbone(themeId, backboneId);
-    else if (type === 'rib') mutations.deleteRib(themeId, backboneId, ribId);
+    // Narrow on the discriminant so each id is known present, rather than
+    // destructuring a widened shape where backboneId/ribId are optional.
+    if (deleteTarget.type === 'theme') mutations.deleteTheme(deleteTarget.themeId);
+    else if (deleteTarget.type === 'backbone') mutations.deleteBackbone(deleteTarget.themeId, deleteTarget.backboneId);
+    else if (deleteTarget.type === 'rib') mutations.deleteRib(deleteTarget.themeId, deleteTarget.backboneId, deleteTarget.ribId);
   };
 
-  const moveBackbone = (themeId, backboneId, direction) => {
+  const moveBackbone = (themeId: string, backboneId: string, direction: number) => {
     updateTheme(themeId, t => ({ ...t, backboneItems: moveItem(t.backboneItems, backboneId, direction) }));
   };
 
-  const moveTheme = (themeId, direction) => {
+  const moveTheme = (themeId: string, direction: number) => {
     updateProduct(prev => ({ ...prev, themes: moveItem(prev.themes, themeId, direction) }));
   };
 
   // Rib drag handlers
-  const handleRibDragStart = (themeId, backboneId, ribId) => {
+  const handleRibDragStart = (themeId: string, backboneId: string, ribId: string) => {
     setDragRib({ themeId, backboneId, ribId });
   };
 
-  const handleRibDragOver = (e, ribId) => {
+  const handleRibDragOver = (e: React.DragEvent, ribId: string) => {
     e.preventDefault();
     e.stopPropagation();
     if (ribId === dragRib?.ribId) return;
@@ -79,22 +93,27 @@ export default function StructureView() {
     dropBeforeRef.current = null;
   };
 
-  const handleRibDrop = (e, targetThemeId, targetBackboneId) => {
+  const handleRibDrop = (e: React.DragEvent, targetThemeId: string, targetBackboneId: string) => {
     e.preventDefault();
     if (!dragRib) return;
 
+    // Capture into a const — the narrowing above does not survive into the
+    // updateProduct callback, so `dragRib.themeId` inside it would be
+    // possibly-null. Same idiom as the `const database = db` capture in
+    // ProjectSharingPanel (CLAUDE.md #60).
+    const source = dragRib;
     const beforeRibId = dropBeforeRef.current;
 
     updateProduct(prev => {
-      let draggedRib = null;
+      let draggedRib: RibItem | undefined;
       const next = {
         ...prev,
         themes: prev.themes.map(t => ({
           ...t,
           backboneItems: t.backboneItems.map(b => {
-            if (t.id === dragRib.themeId && b.id === dragRib.backboneId) {
-              draggedRib = b.ribItems.find(r => r.id === dragRib.ribId);
-              return { ...b, ribItems: b.ribItems.filter(r => r.id !== dragRib.ribId) };
+            if (t.id === source.themeId && b.id === source.backboneId) {
+              draggedRib = b.ribItems.find(r => r.id === source.ribId);
+              return { ...b, ribItems: b.ribItems.filter(r => r.id !== source.ribId) };
             }
             return b;
           }),
@@ -102,6 +121,9 @@ export default function StructureView() {
       };
 
       if (!draggedRib) return prev;
+      // Same capture-after-guard as `source` above: the narrowing does not
+      // survive into the nested map callbacks below.
+      const moved = draggedRib;
 
       return {
         ...next,
@@ -112,10 +134,10 @@ export default function StructureView() {
               const items = [...b.ribItems];
               if (beforeRibId) {
                 const idx = items.findIndex(r => r.id === beforeRibId);
-                if (idx >= 0) items.splice(idx, 0, draggedRib);
-                else items.push(draggedRib);
+                if (idx >= 0) items.splice(idx, 0, moved);
+                else items.push(moved);
               } else {
-                items.push(draggedRib);
+                items.push(moved);
               }
               return { ...b, ribItems: items.map((r, i) => ({ ...r, order: i + 1 })) };
             }
@@ -128,11 +150,11 @@ export default function StructureView() {
     handleRibDragEnd();
   };
 
-  const handleDeleteRib = (themeId, backboneId, ribId, name) => {
+  const handleDeleteRib = (themeId: string, backboneId: string, ribId: string, name: string) => {
     setDeleteTarget({ type: 'rib', themeId, backboneId, ribId, name });
   };
 
-  const handleDeleteBackbone = (themeId, backboneId, name) => {
+  const handleDeleteBackbone = (themeId: string, backboneId: string, name: string) => {
     setDeleteTarget({ type: 'backbone', themeId, backboneId, name });
   };
 
@@ -252,7 +274,7 @@ export default function StructureView() {
                           bbIdx={bbIdx}
                           themeColor={themeColor}
                           sizeMapping={product.sizeMapping}
-                          isCollapsed={collapsed[backbone.id]}
+                          isCollapsed={!!collapsed[backbone.id]}
                           onToggle={() => toggle(backbone.id)}
                           dragRib={dragRib}
                           dropBeforeRib={dropBeforeRib}
