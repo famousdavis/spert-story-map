@@ -11,11 +11,11 @@ vi.stubGlobal('crypto', {
 });
 
 // Mock localStorage
-const store = {};
+const store: Record<string, string> = {};
 vi.stubGlobal('localStorage', {
-  getItem: (key) => store[key] ?? null,
-  setItem: (key, value) => { store[key] = String(value); },
-  removeItem: (key) => { delete store[key]; },
+  getItem: (key: string) => store[key] ?? null,
+  setItem: (key: string, value: unknown) => { store[key] = String(value); },
+  removeItem: (key: string) => { delete store[key]; },
   clear: () => { for (const key of Object.keys(store)) delete store[key]; },
 });
 
@@ -52,7 +52,7 @@ vi.mock('firebase/firestore', () => ({
     mockDocs.set(ref._path, data);
   }),
   getDocs: vi.fn(async () => {
-    const docs = [];
+    const docs: Array<{ id: string | undefined; data: () => unknown }> = [];
     for (const [path, data] of mockDocs) {
       if (path.startsWith('spertstorymap_projects/')) {
         docs.push({
@@ -61,7 +61,7 @@ vi.mock('firebase/firestore', () => ({
         });
       }
     }
-    return { forEach: (fn) => docs.forEach(fn), docs, empty: docs.length === 0 };
+    return { forEach: (fn: (d: (typeof docs)[number]) => void) => docs.forEach(fn), docs, empty: docs.length === 0 };
   }),
   collection: vi.fn((_db, name) => ({ _name: name })),
   query: vi.fn((...args) => args[0]),
@@ -79,7 +79,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function createLocalProduct(id, name) {
+function createLocalProduct(id: string, name: string) {
   return {
     id,
     name,
@@ -92,7 +92,7 @@ function createLocalProduct(id, name) {
   };
 }
 
-function seedLocalStorage(products) {
+function seedLocalStorage(products: Array<{ id: string; name: string }>) {
   // v0.33.0 namespaced shape. Migration always reads from the 'local'
   // namespace (anonymous-session data) because the user must be signed
   // out at the time pre-migration data was captured.
@@ -116,7 +116,7 @@ describe('migrateLocalToCloud', () => {
     expect(result.skipped).toBe(0);
     expect(setDoc).toHaveBeenCalled();
     // Verify owner and members are set
-    const call = setDoc.mock.calls.find(c => c[0]._path.includes('proj-1'));
+    const call = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('proj-1'));
     expect(call[1].owner).toBe('user-1');
     expect(call[1].members).toEqual({ 'user-1': 'owner' });
   });
@@ -152,7 +152,7 @@ describe('migrateLocalToCloud', () => {
     expect(result.uploaded).toBe(1);
     expect(result.skipped).toBe(0);
     // Should have used a new ID (uuid-1)
-    const call = setDoc.mock.calls.find(c => c[0]._path.includes('uuid-'));
+    const call = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('uuid-'));
     expect(call).toBeTruthy();
   });
 
@@ -163,7 +163,7 @@ describe('migrateLocalToCloud', () => {
 
     await migrateLocalToCloud('user-1');
 
-    const call = setDoc.mock.calls.find(c => c[0]._path.includes('proj-1'));
+    const call = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('proj-1'));
     const log = call[1]._changeLog;
     expect(log.length).toBe(2);
     expect(log[1].op).toBe('cloud-migration');
@@ -177,7 +177,7 @@ describe('migrateLocalToCloud', () => {
 
     await migrateLocalToCloud('user-1');
 
-    const prefsCall = setDoc.mock.calls.find(c => c[0]._path.includes('spertstorymap_settings'));
+    const prefsCall = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('spertstorymap_settings'));
     expect(prefsCall[1]).toEqual({ exportName: 'Alice' });
   });
 

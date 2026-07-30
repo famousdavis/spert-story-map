@@ -38,7 +38,7 @@ const product = {
 
 describe('forEachRib', () => {
   it('visits every rib with correct context', () => {
-    const visited = [];
+    const visited: Array<Record<string, string>> = [];
     forEachRib(product, (rib, { theme, backbone }) => {
       visited.push({ ribId: rib.id, themeId: theme.id, backboneId: backbone.id });
     });
@@ -51,13 +51,13 @@ describe('forEachRib', () => {
   });
 
   it('handles empty themes', () => {
-    const visited = [];
+    const visited: Array<Record<string, string>> = [];
     forEachRib({ themes: [] }, (rib) => visited.push(rib.id));
     expect(visited).toEqual([]);
   });
 
   it('handles themes with no backbones', () => {
-    const visited = [];
+    const visited: Array<Record<string, string>> = [];
     forEachRib({ themes: [{ id: 't1', backboneItems: [] }] }, (rib) => visited.push(rib.id));
     expect(visited).toEqual([]);
   });

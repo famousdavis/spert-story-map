@@ -10,11 +10,11 @@ import {
   RIB_CARD_COLOR_KEYS,
 } from '../lib/ribCardColors';
 
-function rib(id, cardColor) {
+function rib(id: string, cardColor?: string) {
   return { id, name: id, size: null, category: 'core', order: 1, releaseAllocations: [], progressHistory: [], ...(cardColor ? { cardColor } : {}) };
 }
 
-function product(ribs, cardColorLabels) {
+function product(ribs: unknown[], cardColorLabels?: Record<string, string>) {
   return {
     id: 'p1', name: 'P', themes: [{ id: 't1', name: 'T', order: 1, backboneItems: [{ id: 'b1', name: 'B', order: 1, ribItems: ribs }] }],
     releases: [], sprints: [], sizeMapping: [],

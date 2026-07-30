@@ -26,11 +26,11 @@ vi.stubGlobal('crypto', {
 });
 
 // Mock localStorage for node environment
-const store = {};
+const store: Record<string, string> = {};
 vi.stubGlobal('localStorage', {
-  getItem: (key) => store[key] ?? null,
-  setItem: (key, value) => { store[key] = String(value); },
-  removeItem: (key) => { delete store[key]; },
+  getItem: (key: string) => store[key] ?? null,
+  setItem: (key: string, value: unknown) => { store[key] = String(value); },
+  removeItem: (key: string) => { delete store[key]; },
   clear: () => { for (const key of Object.keys(store)) delete store[key]; },
 });
 
@@ -534,7 +534,7 @@ describe('cancelPendingSaves', () => {
 
 // --- exportProduct ---
 describe('exportProduct', () => {
-  let capturedBlob;
+  let capturedBlob: Blob | null = null;
 
   // exportProduct now takes a driver as the second argument and reads
   // attribution prefs via driver.loadPreferences(). The minimal stub
@@ -547,11 +547,11 @@ describe('exportProduct', () => {
     capturedBlob = null;
     // Mock DOM APIs for export
     vi.stubGlobal('URL', {
-      createObjectURL: (blob) => { capturedBlob = blob; return 'blob:mock'; },
+      createObjectURL: (blob: Blob) => { capturedBlob = blob; return 'blob:mock'; },
       revokeObjectURL: vi.fn(),
     });
     vi.stubGlobal('document', {
-      createElement: () => ({ click: vi.fn(), set href(_) {}, set download(_) {} }),
+      createElement: () => ({ click: vi.fn(), set href(_: string) {}, set download(_: string) {} }),
     });
   });
 
