@@ -60,7 +60,7 @@ export default function useSizingDrag({ layout, zoom, pan, updateProduct }: { la
   const computeInsertIndex = useCallback((targetSize: string | null, excludeId: string, mapX: number, mapY: number): number => {
     if (targetSize === null) {
       // Unsized zone: grid position (subtract gutter + letter-strip offsets)
-      const cellWidth = layout.cells.length > 0 ? layout.cells[0].width : 188;
+      const cellWidth = layout.cells[0]?.width ?? 188;
       const localX = Math.max(0, mapX - NUMBER_GUTTER_WIDTH);
       const localY = Math.max(0, mapY - LETTER_STRIP_HEIGHT);
       const gridCol = Math.max(0, Math.floor(localX / (cellWidth + CELL_GAP)));
@@ -135,7 +135,7 @@ export default function useSizingDrag({ layout, zoom, pan, updateProduct }: { la
     let targetSize = findTargetSize(mapPos.x, mapPos.y);
     if (targetSize === undefined) targetSize = prev.targetSize; // in gap, keep previous
 
-    const insertIndex = computeInsertIndex(targetSize, prev.ribId, mapPos.x, mapPos.y);
+    const insertIndex = computeInsertIndex(targetSize ?? null, prev.ribId, mapPos.x, mapPos.y);
 
     const state = {
       ...prev,
@@ -203,7 +203,7 @@ export default function useSizingDrag({ layout, zoom, pan, updateProduct }: { la
 
       // Ensure all sibling ribs in the target column are in the list
       // (prevents layout instability when sizingCardOrder was previously empty)
-      const siblingIds = new Set();
+      const siblingIds = new Set<string>();
       for (const cell of layout.cells) {
         if (cell.sizeLabel === targetSize && cell.id !== ribId) {
           siblingIds.add(cell.id);

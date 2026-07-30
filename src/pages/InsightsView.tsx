@@ -18,7 +18,6 @@ import {
 import { useDarkMode } from '../hooks/useDarkMode';
 import type { OutletContextValue } from '../types';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 export default function InsightsView() {
   const { product } = useOutletContext<OutletContextValue>();

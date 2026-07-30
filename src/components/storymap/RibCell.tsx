@@ -56,7 +56,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(cell.name, (name) => onRename(cell.themeId, cell.backboneId, cell.id, name));
 
-  const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(cell.name, RIB_NAME_TOOLTIP_DELAY);
+  const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip<HTMLDivElement>(cell.name, RIB_NAME_TOOLTIP_DELAY);
 
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);

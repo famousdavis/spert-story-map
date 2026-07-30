@@ -69,16 +69,16 @@ export function buildForecasterExport(product: Product) {
   // --- Sprints ---
   const sprintsWithDates = sortedSprints.filter(s => s.endDate);
   const cadence = product.sprintCadenceWeeks || 2;
-  const firstSprintStart = sprintsWithDates.length > 0
-    ? computeFirstSprintStartDate(sprintsWithDates[0].endDate, cadence)
+  const firstWithDate = sprintsWithDates[0];
+  const firstSprintStart = firstWithDate
+    ? computeFirstSprintStartDate(firstWithDate.endDate, cadence)
     : null;
 
   const totalProjectPoints = getTotalProjectPoints(product);
   const sprintRecords = [];
 
-  for (let i = 0; i < sprintsWithDates.length; i++) {
-    const sprint = sprintsWithDates[i];
-    const prevSprint = i > 0 ? sprintsWithDates[i - 1] : null;
+  for (const [i, sprint] of sprintsWithDates.entries()) {
+    const prevSprint = i > 0 ? sprintsWithDates[i - 1] ?? null : null;
 
     // Compute per-sprint velocity and cumulative completed points
     const { doneValue, cumulativeCompleted } = reduceRibs(product, (acc, rib) => {

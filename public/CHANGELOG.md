@@ -1,5 +1,35 @@
 # Changelog
 
+## Version 0.49.21 (2026-07-30)
+
+Type cleanup in the application code — no functional, data, or interface changes. The app behaves
+identically to v0.49.20.
+
+Application-code errors go from 82 to 57, and the repository baseline from 367 to 342. Fourteen files
+improved; ten of them are now clean.
+
+Three shared causes accounted for most of it.
+
+The tooltip helper described the element it attaches to as "any HTML element", which React will not
+accept when the thing it is actually attached to is a button or a div — so every component using a
+tooltip reported a mismatch. The helper now takes the element type from whoever uses it.
+
+The palette of theme colours was being indexed directly in three places to get a fallback colour.
+There is now a named default, which is both clearer at the call sites and correct.
+
+The account-migration code passed its database handle to the cloud service without checking it
+exists, in four places — the same thing corrected in the storage layer in v0.49.18. It now uses the
+same guard, so both places behave identically.
+
+The rest were individual: the forecaster export and the sizing board each walked a list by position
+and read fields off entries the compiler could not confirm were there; the same for the keyboard
+navigation in the ⋮ menus, the "add release here" positions on the map, and the size picker. Two
+declarations that nothing used were removed.
+
+All 934 tests pass, unchanged. No file in the repository regressed.
+
+Verified with the full ship gate.
+
 ## Version 0.49.20 (2026-07-30)
 
 Type cleanup in the application code — no functional, data, or interface changes. The app behaves

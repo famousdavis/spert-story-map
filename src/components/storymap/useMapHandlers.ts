@@ -123,13 +123,13 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
     if (!beforeReleaseId) {
       // Clicked on unassigned lane divider — append after all releases
       const sorted = [...product.releases].sort((a, b) => a.order - b.order);
-      const lastId = sorted.length > 0 ? sorted[sorted.length - 1].id : null;
+      const lastId = sorted[sorted.length - 1]?.id ?? null;
       mutations.addReleaseAfter(lastId);
     } else {
       // Clicked on a release divider — insert before that release (= after the previous one)
       const sorted = [...product.releases].sort((a, b) => a.order - b.order);
       const idx = sorted.findIndex(r => r.id === beforeReleaseId);
-      const prevId = idx > 0 ? sorted[idx - 1].id : null;
+      const prevId = idx > 0 ? sorted[idx - 1]?.id ?? null : null;
       mutations.addReleaseAfter(prevId);
     }
   }, [product.releases, mutations]);

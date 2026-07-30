@@ -68,6 +68,9 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
 ];
 
+/** First palette entry — the fallback when an index or key does not resolve. */
+export const DEFAULT_THEME_COLOR: ThemeColorOption = THEME_COLOR_OPTIONS[0]!;
+
 export const DEFAULT_THEME_COLOR_KEYS: ColorKey[] = THEME_COLOR_OPTIONS.map(o => o.key);
 
 const colorMap: Record<string, ThemeColorOption> = Object.fromEntries(
@@ -82,6 +85,9 @@ export function getThemeColorClasses(
   theme: { color?: string } | null | undefined,
   index: number,
 ): ThemeColorOption {
-  if (theme?.color && colorMap[theme.color]) return colorMap[theme.color];
-  return THEME_COLOR_OPTIONS[index % THEME_COLOR_OPTIONS.length];
+  const named = theme?.color ? colorMap[theme.color] : undefined;
+  if (named) return named;
+  // THEME_COLOR_OPTIONS is a non-empty module constant and the index is taken
+  // modulo its length, so the fallback is for the type system only.
+  return THEME_COLOR_OPTIONS[index % THEME_COLOR_OPTIONS.length] ?? DEFAULT_THEME_COLOR;
 }

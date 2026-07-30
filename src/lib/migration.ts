@@ -15,6 +15,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import type { Firestore } from 'firebase/firestore';
 import {
   loadProductIndex, loadProduct, loadPreferences,
   appendChangeLogEntry,
@@ -22,13 +23,19 @@ import {
 import { sanitizeForFirestore } from './firestoreUtils';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 
+/** Narrow the module-level `db` — see the identical helper in firestoreDriver. */
+function requireDb(): Firestore {
+  if (!db) throw new Error('Cloud storage unavailable. Please try again.');
+  return db;
+}
+
 /**
  * Test Firestore connectivity by reading the user's settings doc.
  * Returns true if reachable, false otherwise.
  */
 export async function testCloudConnection(uid: string): Promise<boolean> {
   try {
-    await getDoc(doc(db, SETTINGS_COL, uid));
+    await getDoc(doc(requireDb(), SETTINGS_COL, uid));
     return true;
   } catch {
     return false;
@@ -70,7 +77,7 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
     // null) and docs the user isn't a member of. We treat PERMISSION_DENIED
     // as "safe to create with a new ID" to handle both cases.
     try {
-      const existing = await getDoc(doc(db, PROJECTS_COL, targetId));
+      const existing = await getDoc(doc(requireDb(), PROJECTS_COL, targetId));
       if (existing.exists()) {
         const data = existing.data();
         if (data.members && data.members[uid]) {
@@ -93,7 +100,7 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
     updatedProduct._changeLog = appendChangeLogEntry(updatedProduct, { op: 'cloud-migration', uid });
 
     const { id, ...rest } = updatedProduct;
-    await setDoc(doc(db, PROJECTS_COL, id), {
+    await setDoc(doc(requireDb(), PROJECTS_COL, id), {
       ...sanitizeForFirestore(rest),
       owner: uid,
       members: { [uid]: 'owner' },
@@ -107,7 +114,7 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
   // they were captured before the user signed in.
   const prefs = loadPreferences('local');
   if (prefs && Object.keys(prefs).length > 0) {
-    await setDoc(doc(db, SETTINGS_COL, uid), sanitizeForFirestore(prefs), { merge: true });
+    await setDoc(doc(requireDb(), SETTINGS_COL, uid), sanitizeForFirestore(prefs), { merge: true });
   }
 
   return { uploaded, skipped };
