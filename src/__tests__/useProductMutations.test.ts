@@ -295,18 +295,18 @@ describe('addReleaseAfter', () => {
 
 // --- splitRib ---
 describe('splitRibInProduct', () => {
-  function makeRibNamed(id, name, opts = {}) {
+  function makeRibNamed(id: string, name: string, opts: { size?: Size; category?: Category } = {}): RibItem {
     return { ...makeRib(id, opts), name };
   }
 
-  function makeProductWithRibs(ribs) {
+  function makeProductWithRibs(ribs: RibItem[]): Product {
     return makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', ribs)])],
     });
   }
 
-  function findRibByName(product, name) {
-    return product.themes[0].backboneItems[0].ribItems.find(r => r.name === name);
+  function findRibByName(product: Product, name: string): RibItem | undefined {
+    return product.themes[0]?.backboneItems[0]?.ribItems.find(r => r.name === name);
   }
 
   it('original with no suffix renames to "(1)" and creates "(2)"', () => {
@@ -448,11 +448,11 @@ describe('splitRibInProduct', () => {
 
 // --- cloneRibInProduct ---
 describe('cloneRibInProduct', () => {
-  function makeRibNamed(id, name, opts = {}) {
+  function makeRibNamed(id: string, name: string, opts: { size?: Size; category?: Category } = {}): RibItem {
     return { ...makeRib(id, opts), name };
   }
 
-  function makeProductWithRibs(ribs) {
+  function makeProductWithRibs(ribs: RibItem[]): Product {
     return makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', ribs)])],
     });

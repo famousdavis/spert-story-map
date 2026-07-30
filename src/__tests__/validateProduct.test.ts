@@ -644,7 +644,7 @@ describe('validateProduct', () => {
     try {
       importProductFromJSON(`{ "key": "${secret}" bad }`);
     } catch (e) {
-      expect(e.message).not.toContain(secret);
+      expect((e as Error).message).not.toContain(secret);
     }
   });
 });

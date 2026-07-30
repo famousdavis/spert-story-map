@@ -1,5 +1,44 @@
 # Changelog
 
+## Version 0.49.15 (2026-07-30)
+
+Type-annotation cleanup in the test suite — no functional, data, or interface changes, and no change
+to the application code. Only test files were touched.
+
+The repository baseline moves from 1,226 to 1,166.
+
+**With this release, there is no longer a single place anywhere in this project — application code or
+tests — where the compiler does not know what a value is.** That was the specific problem this whole
+effort set out to fix. When it started there were 2,183 type errors and roughly 630 of them were
+values the compiler could say nothing at all about, which meant it was also checking nothing around
+them. That category is now empty.
+
+This release closed the last of it in the tests: the fake browser storage both the storage and
+migration suites run against, a mocked document used by the export tests, three collection variables,
+two more sets of sample-data helpers, and a single error variable in a catch block.
+
+| test file | before | after |
+|---|---|---|
+| storage | 110 | 96 |
+| progress mutations | 54 | 41 |
+| migration | 24 | 5 |
+| card colors | 18 | 12 |
+| rib helpers | 13 | 9 |
+| product mutations | 161 | 158 |
+| import validation | 66 | 65 |
+
+All 930 tests pass, unchanged.
+
+What remains is now clearly two things, and worth stating plainly. About two thirds of the remaining
+errors are tests that reach into a list by position — the first theme, the first backbone, the first
+rib — without first establishing that anything is there. The rest are sample objects written inline
+in individual tests that are missing a field or two. Neither is a missing label; both are per-case
+work, and the first would be actively made worse by a mechanical fix, so both are left for a
+deliberate pass rather than rushed here.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming seven
+test files improved, no file regressed, and the application code is untouched at 200 errors.
+
 ## Version 0.49.14 (2026-07-30)
 
 Type-annotation cleanup applied to the test suite — no functional, data, or interface changes, and

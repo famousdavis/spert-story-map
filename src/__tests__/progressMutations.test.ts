@@ -4,15 +4,28 @@
 
 import { describe, it, expect } from 'vitest';
 import { updateProgress, removeProgress, updateComment, calculateNextSprintEndDate } from '../lib/progressMutations';
+import type { Product, ProductUpdater, Theme, Backbone, RibItem, ProgressEntry } from '../types';
 
-function makeProduct({ themes = [] } = {}) {
-  return { themes, sizeMapping: [] };
+function makeProduct({ themes = [] }: { themes?: Theme[] } = {}): Product {
+  return {
+    id: 'p1',
+    name: 'Test Product',
+    description: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    schemaVersion: 2,
+    releases: [],
+    sprints: [],
+    themes,
+    sizeMapping: [],
+  };
 }
 
-function makeRib(id, progressHistory = []) {
+function makeRib(id: string, progressHistory: ProgressEntry[] = []): RibItem {
   return {
     id,
     name: `Rib ${id}`,
+    description: '',
     releaseAllocations: [],
     size: null,
     category: 'core',
@@ -21,20 +34,24 @@ function makeRib(id, progressHistory = []) {
   };
 }
 
-function makeBackbone(id, ribs = []) {
+function makeBackbone(id: string, ribs: RibItem[] = []): Backbone {
   return { id, name: `Backbone ${id}`, ribItems: ribs, order: 1 };
 }
 
-function makeTheme(id, backbones = []) {
+function makeTheme(id: string, backbones: Backbone[] = []): Theme {
   return { id, name: `Theme ${id}`, backboneItems: backbones, order: 1 };
 }
 
-function captureProgressUpdate(mutationFn, product) {
-  let result;
-  const fakeUpdate = (updater) => {
+function captureProgressUpdate(
+  mutationFn: (update: (updater: ProductUpdater) => void) => void,
+  product: Product,
+): Product {
+  let result: Product | undefined;
+  const fakeUpdate = (updater: ProductUpdater) => {
     result = typeof updater === 'function' ? updater(product) : updater;
   };
   mutationFn(fakeUpdate);
+  if (!result) throw new Error('captureProgressUpdate: mutation never called updateProduct');
   return result;
 }
 
