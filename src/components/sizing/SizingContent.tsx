@@ -241,7 +241,7 @@ function SizingRibCell({ cell, onDragStart, onRibClick, isDragging, onEdit, onSp
   const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
   const locked = cell.locked;
   const cardColorKey: RibCardColorKey | undefined = isRibCardColorKey(cell.cardColor) ? cell.cardColor : undefined;
-  const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(cell.name, RIB_NAME_TOOLTIP_DELAY);
+  const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip<HTMLDivElement>(cell.name, RIB_NAME_TOOLTIP_DELAY);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
 

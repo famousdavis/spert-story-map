@@ -5,8 +5,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
-interface UseTooltipReturn {
-  triggerRef: React.RefObject<HTMLElement | null>;
+interface UseTooltipReturn<T extends HTMLElement = HTMLElement> {
+  /**
+   * Generic in the element it attaches to. It was fixed to `HTMLElement`, which
+   * React will not accept as a `ref` on a concrete element (a `<button>` wants
+   * `Ref<HTMLButtonElement>`), so every consumer reported a mismatch.
+   */
+  triggerRef: React.RefObject<T | null>;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   tooltipEl: React.ReactPortal | null;
@@ -19,12 +24,12 @@ interface UseTooltipReturn {
  *   const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip(text);
  *   return <><div ref={triggerRef} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>…</div>{tooltipEl}</>
  */
-export function useTooltip(text: string, delay = 200): UseTooltipReturn {
+export function useTooltip<T extends HTMLElement = HTMLElement>(text: string, delay = 200): UseTooltipReturn<T> {
   const [visible, setVisible] = useState(false);
   const posRef = useRef({ x: 0, y: 0 });
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerRef = useRef<HTMLElement | null>(null);
+  const triggerRef = useRef<T | null>(null);
 
   const onMouseEnter = useCallback(() => {
     timerRef.current = setTimeout(() => {

@@ -103,7 +103,7 @@ export default function KebabMenu({
     let idx = focusedIdx;
     for (let i = 0; i < items.length; i++) {
       idx = (idx + delta + items.length) % items.length;
-      if (!items[idx].disabled) {
+      if (!items[idx]?.disabled) {
         setFocusedIdx(idx);
         return;
       }

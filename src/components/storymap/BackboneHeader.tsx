@@ -5,7 +5,7 @@
 import React from 'react';
 import { THEME_HEIGHT, BACKBONE_HEIGHT } from './useMapLayout';
 import useInlineEdit from './useInlineEdit';
-import { THEME_COLOR_OPTIONS } from '../../lib/themeColors';
+import { DEFAULT_THEME_COLOR } from '../../lib/themeColors';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
 interface BackboneHeaderProps {
@@ -20,7 +20,7 @@ interface BackboneHeaderProps {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export default function BackboneHeader({ column, colorClasses, onRename, onDelete, isDropTarget, isDragging, onDragStart }: BackboneHeaderProps) {
-  const color = colorClasses?.light || THEME_COLOR_OPTIONS[0].light;
+  const color = colorClasses?.light || DEFAULT_THEME_COLOR.light;
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(column.backboneName, (name) => onRename(column.themeId, column.backboneId, name));
 

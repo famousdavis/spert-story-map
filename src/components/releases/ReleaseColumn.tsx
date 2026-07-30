@@ -101,7 +101,7 @@ export default function ReleaseColumn({
     onMouseEnter: deleteMouseEnter,
     onMouseLeave: deleteMouseLeave,
     tooltipEl: deleteTooltipEl,
-  } = useTooltip(
+  } = useTooltip<HTMLButtonElement>(
     hasItems ? 'Move all items out first' : release ? `Delete ${release.name}` : null
   );
   const isOver = dropTarget?.col === colId && dragRibId;

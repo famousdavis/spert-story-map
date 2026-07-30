@@ -4,7 +4,7 @@
 
 import React from 'react';
 import useInlineEdit from './useInlineEdit';
-import { THEME_COLOR_OPTIONS } from '../../lib/themeColors';
+import { DEFAULT_THEME_COLOR } from '../../lib/themeColors';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
 interface ThemeHeaderProps {
@@ -20,7 +20,7 @@ interface ThemeHeaderProps {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelete, onAddBackbone, isDropTarget, isDragging, onDragStart }: ThemeHeaderProps) {
-  const color = colorClasses?.solid || THEME_COLOR_OPTIONS[0].solid;
+  const color = colorClasses?.solid || DEFAULT_THEME_COLOR.solid;
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(themeSpan.themeName, (name) => onRename(themeSpan.themeId, name));
 

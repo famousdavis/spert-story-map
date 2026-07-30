@@ -76,7 +76,7 @@ export default function SizePicker({ value, sizeMapping, onChange }: SizePickerP
       {sizeMapping.map(m => (
         <button
           key={m.label}
-          onClick={() => { onChange(m.label); setOpen(false); }}
+          onClick={() => { onChange(m.label as Size); setOpen(false); }}
           className={`block w-full text-left px-3 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
             value === m.label ? 'font-semibold bg-gray-50 dark:bg-gray-800' : ''
           }`}

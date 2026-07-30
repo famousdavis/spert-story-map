@@ -15,7 +15,6 @@ import type {
   StorageDriver,
   StorageMode,
   ImportPhase,
-  ImportDecision,
   ConflictAction,
   ImportOutcome,
 } from '../types';
