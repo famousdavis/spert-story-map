@@ -3,7 +3,8 @@
 // See LICENSE file in the project root for full license text.
 
 import React, { useEffect, useMemo } from 'react';
-import { COL_WIDTH, COL_GAP, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH } from './useMapLayout';
+import { COL_GAP, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH } from './useMapLayout';
+import type { MapLayout } from './useMapLayout';
 import ThemeHeader from './ThemeHeader';
 import BackboneHeader from './BackboneHeader';
 import ReleaseDivider from './ReleaseDivider';
@@ -18,7 +19,7 @@ import type { RibCardColorKey } from '../../lib/ribCardColors';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
 interface MapContentProps {
-  layout: any;
+  layout: MapLayout;
   themes: Theme[];
   product: Product;
   onRibClick: (cell: any, e: React.MouseEvent) => void;

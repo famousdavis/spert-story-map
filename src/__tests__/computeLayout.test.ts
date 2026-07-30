@@ -18,8 +18,9 @@ import {
   ADD_BUTTON_RESERVED,
   COLLAPSED_LANE_HEIGHT,
 } from '../components/storymap/useMapLayout';
+import type { Product, Theme, Backbone, RibItem, Release, ReleaseAllocation } from '../types';
 
-function makeRib(id, allocations = []) {
+function makeRib(id: string, allocations: ReleaseAllocation[] = []): RibItem {
   return {
     id,
     name: `Rib ${id}`,
@@ -31,16 +32,31 @@ function makeRib(id, allocations = []) {
   };
 }
 
-function makeBackbone(id, ribs = []) {
+function makeBackbone(id: string, ribs: RibItem[] = []): Backbone {
   return { id, name: `Backbone ${id}`, ribItems: ribs, order: 1 };
 }
 
-function makeTheme(id, backbones = []) {
+function makeTheme(id: string, backbones: Backbone[] = []): Theme {
   return { id, name: `Theme ${id}`, backboneItems: backbones, order: 1 };
 }
 
-function makeProduct({ themes = [], releases = [] } = {}) {
-  return { themes, releases, sizeMapping: [], releaseCardOrder: {} };
+function makeProduct({ themes = [], releases = [] }: {
+  themes?: Theme[];
+  releases?: Release[];
+} = {}): Product {
+  return {
+    id: 'p1',
+    name: 'Test Product',
+    description: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    schemaVersion: 2,
+    sprints: [],
+    themes,
+    releases,
+    sizeMapping: [],
+    releaseCardOrder: {},
+  };
 }
 
 describe('computeLayout', () => {
