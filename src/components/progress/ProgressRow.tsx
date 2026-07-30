@@ -11,9 +11,14 @@ import type { RibItem, SizeMapping, Sprint } from '../../types';
 
 /** Extended rib with display-time computed fields injected by the progress view. */
 interface ProgressRib extends RibItem {
-  _releaseId?: string;
-  _allocPct?: number;
-  _editable?: boolean;
+  // REQUIRED, and null (not absent) for the backbone/theme groupings, which
+  // have no single allocation to edit. ProgressTrackingView is the only
+  // producer and always writes all three; declaring them optional meant every
+  // read was `string | null | undefined`, which matched neither this file's own
+  // prop signatures nor the lib helpers in progressViewHelpers.
+  _releaseId: string | null;
+  _allocPct: number | null;
+  _editable: boolean;
   backboneName?: string;
   allocTotal?: number;
   points?: number;
@@ -34,7 +39,7 @@ interface ProgressRowProps {
   idx: number;
   sprint: Sprint | undefined;
   prevSprint: Sprint | undefined;
-  selectedSprint: string;
+  selectedSprint: string | null;
   showTargetCol: boolean;
   totalCols: number;
   expandedRows: Set<string>;
@@ -43,14 +48,14 @@ interface ProgressRowProps {
   setCommentDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   progressDrafts: Record<string, string>;
   setProgressDrafts: Dispatch<SetStateAction<Record<string, string>>>;
-  getSprintPct: (rib: ProgressRib, releaseId?: string) => number | null;
-  getCurrentPct: (rib: ProgressRib, releaseId?: string) => number;
-  getDelta: (rib: ProgressRib, releaseId?: string) => number | null;
-  getCommentCount: (rib: ProgressRib, releaseId?: string) => number;
-  getCommentHistory: (rib: ProgressRib, releaseId?: string) => CommentHistoryEntry[];
-  updateProgress: (ribId: string, releaseId: string | undefined, value: number) => void;
-  removeProgress: (ribId: string, releaseId: string | undefined) => void;
-  updateComment: (ribId: string, releaseId: string | undefined, comment: string) => void;
+  getSprintPct: (rib: ProgressRib, releaseId: string | null) => number | null;
+  getCurrentPct: (rib: ProgressRib, releaseId: string | null) => number;
+  getDelta: (rib: ProgressRib, releaseId: string | null) => number | null;
+  getCommentCount: (rib: ProgressRib, releaseId: string | null) => number;
+  getCommentHistory: (rib: ProgressRib, releaseId: string | null) => CommentHistoryEntry[];
+  updateProgress: (ribId: string, releaseId: string | null, value: number) => void;
+  removeProgress: (ribId: string, releaseId: string | null) => void;
+  updateComment: (ribId: string, releaseId: string | null, comment: string) => void;
   sizeMapping: SizeMapping[];
 }
 
@@ -156,7 +161,7 @@ export default function ProgressRow({
                   }
                   setProgressDrafts(prev => { const next = { ...prev }; delete next[rowKey]; return next; });
                 }}
-                onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                 className="w-14 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-1 py-1 text-sm text-center focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
               />
             ) : (
@@ -164,7 +169,7 @@ export default function ProgressRow({
                 type="button"
                 onClick={e => {
                   e.stopPropagation();
-                  setProgressDrafts(prev => ({ ...prev, [rowKey]: sprintPct ?? '' }));
+                  setProgressDrafts(prev => ({ ...prev, [rowKey]: sprintPct != null ? String(sprintPct) : '' }));
                 }}
                 className="w-14 border border-gray-200 dark:border-gray-600 rounded px-1 py-1 text-sm text-center tabular-nums text-gray-700 dark:text-gray-300 hover:border-blue-400 dark:hover:border-blue-500 cursor-text"
               >

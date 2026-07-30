@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 0.49.19 (2026-07-30)
+
+Type cleanup in the Progress Tracking screen, plus new test coverage for it — no functional, data, or
+interface changes. The app behaves identically to v0.49.18.
+
+Application-code errors go from 137 to 121, and the repository baseline from 422 to 406.
+
+The Progress screen describes each table row three separate times — once where the rows are built,
+once in the row component, and once in the comment panel — and the three descriptions disagreed about
+what can be empty. Rows grouped by backbone or theme have no single release to edit against, so the
+screen marks them read-only and leaves their release empty; the row component, meanwhile, described
+that release as always present. The same disagreement applied to the selected sprint, which is
+genuinely absent until a project has sprints.
+
+All three now say the same thing, and they say what is actually true rather than what would be
+convenient. The three functions that write progress, remove progress, and save a note accept the
+empty cases and decline them, instead of the screen quietly promising they cannot happen.
+
+**This screen had no test coverage at all, which is the real reason a change here was uncomfortable.**
+It now has some: four tests covering editing a percentage, clearing one, rejecting a value above the
+row's allocation, and confirming a read-only row offers no editor. Those were written to fail first
+against a deliberately broken version, so they are known to catch the thing they are meant to catch.
+
+The test suite is now 934 tests across 38 files, all passing.
+
+Verified with the full ship gate, and by exercising the screen in a running browser: the table
+renders, the editor opens, and an edited percentage commits.
+
 ## Version 0.49.18 (2026-07-30)
 
 Type cleanup in the application code — no functional, data, or interface changes. The app behaves
