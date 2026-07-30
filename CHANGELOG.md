@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 0.49.11 (2026-07-30)
+
+Type-annotation cleanup, sixth instalment — no functional, data, or interface changes. The app
+behaves identically to v0.49.10.
+
+The Settings and Release Planning pages are annotated, taking the repository baseline from 1,931 to
+1,904. Settings goes from 18 errors to 3 and Release Planning from 15 to 3.
+
+Fourteen never-annotated parameters across the two pages are annotated, and the states behind the
+release drag-and-drop, the delete confirmation, and the allocation dialog now have declared shapes.
+
+Two small pieces of genuine fragility were found and closed, neither of which changes behaviour.
+Reordering releases by dragging removes the dragged release from the list and re-inserts it, without
+first confirming the removal produced anything; that check is now made. And the Settings delete
+confirmation read its target inside a handler that can, in principle, run when there is no target;
+that read is now guarded.
+
+One component interface was corrected to describe what it is actually given. The release column
+accepts a drag-over handler that the Release Planning page deliberately omits while a whole column is
+being dragged, because a different handler takes over in that case. The component's description said
+the handler was always provided. It now says it is optional, which is what the calling code has
+always done, and the two places that use it are guarded accordingly.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming two
+files improved and no file in the repository regressed.
+
 ## Version 0.49.10 (2026-07-30)
 
 Type-annotation cleanup, fifth instalment — no functional, data, or interface changes. The app

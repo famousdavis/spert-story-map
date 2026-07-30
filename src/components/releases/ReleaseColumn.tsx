@@ -38,7 +38,12 @@ interface ReleaseColumnProps {
   dropTarget: DropTargetState | null;
   isColDropTarget: boolean;
   isColDragging: boolean;
-  onColumnDragOver: (e: React.DragEvent, colId: string) => void;
+  /**
+   * Omitted by ReleasePlanningView for release columns while a COLUMN drag is
+   * in flight — onColDragOver takes over in that case. The two are
+   * complementary, so a guard here is defensive rather than reachable.
+   */
+  onColumnDragOver?: (e: React.DragEvent, colId: string) => void;
   onColumnDrop: (colId: string) => void;
   onColDragStart: (e: React.DragEvent, releaseId: string) => void;
   onColDragEnd: () => void;
@@ -122,7 +127,7 @@ export default function ReleaseColumn({
     return (
       <div
         className="flex-shrink-0 w-72"
-        onDragOver={e => onColumnDragOver(e, 'unassigned')}
+        onDragOver={e => onColumnDragOver?.(e, 'unassigned')}
         onDrop={e => { e.preventDefault(); onColumnDrop('unassigned'); }}
       >
         <div className={`bg-amber-50 dark:bg-amber-900/20 border rounded-xl overflow-hidden transition-colors ${
@@ -151,7 +156,7 @@ export default function ReleaseColumn({
       className="flex-shrink-0 flex"
       onDragOver={e => {
         if (onColDragOver) onColDragOver(e, release.id);
-        else onColumnDragOver(e, release.id);
+        else onColumnDragOver?.(e, release.id);
       }}
       onDrop={e => {
         e.preventDefault();
