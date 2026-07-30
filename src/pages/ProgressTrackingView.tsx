@@ -24,7 +24,29 @@ import BurnUpChart from '../components/progress/BurnUpChart';
 import ProgressRow from '../components/progress/ProgressRow';
 import GroupSummaryHeader from '../components/progress/GroupSummaryHeader';
 import ProgressHeader from '../components/progress/ProgressHeader';
-import type { OutletContextValue } from '../types';
+import type { OutletContextValue, RibItem } from '../types';
+
+type GroupBy = 'release' | 'backbone' | 'theme';
+
+/**
+ * A rib as enriched by getAllRibItems (theme/backbone names + ids), plus the
+ * per-row fields this view injects. `_releaseId` / `_allocPct` are null for the
+ * backbone/theme groupings, which have no single allocation to edit.
+ */
+type ProgressRibRow = ReturnType<typeof getAllRibItems>[number] & {
+  _releaseId: string | null;
+  _releaseName?: string;
+  _allocPct: number | null;
+  _editable: boolean;
+};
+
+/** One collapsible group in the progress table. */
+interface ProgressGroup {
+  label: string;
+  releaseId?: string;
+  entityId?: string;
+  items: ProgressRibRow[];
+}
 
 export default function ProgressTrackingView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
@@ -32,13 +54,13 @@ export default function ProgressTrackingView() {
   const [selectedSprint, setSelectedSprint] = useState(
     product.sprints.length > 0 ? product.sprints[product.sprints.length - 1].id : null
   );
-  const [groupBy, setGroupBy] = useState('release');
-  const [expandedRows, setExpandedRows] = useState(new Set());
-  const [commentDrafts, setCommentDrafts] = useState({});
+  const [groupBy, setGroupBy] = useState<GroupBy>('release');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [showReleaseBars, setShowReleaseBars] = useState(false);
   const [showChart, setShowChart] = useState(false);
-  const [progressDrafts, setProgressDrafts] = useState({});
-  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  const [progressDrafts, setProgressDrafts] = useState<Record<string, string>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   // Track previous sprint/groupBy to reset transient state on change
   const [lastSprint, setLastSprint] = useState(selectedSprint);
   const [lastGroupBy, setLastGroupBy] = useState(groupBy);
@@ -54,7 +76,7 @@ export default function ProgressTrackingView() {
     setCollapsedGroups(new Set());
   }
 
-  const toggleRow = (rowKey) => {
+  const toggleRow = (rowKey: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
       if (next.has(rowKey)) next.delete(rowKey);
@@ -63,7 +85,7 @@ export default function ProgressTrackingView() {
     });
   };
 
-  const toggleGroup = (groupKey) => {
+  const toggleGroup = (groupKey: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
       if (next.has(groupKey)) next.delete(groupKey);
@@ -84,45 +106,45 @@ export default function ProgressTrackingView() {
 
   // Sprint order lookup for sorting comment history
   const sprintOrder = useMemo(() => {
-    const order = {};
+    const order: Record<string, number> = {};
     product.sprints.forEach(s => { order[s.id] = s.order; });
     return order;
   }, [product.sprints]);
 
   const sprintNameMap = useMemo(() => {
-    const map = {};
+    const map: Record<string, string> = {};
     product.sprints.forEach(s => { map[s.id] = s.name; });
     return map;
   }, [product.sprints]);
 
   // Thin wrappers that bind updateProduct + selectedSprint
-  const updateProgress = (ribId, releaseId, percentComplete) => {
+  const updateProgress = (ribId: string, releaseId: string, percentComplete: number) => {
     doUpdateProgress(updateProduct, ribId, releaseId, selectedSprint, percentComplete);
   };
-  const removeProgress = (ribId, releaseId) => {
+  const removeProgress = (ribId: string, releaseId: string) => {
     doRemoveProgress(updateProduct, ribId, releaseId, selectedSprint);
   };
-  const updateComment = (ribId, releaseId, comment) => {
+  const updateComment = (ribId: string, releaseId: string, comment: string) => {
     doUpdateComment(updateProduct, ribId, releaseId, selectedSprint, comment);
   };
 
   // Bind pure helpers to component-level lookup maps
   const boundGetCommentHistory = useCallback(
-    (rib, releaseId) => getCommentHistory(rib, releaseId, sprintNameMap, sprintOrder),
+    (rib: RibItem, releaseId: string | null) => getCommentHistory(rib, releaseId, sprintNameMap, sprintOrder),
     [sprintNameMap, sprintOrder]
   );
   const boundGetSprintPct = useCallback(
-    (rib, releaseId) => getSprintPct(rib, releaseId, selectedSprint),
+    (rib: RibItem, releaseId: string | null) => getSprintPct(rib, releaseId, selectedSprint),
     [selectedSprint]
   );
   const boundGetDelta = useCallback(
-    (rib, releaseId) => getDelta(rib, releaseId, sprint, prevSprint, selectedSprint),
+    (rib: RibItem, releaseId: string | null) => getDelta(rib, releaseId, sprint, prevSprint, selectedSprint),
     [sprint, prevSprint, selectedSprint]
   );
 
   // Build rows
   const grouped = useMemo(() => {
-    const groups = {};
+    const groups: Record<string, ProgressGroup> = {};
 
     if (groupBy === 'release') {
       for (const rib of assignedRibs) {
@@ -140,9 +162,10 @@ export default function ProgressTrackingView() {
           });
         }
       }
-      const releaseOrder = {};
+      const releaseOrder: Record<string, number> = {};
       product.releases.forEach(r => { releaseOrder[r.id] = r.order; });
-      const result = Object.values(groups).sort((a, b) => (releaseOrder[a.releaseId] || 0) - (releaseOrder[b.releaseId] || 0));
+      const result = Object.values(groups)
+        .sort((a, b) => (releaseOrder[a.releaseId ?? ''] || 0) - (releaseOrder[b.releaseId ?? ''] || 0));
       for (const g of result) {
         g.items.sort((a, b) => a.backboneName.localeCompare(b.backboneName) || a.name.localeCompare(b.name));
       }
@@ -150,7 +173,8 @@ export default function ProgressTrackingView() {
     }
 
     for (const rib of assignedRibs) {
-      let key, label;
+      let key: string;
+      let label: string;
       if (groupBy === 'backbone') {
         key = rib.backboneId;
         label = rib.backboneName;
@@ -175,7 +199,7 @@ export default function ProgressTrackingView() {
 
   // Collect all row keys for expand-all
   const allRowKeys = useMemo(() => {
-    const keys = [];
+    const keys: string[] = [];
     grouped.forEach(group => {
       group.items.forEach((rib, idx) => {
         keys.push(`${rib.id}-${rib._releaseId || idx}`);
