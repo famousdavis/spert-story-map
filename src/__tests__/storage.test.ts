@@ -195,18 +195,27 @@ describe('duplicateProduct', () => {
 
   it('remaps all IDs consistently', () => {
     const dup = duplicateProduct(original);
-    // Release IDs should be different
-    expect(dup.releases[0]?.id).not.toBe('rel-1');
-    // Sprint IDs should be different
-    expect(dup.sprints[0]?.id).not.toBe('sp-1');
-    // Theme/backbone/rib IDs should be different
+    // Bind every cross-reference BEFORE asserting. Optional chaining is wrong
+    // here: `expect(a?.x).not.toBe('rel-1')` passes when `a` is missing, and
+    // `expect(a?.x).toBe(b?.y)` is `undefined === undefined` when both are —
+    // so a duplicate that DROPPED releases/sprints/allocations entirely would
+    // satisfy every line below. That is precisely the regression this test
+    // exists to catch, so each value must be required into scope first.
+    const dupRelease = req(dup.releases[0], 'dup.releases[0]');
+    const dupSprint = req(dup.sprints[0], 'dup.sprints[0]');
     const dupRib = req(dup.themes[0]?.backboneItems[0]?.ribItems[0], 'dupRib');
+    const dupAlloc = req(dupRib.releaseAllocations[0], 'dupRib.releaseAllocations[0]');
+    const dupProgress = req(dupRib.progressHistory[0], 'dupRib.progressHistory[0]');
+
+    // Release / sprint / rib IDs should all be different
+    expect(dupRelease.id).not.toBe('rel-1');
+    expect(dupSprint.id).not.toBe('sp-1');
     expect(dupRib.id).not.toBe('r1');
     // Rib's allocation should reference the new release ID
-    expect(dupRib.releaseAllocations[0]?.releaseId).toBe(dup.releases[0]?.id);
+    expect(dupAlloc.releaseId).toBe(dupRelease.id);
     // Progress history should reference the new sprint ID and release ID
-    expect(dupRib.progressHistory[0]?.sprintId).toBe(dup.sprints[0]?.id);
-    expect(dupRib.progressHistory[0]?.releaseId).toBe(dup.releases[0]?.id);
+    expect(dupProgress.sprintId).toBe(dupSprint.id);
+    expect(dupProgress.releaseId).toBe(dupRelease.id);
   });
 
   it('remaps releaseCardOrder keys and values', () => {

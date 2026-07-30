@@ -13,6 +13,7 @@ import {
   appendRibNoteInProduct,
 } from '../lib/productTransforms';
 import { buildAiSnapshot, selectSnapshotForWrite } from '../lib/aiSnapshot';
+import { req } from './testHelpers';
 
 function makeProduct(): Product {
   return {
@@ -2531,11 +2532,13 @@ describe('applyAiOp — bulk_append_rib_notes', () => {
       notes: [{ ribId: 'r1', text: 'A2.' }, { ribId: 'r2', text: 'B2.' }],
     });
     const log = next._changeLog ?? [];
-    const last = log[log.length - 1];
-    expect(last?.op).toBe('update');
-    expect(last?.entity).toBe('rib');
-    expect(last?.source).toBe('ai');
-    expect(last?.id).toBeUndefined();
+    // Bind, don't optional-chain: `expect(last?.id).toBeUndefined()` passes
+    // when the log is EMPTY, which is the opposite of what this asserts.
+    const last = req(log[log.length - 1], 'last changelog entry');
+    expect(last.op).toBe('update');
+    expect(last.entity).toBe('rib');
+    expect(last.source).toBe('ai');
+    expect(last.id).toBeUndefined();
   });
 
   it('all-unknown-ribId batch is ref-equal, no changelog entry', () => {
