@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 0.49.22 (2026-07-30)
+
+Test-suite integrity fix — no functional, data, or interface changes. The app behaves identically to
+v0.49.21.
+
+An audit of the type cleanup shipped in v0.49.16 found three tests that could pass without actually
+checking anything.
+
+The cause is a subtlety in how those tests were rewritten. Where a value might be absent, they use a
+"read it only if it is there" form. That is safe when the check that follows would fail on a missing
+value — but three of the checks would have *passed* on a missing value, so the safeguard quietly
+turned them into tests that could never fail.
+
+The most serious covered project duplication. When a project is copied, every internal reference —
+releases, sprints, allocations, progress history — has to be renumbered to point at the copy. That
+test was the only thing guarding it, and it would have passed even if copying had dropped all of
+them entirely. It now requires each value to be present before comparing, and reports by name which
+one is missing. Confirmed by deliberately breaking the copy step and checking that the test catches
+it, which it now does and previously did not.
+
+The other two — one covering the AI change-history summary, one covering how cards stack on the
+sizing board — had the same flaw and were corrected the same way.
+
+No behaviour changed and no test was added or removed; three existing tests went from unable to fail
+to able to fail. All 934 tests pass. The type-error baseline is unchanged at 342.
+
 ## Version 0.49.21 (2026-07-30)
 
 Type cleanup in the application code — no functional, data, or interface changes. The app behaves

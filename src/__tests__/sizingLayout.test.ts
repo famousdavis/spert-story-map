@@ -363,6 +363,10 @@ describe('computeSizingLayout targetWidth expansion', () => {
     const layout = computeSizingLayout(product);
     expect(layout.sizedSubColsByLabel.M).toBe(1);
     const mCells = layout.cells.filter(c => c.sizeLabel === 'M').sort((a, b) => a.y - b.y);
+    // Pin the count first — without it, `expect(mCells[0]?.x).toBe(mCells[1]?.x)`
+    // is `undefined === undefined` and passes on a layout that emitted NO cells.
+    // Same guard the unsized-row test above uses.
+    expect(mCells).toHaveLength(3);
     // All three stack vertically — same x, ascending y
     expect(mCells[0]?.x).toBe(mCells[1]?.x);
     expect(mCells[1]?.x).toBe(mCells[2]?.x);
