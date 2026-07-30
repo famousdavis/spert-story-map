@@ -8,7 +8,7 @@ import {
   addNamedReleaseToProduct, allocateRibInProduct, unassignRibInProduct,
   addNamedThemeToProduct, addNamedBackboneToProduct,
 } from '../lib/productTransforms';
-import type { Product, ReleaseAllocation } from '../types';
+import type { Product, ReleaseAllocation, Theme, Backbone, RibItem, Size, Category } from '../types';
 
 // Mock crypto.randomUUID
 let uuidCounter = 0;
@@ -21,10 +21,14 @@ vi.stubGlobal('crypto', {
 // The hook itself just wraps these patterns in useCallback, so testing the
 // updater functions directly covers the core logic.
 
-function makeRib(id, { size = null, category = 'core' } = {}) {
+function makeRib(id: string, { size = null, category = 'core' }: {
+  size?: Size;
+  category?: Category;
+} = {}): RibItem {
   return {
     id,
     name: `Rib ${id}`,
+    description: '',
     size,
     category,
     order: 1,
@@ -33,20 +37,31 @@ function makeRib(id, { size = null, category = 'core' } = {}) {
   };
 }
 
-function makeBackbone(id, ribs = []) {
+function makeBackbone(id: string, ribs: RibItem[] = []): Backbone {
   return { id, name: `Backbone ${id}`, ribItems: ribs, order: 1 };
 }
 
-function makeTheme(id, backbones = []) {
+function makeTheme(id: string, backbones: Backbone[] = []): Theme {
   return { id, name: `Theme ${id}`, backboneItems: backbones, order: 1 };
 }
 
-function makeProduct({ themes = [] } = {}) {
-  return { themes, releases: [], sprints: [], sizeMapping: [] };
+function makeProduct({ themes = [] }: { themes?: Theme[] } = {}): Product {
+  return {
+    id: 'p1',
+    name: 'Test Product',
+    description: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    schemaVersion: 2,
+    themes,
+    releases: [],
+    sprints: [],
+    sizeMapping: [],
+  };
 }
 
 // Simulate updateTheme(themeId, updater) — returns the updated product
-function applyUpdateTheme(product, themeId, updater) {
+function applyUpdateTheme(product: Product, themeId: string, updater: ((t: Theme) => Theme) | Partial<Theme>): Product {
   return {
     ...product,
     themes: product.themes.map(t =>
@@ -55,7 +70,7 @@ function applyUpdateTheme(product, themeId, updater) {
   };
 }
 
-function applyUpdateBackbone(product, themeId, backboneId, updater) {
+function applyUpdateBackbone(product: Product, themeId: string, backboneId: string, updater: ((b: Backbone) => Backbone) | Partial<Backbone>): Product {
   return {
     ...product,
     themes: product.themes.map(t =>
@@ -71,7 +86,7 @@ function applyUpdateBackbone(product, themeId, backboneId, updater) {
   };
 }
 
-function applyUpdateRib(product, themeId, backboneId, ribId, updater) {
+function applyUpdateRib(product: Product, themeId: string, backboneId: string, ribId: string, updater: ((r: RibItem) => RibItem) | Partial<RibItem>): Product {
   return {
     ...product,
     themes: product.themes.map(t =>
@@ -89,13 +104,20 @@ function applyUpdateRib(product, themeId, backboneId, ribId, updater) {
   };
 }
 
-function applyMoveItem(items, id, direction, key = 'id') {
+function applyMoveItem<T extends { id: string; order: number }>(items: T[], id: string, direction: number, key: keyof T = 'id' as keyof T): T[] {
   const arr = [...items];
   const idx = arr.findIndex(item => item[key] === id);
   if (idx < 0) return items;
   const newIdx = idx + direction;
   if (newIdx < 0 || newIdx >= arr.length) return items;
-  [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+  // Both indices are in range (checked above), but indexed reads are
+  // `T | undefined` under noUncheckedIndexedAccess — bind them explicitly
+  // rather than swapping through possibly-undefined slots.
+  const a = arr[idx];
+  const b = arr[newIdx];
+  if (a === undefined || b === undefined) return items;
+  arr[idx] = b;
+  arr[newIdx] = a;
   return arr.map((item, i) => ({ ...item, order: i + 1 }));
 }
 
@@ -208,7 +230,7 @@ describe('moveItem', () => {
 
 // --- addReleaseAfter (updater logic) ---
 // Simulates the updater function from useProductMutations.addReleaseAfter
-function applyAddReleaseAfter(product, afterReleaseId) {
+function applyAddReleaseAfter(product: Product, afterReleaseId: string | null): Product {
   const sorted = [...product.releases].sort((a, b) => a.order - b.order);
   const afterIdx = afterReleaseId
     ? sorted.findIndex(r => r.id === afterReleaseId)

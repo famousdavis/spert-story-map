@@ -1,5 +1,41 @@
 # Changelog
 
+## Version 0.49.14 (2026-07-30)
+
+Type-annotation cleanup applied to the test suite — no functional, data, or interface changes, and
+no change to the application code at all. Only test files were touched.
+
+This is the largest single reduction so far: **624 errors removed**, taking the repository baseline
+from 1,850 to 1,226. Combined with the eight earlier instalments, the total has come down from 2,183.
+
+The project's tests build their sample data through small helper functions — make a rib item, make a
+backbone, make a theme, make a product. Those helpers had never described what they accept or
+return, and because they start from empty lists, the compiler concluded those lists could never
+contain anything. Every test that then put real data into one, or read a field back out, was
+therefore unchecked. That single pattern accounted for roughly half the errors in the entire
+repository.
+
+Describing four sets of those helpers resolved 624 errors:
+
+| test file | before | after |
+|---|---|---|
+| map mutations | 435 | 187 |
+| calculations | 279 | 48 |
+| forecaster export | 185 | 90 |
+| product mutations | 211 | 161 |
+
+All 930 tests pass, unchanged. Nothing about what the tests assert was altered — the helpers now
+also fill in the few product fields they had been omitting, which the tests never looked at.
+
+One file's count improved less than the others, and deliberately so. Describing its helpers cleared
+34 errors but revealed 37 places where a test reaches into a list by position without first checking
+there is anything there. Those gaps were always present; they were simply invisible while the helper
+returned an unchecked value. They are left visible rather than papered over, and are the main
+remaining category across the suite.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming four
+test files improved, no file regressed, and the application code is untouched at 200 errors.
+
 ## Version 0.49.13 (2026-07-30)
 
 Type-annotation cleanup, eighth instalment — and the completion of this pass. No functional, data,

@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { addDays, computeFirstSprintStartDate, buildForecasterExport } from '../lib/exportForForecaster';
+import type { Theme, Backbone, RibItem, ReleaseAllocation, ProgressEntry, Size, Category } from '../types';
 
 const SIZE_MAPPING = [
   { label: 'S', points: 10 },
@@ -11,19 +12,26 @@ const SIZE_MAPPING = [
   { label: 'L', points: 40 },
 ];
 
-function makeRib(id, { size = null, category = 'core', allocations = [], history = [] } = {}) {
+function makeRib(id: string, { size = null, category = 'core', allocations = [], history = [] }: {
+  size?: Size;
+  category?: Category;
+  allocations?: ReleaseAllocation[];
+  history?: ProgressEntry[];
+} = {}): RibItem {
   return {
-    id, name: `Rib ${id}`, size, category, order: 1,
+    id, name: `Rib ${id}`, description: '', size, category, order: 1,
     releaseAllocations: allocations,
     progressHistory: history,
   };
 }
 
-function makeBackbone(id, ribs = []) {
+function makeBackbone(id: string, ribs: RibItem[] = []) {
+  // `backboneItems: undefined` is deliberate malformed-shape test data, so the
+  // return type stays inferred rather than annotated as Backbone.
   return { id, name: `Backbone ${id}`, backboneItems: undefined, ribItems: ribs, order: 1 };
 }
 
-function makeTheme(id, backbones = []) {
+function makeTheme(id: string, backbones: Backbone[] = []): Theme {
   return { id, name: `Theme ${id}`, backboneItems: backbones, order: 1 };
 }
 
