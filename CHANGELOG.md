@@ -1,5 +1,38 @@
 # Changelog
 
+## Version 0.49.7 (2026-07-30)
+
+Type-annotation cleanup, second instalment — no functional, data, or interface changes. The app
+behaves identically to v0.49.6.
+
+The Progress Tracking page, the largest single concentration of type debt in the codebase, goes from
+**64 errors to 22**, bringing the repository baseline from 2,150 to 2,108. Every remaining error in
+that file is a different kind of problem, described below.
+
+Most of the page's progress table was invisible to the compiler. The grouped rows it builds — the
+collapsible Release / Backbone / Theme sections — were assembled into an untyped object, so the
+compiler treated each group as an unknown value and checked nothing about the rows inside it, the
+sort comparisons between them, or the fields read out of them when rendering. Two sprint lookup
+tables had the same problem. Those now have declared shapes, and with them the row type the table
+actually passes around is written down for the first time. Fourteen function parameters that had
+never been annotated — row and group keys, rib and release identifiers, percentages, comments — are
+annotated too.
+
+Nothing about the page changed. No sorting, grouping, expansion, or progress-entry behaviour was
+touched; the work was describing structures that were already there.
+
+The 22 errors left are deliberately left. They are one real design question, not annotation debt:
+the page allows "no sprint selected" and "no single release to edit" as legitimate states, and
+represents both as null, while the components and helpers it hands them to were declared as though
+neither could happen. The same row shape is currently declared three separate ways across the page,
+the table row, and the comment panel, and the three disagree about null. Reconciling that is a
+decision about the component contract rather than a matter of adding types, so it is scheduled with
+the rest of the strict-null work instead of being papered over here.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming this
+release changed the error count of exactly one file and left every other file in the repository
+untouched.
+
 ## Version 0.49.6 (2026-07-30)
 
 Type-annotation cleanup — no functional, data, or interface changes. The app behaves identically to
