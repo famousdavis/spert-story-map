@@ -170,7 +170,7 @@ export function validateProduct(data: unknown): Product {
   }
 
   const validSizeLabels = sizeMapping
-    ? new Set(sizeMapping.map(s => s.label))
+    ? new Set(sizeMapping.map((s: { label: string }) => s.label))
     : null;
 
   // --- Themes ---
@@ -245,7 +245,7 @@ export function validateProduct(data: unknown): Product {
           // Strip allocations referencing non-existent releases
           if (releaseIds.size > 0) {
             rib.releaseAllocations = rib.releaseAllocations.filter(
-              alloc => isValidId(alloc.releaseId) && releaseIds.has(alloc.releaseId)
+              (alloc: { releaseId: unknown }) => isValidId(alloc.releaseId) && releaseIds.has(alloc.releaseId)
             );
           }
           assert(rib.releaseAllocations.length <= MAX_ALLOCATIONS,
@@ -267,7 +267,7 @@ export function validateProduct(data: unknown): Product {
         // Progress history
         if (Array.isArray(rib.progressHistory)) {
           // Strip entries referencing non-existent sprints or releases
-          rib.progressHistory = rib.progressHistory.filter(p => {
+          rib.progressHistory = rib.progressHistory.filter((p: { sprintId: unknown; releaseId?: unknown }) => {
             if (!isValidId(p.sprintId)) return false;
             if (sprintIds.size > 0 && !sprintIds.has(p.sprintId)) return false;
             if (p.releaseId !== undefined) {

@@ -141,7 +141,7 @@ export default function AboutView() {
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-8">
       <h3 className="text-base font-semibold text-blue-600 dark:text-blue-400 mb-3">{title}</h3>

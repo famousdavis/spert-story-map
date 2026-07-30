@@ -400,11 +400,11 @@ export function useAiConnectivity(
         try { snap = await getDoc(doc(db, SESSIONS_COL, storedId)); }
         catch (err) { console.error('[AI] Session check failed:', err); return false; }
         if (snap.exists()) {
-          const d = snap.data();
-          const storedExp = d.expiresAt?.toDate?.() as Date | undefined;
+          const d = snap.data() as { expiresAt?: { toDate?: () => Date }; consentRead?: boolean } | undefined;
+          const storedExp = d?.expiresAt?.toDate?.();
           if (!storedExp || storedExp >= new Date()) {
             sessionId = storedId;
-            prevConsentRead = (d.consentRead as boolean) ?? false;
+            prevConsentRead = d?.consentRead ?? false;
           } else {
             clearLastSeq(storedId);
             sessionId = crypto.randomUUID();

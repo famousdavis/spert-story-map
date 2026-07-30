@@ -1,5 +1,39 @@
 # Changelog
 
+## Version 0.49.13 (2026-07-30)
+
+Type-annotation cleanup, eighth instalment — and the completion of this pass. No functional, data,
+or interface changes. The app behaves identically to v0.49.12.
+
+Sixteen remaining files are annotated, taking the repository baseline from 1,881 to 1,850.
+
+**This completes the annotation work begun in v0.49.6.** Across eight releases the repository has
+gone from 2,183 type errors to 1,850, and the specific problem this pass set out to fix — code where
+the compiler had no idea what a value was, and so was checking nothing around it — is now entirely
+gone from the application source. Every function parameter, every piece of component state, and
+every lookup table in the shipped code now has a declared type. At the start of this work 461 of the
+errors were in application code; 200 remain, and all of them are a different and more considered kind
+of problem.
+
+This release covers the last of the small cases: keyboard and pointer handlers across the map, the
+sizing board, the detail panels and the inline editor; the release drag-and-drop; the import
+validator; the Firestore project loader; and two small presentational components on the About page
+that had no described properties at all. Two internal hooks that receive the map and sizing layouts
+now use the definitions written in v0.49.9 and v0.49.10 rather than accepting anything.
+
+One pattern was fixed in four places. Several keyboard handlers check what kind of element a keypress
+came from, so they do not steal typing from text fields. That element was read without first
+establishing that it was there or that it was the kind of thing with a tag name. All four now handle
+its absence, with no change to behaviour in any reachable case.
+
+What remains is genuinely different work: places where the code allows something to be absent and the
+thing receiving it does not, and places where the same object is described in two files in two
+slightly different ways. Those are decisions about interfaces rather than missing labels, and they
+are scheduled separately.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming sixteen
+files improved and no file in the repository regressed.
+
 ## Version 0.49.12 (2026-07-30)
 
 Type-annotation cleanup, seventh instalment — no functional, data, or interface changes. The app

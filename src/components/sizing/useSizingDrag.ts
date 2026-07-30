@@ -5,6 +5,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Product } from '../../types';
 import { CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
+import type { SizingLayout } from './useSizingLayout';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
@@ -14,8 +15,7 @@ const DRAG_THRESHOLD = 8;
  * Pointer-event drag hook for the sizing board.
  * Only handles rib drags between size columns / unsized zone.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- drag state and layout from computeSizingLayout have complex inferred shapes
-export default function useSizingDrag({ layout, zoom, pan, updateProduct }: { layout: any; zoom: number; pan: { x: number; y: number }; updateProduct: UpdateProduct }) {
+export default function useSizingDrag({ layout, zoom, pan, updateProduct }: { layout: SizingLayout; zoom: number; pan: { x: number; y: number }; updateProduct: UpdateProduct }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drag state and layout from computeSizingLayout have complex inferred shapes
   const [dragState, setDragState] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drag state and layout from computeSizingLayout have complex inferred shapes

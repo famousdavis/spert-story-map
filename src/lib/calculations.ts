@@ -306,8 +306,8 @@ export function getSprintSummary(product: Product, sprintId: string) {
     nonCoreTotalPts: 0, nonCoreCompletedPts: 0, nonCoreCompletedPrev: 0,
   });
 
-  const round1 = v => Math.round(v * 10) / 10;
-  const pct = (completed, total) => total > 0 ? Math.round((completed / total) * 1000) / 10 : 0;
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+  const pct = (completed: number, total: number) => total > 0 ? Math.round((completed / total) * 1000) / 10 : 0;
 
   return {
     sprintName: sprint.name,

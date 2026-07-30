@@ -110,7 +110,7 @@ export function useReleaseDrag(updateProduct: UpdateProduct, allRibs: RibItem[],
       if (!sameColumn) {
         const srcOrder = prevCardOrder[dragFromCol] || [];
         if (srcOrder.includes(dragRibId)) {
-          prevCardOrder[dragFromCol] = srcOrder.filter(id => id !== dragRibId);
+          prevCardOrder[dragFromCol] = srcOrder.filter((id: string) => id !== dragRibId);
         }
       }
 
