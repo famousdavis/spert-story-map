@@ -49,8 +49,9 @@ function updateRibProgress(
 export function updateProgress(updateProduct: UpdateProduct, ribId: string, releaseId: string, sprintId: string, percentComplete: number): void {
   updateRibProgress(updateProduct, ribId, sprintId, releaseId, (history, existingIdx) => {
     const now = new Date().toISOString();
-    if (existingIdx >= 0) {
-      history[existingIdx] = { ...history[existingIdx], percentComplete, updatedAt: now };
+    const existing = existingIdx >= 0 ? history[existingIdx] : undefined;
+    if (existing) {
+      history[existingIdx] = { ...existing, percentComplete, updatedAt: now };
     } else {
       history.push({ sprintId, releaseId, percentComplete, comment: '', updatedAt: now });
     }
@@ -62,8 +63,10 @@ export function updateProgress(updateProduct: UpdateProduct, ribId: string, rele
 export function removeProgress(updateProduct: UpdateProduct, ribId: string, releaseId: string, sprintId: string): void {
   updateRibProgress(updateProduct, ribId, sprintId, releaseId, (history, existingIdx) => {
     if (existingIdx < 0) return null;
-    if (history[existingIdx].comment) {
-      history[existingIdx] = { ...history[existingIdx], percentComplete: null, updatedAt: new Date().toISOString() };
+    const existing = history[existingIdx];
+    if (!existing) return null;
+    if (existing.comment) {
+      history[existingIdx] = { ...existing, percentComplete: null, updatedAt: new Date().toISOString() };
     } else {
       history.splice(existingIdx, 1);
     }
@@ -75,8 +78,9 @@ export function removeProgress(updateProduct: UpdateProduct, ribId: string, rele
 export function updateComment(updateProduct: UpdateProduct, ribId: string, releaseId: string, sprintId: string, comment: string): void {
   updateRibProgress(updateProduct, ribId, sprintId, releaseId, (history, existingIdx) => {
     const now = new Date().toISOString();
-    if (existingIdx >= 0) {
-      history[existingIdx] = { ...history[existingIdx], comment, updatedAt: now };
+    const existing = existingIdx >= 0 ? history[existingIdx] : undefined;
+    if (existing) {
+      history[existingIdx] = { ...existing, comment, updatedAt: now };
     } else {
       history.push({ sprintId, releaseId, percentComplete: null, comment, updatedAt: now });
     }

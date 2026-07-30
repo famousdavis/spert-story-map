@@ -121,8 +121,13 @@ export function useProduct(productId: string) {
   // Stable updater that only touches product
   const setProduct = useCallback((updater: ProductUpdater) => {
     setState(prev => {
-      const next = typeof updater === 'function' ? updater(prev.product) : updater;
-      return { ...prev, product: next };
+      if (typeof updater !== 'function') return { ...prev, product: updater };
+      // Nothing loaded yet — there is no previous product to transform. Every
+      // caller runs from a rendered view, which only mounts once the product
+      // exists, so this is unreachable; previously the functional updater was
+      // handed `null` and would have thrown on its first spread.
+      if (!prev.product) return prev;
+      return { ...prev, product: updater(prev.product) };
     });
   }, []);
 
@@ -167,6 +172,7 @@ export function useProduct(productId: string) {
       if (stack.length === 0) return prev;
 
       const previous = stack[stack.length - 1];
+      if (!previous) return prev; // unreachable: stack.length was checked above
       undoStackRef.current = stack.slice(0, -1);
       redoStackRef.current = [...redoStackRef.current, prev];
 
@@ -182,6 +188,7 @@ export function useProduct(productId: string) {
       if (stack.length === 0) return prev;
 
       const next = stack[stack.length - 1];
+      if (!next) return prev; // unreachable: stack.length was checked above
       redoStackRef.current = stack.slice(0, -1);
       undoStackRef.current = [...undoStackRef.current, prev];
 

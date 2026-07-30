@@ -49,8 +49,8 @@ function spliceCardOrderByColumn(cardOrder: Record<string, string[]>, key: strin
     // Walk the list counting siblings; insert before the Nth sibling.
     let siblingCount = 0;
     let globalIdx = -1;
-    for (let i = 0; i < list.length; i++) {
-      if (columnRibIds.has(list[i])) {
+    for (const [i, entry] of list.entries()) {
+      if (columnRibIds.has(entry)) {
         if (siblingCount === insertIndex) {
           globalIdx = i;
           break;
@@ -61,7 +61,8 @@ function spliceCardOrderByColumn(cardOrder: Record<string, string[]>, key: strin
     // insertIndex at or beyond all siblings — place after the last sibling
     if (globalIdx === -1) {
       for (let i = list.length - 1; i >= 0; i--) {
-        if (columnRibIds.has(list[i])) {
+        const entry = list[i];
+        if (entry !== undefined && columnRibIds.has(entry)) {
           globalIdx = i + 1;
           break;
         }
@@ -150,6 +151,10 @@ function moveRibBetweenBackbones(themes: Theme[], ribId: string, fromThemeId: st
   });
 
   if (!ribData) return null;
+  // Capture — the guard does not narrow inside the map callback below, so
+  // `{ ...ribData }` there would spread `RibItem | null` and yield a partial
+  // rib (every field optional), which is what the callers were reporting.
+  const movedRib: RibItem = ribData;
 
   // 2. Add rib to target backbone
   const result = stripped.map(t => {
@@ -158,7 +163,7 @@ function moveRibBetweenBackbones(themes: Theme[], ribId: string, fromThemeId: st
       ...t,
       backboneItems: t.backboneItems.map(b => {
         if (b.id !== toBackboneId) return b;
-        return { ...b, ribItems: [...b.ribItems, { ...ribData, order: b.ribItems.length + 1 }] };
+        return { ...b, ribItems: [...b.ribItems, { ...movedRib, order: b.ribItems.length + 1 }] };
       }),
     };
   });
@@ -255,6 +260,8 @@ export function moveBackboneToTheme(updateProduct: UpdateProduct, backboneId: st
     });
 
     if (!backboneData) return prev;
+    // Capture — the guard above does not narrow inside the map callback.
+    const movedBackbone = backboneData;
 
     // 2. Add backbone to target theme at insertion index
     const themesWithBb = themes.map(t => {
@@ -262,7 +269,7 @@ export function moveBackboneToTheme(updateProduct: UpdateProduct, backboneId: st
       const items = [...t.backboneItems];
       const idx = insertIndex != null && insertIndex >= 0 && insertIndex <= items.length
         ? insertIndex : items.length;
-      items.splice(idx, 0, backboneData);
+      items.splice(idx, 0, movedBackbone);
       return {
         ...t,
         backboneItems: items.map((b, i) => ({ ...b, order: i + 1 })),
@@ -282,6 +289,7 @@ export function reorderTheme(updateProduct: UpdateProduct, themeId: string, inse
     const idx = prev.themes.findIndex(t => t.id === themeId);
     if (idx === -1) return prev;
     const theme = prev.themes[idx];
+    if (!theme) return prev; // unreachable: idx came from findIndex
     const without = prev.themes.filter(t => t.id !== themeId);
     const pos = insertIndex != null && insertIndex >= 0 && insertIndex <= without.length
       ? insertIndex : without.length;
@@ -303,6 +311,7 @@ export function reorderRelease(updateProduct: UpdateProduct, releaseId: string, 
     const idx = sorted.findIndex(r => r.id === releaseId);
     if (idx === -1) return prev;
     const release = sorted[idx];
+    if (!release) return prev; // unreachable: idx came from findIndex
     const without = sorted.filter(r => r.id !== releaseId);
     const pos = insertIndex != null && insertIndex >= 0 && insertIndex <= without.length
       ? insertIndex : without.length;

@@ -6,6 +6,17 @@ import type { Product, Category, Size, ChangeLogEntry } from '../types';
 import { DEFAULT_SIZE_MAPPING, SCHEMA_VERSION } from './constants';
 import { getWorkspaceId } from './storage';
 
+/**
+ * Index into one of the arrays this module builds above, naming the offender if
+ * a sample definition ever references a row that does not exist. Indexed access
+ * is `T | undefined` under noUncheckedIndexedAccess; every index used here
+ * resolves today, so this never throws.
+ */
+function req<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`sampleData: expected ${what} to exist`);
+  return value;
+}
+
 export function createSampleProduct(): Product {
   const now = new Date().toISOString();
   const productId = crypto.randomUUID();
@@ -36,16 +47,21 @@ export function createSampleProduct(): Product {
       order: 0,
       size,
       category: category || 'core',
+      // `releases` / `sprints` are built above this call, so every index used
+      // by the sample definitions resolves; req() names the offender loudly if
+      // a definition is ever edited to reference a row that does not exist.
       releaseAllocations: allocations.map(([relIdx, pct, memo]) => ({
-        releaseId: releases[relIdx].id,
+        releaseId: req(releases[relIdx], `releases[${relIdx}]`).id,
         percentage: pct,
         memo: memo || '',
       })),
       progressHistory: progress.map(([spIdx, relIdx, pct, comment]) => ({
-        sprintId: sprints[spIdx].id,
-        releaseId: releases[relIdx].id,
+        sprintId: req(sprints[spIdx], `sprints[${spIdx}]`).id,
+        releaseId: req(releases[relIdx], `releases[${relIdx}]`).id,
         percentComplete: pct,
-        ...(comment ? { comment, updatedAt: sprints[spIdx].endDate + 'T17:00:00.000Z' } : {}),
+        ...(comment
+          ? { comment, updatedAt: req(sprints[spIdx], `sprints[${spIdx}]`).endDate + 'T17:00:00.000Z' }
+          : {}),
       })),
     };
   }

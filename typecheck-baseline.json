@@ -1,7 +1,7 @@
 {
-  "errors": 406,
-  "_measured": "2026-07-30 (v0.49.19). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
+  "errors": 367,
+  "_measured": "2026-07-30 (v0.49.20). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
   "_scope": "npx tsc -b --force — tsconfig.app.json (all of src/, strict + noUncheckedIndexedAccess) plus tsconfig.node.json",
-  "_breakdown": "285 in src/__tests__, 121 in production source. noUncheckedIndexedAccess accounts for 358 of the total (only 63 of those in production source).",
+  "_breakdown": "285 in src/__tests__, 82 in production source. noUncheckedIndexedAccess accounts for 358 of the total (only 63 of those in production source).",
   "_direction": "This number may only go DOWN. scripts/typecheck-baseline.mjs fails the gate if it grows, and also fails if it shrinks without being recorded here."
 }

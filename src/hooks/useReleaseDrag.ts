@@ -107,7 +107,10 @@ export function useReleaseDrag(updateProduct: UpdateProduct, allRibs: RibItem[],
       const prevCardOrder = { ...(next.releaseCardOrder || {}) };
       prevCardOrder[targetCol] = newOrder;
 
-      if (!sameColumn) {
+      // `sameColumn` is `dragFromCol === targetCol`, so reaching here with a
+      // null dragFromCol would mean targetCol is non-null and different — but
+      // the key is still only usable once it is known to be a string.
+      if (!sameColumn && dragFromCol !== null) {
         const srcOrder = prevCardOrder[dragFromCol] || [];
         if (srcOrder.includes(dragRibId)) {
           prevCardOrder[dragFromCol] = srcOrder.filter((id: string) => id !== dragRibId);
@@ -170,6 +173,7 @@ export function useReleaseDrag(updateProduct: UpdateProduct, allRibs: RibItem[],
       const dragIdx = releases.findIndex(r => r.id === dragColId);
       if (dragIdx < 0) return prev;
       const [dragged] = releases.splice(dragIdx, 1);
+      if (!dragged) return prev; // unreachable: dragIdx came from findIndex
 
       if (beforeId) {
         const beforeIdx = releases.findIndex(r => r.id === beforeId);
