@@ -1,0 +1,30 @@
+{
+  "repo": "spert-story-map",
+
+  "versionConstant": {
+    "file": "src/lib/version.ts",
+    "export": "APP_VERSION"
+  },
+
+  "changelog": {
+    "file": "CHANGELOG.md",
+    "headingPattern": "^## Version (\\d+\\.\\d+\\.\\d+)\\s*\\("
+  },
+
+  "claudeMdVersionPatterns": [],
+
+  "commands": [
+    { "name": "lint", "run": "npm run lint" },
+    {
+      "name": "typecheck (ratchet)",
+      "run": "npm run typecheck:baseline",
+      "_note": "NOT `tsc -b`. Nothing had ever typechecked this repo — `build` is a bare `vite build` — and the first run found 2,183 errors. The ratchet holds that number from growing; see scripts/typecheck-baseline.mjs and typecheck-baseline.json. Wiring tsc into `build` today would fail every Vercel deploy."
+    },
+    { "name": "test", "run": "npm test" },
+    {
+      "name": "build (vite build — does NOT typecheck)",
+      "run": "npm run build",
+      "_note": "Kept as a bare vite build deliberately. The typecheck step above is what covers types, at a baseline, until the debt is paid down."
+    }
+  ]
+}

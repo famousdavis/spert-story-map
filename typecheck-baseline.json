@@ -1,0 +1,7 @@
+{
+  "errors": 2183,
+  "_measured": "2026-07-29, the first time tsc had ever been run against this repository",
+  "_scope": "npx tsc -b --force — tsconfig.app.json (all of src/, strict + noUncheckedIndexedAccess) plus tsconfig.node.json",
+  "_breakdown": "~1,720 in src/__tests__, ~460 in production source. noUncheckedIndexedAccess accounts for ~360 of the total.",
+  "_direction": "This number may only go DOWN. scripts/typecheck-baseline.mjs fails the gate if it grows, and also fails if it shrinks without being recorded here."
+}
