@@ -112,7 +112,9 @@ export function buildRibMoveState(
   // Compute insertion index — exclude all dragged IDs from existing cells
   const excludeIds = prev.selectedIds || new Set([prev.ribId]);
   const insertIndex = computeInsertIndex(
-    cells, targetBackboneId, targetReleaseId, excludeIds, mapPos.y,
+    // `?? null` bridges the drag state's `string | null | undefined` to the
+    // `string | null` the helper declares; both mean "no target release".
+    cells, targetBackboneId, targetReleaseId ?? null, excludeIds, mapPos.y,
   );
 
   return {
@@ -144,8 +146,8 @@ export function buildBackboneMoveState(
     .sort((a, b) => a.x - b.x);
 
   let insertIndex = themeCols.length; // default: append at end
-  for (let i = 0; i < themeCols.length; i++) {
-    const colMid = themeCols[i].x + COL_WIDTH / 2;
+  for (const [i, col] of themeCols.entries()) {
+    const colMid = col.x + COL_WIDTH / 2;
     if (mapPos.x < colMid) {
       insertIndex = i;
       break;
@@ -174,8 +176,8 @@ export function computeInsertIndex(cells: LayoutCell[], backboneId: string | nul
 
   if (laneCells.length === 0) return 0;
 
-  for (let i = 0; i < laneCells.length; i++) {
-    const cellMid = laneCells[i].y + CELL_HEIGHT / 2;
+  for (const [i, cell] of laneCells.entries()) {
+    const cellMid = cell.y + CELL_HEIGHT / 2;
     if (mapY < cellMid) return i;
   }
   return laneCells.length;
@@ -240,8 +242,8 @@ export function buildThemeMoveState(prev: ThemeDragState, mapPos: MapPoint, them
     .sort((a, b) => a.x - b.x);
 
   let insertIndex = otherSpans.length; // default: append at end
-  for (let i = 0; i < otherSpans.length; i++) {
-    const spanMid = otherSpans[i].x + otherSpans[i].width / 2;
+  for (const [i, span] of otherSpans.entries()) {
+    const spanMid = span.x + span.width / 2;
     if (mapPos.x < spanMid) {
       insertIndex = i;
       break;
@@ -291,8 +293,8 @@ export function buildReleaseMoveState(prev: ReleaseDragState, mapPos: MapPoint, 
     .sort((a, b) => a.y - b.y);
 
   let insertIndex = otherLanes.length; // default: append at end
-  for (let i = 0; i < otherLanes.length; i++) {
-    const laneMid = otherLanes[i].y + otherLanes[i].height / 2;
+  for (const [i, otherLane] of otherLanes.entries()) {
+    const laneMid = otherLane.y + otherLane.height / 2;
     if (mapPos.y < laneMid) {
       insertIndex = i;
       break;

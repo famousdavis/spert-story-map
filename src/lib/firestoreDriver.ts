@@ -20,9 +20,23 @@ import {
   deleteField, runTransaction, arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import type { Firestore } from 'firebase/firestore';
 import { migrateToV2 } from './storage';
 import { sanitizeForFirestore } from './firestoreUtils';
 import { callRevokeInvite, callResendInvite } from './callables';
+
+/**
+ * Narrow the module-level `db`, which is `Firestore | null` because firebase.ts
+ * skips initialisation when the env vars are absent. The cloud driver is only
+ * constructed once Firebase is configured, so this never throws in practice —
+ * but the calls below were passing `db` straight into `doc()`/`collection()`
+ * unguarded, while three other sites in this same file already guard it. The
+ * message matches those.
+ */
+function requireDb(): Firestore {
+  if (!db) throw new Error('Cloud storage unavailable. Please try again.');
+  return db;
+}
 import type { PendingInvite } from '../types';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 
@@ -124,7 +138,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
    */
   async function doSaveProduct(product: Product): Promise<void> {
     try {
-      const ref = doc(db, PROJECTS_COL, product.id);
+      const ref = doc(requireDb(), PROJECTS_COL, product.id);
       const {
         id: _id,
         // Cloud-only / export-only fields that must never be written by a
@@ -178,7 +192,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
   async function doSavePrefs(prefs: any): Promise<void> {
     try {
-      const ref = doc(db, SETTINGS_COL, uid);
+      const ref = doc(requireDb(), SETTINGS_COL, uid);
       await setDoc(ref, sanitizeForFirestore(prefs));
     } catch (e) {
       handleWriteError(e);
@@ -196,7 +210,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      */
     async loadProductIndex() {
       const q = query(
-        collection(db, PROJECTS_COL),
+        collection(requireDb(), PROJECTS_COL),
         where(`members.${uid}`, 'in', ['owner', 'editor', 'viewer']),
       );
       const snap = await getDocs(q);
@@ -219,7 +233,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     },
 
     async loadProduct(id) {
-      const ref = doc(db, PROJECTS_COL, id);
+      const ref = doc(requireDb(), PROJECTS_COL, id);
       const snap = await getDoc(ref);
       if (!snap.exists()) return null;
       const data = snap.data();
@@ -259,7 +273,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       if (productTimer) { clearTimeout(productTimer); productTimer = null; }
       productPending = null;
       try {
-        const ref = doc(db, PROJECTS_COL, product.id);
+        const ref = doc(requireDb(), PROJECTS_COL, product.id);
         const { id: _id, ...rest } = product;
         const data = sanitizeForFirestore(rest);
         await setDoc(ref, {
@@ -320,7 +334,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         productTimer = null;
         productPending = null;
       }
-      const ref = doc(db, PROJECTS_COL, product.id);
+      const ref = doc(requireDb(), PROJECTS_COL, product.id);
       const { id: _id, ...rest } = product;
       const data = sanitizeForFirestore(rest);
       await runTransaction(db, async (tx) => {
@@ -350,7 +364,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       // doesn't suppress legitimate changelog entries.
       changeLogBaseline.delete(id);
       try {
-        await deleteDoc(doc(db, PROJECTS_COL, id));
+        await deleteDoc(doc(requireDb(), PROJECTS_COL, id));
       } catch (e) {
         handleWriteError(e);
       }
@@ -358,7 +372,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
 
     async loadPreferences() {
       try {
-        const ref = doc(db, SETTINGS_COL, uid);
+        const ref = doc(requireDb(), SETTINGS_COL, uid);
         const snap = await getDoc(ref);
         return snap.exists() ? snap.data() : {};
       } catch (e) {
@@ -455,7 +469,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       cb: (product: Product) => void,
       onError?: (error: unknown) => void,
     ) {
-      const ref = doc(db, PROJECTS_COL, id);
+      const ref = doc(requireDb(), PROJECTS_COL, id);
       const rawUnsubscribe = onSnapshot(
         ref,
         (snap) => {
@@ -511,7 +525,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     async listPendingInvites(productId: string): Promise<PendingInvite[]> {
       try {
         const q = query(
-          collection(db, 'spertsuite_invitations'),
+          collection(requireDb(), 'spertsuite_invitations'),
           where('inviterUid', '==', uid),
           where('modelId', '==', productId),
         );
@@ -567,7 +581,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         throw new Error('Cannot remove yourself from a project.');
       }
       try {
-        const ref = doc(db, PROJECTS_COL, productId);
+        const ref = doc(requireDb(), PROJECTS_COL, productId);
         await runTransaction(db, async (tx) => {
           const snap = await tx.get(ref);
           if (!snap.exists()) {

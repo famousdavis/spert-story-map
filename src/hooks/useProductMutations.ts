@@ -109,7 +109,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
               ...t,
               backboneItems: t.backboneItems.map(b =>
                 b.id === backboneId
-                  ? { ...b, ribItems: [...b.ribItems, { id, name: 'New Rib Item', description: '', order: b.ribItems.length + 1, size: null, category: 'core', releaseAllocations: [], progressHistory: [], notes: '' }] }
+                  ? { ...b, ribItems: [...b.ribItems, { id, name: 'New Rib Item', description: '', order: b.ribItems.length + 1, size: null, category: 'core' as const, releaseAllocations: [], progressHistory: [], notes: '' }] }
                   : b
               ),
             }
@@ -132,7 +132,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
               ...t,
               backboneItems: t.backboneItems.map(b =>
                 b.id === backboneId
-                  ? { ...b, ribItems: [...b.ribItems, { id, name: 'New Rib Item', description: '', order: b.ribItems.length + 1, size: null, category: 'core', releaseAllocations: [{ releaseId, percentage: 100 }], progressHistory: [], notes: '' }] }
+                  ? { ...b, ribItems: [...b.ribItems, { id, name: 'New Rib Item', description: '', order: b.ribItems.length + 1, size: null, category: 'core' as const, releaseAllocations: [{ releaseId, percentage: 100 }], progressHistory: [], notes: '' }] }
                   : b
               ),
             }
@@ -197,7 +197,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
           id,
           name: `Sprint ${prev.sprints.length + 1}`,
           order: prev.sprints.length + 1,
-          endDate: calculateNextSprintEndDate(last?.endDate, cadenceWeeks),
+          endDate: calculateNextSprintEndDate(last?.endDate ?? null, cadenceWeeks),
         }],
       };
       return { ...next, _changeLog: appendChangeLogEntry(next, { op: 'add', entity: 'sprint', id }) };
@@ -208,7 +208,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
 
   const deleteTheme = useCallback((themeId: string) => {
     updateProduct(prev => {
-      const ribIds = new Set();
+      const ribIds = new Set<string>();
       const theme = prev.themes.find(t => t.id === themeId);
       if (theme) theme.backboneItems.forEach(b => b.ribItems.forEach(r => ribIds.add(r.id)));
       const next = {
@@ -223,7 +223,7 @@ export function useProductMutations(updateProduct: UpdateProduct) {
 
   const deleteBackbone = useCallback((themeId: string, backboneId: string) => {
     updateProduct(prev => {
-      const ribIds = new Set();
+      const ribIds = new Set<string>();
       const theme = prev.themes.find(t => t.id === themeId);
       const bb = theme?.backboneItems.find(b => b.id === backboneId);
       if (bb) bb.ribItems.forEach(r => ribIds.add(r.id));
@@ -316,13 +316,26 @@ export function useProductMutations(updateProduct: UpdateProduct) {
     });
   }, [updateProduct]);
 
-  const moveItem = useCallback(<T extends Record<string, unknown>>(items: T[], id: string, direction: number, key = 'id'): T[] => {
+  /**
+   * Move an ordered item up or down one slot and renumber `order`.
+   *
+   * Constrained to what the function actually needs — an `id` to find by and an
+   * `order` to rewrite. It was previously `<T extends Record<string, unknown>>`,
+   * which no interface satisfies (interfaces have no implicit index signature),
+   * so every call site reported TS2345. The old `key = 'id'` parameter was dead:
+   * neither of the two call sites ever passed it.
+   */
+  const moveItem = useCallback(<T extends { id: string; order: number }>(items: T[], id: string, direction: number): T[] => {
     const arr = [...items];
-    const idx = arr.findIndex(item => item[key] === id);
+    const idx = arr.findIndex(item => item.id === id);
     if (idx < 0) return items;
     const newIdx = idx + direction;
     if (newIdx < 0 || newIdx >= arr.length) return items;
-    [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+    const a = arr[idx];
+    const b = arr[newIdx];
+    if (a === undefined || b === undefined) return items;
+    arr[idx] = b;
+    arr[newIdx] = a;
     return arr.map((item, i) => ({ ...item, order: i + 1 }));
   }, []);
 

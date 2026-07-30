@@ -107,7 +107,12 @@ export interface Release {
   name: string;
   description?: string;
   order: number;
-  targetDate?: string;
+  /**
+   * Null (not absent) when a release is created — both `addRelease` and the
+   * DataSection sample write `targetDate: null` explicitly. Consumers guard
+   * with `release.targetDate && ...`, which treats null and undefined alike.
+   */
+  targetDate?: string | null;
 }
 
 export interface Sprint {
