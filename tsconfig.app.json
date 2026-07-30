@@ -7,6 +7,15 @@
     "module": "ESNext",
     "skipLibCheck": true,
 
+    /* Node globals for the repo-hygiene guards in src/__tests__ (LICENSE
+       conformance, changelog/public-copy sync, static-asset resolution). Those
+       read from disk, and without this they cannot see `node:fs`, `process` or
+       `Buffer` — 14 errors that had nothing to do with the app. @types/node is
+       already a devDependency; this only brings its globals into scope.
+       Verified to change nothing else: the typecheck error count is identical
+       with and without it. */
+    "types": ["node"],
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

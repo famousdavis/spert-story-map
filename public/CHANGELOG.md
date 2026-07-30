@@ -1,5 +1,62 @@
 # Changelog
 
+## Version 0.49.5 (2026-07-29)
+
+Release-process hardening — no functional, data, or interface changes. The app behaves identically
+to v0.49.4.
+
+This repository had never been type-checked. Its `build` script is a bare `vite build`, which strips
+TypeScript types without checking them; there was no `typecheck` script, and no CI. So no build, no
+test run, no lint pass and no deploy had ever run `tsc` against this code. The first run found
+**2,183 errors across 77 files** — roughly 1,720 in `src/__tests__` and about 460 in production
+source. `tsconfig.app.json` turns on `strict`, `noUnusedLocals`, `noUnusedParameters` and
+`noUncheckedIndexedAccess`, an aspirational configuration the code was never actually held to
+because nothing enforced it.
+
+That backlog is not fixable in a release whose purpose is to install a gate, and wiring `tsc` into
+`build` today would fail every Vercel deploy. So this release stops the bleeding instead: a
+**typecheck ratchet** records the current count and fails if it grows. It is the same discipline
+already used for ESLint in SPERT Scheduler — gate on the number, not the exit code. The ratchet
+only turns one way: fixing errors also fails the check, with a message telling you to lower the
+number, so progress gets recorded rather than quietly leaving headroom for regressions. It proved
+itself immediately by catching 14 errors in the very guard files added by this release.
+
+Also adds the SPERT® Suite ship gate — `npm run shipgate` locally, and the same script in CI on
+every pull request and push to `main`. This is the first continuous integration this repository has
+ever had; until now a green check meant Vercel had built a preview, not that the 923 tests had run,
+because nothing ran them.
+
+### Added
+- **`npm run shipgate` — the release gate.** Verifies that `package.json`, both version fields in
+  `package-lock.json`, `APP_VERSION` and the newest `CHANGELOG.md` entry all agree, then runs lint,
+  the typecheck ratchet, the tests and a production build. It reports every disagreement in one run
+  rather than stopping at the first.
+- **Continuous integration** (`.github/workflows/shipgate.yml`), running the same `npm run shipgate`
+  on every pull request and push to `main`, so the local gate and the automated one cannot drift
+  apart. It installs with `npm ci`, which refuses to run at all if the lockfile and `package.json`
+  disagree.
+- **`npm run typecheck`** for the full report, and **`npm run typecheck:baseline`** for the ratchet.
+- **A guard that `public/CHANGELOG.md` stays byte-identical to the root file.** This matters more
+  here than anywhere else in the suite: the changelog page does not import data at build time, it
+  performs a runtime `fetch('/CHANGELOG.md')`. The public copy is the only thing users ever see, so
+  a drifted copy renders a confidently out-of-date changelog and a missing one renders
+  "No changelog available." The guard also checks that every version heading matches the exact
+  `## Version X.Y.Z (YYYY-MM-DD)` form the renderer needs to display it as a heading.
+- **A guard that `LICENSE` matches the canonical suite licence** — one SHA-256 of the licence body,
+  normalised for the repository URL on line 4, the only line that legitimately differs across the
+  nine repositories.
+- **A guard that every static asset linked from source exists in `public/`** — the Quick Reference
+  Guide and Connect AI Guide PDFs, the favicons, and the changelog itself.
+
+### Changed
+- **`tsconfig.app.json` now includes `"types": ["node"]`.** The repo-hygiene guards read from disk,
+  and without it they cannot see `node:fs`, `process` or `Buffer`. `@types/node` was already a
+  devDependency; this only brings its globals into scope. Verified to change nothing else — the
+  typecheck error count is identical with and without it.
+- **`build` remains a bare `vite build`, deliberately.** Adding `tsc -b` to it would fail the
+  deploy on every push until the 2,183 errors are paid down. The ratchet covers types in the
+  meantime.
+
 ## Version 0.49.4 (2026-07-29)
 
 Licensing only — no functional, data, or interface changes. The app behaves identically to v0.49.3.
