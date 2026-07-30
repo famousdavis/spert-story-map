@@ -18,6 +18,7 @@ import {
   cancelPendingSaves,
 } from '../lib/storage';
 import { SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from '../lib/constants';
+import { req } from './testHelpers';
 
 // Mock crypto.randomUUID since we're in node environment
 let uuidCounter = 0;
@@ -65,10 +66,10 @@ describe('appendChangeLogEntry', () => {
     const product = { _changeLog: [] };
     const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 'x' });
     expect(result).toHaveLength(1);
-    expect(result[0].op).toBe('add');
-    expect(result[0].entity).toBe('theme');
-    expect(result[0].id).toBe('x');
-    expect(result[0].t).toBeGreaterThan(0);
+    expect(result[0]?.op).toBe('add');
+    expect(result[0]?.entity).toBe('theme');
+    expect(result[0]?.id).toBe('x');
+    expect(result[0]?.t).toBeGreaterThan(0);
   });
 
   it('handles missing _changeLog', () => {
@@ -80,8 +81,8 @@ describe('appendChangeLogEntry', () => {
     const product = { _changeLog: [{ t: 1000, op: 'create', entity: 'product' }] };
     const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 't1' });
     expect(result).toHaveLength(2);
-    expect(result[0].op).toBe('create');
-    expect(result[1].op).toBe('add');
+    expect(result[0]?.op).toBe('create');
+    expect(result[1]?.op).toBe('add');
   });
 
   it('caps at CHANGELOG_MAX_ENTRIES', () => {
@@ -89,9 +90,9 @@ describe('appendChangeLogEntry', () => {
     const product = { _changeLog: log };
     const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 'new' });
     expect(result).toHaveLength(CHANGELOG_MAX_ENTRIES);
-    expect(result[CHANGELOG_MAX_ENTRIES - 1].id).toBe('new');
+    expect(result[CHANGELOG_MAX_ENTRIES - 1]?.id).toBe('new');
     // Oldest entry dropped
-    expect(result[0].id).toBe('t1');
+    expect(result[0]?.id).toBe('t1');
   });
 });
 
@@ -131,9 +132,9 @@ describe('createNewProduct', () => {
   it('initializes _changeLog with create event', () => {
     const product = createNewProduct('Test');
     expect(product._changeLog).toHaveLength(1);
-    expect(product._changeLog[0].op).toBe('create');
-    expect(product._changeLog[0].entity).toBe('product');
-    expect(product._changeLog[0].t).toBeGreaterThan(0);
+    expect(product._changeLog[0]?.op).toBe('create');
+    expect(product._changeLog[0]?.entity).toBe('product');
+    expect(product._changeLog[0]?.t).toBeGreaterThan(0);
   });
 
   it('uses workspaceIdOverride for _originRef when provided', () => {
@@ -195,32 +196,32 @@ describe('duplicateProduct', () => {
   it('remaps all IDs consistently', () => {
     const dup = duplicateProduct(original);
     // Release IDs should be different
-    expect(dup.releases[0].id).not.toBe('rel-1');
+    expect(dup.releases[0]?.id).not.toBe('rel-1');
     // Sprint IDs should be different
-    expect(dup.sprints[0].id).not.toBe('sp-1');
+    expect(dup.sprints[0]?.id).not.toBe('sp-1');
     // Theme/backbone/rib IDs should be different
-    const dupRib = dup.themes[0].backboneItems[0].ribItems[0];
+    const dupRib = req(dup.themes[0]?.backboneItems[0]?.ribItems[0], 'dupRib');
     expect(dupRib.id).not.toBe('r1');
     // Rib's allocation should reference the new release ID
-    expect(dupRib.releaseAllocations[0].releaseId).toBe(dup.releases[0].id);
+    expect(dupRib.releaseAllocations[0]?.releaseId).toBe(dup.releases[0]?.id);
     // Progress history should reference the new sprint ID and release ID
-    expect(dupRib.progressHistory[0].sprintId).toBe(dup.sprints[0].id);
-    expect(dupRib.progressHistory[0].releaseId).toBe(dup.releases[0].id);
+    expect(dupRib.progressHistory[0]?.sprintId).toBe(dup.sprints[0]?.id);
+    expect(dupRib.progressHistory[0]?.releaseId).toBe(dup.releases[0]?.id);
   });
 
   it('remaps releaseCardOrder keys and values', () => {
     const dup = duplicateProduct(original);
-    const newRelId = dup.releases[0].id;
-    const newRibId = dup.themes[0].backboneItems[0].ribItems[0].id;
-    expect(dup.releaseCardOrder[newRelId]).toEqual([newRibId]);
-    expect(dup.releaseCardOrder['unassigned']).toEqual([]);
+    const newRelId = dup.releases[0]?.id;
+    const newRibId = dup.themes[0]?.backboneItems[0]?.ribItems[0]?.id;
+    expect(dup.releaseCardOrder?.[newRelId]).toEqual([newRibId]);
+    expect(dup.releaseCardOrder?.['unassigned']).toEqual([]);
     // Old keys should not exist
     expect(dup.releaseCardOrder['rel-1']).toBeUndefined();
   });
 
   it('preserves rib data (size, category, name)', () => {
     const dup = duplicateProduct(original);
-    const dupRib = dup.themes[0].backboneItems[0].ribItems[0];
+    const dupRib = req(dup.themes[0]?.backboneItems[0]?.ribItems[0], 'dupRib');
     expect(dupRib.name).toBe('Rib 1');
     expect(dupRib.size).toBe('M');
     expect(dupRib.category).toBe('core');
@@ -255,18 +256,18 @@ describe('duplicateProduct', () => {
     };
 
     const dup = duplicateProduct(multi);
-    const dupRib = dup.themes[0].backboneItems[0].ribItems[0];
+    const dupRib = req(dup.themes[0]?.backboneItems[0]?.ribItems[0], 'dupRib');
     // Each allocation references consistent new release IDs
-    const newRel1 = dup.releases[0].id;
-    const newRel2 = dup.releases[1].id;
-    expect(dupRib.releaseAllocations[0].releaseId).toBe(newRel1);
-    expect(dupRib.releaseAllocations[1].releaseId).toBe(newRel2);
+    const newRel1 = dup.releases[0]?.id;
+    const newRel2 = dup.releases[1]?.id;
+    expect(dupRib.releaseAllocations[0]?.releaseId).toBe(newRel1);
+    expect(dupRib.releaseAllocations[1]?.releaseId).toBe(newRel2);
     // Progress also references the same remapped IDs
-    expect(dupRib.progressHistory[0].releaseId).toBe(newRel1);
-    expect(dupRib.progressHistory[1].releaseId).toBe(newRel2);
+    expect(dupRib.progressHistory[0]?.releaseId).toBe(newRel1);
+    expect(dupRib.progressHistory[1]?.releaseId).toBe(newRel2);
     // Card order keys remapped
-    expect(dup.releaseCardOrder[newRel1]).toBeDefined();
-    expect(dup.releaseCardOrder[newRel2]).toBeDefined();
+    expect(dup.releaseCardOrder?.[newRel1]).toBeDefined();
+    expect(dup.releaseCardOrder?.[newRel2]).toBeDefined();
   });
 
   it('handles empty releaseCardOrder', () => {
@@ -294,8 +295,8 @@ describe('duplicateProduct', () => {
       }],
     };
     const dup = duplicateProduct(legacy);
-    const entry = dup.themes[0].backboneItems[0].ribItems[0].progressHistory[0];
-    expect(entry.sprintId).toBe(dup.sprints[0].id);
+    const entry = req(dup.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory[0], 'entry');
+    expect(entry.sprintId).toBe(dup.sprints[0]?.id);
     // No releaseId should be added
     expect(entry.releaseId).toBeUndefined();
   });
@@ -322,9 +323,9 @@ describe('duplicateProduct', () => {
   it('initializes fresh _changeLog with duplicate event', () => {
     const dup = duplicateProduct(original);
     expect(dup._changeLog).toHaveLength(1);
-    expect(dup._changeLog[0].op).toBe('duplicate');
-    expect(dup._changeLog[0].entity).toBe('product');
-    expect(dup._changeLog[0].source).toBe('orig-id');
+    expect(dup._changeLog[0]?.op).toBe('duplicate');
+    expect(dup._changeLog[0]?.entity).toBe('product');
+    expect(dup._changeLog[0]?.source).toBe('orig-id');
   });
 
   it('uses workspaceIdOverride for _originRef when provided', () => {
@@ -429,7 +430,7 @@ describe('importProductFromJSON', () => {
       }],
     });
     const result = importProductFromJSON(json);
-    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(1);
+    expect(result.themes[0]?.backboneItems[0]?.ribItems).toHaveLength(1);
   });
 
   it('preserves _originRef from imported data', () => {
@@ -456,8 +457,8 @@ describe('importProductFromJSON', () => {
     });
     const result = importProductFromJSON(json);
     expect(result._changeLog).toHaveLength(2);
-    expect(result._changeLog[1].op).toBe('import');
-    expect(result._changeLog[1].source).toBe('file');
+    expect(result._changeLog[1]?.op).toBe('import');
+    expect(result._changeLog[1]?.source).toBe('file');
   });
 
   it('creates _changeLog with import event if none existed', () => {
@@ -466,7 +467,7 @@ describe('importProductFromJSON', () => {
     });
     const result = importProductFromJSON(json);
     expect(result._changeLog).toHaveLength(1);
-    expect(result._changeLog[0].op).toBe('import');
+    expect(result._changeLog[0]?.op).toBe('import');
   });
 
   it('strips _storageRef and attribution fields on import', () => {

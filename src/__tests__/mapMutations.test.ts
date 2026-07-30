@@ -8,6 +8,7 @@ import { computeLayout, CELL_HEIGHT, CELL_GAP } from '../components/storymap/use
 import type { MapLayout } from '../components/storymap/useMapLayout';
 import { computeInsertIndex } from '../components/storymap/mapDragHelpers';
 import type { Product, ProductUpdater, Theme, Backbone, RibItem, Release, ReleaseAllocation } from '../types';
+import { req } from './testHelpers';
 
 // Helper: creates a minimal product with configurable themes/backbones/ribs
 function makeProduct({
@@ -83,12 +84,12 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
+    const updatedRib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedRib');
     expect(updatedRib.releaseAllocations).toEqual([
       { releaseId: 'rel-B', percentage: 100, memo: '' },
     ]);
-    expect(result.releaseCardOrder['rel-A']).toEqual([]);
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r1']);
+    expect(result.releaseCardOrder?.['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r1']);
   });
 
   it('moves a rib to unassigned (clears allocations)', () => {
@@ -103,10 +104,10 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
+    const updatedRib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedRib');
     expect(updatedRib.releaseAllocations).toEqual([]);
-    expect(result.releaseCardOrder['rel-A']).toEqual([]);
-    expect(result.releaseCardOrder['unassigned']).toEqual(['r1']);
+    expect(result.releaseCardOrder?.['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder?.['unassigned']).toEqual(['r1']);
   });
 
   it('moves a rib from unassigned to a release', () => {
@@ -121,12 +122,12 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
+    const updatedRib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedRib');
     expect(updatedRib.releaseAllocations).toEqual([
       { releaseId: 'rel-B', percentage: 100, memo: '' },
     ]);
-    expect(result.releaseCardOrder['unassigned']).toEqual([]);
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r1']);
+    expect(result.releaseCardOrder?.['unassigned']).toEqual([]);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r1']);
   });
 
   it('preserves memo when transferring allocations', () => {
@@ -140,9 +141,9 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
-    expect(updatedRib.releaseAllocations[0].memo).toBe('important note');
-    expect(updatedRib.releaseAllocations[0].percentage).toBe(60);
+    const updatedRib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedRib');
+    expect(updatedRib.releaseAllocations[0]?.memo).toBe('important note');
+    expect(updatedRib.releaseAllocations[0]?.percentage).toBe(60);
   });
 
   it('guards against duplicate allocation on same release', () => {
@@ -161,14 +162,14 @@ describe('moveRibToRelease', () => {
     );
 
     // Should not create a duplicate — rib should be unchanged
-    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
+    const updatedRib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedRib');
     expect(updatedRib.releaseAllocations).toHaveLength(2);
     expect(updatedRib.releaseAllocations).toEqual(rib.releaseAllocations);
   });
 
   it('does not modify other ribs', () => {
-    const rib1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
-    const rib2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const rib1 = req(makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]), 'rib1');
+    const rib2 = req(makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]), 'rib2');
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [rib1, rib2])])],
     });
@@ -178,7 +179,7 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    const r2 = result.themes[0].backboneItems[0].ribItems[1];
+    const r2 = req(result.themes[0]?.backboneItems[0]?.ribItems[1], 'r2');
     expect(r2.releaseAllocations).toEqual([{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
   });
 
@@ -194,7 +195,7 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r2', 'r1', 'r3']);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r2', 'r1', 'r3']);
   });
 
   it('inserts rib at beginning when insertIndex is 0', () => {
@@ -209,7 +210,7 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r1', 'r2', 'r3']);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r1', 'r2', 'r3']);
   });
 
   it('appends rib when insertIndex is null', () => {
@@ -224,7 +225,7 @@ describe('moveRibToRelease', () => {
       product,
     );
 
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r2', 'r3', 'r1']);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r2', 'r3', 'r1']);
   });
 });
 
@@ -241,7 +242,7 @@ describe('reorderRibInRelease', () => {
       product,
     );
 
-    expect(result.releaseCardOrder['rel-A']).toEqual(['r2', 'r3', 'r1']);
+    expect(result.releaseCardOrder?.['rel-A']).toEqual(['r2', 'r3', 'r1']);
   });
 
   it('moves rib to beginning', () => {
@@ -255,7 +256,7 @@ describe('reorderRibInRelease', () => {
       product,
     );
 
-    expect(result.releaseCardOrder['rel-A']).toEqual(['r3', 'r1', 'r2']);
+    expect(result.releaseCardOrder?.['rel-A']).toEqual(['r3', 'r1', 'r2']);
   });
 
   it('handles unassigned lane', () => {
@@ -269,7 +270,7 @@ describe('reorderRibInRelease', () => {
       product,
     );
 
-    expect(result.releaseCardOrder['unassigned']).toEqual(['r2', 'r1']);
+    expect(result.releaseCardOrder?.['unassigned']).toEqual(['r2', 'r1']);
   });
 
   it('does not modify allocations', () => {
@@ -285,9 +286,9 @@ describe('reorderRibInRelease', () => {
     );
 
     // Allocations unchanged
-    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
-    expect(updatedRib.releaseAllocations[0].percentage).toBe(60);
-    expect(updatedRib.releaseAllocations[0].memo).toBe('keep');
+    const updatedRib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedRib');
+    expect(updatedRib.releaseAllocations[0]?.percentage).toBe(60);
+    expect(updatedRib.releaseAllocations[0]?.memo).toBe('keep');
   });
 });
 
@@ -307,9 +308,9 @@ describe('moveRibToBackbone', () => {
       product,
     );
 
-    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
-    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(1);
-    expect(result.themes[0].backboneItems[1].ribItems[0].id).toBe('r1');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[1]?.ribItems).toHaveLength(1);
+    expect(result.themes[0]?.backboneItems[1]?.ribItems[0]?.id).toBe('r1');
   });
 
   it('moves a rib across themes', () => {
@@ -326,9 +327,9 @@ describe('moveRibToBackbone', () => {
       product,
     );
 
-    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
-    expect(result.themes[1].backboneItems[0].ribItems).toHaveLength(1);
-    expect(result.themes[1].backboneItems[0].ribItems[0].id).toBe('r1');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems).toHaveLength(0);
+    expect(result.themes[1]?.backboneItems[0]?.ribItems).toHaveLength(1);
+    expect(result.themes[1]?.backboneItems[0]?.ribItems[0]?.id).toBe('r1');
   });
 
   it('returns prev if rib not found', () => {
@@ -346,7 +347,7 @@ describe('moveRibToBackbone', () => {
 
   it('assigns correct order on target backbone', () => {
     const existingRib = makeRib('r-existing');
-    const movedRib = makeRib('r1');
+    const movedRib = req(makeRib('r1'), 'movedRib');
     const product = makeProduct({
       themes: [makeTheme('t1', [
         makeBackbone('b1', [movedRib]),
@@ -359,7 +360,7 @@ describe('moveRibToBackbone', () => {
       product,
     );
 
-    const addedRib = result.themes[0].backboneItems[1].ribItems[1];
+    const addedRib = req(result.themes[0]?.backboneItems[1]?.ribItems[1], 'addedRib');
     expect(addedRib.id).toBe('r1');
     expect(addedRib.order).toBe(2); // Appended after existingRib
   });
@@ -382,19 +383,19 @@ describe('moveBackboneToTheme', () => {
     );
 
     // Source theme should have b1 removed
-    expect(result.themes[0].backboneItems).toHaveLength(1);
-    expect(result.themes[0].backboneItems[0].id).toBe('b2');
-    expect(result.themes[0].backboneItems[0].order).toBe(1); // reindexed
+    expect(result.themes[0]?.backboneItems).toHaveLength(1);
+    expect(result.themes[0]?.backboneItems[0]?.id).toBe('b2');
+    expect(result.themes[0]?.backboneItems[0]?.order).toBe(1); // reindexed
 
     // Target theme should have b1 added
-    expect(result.themes[1].backboneItems).toHaveLength(2);
-    expect(result.themes[1].backboneItems[1].id).toBe('b1');
-    expect(result.themes[1].backboneItems[1].order).toBe(2);
+    expect(result.themes[1]?.backboneItems).toHaveLength(2);
+    expect(result.themes[1]?.backboneItems[1]?.id).toBe('b1');
+    expect(result.themes[1]?.backboneItems[1]?.order).toBe(2);
   });
 
   it('preserves ribs when moving backbone', () => {
-    const rib1 = makeRib('r1');
-    const rib2 = makeRib('r2');
+    const rib1 = req(makeRib('r1'), 'rib1');
+    const rib2 = req(makeRib('r2'), 'rib2');
     const product = makeProduct({
       themes: [
         makeTheme('t1', [makeBackbone('b1', [rib1, rib2])]),
@@ -407,10 +408,10 @@ describe('moveBackboneToTheme', () => {
       product,
     );
 
-    const movedBb = result.themes[1].backboneItems[0];
+    const movedBb = req(result.themes[1]?.backboneItems[0], 'movedBb');
     expect(movedBb.ribItems).toHaveLength(2);
-    expect(movedBb.ribItems[0].id).toBe('r1');
-    expect(movedBb.ribItems[1].id).toBe('r2');
+    expect(movedBb.ribItems[0]?.id).toBe('r1');
+    expect(movedBb.ribItems[1]?.id).toBe('r2');
   });
 
   it('returns prev if backbone not found', () => {
@@ -443,11 +444,11 @@ describe('moveRib2D', () => {
       product,
     );
 
-    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
-    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(1);
-    expect(result.themes[0].backboneItems[1].ribItems[0].id).toBe('r1');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[1]?.ribItems).toHaveLength(1);
+    expect(result.themes[0]?.backboneItems[1]?.ribItems[0]?.id).toBe('r1');
     // Allocation unchanged
-    expect(result.themes[0].backboneItems[1].ribItems[0].releaseAllocations[0].releaseId).toBe('rel-A');
+    expect(result.themes[0]?.backboneItems[1]?.ribItems[0]?.releaseAllocations[0]?.releaseId).toBe('rel-A');
   });
 
   it('moves rib to different release only', () => {
@@ -465,10 +466,10 @@ describe('moveRib2D', () => {
       product,
     );
 
-    const updatedRib = result.themes[0].backboneItems[0].ribItems[0];
-    expect(updatedRib.releaseAllocations[0].releaseId).toBe('rel-B');
-    expect(result.releaseCardOrder['rel-A']).toEqual([]);
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r1']);
+    const updatedRib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedRib');
+    expect(updatedRib.releaseAllocations[0]?.releaseId).toBe('rel-B');
+    expect(result.releaseCardOrder?.['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r1']);
   });
 
   it('moves rib to different backbone AND release simultaneously', () => {
@@ -487,16 +488,16 @@ describe('moveRib2D', () => {
     );
 
     // Backbone changed
-    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
-    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(1);
+    expect(result.themes[0]?.backboneItems[0]?.ribItems).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[1]?.ribItems).toHaveLength(1);
     // Release changed with preserved memo
-    const movedRib = result.themes[0].backboneItems[1].ribItems[0];
-    expect(movedRib.releaseAllocations[0].releaseId).toBe('rel-B');
-    expect(movedRib.releaseAllocations[0].percentage).toBe(80);
-    expect(movedRib.releaseAllocations[0].memo).toBe('test');
+    const movedRib = req(result.themes[0]?.backboneItems[1]?.ribItems[0], 'movedRib');
+    expect(movedRib.releaseAllocations[0]?.releaseId).toBe('rel-B');
+    expect(movedRib.releaseAllocations[0]?.percentage).toBe(80);
+    expect(movedRib.releaseAllocations[0]?.memo).toBe('test');
     // Card order updated
-    expect(result.releaseCardOrder['rel-A']).toEqual([]);
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r1']);
+    expect(result.releaseCardOrder?.['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r1']);
   });
 
   it('is a no-op when neither backbone nor release changed', () => {
@@ -524,7 +525,7 @@ describe('moveRib2D', () => {
       product,
     );
 
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r2', 'r1', 'r3']);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r2', 'r1', 'r3']);
   });
 });
 
@@ -532,7 +533,7 @@ describe('moveRib2D', () => {
 describe('moveRibs2D', () => {
   it('batch moves ribs to a different backbone', () => {
     const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
-    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const r2 = req(makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]), 'r2');
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2]), makeBackbone('b2', [])])],
     });
@@ -545,13 +546,13 @@ describe('moveRibs2D', () => {
       product,
     );
 
-    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
-    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(2);
+    expect(result.themes[0]?.backboneItems[0]?.ribItems).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[1]?.ribItems).toHaveLength(2);
   });
 
   it('batch moves ribs to a different release', () => {
     const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
-    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const r2 = req(makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]), 'r2');
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2])])],
       releaseCardOrder: { 'rel-A': ['r1', 'r2'] },
@@ -565,17 +566,17 @@ describe('moveRibs2D', () => {
       product,
     );
 
-    const rib1 = result.themes[0].backboneItems[0].ribItems[0];
-    const rib2 = result.themes[0].backboneItems[0].ribItems[1];
-    expect(rib1.releaseAllocations[0].releaseId).toBe('rel-B');
-    expect(rib2.releaseAllocations[0].releaseId).toBe('rel-B');
-    expect(result.releaseCardOrder['rel-A']).toEqual([]);
-    expect(result.releaseCardOrder['rel-B']).toEqual(['r1', 'r2']);
+    const rib1 = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'rib1');
+    const rib2 = req(result.themes[0]?.backboneItems[0]?.ribItems[1], 'rib2');
+    expect(rib1.releaseAllocations[0]?.releaseId).toBe('rel-B');
+    expect(rib2.releaseAllocations[0]?.releaseId).toBe('rel-B');
+    expect(result.releaseCardOrder?.['rel-A']).toEqual([]);
+    expect(result.releaseCardOrder?.['rel-B']).toEqual(['r1', 'r2']);
   });
 
   it('batch moves ribs to different backbone AND release', () => {
     const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
-    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 50, memo: 'note' }]);
+    const r2 = req(makeRib('r2', [{ releaseId: 'rel-A', percentage: 50, memo: 'note' }]), 'r2');
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2]), makeBackbone('b2', [])])],
       releaseCardOrder: { 'rel-A': ['r1', 'r2'] },
@@ -590,18 +591,18 @@ describe('moveRibs2D', () => {
     );
 
     // Backbone changed
-    expect(result.themes[0].backboneItems[0].ribItems).toHaveLength(0);
-    expect(result.themes[0].backboneItems[1].ribItems).toHaveLength(2);
+    expect(result.themes[0]?.backboneItems[0]?.ribItems).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[1]?.ribItems).toHaveLength(2);
     // Release changed with preserved memo
-    const movedR2 = result.themes[0].backboneItems[1].ribItems.find(r => r.id === 'r2');
-    expect(movedR2.releaseAllocations[0].releaseId).toBe('rel-B');
-    expect(movedR2.releaseAllocations[0].percentage).toBe(50);
-    expect(movedR2.releaseAllocations[0].memo).toBe('note');
+    const movedR2 = req(result.themes[0]?.backboneItems[1]?.ribItems.find(r => r.id === 'r2'), 'movedR2');
+    expect(movedR2.releaseAllocations[0]?.releaseId).toBe('rel-B');
+    expect(movedR2.releaseAllocations[0]?.percentage).toBe(50);
+    expect(movedR2.releaseAllocations[0]?.memo).toBe('note');
   });
 
   it('skips ribs that already have target release allocation', () => {
     const r1 = makeRib('r1', [{ releaseId: 'rel-A', percentage: 50, memo: '' }, { releaseId: 'rel-B', percentage: 50, memo: '' }]);
-    const r2 = makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]);
+    const r2 = req(makeRib('r2', [{ releaseId: 'rel-A', percentage: 100, memo: '' }]), 'r2');
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [r1, r2])])],
       releaseCardOrder: { 'rel-A': ['r1', 'r2'] },
@@ -616,11 +617,11 @@ describe('moveRibs2D', () => {
     );
 
     // r1 already had rel-B allocation, should be unchanged
-    const updatedR1 = result.themes[0].backboneItems[0].ribItems[0];
+    const updatedR1 = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'updatedR1');
     expect(updatedR1.releaseAllocations).toHaveLength(2);
     // r2 should have moved
-    const updatedR2 = result.themes[0].backboneItems[0].ribItems[1];
-    expect(updatedR2.releaseAllocations[0].releaseId).toBe('rel-B');
+    const updatedR2 = req(result.themes[0]?.backboneItems[0]?.ribItems[1], 'updatedR2');
+    expect(updatedR2.releaseAllocations[0]?.releaseId).toBe('rel-B');
   });
 
   it('is a no-op with empty entries', () => {
@@ -734,12 +735,12 @@ describe('card order placement', () => {
         (update) => reorderRibInRelease(update, 'r3', 'rel-A', 0, 'b1'),
         product,
       );
-      const order = result.releaseCardOrder['rel-A'];
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
       // r3 should now be before r1 among b1 siblings
-      const b1Ribs = order.filter(id => ['r1', 'r3'].includes(id));
+      const b1Ribs = order.filter(id => ['r1', 'r3']?.includes(id));
       expect(b1Ribs).toEqual(['r3', 'r1']);
       // b2 ribs should be unchanged relative to each other
-      const b2Ribs = order.filter(id => ['r2', 'r4'].includes(id));
+      const b2Ribs = order.filter(id => ['r2', 'r4']?.includes(id));
       expect(b2Ribs).toEqual(['r2', 'r4']);
     });
 
@@ -750,8 +751,8 @@ describe('card order placement', () => {
         (update) => reorderRibInRelease(update, 'r1', 'rel-A', 1, 'b1'),
         product,
       );
-      const order = result.releaseCardOrder['rel-A'];
-      const b1Ribs = order.filter(id => ['r1', 'r3'].includes(id));
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
+      const b1Ribs = order.filter(id => ['r1', 'r3']?.includes(id));
       expect(b1Ribs).toEqual(['r3', 'r1']);
     });
 
@@ -775,8 +776,8 @@ describe('card order placement', () => {
         (update) => reorderRibInRelease(update, 'r1', 'rel-A', 2, 'b1'),
         product,
       );
-      const order = result.releaseCardOrder['rel-A'];
-      const b1Ribs = order.filter(id => ['r1', 'r3', 'r5'].includes(id));
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
+      const b1Ribs = order.filter(id => ['r1', 'r3', 'r5']?.includes(id));
       expect(b1Ribs).toEqual(['r3', 'r5', 'r1']);
     });
 
@@ -796,7 +797,7 @@ describe('card order placement', () => {
         product,
       );
       // Should create an order with r1 after r2
-      const order = result.releaseCardOrder['rel-A'];
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
       expect(order).toContain('r1');
     });
   });
@@ -812,9 +813,9 @@ describe('card order placement', () => {
         ),
         product,
       );
-      const order = result.releaseCardOrder['rel-A'];
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
       // In b2 column, order should be: r2, r1, r4
-      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4'].includes(id));
+      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4']?.includes(id));
       expect(b2Ribs).toEqual(['r2', 'r1', 'r4']);
     });
 
@@ -828,8 +829,8 @@ describe('card order placement', () => {
         ),
         product,
       );
-      const order = result.releaseCardOrder['rel-A'];
-      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4'].includes(id));
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
+      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4']?.includes(id));
       expect(b2Ribs).toEqual(['r1', 'r2', 'r4']);
     });
 
@@ -843,8 +844,8 @@ describe('card order placement', () => {
         ),
         product,
       );
-      const order = result.releaseCardOrder['rel-A'];
-      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4'].includes(id));
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
+      const b2Ribs = order.filter(id => ['r1', 'r2', 'r4']?.includes(id));
       expect(b2Ribs).toEqual(['r2', 'r4', 'r1']);
     });
 
@@ -869,9 +870,9 @@ describe('card order placement', () => {
         ),
         product,
       );
-      expect(result.releaseCardOrder['rel-A']).toEqual([]);
-      const orderB = result.releaseCardOrder['rel-B'];
-      const b2Ribs = orderB.filter(id => ['r1', 'r5'].includes(id));
+      expect(result.releaseCardOrder?.['rel-A']).toEqual([]);
+      const orderB = req(result.releaseCardOrder?.['rel-B'], 'orderB');
+      const b2Ribs = orderB.filter(id => ['r1', 'r5']?.includes(id));
       expect(b2Ribs).toEqual(['r1', 'r5']);
     });
 
@@ -897,7 +898,7 @@ describe('card order placement', () => {
         ),
         product,
       );
-      const order = result.releaseCardOrder['rel-A'];
+      const order = req(result.releaseCardOrder?.['rel-A'], 'order');
       // r1 should be in the card order
       expect(order).toContain('r1');
     });
@@ -922,8 +923,8 @@ describe('card order placement', () => {
         ),
         product,
       );
-      const orderB = result.releaseCardOrder['rel-B'];
-      const b2Ribs = orderB.filter(id => ['r1', 'r5'].includes(id));
+      const orderB = req(result.releaseCardOrder?.['rel-B'], 'orderB');
+      const b2Ribs = orderB.filter(id => ['r1', 'r5']?.includes(id));
       expect(b2Ribs).toEqual(['r5', 'r1']);
     });
   });
@@ -969,7 +970,7 @@ describe('end-to-end rib drag placement', () => {
     const b1Cells = layout1.cells
       .filter(c => c.backboneId === 'b1' && c.releaseId === 'rel-A')
       .sort((a, b) => a.y - b.y);
-    const lastCellY = b1Cells[b1Cells.length - 1].y + CELL_HEIGHT; // below last cell
+    const lastCellY = b1Cells[b1Cells.length - 1]?.y + CELL_HEIGHT; // below last cell
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b1', 'rel-A', new Set(['r1']), lastCellY,
     );
@@ -992,7 +993,7 @@ describe('end-to-end rib drag placement', () => {
     const product = e2eProduct();
     const layout1 = computeLayout(product);
 
-    const lane = layout1.releaseLanes[0];
+    const lane = req(layout1.releaseLanes[0], 'lane');
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b1', 'rel-A', new Set(['r3']), lane.y, // above all cells
     );
@@ -1015,7 +1016,7 @@ describe('end-to-end rib drag placement', () => {
     const b2Cells = layout1.cells
       .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-A')
       .sort((a, b) => a.y - b.y);
-    const belowLast = b2Cells[b2Cells.length - 1].y + CELL_HEIGHT;
+    const belowLast = b2Cells[b2Cells.length - 1]?.y + CELL_HEIGHT;
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b2', 'rel-A', new Set(['r1']), belowLast,
     );
@@ -1038,7 +1039,7 @@ describe('end-to-end rib drag placement', () => {
     const product = e2eProduct();
     const layout1 = computeLayout(product);
 
-    const lane = layout1.releaseLanes[0];
+    const lane = req(layout1.releaseLanes[0], 'lane');
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b2', 'rel-A', new Set(['r1']), lane.y,
     );
@@ -1064,7 +1065,7 @@ describe('end-to-end rib drag placement', () => {
     const b2Cells = layout1.cells
       .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-A')
       .sort((a, b) => a.y - b.y);
-    const betweenY = b2Cells[0].y + CELL_HEIGHT + CELL_GAP / 2; // between r4 and r5
+    const betweenY = b2Cells[0]?.y + CELL_HEIGHT + CELL_GAP / 2; // between r4 and r5
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b2', 'rel-A', new Set(['r1']), betweenY,
     );
@@ -1168,7 +1169,7 @@ describe('end-to-end rib drag placement', () => {
     const b2Cells = layout1.cells
       .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-B')
       .sort((a, b) => a.y - b.y);
-    const betweenY = b2Cells[0].y + CELL_HEIGHT + CELL_GAP / 2;
+    const betweenY = b2Cells[0]?.y + CELL_HEIGHT + CELL_GAP / 2;
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b2', 'rel-B', new Set(['r1']), betweenY,
     );
@@ -1203,7 +1204,7 @@ describe('transferAllocation', () => {
 
   it('swaps allocation from one release to another', () => {
     const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 60, memo: 'keep' }]);
-    const result = transferAllocation(rib, 'rel-A', 'rel-B');
+    const result = req(transferAllocation(rib, 'rel-A', 'rel-B'), 'result');
     expect(result).toEqual([{ releaseId: 'rel-B', percentage: 60, memo: 'keep' }]);
   });
 
@@ -1220,7 +1221,7 @@ describe('transferAllocation', () => {
       { releaseId: 'rel-A', percentage: 40, memo: '' },
       { releaseId: 'rel-C', percentage: 60, memo: 'other' },
     ]);
-    const result = transferAllocation(rib, 'rel-A', 'rel-B');
+    const result = req(transferAllocation(rib, 'rel-A', 'rel-B'), 'result');
     expect(result).toHaveLength(2);
     expect(result.find(a => a.releaseId === 'rel-C')).toEqual({ releaseId: 'rel-C', percentage: 60, memo: 'other' });
     expect(result.find(a => a.releaseId === 'rel-B')).toEqual({ releaseId: 'rel-B', percentage: 40, memo: '' });

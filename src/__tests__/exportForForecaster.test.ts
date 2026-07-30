@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { addDays, computeFirstSprintStartDate, buildForecasterExport } from '../lib/exportForForecaster';
 import type { Theme, Backbone, RibItem, ReleaseAllocation, ProgressEntry, Size, Category } from '../types';
+import { req } from './testHelpers';
 
 const SIZE_MAPPING = [
   { label: 'S', points: 10 },
@@ -117,7 +118,7 @@ describe('buildForecasterExport — structure', () => {
 
   it('maps project fields correctly', () => {
     const result = buildForecasterExport(makeProduct());
-    const proj = result.projects[0];
+    const proj = req(result.projects[0], 'proj');
     expect(proj.id).toBe('prod-1');
     expect(proj.name).toBe('Test Product');
     expect(proj.unitOfMeasure).toBe('Story Points');
@@ -158,7 +159,7 @@ describe('buildForecasterExport — milestones', () => {
     });
 
     const result = buildForecasterExport(product);
-    const milestones = result.projects[0].milestones;
+    const milestones = result.projects[0]?.milestones;
     expect(milestones).toHaveLength(2);
     expect(milestones[0].name).toBe('Release 1');
     expect(milestones[0].backlogSize).toBe(12); // 20 * 60/100
@@ -180,7 +181,7 @@ describe('buildForecasterExport — milestones', () => {
     });
 
     const result = buildForecasterExport(product);
-    const milestones = result.projects[0].milestones;
+    const milestones = result.projects[0]?.milestones;
     expect(milestones).toHaveLength(1);
     expect(milestones[0].name).toBe('Release 1');
   });
@@ -198,7 +199,7 @@ describe('buildForecasterExport — milestones', () => {
     });
 
     const result = buildForecasterExport(product);
-    const milestones = result.projects[0].milestones;
+    const milestones = result.projects[0]?.milestones;
     expect(milestones).toHaveLength(9);
     // 9th milestone (index 8) wraps back to first color
     expect(milestones[8].color).toBe(milestones[0].color);
@@ -220,7 +221,7 @@ describe('buildForecasterExport — milestones', () => {
     });
 
     const result = buildForecasterExport(product);
-    const milestones = result.projects[0].milestones;
+    const milestones = result.projects[0]?.milestones;
     expect(milestones).toHaveLength(1);
     // Gets first color since it's the first kept milestone
     expect(milestones[0].color).toBe('#2563eb');
@@ -243,7 +244,7 @@ describe('buildForecasterExport — milestones', () => {
     });
 
     const result = buildForecasterExport(product);
-    const milestones = result.projects[0].milestones;
+    const milestones = result.projects[0]?.milestones;
     expect(milestones[0].name).toBe('Alpha');
     expect(milestones[1].name).toBe('Beta');
   });
@@ -260,10 +261,10 @@ describe('buildForecasterExport — sprint mapping', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].sprintNumber).toBe(1);
-    expect(result.sprints[0].id).toBe('s1');
-    expect(result.sprints[1].sprintNumber).toBe(2);
-    expect(result.sprints[1].id).toBe('s2');
+    expect(result.sprints[0]?.sprintNumber).toBe(1);
+    expect(result.sprints[0]?.id).toBe('s1');
+    expect(result.sprints[1]?.sprintNumber).toBe(2);
+    expect(result.sprints[1]?.id).toBe('s2');
   });
 
   it('computes sprint dates correctly', () => {
@@ -277,11 +278,11 @@ describe('buildForecasterExport — sprint mapping', () => {
 
     const result = buildForecasterExport(product);
     // Sprint 1: start = Jan 24 - 13 = Jan 11
-    expect(result.sprints[0].sprintStartDate).toBe('2026-01-11');
-    expect(result.sprints[0].sprintFinishDate).toBe('2026-01-24');
+    expect(result.sprints[0]?.sprintStartDate).toBe('2026-01-11');
+    expect(result.sprints[0]?.sprintFinishDate).toBe('2026-01-24');
     // Sprint 2: start = Jan 24 + 1 = Jan 25
-    expect(result.sprints[1].sprintStartDate).toBe('2026-01-25');
-    expect(result.sprints[1].sprintFinishDate).toBe('2026-02-07');
+    expect(result.sprints[1]?.sprintStartDate).toBe('2026-01-25');
+    expect(result.sprints[1]?.sprintFinishDate).toBe('2026-02-07');
   });
 
   it('skips sprints without endDate', () => {
@@ -295,9 +296,9 @@ describe('buildForecasterExport — sprint mapping', () => {
 
     const result = buildForecasterExport(product);
     expect(result.sprints).toHaveLength(2);
-    expect(result.sprints[0].id).toBe('s1');
-    expect(result.sprints[1].id).toBe('s3');
-    expect(result.sprints[1].sprintNumber).toBe(2);
+    expect(result.sprints[0]?.id).toBe('s1');
+    expect(result.sprints[1]?.id).toBe('s3');
+    expect(result.sprints[1]?.sprintNumber).toBe(2);
   });
 
   it('sets includedInForecast to true for all sprints', () => {
@@ -306,7 +307,7 @@ describe('buildForecasterExport — sprint mapping', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].includedInForecast).toBe(true);
+    expect(result.sprints[0]?.includedInForecast).toBe(true);
   });
 
   it('sets firstSprintStartDate on project when sprints exist', () => {
@@ -316,7 +317,7 @@ describe('buildForecasterExport — sprint mapping', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.projects[0].firstSprintStartDate).toBe('2026-01-11');
+    expect(result.projects[0]?.firstSprintStartDate).toBe('2026-01-11');
   });
 });
 
@@ -335,7 +336,7 @@ describe('buildForecasterExport — doneValue', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].doneValue).toBe(10); // 20 * 50/100
+    expect(result.sprints[0]?.doneValue).toBe(10); // 20 * 50/100
   });
 
   it('computes doneValue as delta between consecutive sprints', () => {
@@ -357,8 +358,8 @@ describe('buildForecasterExport — doneValue', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].doneValue).toBe(10); // 40 * 25/100
-    expect(result.sprints[1].doneValue).toBe(20); // 40 * (75-25)/100
+    expect(result.sprints[0]?.doneValue).toBe(10); // 40 * 25/100
+    expect(result.sprints[1]?.doneValue).toBe(20); // 40 * (75-25)/100
   });
 
   it('sums doneValue across multiple ribs', () => {
@@ -379,7 +380,7 @@ describe('buildForecasterExport — doneValue', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].doneValue).toBe(20); // 10*100/100 + 20*50/100
+    expect(result.sprints[0]?.doneValue).toBe(20); // 10*100/100 + 20*50/100
   });
 
   it('returns 0 doneValue for sprint with no progress', () => {
@@ -394,7 +395,7 @@ describe('buildForecasterExport — doneValue', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].doneValue).toBe(0);
+    expect(result.sprints[0]?.doneValue).toBe(0);
   });
 
   it('returns 0 doneValue when progress is only in earlier sprints', () => {
@@ -413,8 +414,8 @@ describe('buildForecasterExport — doneValue', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].doneValue).toBe(10); // 20 * 50/100
-    expect(result.sprints[1].doneValue).toBe(0);  // no new progress
+    expect(result.sprints[0]?.doneValue).toBe(10); // 20 * 50/100
+    expect(result.sprints[1]?.doneValue).toBe(0);  // no new progress
   });
 });
 
@@ -439,8 +440,8 @@ describe('buildForecasterExport — backlogAtSprintEnd', () => {
     });
 
     const result = buildForecasterExport(product);
-    expect(result.sprints[0].backlogAtSprintEnd).toBe(30); // 40 - 40*25/100
-    expect(result.sprints[1].backlogAtSprintEnd).toBe(10); // 40 - 40*75/100
+    expect(result.sprints[0]?.backlogAtSprintEnd).toBe(30); // 40 - 40*25/100
+    expect(result.sprints[1]?.backlogAtSprintEnd).toBe(10); // 40 - 40*75/100
   });
 
   it('includes unallocated ribs in backlog total', () => {
@@ -457,7 +458,7 @@ describe('buildForecasterExport — backlogAtSprintEnd', () => {
 
     const result = buildForecasterExport(product);
     // Total = 30 (20 + 10), no progress, so backlog = 30
-    expect(result.sprints[0].backlogAtSprintEnd).toBe(30);
+    expect(result.sprints[0]?.backlogAtSprintEnd).toBe(30);
   });
 });
 
@@ -484,7 +485,7 @@ describe('buildForecasterExport — edge cases', () => {
     const result = buildForecasterExport(product);
     // Release has 0 points from unsized rib, so no milestone
     expect(result.projects[0].milestones).toBeUndefined();
-    expect(result.sprints[0].doneValue).toBe(0);
+    expect(result.sprints[0]?.doneValue).toBe(0);
   });
 
   it('handles partial allocation percentages', () => {
@@ -498,7 +499,7 @@ describe('buildForecasterExport — edge cases', () => {
     });
 
     const result = buildForecasterExport(product);
-    const milestones = result.projects[0].milestones;
+    const milestones = result.projects[0]?.milestones;
     expect(milestones).toHaveLength(1);
     expect(milestones[0].backlogSize).toBe(12); // 40 * 30/100
   });
@@ -531,11 +532,11 @@ describe('buildForecasterExport — edge cases', () => {
 
     const result = buildForecasterExport(product);
     // backlogSize = 40 * 33/100 = 13.2
-    expect(result.projects[0].milestones[0].backlogSize).toBe(13.2);
+    expect(result.projects[0]?.milestones[0]?.backlogSize).toBe(13.2);
     // doneValue = 40 * 33/100 = 13.2
-    expect(result.sprints[0].doneValue).toBe(13.2);
+    expect(result.sprints[0]?.doneValue).toBe(13.2);
     // Verify no floating-point noise (like 13.200000000000001)
-    expect(String(result.sprints[0].doneValue)).toBe('13.2');
+    expect(String(result.sprints[0]?.doneValue)).toBe('13.2');
   });
 });
 
@@ -582,7 +583,7 @@ describe('buildForecasterExport — integration', () => {
     const result = buildForecasterExport(product);
 
     // Project
-    const proj = result.projects[0];
+    const proj = req(result.projects[0], 'proj');
     expect(proj.unitOfMeasure).toBe('Story Points');
     expect(proj.firstSprintStartDate).toBe('2026-01-11');
 
@@ -590,10 +591,10 @@ describe('buildForecasterExport — integration', () => {
     // MVP: rib1 100% of 10 + rib2 50% of 20 = 10 + 10 = 20
     // GA: rib2 50% of 20 = 10
     expect(proj.milestones).toHaveLength(2);
-    expect(proj.milestones[0].name).toBe('MVP');
-    expect(proj.milestones[0].backlogSize).toBe(20);
-    expect(proj.milestones[1].name).toBe('GA');
-    expect(proj.milestones[1].backlogSize).toBe(10);
+    expect(proj.milestones[0]?.name).toBe('MVP');
+    expect(proj.milestones[0]?.backlogSize).toBe(20);
+    expect(proj.milestones[1]?.name).toBe('GA');
+    expect(proj.milestones[1]?.backlogSize).toBe(10);
 
     // Total project points = 10 + 20 + 40 = 70
 
@@ -604,10 +605,10 @@ describe('buildForecasterExport — integration', () => {
     // doneValue = 5 + 5 = 10
     // cumulativeCompleted = 5 + 5 = 10
     // backlogAtSprintEnd = 70 - 10 = 60
-    expect(result.sprints[0].doneValue).toBe(10);
-    expect(result.sprints[0].backlogAtSprintEnd).toBe(60);
-    expect(result.sprints[0].sprintStartDate).toBe('2026-01-11');
-    expect(result.sprints[0].sprintFinishDate).toBe('2026-01-24');
+    expect(result.sprints[0]?.doneValue).toBe(10);
+    expect(result.sprints[0]?.backlogAtSprintEnd).toBe(60);
+    expect(result.sprints[0]?.sprintStartDate).toBe('2026-01-11');
+    expect(result.sprints[0]?.sprintFinishDate).toBe('2026-01-24');
 
     // Sprint 2:
     // rib1: pctAsOf=100, pctPrev=50, done=10*50/100=5
@@ -615,9 +616,9 @@ describe('buildForecasterExport — integration', () => {
     // doneValue = 5 + 9 = 14
     // cumulativeCompleted = 10 + 14 = 24
     // backlogAtSprintEnd = 70 - 24 = 46
-    expect(result.sprints[1].doneValue).toBe(14);
-    expect(result.sprints[1].backlogAtSprintEnd).toBe(46);
-    expect(result.sprints[1].sprintStartDate).toBe('2026-01-25');
+    expect(result.sprints[1]?.doneValue).toBe(14);
+    expect(result.sprints[1]?.backlogAtSprintEnd).toBe(46);
+    expect(result.sprints[1]?.sprintStartDate).toBe('2026-01-25');
 
     // Sprint 3:
     // rib1: pctAsOf=100, pctPrev=100, done=0
@@ -625,8 +626,8 @@ describe('buildForecasterExport — integration', () => {
     // doneValue = 0 + 6 = 6
     // cumulativeCompleted = 24 + 6 = 30
     // backlogAtSprintEnd = 70 - 30 = 40
-    expect(result.sprints[2].doneValue).toBe(6);
-    expect(result.sprints[2].backlogAtSprintEnd).toBe(40);
-    expect(result.sprints[2].sprintStartDate).toBe('2026-02-08');
+    expect(result.sprints[2]?.doneValue).toBe(6);
+    expect(result.sprints[2]?.backlogAtSprintEnd).toBe(40);
+    expect(result.sprints[2]?.sprintStartDate).toBe('2026-02-08');
   });
 });

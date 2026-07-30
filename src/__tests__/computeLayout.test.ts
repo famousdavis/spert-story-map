@@ -19,6 +19,8 @@ import {
   COLLAPSED_LANE_HEIGHT,
 } from '../components/storymap/useMapLayout';
 import type { Product, Theme, Backbone, RibItem, Release, ReleaseAllocation } from '../types';
+import { req } from './testHelpers';
+
 
 function makeRib(id: string, allocations: ReleaseAllocation[] = []): RibItem {
   return {
@@ -81,9 +83,9 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     expect(result.columns).toHaveLength(3);
-    expect(result.columns[0].backboneId).toBe('b1');
-    expect(result.columns[1].backboneId).toBe('b2');
-    expect(result.columns[2].backboneId).toBe('b3');
+    expect(result.columns[0]?.backboneId).toBe('b1');
+    expect(result.columns[1]?.backboneId).toBe('b2');
+    expect(result.columns[2]?.backboneId).toBe('b3');
   });
 
   it('assigns correct X positions to columns', () => {
@@ -92,8 +94,8 @@ describe('computeLayout', () => {
     });
 
     const result = computeLayout(product);
-    expect(result.columns[0].x).toBe(LANE_LABEL_WIDTH);
-    expect(result.columns[1].x).toBe(LANE_LABEL_WIDTH + COL_WIDTH + COL_GAP);
+    expect(result.columns[0]?.x).toBe(LANE_LABEL_WIDTH);
+    expect(result.columns[1]?.x).toBe(LANE_LABEL_WIDTH + COL_WIDTH + COL_GAP);
   });
 
   it('creates theme spans that cover their backbones', () => {
@@ -108,13 +110,13 @@ describe('computeLayout', () => {
     expect(result.themeSpans).toHaveLength(2);
 
     // First theme spans 2 columns
-    const ts1 = result.themeSpans[0];
+    const ts1 = req(result.themeSpans[0], 'themeSpans[0]');
     expect(ts1.themeId).toBe('t1');
     expect(ts1.colCount).toBe(2);
     expect(ts1.width).toBe(2 * (COL_WIDTH + COL_GAP) - COL_GAP);
 
     // Second theme spans 1 column
-    const ts2 = result.themeSpans[1];
+    const ts2 = req(result.themeSpans[1], 'themeSpans[1]');
     expect(ts2.themeId).toBe('t2');
     expect(ts2.colCount).toBe(1);
     expect(ts2.width).toBe(COL_WIDTH);
@@ -143,12 +145,12 @@ describe('computeLayout', () => {
     expect(result.releaseLanes).toHaveLength(2);
 
     const bodyTop = THEME_HEIGHT + BACKBONE_HEIGHT;
-    expect(result.releaseLanes[0].y).toBe(bodyTop);
-    expect(result.releaseLanes[0].releaseId).toBe('rel-1');
-    expect(result.releaseLanes[0].height).toBe(MIN_LANE_HEIGHT); // No ribs, so min height
+    expect(result.releaseLanes[0]?.y).toBe(bodyTop);
+    expect(result.releaseLanes[0]?.releaseId).toBe('rel-1');
+    expect(result.releaseLanes[0]?.height).toBe(MIN_LANE_HEIGHT); // No ribs, so min height
 
-    expect(result.releaseLanes[1].y).toBe(bodyTop + MIN_LANE_HEIGHT);
-    expect(result.releaseLanes[1].releaseId).toBe('rel-2');
+    expect(result.releaseLanes[1]?.y).toBe(bodyTop + MIN_LANE_HEIGHT);
+    expect(result.releaseLanes[1]?.releaseId).toBe('rel-2');
   });
 
   it('sorts releases by order', () => {
@@ -161,8 +163,8 @@ describe('computeLayout', () => {
     });
 
     const result = computeLayout(product);
-    expect(result.releaseLanes[0].releaseId).toBe('rel-1');
-    expect(result.releaseLanes[1].releaseId).toBe('rel-2');
+    expect(result.releaseLanes[0]?.releaseId).toBe('rel-1');
+    expect(result.releaseLanes[1]?.releaseId).toBe('rel-2');
   });
 
   it('places cells at correct absolute positions', () => {
@@ -175,7 +177,7 @@ describe('computeLayout', () => {
     const result = computeLayout(product);
     expect(result.cells).toHaveLength(1);
 
-    const cell = result.cells[0];
+    const cell = req(result.cells[0], 'cells[0]');
     expect(cell.id).toBe('r1');
     expect(cell.x).toBe(LANE_LABEL_WIDTH + CELL_PAD);
     expect(cell.y).toBe(THEME_HEIGHT + BACKBONE_HEIGHT + CELL_PAD);
@@ -242,7 +244,7 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     const expectedHeight = 3 * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED;
-    expect(result.releaseLanes[0].height).toBe(Math.max(expectedHeight, MIN_LANE_HEIGHT));
+    expect(result.releaseLanes[0]?.height).toBe(Math.max(expectedHeight, MIN_LANE_HEIGHT));
   });
 
   it('emits a + Rib gap button for every column×lane (including longest unassigned column)', () => {
@@ -280,7 +282,7 @@ describe('computeLayout', () => {
       g => g.releaseId === 'rel-1' && g.backboneId === 'b0'
     );
     expect(emptyRel).toBeDefined();
-    expect(emptyRel!.y).toBe(result.releaseLanes[0].y + CELL_PAD);
+    expect(emptyRel!.y).toBe(result.releaseLanes[0]?.y + CELL_PAD);
   });
 
   it('creates multiple cells for partial allocations', () => {
@@ -300,10 +302,10 @@ describe('computeLayout', () => {
     // Should produce 2 cells (one per allocation)
     const ribCells = result.cells.filter(c => c.id === 'r1');
     expect(ribCells).toHaveLength(2);
-    expect(ribCells[0].releaseId).toBe('rel-1');
-    expect(ribCells[0].isPartial).toBe(true);
-    expect(ribCells[1].releaseId).toBe('rel-2');
-    expect(ribCells[1].isPartial).toBe(true);
+    expect(ribCells[0]?.releaseId).toBe('rel-1');
+    expect(ribCells[0]?.isPartial).toBe(true);
+    expect(ribCells[1]?.releaseId).toBe('rel-2');
+    expect(ribCells[1]?.isPartial).toBe(true);
   });
 
   it('enriches cells with theme/backbone context', () => {
@@ -314,7 +316,7 @@ describe('computeLayout', () => {
     });
 
     const result = computeLayout(product);
-    const cell = result.cells[0];
+    const cell = req(result.cells[0], 'cells[0]');
     expect(cell.themeId).toBe('t1');
     expect(cell.themeName).toBe('Theme t1');
     expect(cell.backboneId).toBe('b1');
@@ -331,18 +333,18 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     expect(result.columns).toHaveLength(1);
-    expect(result.columns[0].backboneId).toBe('b1');
+    expect(result.columns[0]?.backboneId).toBe('b1');
     expect(result.themeSpans).toHaveLength(2);
 
     // Empty theme gets a placeholder span
-    const ts1 = result.themeSpans[0];
+    const ts1 = req(result.themeSpans[0], 'themeSpans[0]');
     expect(ts1.themeId).toBe('t1');
     expect(ts1.colCount).toBe(0);
     expect(ts1.isEmpty).toBe(true);
     expect(ts1.width).toBe(COL_WIDTH);
 
     // Second theme follows after the placeholder
-    const ts2 = result.themeSpans[1];
+    const ts2 = req(result.themeSpans[1], 'themeSpans[1]');
     expect(ts2.themeId).toBe('t2');
     expect(ts2.colCount).toBe(1);
     expect(ts2.x).toBe(LANE_LABEL_WIDTH + COL_WIDTH + COL_GAP);
@@ -356,9 +358,9 @@ describe('computeLayout', () => {
     const result = computeLayout(product);
     expect(result.columns).toHaveLength(0);
     expect(result.themeSpans).toHaveLength(1);
-    expect(result.themeSpans[0].themeId).toBe('t1');
-    expect(result.themeSpans[0].isEmpty).toBe(true);
-    expect(result.themeSpans[0].width).toBe(COL_WIDTH);
+    expect(result.themeSpans[0]?.themeId).toBe('t1');
+    expect(result.themeSpans[0]?.isEmpty).toBe(true);
+    expect(result.themeSpans[0]?.width).toBe(COL_WIDTH);
     expect(result.totalWidth).toBe(LANE_LABEL_WIDTH + COL_WIDTH + RIGHT_LABEL_WIDTH);
   });
 
@@ -370,8 +372,8 @@ describe('computeLayout', () => {
     const result = computeLayout(product);
     expect(result.columns).toHaveLength(0);
     expect(result.themeSpans).toHaveLength(2);
-    expect(result.themeSpans[0].x).toBe(LANE_LABEL_WIDTH);
-    expect(result.themeSpans[1].x).toBe(LANE_LABEL_WIDTH + COL_WIDTH + COL_GAP);
+    expect(result.themeSpans[0]?.x).toBe(LANE_LABEL_WIDTH);
+    expect(result.themeSpans[1]?.x).toBe(LANE_LABEL_WIDTH + COL_WIDTH + COL_GAP);
   });
 
   it('correctly positions mixed empty and populated themes with cells', () => {
@@ -389,19 +391,19 @@ describe('computeLayout', () => {
     expect(result.themeSpans).toHaveLength(3);
 
     // t1 spans 1 column
-    expect(result.themeSpans[0].colCount).toBe(1);
+    expect(result.themeSpans[0]?.colCount).toBe(1);
 
     // t2 is empty placeholder at slot 1
-    expect(result.themeSpans[1].isEmpty).toBe(true);
-    expect(result.themeSpans[1].x).toBe(LANE_LABEL_WIDTH + (COL_WIDTH + COL_GAP));
+    expect(result.themeSpans[1]?.isEmpty).toBe(true);
+    expect(result.themeSpans[1]?.x).toBe(LANE_LABEL_WIDTH + (COL_WIDTH + COL_GAP));
 
     // t3 follows at slot 2
-    expect(result.themeSpans[2].colCount).toBe(1);
-    expect(result.themeSpans[2].x).toBe(LANE_LABEL_WIDTH + 2 * (COL_WIDTH + COL_GAP));
+    expect(result.themeSpans[2]?.colCount).toBe(1);
+    expect(result.themeSpans[2]?.x).toBe(LANE_LABEL_WIDTH + 2 * (COL_WIDTH + COL_GAP));
 
     // Rib cell still placed correctly for b3
     expect(result.cells).toHaveLength(1);
-    expect(result.cells[0].backboneId).toBe('b3');
+    expect(result.cells[0]?.backboneId).toBe('b3');
   });
 });
 
@@ -431,15 +433,15 @@ describe('computeLayout — collapsed release lanes', () => {
     const a = computeLayout(product);
     const b = computeLayout(product, []);
     expect(a.totalHeight).toBe(b.totalHeight);
-    expect(a.releaseLanes[0].height).toBe(b.releaseLanes[0].height);
-    expect(a.releaseLanes[0].collapsed).toBe(false);
+    expect(a.releaseLanes[0]?.height).toBe(b.releaseLanes[0]?.height);
+    expect(a.releaseLanes[0]?.collapsed).toBe(false);
   });
 
   it('collapsed lane gets COLLAPSED_LANE_HEIGHT, emits no cells, no gap buttons', () => {
     const product = productWithTwoReleases();
     const result = computeLayout(product, ['rel-1']);
 
-    const lane = result.releaseLanes.find((l: { releaseId: string }) => l.releaseId === 'rel-1');
+    const lane = req(result.releaseLanes.find(l => l.releaseId === 'rel-1'), "releaseLanes 'rel-1'");
     expect(lane.collapsed).toBe(true);
     expect(lane.height).toBe(COLLAPSED_LANE_HEIGHT);
 
@@ -467,7 +469,7 @@ describe('computeLayout — collapsed release lanes', () => {
       releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
     });
     const result = computeLayout(product);
-    const lane = result.releaseLanes[0];
+    const lane = req(result.releaseLanes[0], 'releaseLanes[0]');
     expect(lane.cardCount).toBe(4);
     // Height uses the tallest column (3 ribs), not the total count
     const expectedHeight = 3 * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED;
@@ -479,17 +481,17 @@ describe('computeLayout — collapsed release lanes', () => {
     const open = computeLayout(product);
     const collapsed = computeLayout(product, ['rel-1']);
 
-    const rel1Open = open.releaseLanes[0].height;
+    const rel1Open = req(open.releaseLanes[0]?.height, 'rel1Open');
     const saved = rel1Open - COLLAPSED_LANE_HEIGHT;
     expect(saved).toBeGreaterThan(0);
 
     // rel-2 (downstream) and the unassigned lane both move up by the saved height
-    expect(collapsed.releaseLanes[1].y).toBe(open.releaseLanes[1].y - saved);
+    expect(collapsed.releaseLanes[1]?.y).toBe(open.releaseLanes[1]?.y - saved);
     expect(collapsed.unassignedLane.y).toBe(open.unassignedLane.y - saved);
     expect(collapsed.totalHeight).toBe(open.totalHeight - saved);
 
     // First collapsed lane still starts at bodyTop
-    expect(collapsed.releaseLanes[0].y).toBe(bodyTop);
+    expect(collapsed.releaseLanes[0]?.y).toBe(bodyTop);
   });
 
   it('a partial-allocation rib still renders in the open lane when its other lane is collapsed', () => {
@@ -515,7 +517,7 @@ describe('computeLayout — collapsed release lanes', () => {
     expect(result.cells.some((c: { releaseId: string | null }) => c.releaseId === 'rel-1')).toBe(false);
     expect(result.cells.some((c: { id: string; releaseId: string | null }) => c.id === 'r1' && c.releaseId === 'rel-2')).toBe(true);
     // Collapsed lane's cardCount still counts its allocation
-    const lane = result.releaseLanes.find((l: { releaseId: string }) => l.releaseId === 'rel-1');
+    const lane = req(result.releaseLanes.find(l => l.releaseId === 'rel-1'), "releaseLanes 'rel-1'");
     expect(lane.cardCount).toBe(1);
   });
 });

@@ -55,9 +55,9 @@ describe('getCommentHistory', () => {
     ]);
     const result = getCommentHistory(rib, 'r1', sprintNameMap, sprintOrder);
     expect(result).toHaveLength(3);
-    expect(result[0].sprintName).toBe('Sprint 3');
-    expect(result[1].sprintName).toBe('Sprint 2');
-    expect(result[2].sprintName).toBe('Sprint 1');
+    expect(result[0]?.sprintName).toBe('Sprint 3');
+    expect(result[1]?.sprintName).toBe('Sprint 2');
+    expect(result[2]?.sprintName).toBe('Sprint 1');
   });
 
   it('filters by releaseId', () => {
@@ -67,7 +67,7 @@ describe('getCommentHistory', () => {
     ]);
     const result = getCommentHistory(rib, 'r1', sprintNameMap, sprintOrder);
     expect(result).toHaveLength(1);
-    expect(result[0].comment).toBe('yes');
+    expect(result[0]?.comment).toBe('yes');
   });
 
   it('returns all comments when releaseId is null', () => {

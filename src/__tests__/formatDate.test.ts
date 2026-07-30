@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { formatDate, parseDate, formatRelativeTime } from '../lib/formatDate';
+import { req } from './testHelpers';
 
 describe('formatDate', () => {
   it('returns empty string for falsy input', () => {
@@ -13,12 +14,12 @@ describe('formatDate', () => {
   });
 
   it('formats a date-only ISO string', () => {
-    const result = formatDate('2025-03-15');
+    const result = req(formatDate('2025-03-15'), 'result');
     expect(result).toBe('Mar 15, 2025');
   });
 
   it('formats a full ISO datetime string', () => {
-    const result = formatDate('2025-06-01T14:30:00Z');
+    const result = req(formatDate('2025-06-01T14:30:00Z'), 'result');
     // toLocaleDateString may shift day based on timezone, so just check it parses
     expect(result).toMatch(/\w{3} \d{1,2}, 2025/);
   });
@@ -48,7 +49,7 @@ describe('parseDate', () => {
   });
 
   it('parses an ISO string', () => {
-    const result = parseDate('2025-06-01T12:00:00Z');
+    const result = req(parseDate('2025-06-01T12:00:00Z'), 'result');
     expect(result).toBeInstanceOf(Date);
     expect(result.toISOString()).toBe('2025-06-01T12:00:00.000Z');
   });
@@ -75,7 +76,7 @@ describe('formatRelativeTime', () => {
 
   it('returns time string for dates older than 60 minutes', () => {
     vi.setSystemTime(new Date('2025-06-01T14:00:00Z'));
-    const result = formatRelativeTime(new Date('2025-06-01T12:00:00Z'));
+    const result = req(formatRelativeTime(new Date('2025-06-01T12:00:00Z')), 'result');
     expect(result).toBeTruthy();
     expect(result).not.toContain('ago');
   });

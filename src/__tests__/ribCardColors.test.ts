@@ -9,6 +9,7 @@ import {
   migrateCardColors,
   RIB_CARD_COLOR_KEYS,
 } from '../lib/ribCardColors';
+import { req } from './testHelpers';
 
 function rib(id: string, cardColor?: string) {
   return { id, name: id, size: null, category: 'core', order: 1, releaseAllocations: [], progressHistory: [], ...(cardColor ? { cardColor } : {}) };
@@ -49,28 +50,28 @@ describe('migrateCardColors', () => {
 
   it('rewrites amber cardColor to orange on ribs', () => {
     const p = product([rib('r1', 'amber'), rib('r2', 'rose'), rib('r3')]);
-    const next = migrateCardColors(p);
-    const ribs = next.themes[0].backboneItems[0].ribItems;
-    expect(ribs[0].cardColor).toBe('orange');
-    expect(ribs[1].cardColor).toBe('rose');
+    const next = req(migrateCardColors(p), 'next');
+    const ribs = req(next.themes[0]?.backboneItems[0]?.ribItems, 'ribs');
+    expect(ribs[0]?.cardColor).toBe('orange');
+    expect(ribs[1]?.cardColor).toBe('rose');
     expect(ribs[2].cardColor).toBeUndefined();
   });
 
   it('remaps the cardColorLabels amber key to orange', () => {
     const p = product([rib('r1', 'amber')], { amber: 'Deferred', rose: 'Blocked' });
-    const next = migrateCardColors(p);
+    const next = req(migrateCardColors(p), 'next');
     expect(next.cardColorLabels).toEqual({ orange: 'Deferred', rose: 'Blocked' });
   });
 
   it('keeps an existing orange label over the legacy amber one', () => {
     const p = product([rib('r1', 'amber')], { amber: 'old', orange: 'new' });
-    const next = migrateCardColors(p);
+    const next = req(migrateCardColors(p), 'next');
     expect(next.cardColorLabels).toEqual({ orange: 'new' });
   });
 
   it('is idempotent — returns the SAME reference when nothing is legacy', () => {
     const p = product([rib('r1', 'orange'), rib('r2', 'sky')], { orange: 'X' });
-    const next = migrateCardColors(p);
+    const next = req(migrateCardColors(p), 'next');
     expect(next).toBe(p);
   });
 });
