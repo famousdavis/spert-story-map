@@ -10,22 +10,25 @@ import { useProductMutations } from '../hooks/useProductMutations';
 import { useReleaseDrag } from '../hooks/useReleaseDrag';
 import ReleaseColumn from '../components/releases/ReleaseColumn';
 import AllocationModal from '../components/releases/AllocationModal';
-import type { OutletContextValue, Category } from '../types';
+import type { OutletContextValue, Category, ReleaseAllocation } from '../types';
+
+/** A rib as enriched by getAllRibItems — what the release board moves around. */
+type PlanningRib = ReturnType<typeof getAllRibItems>[number];
 
 export default function ReleasePlanningView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
   const { addRelease } = useProductMutations(updateProduct);
-  const handleDeleteRelease = useCallback((releaseId) => {
+  const handleDeleteRelease = useCallback((releaseId: string) => {
     updateProduct(prev => deleteReleaseFromProduct(prev, releaseId));
   }, [updateProduct]);
-  const handleRenameRelease = useCallback((releaseId, newName) => {
+  const handleRenameRelease = useCallback((releaseId: string, newName: string) => {
     updateProduct(prev => ({
       ...prev,
       releases: prev.releases.map(r => r.id === releaseId ? { ...r, name: newName } : r),
     }));
   }, [updateProduct]);
-  const [filter, setFilter] = useState('all');
-  const [allocModal, setAllocModal] = useState(null);
+  const [filter, setFilter] = useState<'all' | Category>('all');
+  const [allocModal, setAllocModal] = useState<PlanningRib | null>(null);
 
   const allRibs = useMemo(() => getAllRibItems(product), [product]);
   const totalPoints = useMemo(() => getTotalProjectPoints(product), [product]);
@@ -39,7 +42,7 @@ export default function ReleasePlanningView() {
   // Card ordering per column — stored in product.releaseCardOrder
   const cardOrder = product.releaseCardOrder;
 
-  const getSortedRibs = useCallback((colId, ribs) => {
+  const getSortedRibs = useCallback((colId: string, ribs: PlanningRib[]) => {
     const order = cardOrder?.[colId];
     if (!order || order.length === 0) return ribs;
     const sorted = [...ribs].sort((a, b) => {
@@ -58,13 +61,13 @@ export default function ReleasePlanningView() {
     return getSortedRibs('unassigned', items);
   }, [filteredRibs, getSortedRibs]);
 
-  const ribsForRelease = useCallback((releaseId) => {
+  const ribsForRelease = useCallback((releaseId: string) => {
     const items = filteredRibs.filter(r => r.releaseAllocations.some(a => a.releaseId === releaseId));
     return getSortedRibs(releaseId, items);
   }, [filteredRibs, getSortedRibs]);
 
   // Update a single rib's allocations
-  const updateRibAllocation = useCallback((ribId, allocations) => {
+  const updateRibAllocation = useCallback((ribId: string, allocations: ReleaseAllocation[]) => {
     updateProduct(prev => ({
       ...prev,
       themes: prev.themes.map(t => ({
@@ -161,14 +164,14 @@ export default function ReleasePlanningView() {
               product={product}
               dragRibId={dragRibId}
               dropTarget={dropTarget}
-              isColDropTarget={dropBeforeColId === release.id && dragColId && dragColId !== release.id}
+              isColDropTarget={!!(dropBeforeColId === release.id && dragColId && dragColId !== release.id)}
               isColDragging={dragColId === release.id}
               onColumnDragOver={dragColId ? undefined : handleColumnDragOver}
               onColumnDrop={handleDrop}
               onColDragStart={handleColDragStart}
               onColDragEnd={handleColDragEnd}
-              onColDragOver={dragColId ? handleColDragOver : undefined}
-              onColDrop={dragColId ? handleColDrop : undefined}
+              onColDragOver={dragColId ? handleColDragOver : null}
+              onColDrop={dragColId ? handleColDrop : null}
               onCardDragStart={handleDragStart}
               onCardDragEnd={handleDragEnd}
               onCardDragOver={handleCardDragOver}

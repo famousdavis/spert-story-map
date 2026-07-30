@@ -13,7 +13,7 @@ import { Section, Field } from '../components/ui/Section';
 import SharingSection from '../components/settings/SharingSection';
 import SizeMappingSection from '../components/settings/SizeMappingSection';
 import DataSection from '../components/settings/DataSection';
-import type { OutletContextValue } from '../types';
+import type { OutletContextValue, Release, Sprint } from '../types';
 
 // ──────────────────────────────────────────────────────────────────
 // Buffered input wrappers
@@ -81,13 +81,17 @@ export default function SettingsView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
   const { addRelease, addSprint } = useProductMutations(updateProduct);
   const { driver } = useStorage();
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  // Only releases route through this dialog today; the shape is explicit so
+  // the confirm handler can read `.id` / `.message` without a widened object.
+  const [deleteTarget, setDeleteTarget] = useState<
+    { type: 'release'; id: string; message: string } | null
+  >(null);
   const baseId = useId();
 
   // Release drag-to-reorder state
-  const [dragReleaseId, setDragReleaseId] = useState(null);
-  const [dropBeforeReleaseId, setDropBeforeReleaseId] = useState(null);
-  const dropBeforeReleaseRef = useRef(null);
+  const [dragReleaseId, setDragReleaseId] = useState<string | null>(null);
+  const [dropBeforeReleaseId, setDropBeforeReleaseId] = useState<string | null>(null);
+  const dropBeforeReleaseRef = useRef<string | null>(null);
 
   // Per-row commit handlers — kept here (not in BufferedText) so the buffered
   // wrapper stays a pure leaf and updateProduct identity stays stable across
@@ -101,19 +105,19 @@ export default function SettingsView() {
   }, [updateProduct]);
 
   // Releases
-  const updateRelease = (id, updates) => {
+  const updateRelease = (id: string, updates: Partial<Release>) => {
     updateProduct(prev => ({
       ...prev,
       releases: prev.releases.map(r => r.id === id ? { ...r, ...updates } : r),
     }));
   };
 
-  const handleReleaseDragStart = (e, releaseId) => {
+  const handleReleaseDragStart = (e: React.DragEvent, releaseId: string) => {
     e.dataTransfer.effectAllowed = 'move';
     setDragReleaseId(releaseId);
   };
 
-  const handleReleaseDragOver = (e, releaseId) => {
+  const handleReleaseDragOver = (e: React.DragEvent, releaseId: string) => {
     e.preventDefault();
     if (releaseId === dragReleaseId) return;
     if (dropBeforeReleaseRef.current !== releaseId) {
@@ -122,7 +126,7 @@ export default function SettingsView() {
     }
   };
 
-  const handleReleaseDrop = (e) => {
+  const handleReleaseDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (!dragReleaseId) return;
     const beforeId = dropBeforeReleaseRef.current;
@@ -131,6 +135,7 @@ export default function SettingsView() {
       const dragIdx = releases.findIndex(r => r.id === dragReleaseId);
       if (dragIdx < 0) return prev;
       const [dragged] = releases.splice(dragIdx, 1);
+      if (!dragged) return prev;
       if (beforeId) {
         const beforeIdx = releases.findIndex(r => r.id === beforeId);
         releases.splice(beforeIdx >= 0 ? beforeIdx : releases.length, 0, dragged);
@@ -148,7 +153,7 @@ export default function SettingsView() {
     dropBeforeReleaseRef.current = null;
   };
 
-  const deleteRelease = (id) => {
+  const deleteRelease = (id: string) => {
     if (releaseHasAllocations(product, id)) {
       setDeleteTarget({ type: 'release', id, message: 'This release has rib items allocated to it. Deleting it will remove those allocations. Continue?' });
     } else {
@@ -157,14 +162,14 @@ export default function SettingsView() {
   };
 
   // Sprints
-  const updateSprint = (id, updates) => {
+  const updateSprint = (id: string, updates: Partial<Sprint>) => {
     updateProduct(prev => ({
       ...prev,
       sprints: prev.sprints.map(s => s.id === id ? { ...s, ...updates } : s),
     }));
   };
 
-  const deleteSprint = (id) => {
+  const deleteSprint = (id: string) => {
     updateProduct(prev => deleteSprintFromProduct(prev, id));
   };
 
@@ -301,7 +306,7 @@ export default function SettingsView() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
-          if (deleteTarget.type === 'release') updateProduct(prev => deleteReleaseFromProduct(prev, deleteTarget.id));
+          if (deleteTarget?.type === 'release') updateProduct(prev => deleteReleaseFromProduct(prev, deleteTarget.id));
         }}
         title="Confirm Delete"
         message={deleteTarget?.message || ''}
