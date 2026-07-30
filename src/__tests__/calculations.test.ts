@@ -28,6 +28,7 @@ import {
   getReleaseProgressOverTime,
 } from '../lib/calculations';
 import type { Product, Theme, Backbone, RibItem, Release, Sprint, ReleaseAllocation, ProgressEntry, SizeMapping, Size, Category } from '../types';
+import { req } from './testHelpers';
 
 const SIZE_MAPPING = [
   { label: 'S', points: 10 },
@@ -112,9 +113,9 @@ describe('getAllRibItems', () => {
     });
     const items = getAllRibItems(product);
     expect(items).toHaveLength(3);
-    expect(items[0].themeId).toBe('t1');
-    expect(items[0].backboneId).toBe('b1');
-    expect(items[2].themeId).toBe('t2');
+    expect(items[0]?.themeId).toBe('t1');
+    expect(items[0]?.backboneId).toBe('b1');
+    expect(items[2]?.themeId).toBe('t2');
   });
 });
 
@@ -477,9 +478,9 @@ describe('getProgressOverTime', () => {
     });
     const data = getProgressOverTime(product);
     expect(data).toHaveLength(2);
-    expect(data[0].sprintName).toBe('Sprint 1');
-    expect(data[0].completedPoints).toBe(5); // 10 * 50%
-    expect(data[1].completedPoints).toBe(10); // 10 * 100%
+    expect(data[0]?.sprintName).toBe('Sprint 1');
+    expect(data[0]?.completedPoints).toBe(5); // 10 * 50%
+    expect(data[1]?.completedPoints).toBe(10); // 10 * 100%
   });
 });
 
@@ -503,7 +504,7 @@ describe('getSprintSummary', () => {
       releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
       sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1 }],
     });
-    const summary = getSprintSummary(product, 'sp-1');
+    const summary = req(getSprintSummary(product, 'sp-1'), 'summary');
     expect(summary.totalPoints).toBe(20);
     expect(summary.completedPoints).toBe(10);
     expect(summary.remainingPoints).toBe(10);
@@ -531,7 +532,7 @@ describe('getSprintSummary', () => {
         { id: 'sp-2', name: 'Sprint 2', order: 2 },
       ],
     });
-    const summary = getSprintSummary(product, 'sp-2');
+    const summary = req(getSprintSummary(product, 'sp-2'), 'summary');
     // Sprint 2: 80% of 10pts = 8pts completed
     // Sprint 1: 30% of 10pts = 3pts completed
     // Delta: 8 - 3 = 5
@@ -559,8 +560,8 @@ describe('getReleaseProgressOverTime', () => {
     });
     const data = getReleaseProgressOverTime(product, 'rel-1');
     expect(data).toHaveLength(1);
-    expect(data[0].totalPoints).toBe(20);
-    expect(data[0].completedPoints).toBe(10);
+    expect(data[0]?.totalPoints).toBe(20);
+    expect(data[0]?.completedPoints).toBe(10);
   });
 });
 
@@ -695,7 +696,7 @@ describe('getSprintSummary core/nonCore breakdown', () => {
       sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1 }],
     });
 
-    const summary = getSprintSummary(product, 'sp-1');
+    const summary = req(getSprintSummary(product, 'sp-1'), 'summary');
     expect(summary.core.totalPoints).toBe(20);
     expect(summary.core.completedPoints).toBe(10);
     expect(summary.core.percentComplete).toBe(50);
@@ -729,7 +730,7 @@ describe('getSprintSummary core/nonCore breakdown', () => {
       ],
     });
 
-    const summary = getSprintSummary(product, 'sp-2');
+    const summary = req(getSprintSummary(product, 'sp-2'), 'summary');
     expect(summary.itemsTotal).toBe(2);
     expect(summary.itemsUpdated).toBe(1); // only r1 has sp-2 entry
   });

@@ -118,8 +118,8 @@ describe('computeSizingLayout sorting by sizingCardOrder', () => {
     const mCells = layout.cells.filter(c => c.sizeLabel === 'M');
     expect(mCells.map(c => c.id)).toEqual(['r3', 'r2', 'r1']);
     // Verify Y positions are ascending (first in order = top)
-    expect(mCells[0].y).toBeLessThan(mCells[1].y);
-    expect(mCells[1].y).toBeLessThan(mCells[2].y);
+    expect(mCells[0]?.y).toBeLessThan(mCells[1]?.y);
+    expect(mCells[1]?.y).toBeLessThan(mCells[2]?.y);
   });
 
   it('falls back to default order for ribs not in sizingCardOrder', () => {
@@ -134,7 +134,7 @@ describe('computeSizingLayout sorting by sizingCardOrder', () => {
     const layout = computeSizingLayout(product);
     const sCells = layout.cells.filter(c => c.sizeLabel === 'S');
     // r2 has position 0, r1 and r3 have Infinity (stable order: r1 before r3)
-    expect(sCells[0].id).toBe('r2');
+    expect(sCells[0]?.id).toBe('r2');
   });
 
   it('handles empty sizingCardOrder gracefully', () => {
@@ -163,7 +163,7 @@ describe('computeSizingLayout cell positions', () => {
     const mCells = layout.cells.filter(c => c.sizeLabel === 'M').sort((a, b) => a.y - b.y);
     expect(mCells).toHaveLength(2);
     // Second cell should be exactly CELL_HEIGHT + CELL_GAP below first
-    expect(mCells[1].y - mCells[0].y).toBe(CELL_HEIGHT + CELL_GAP);
+    expect(mCells[1]?.y - mCells[0]?.y).toBe(CELL_HEIGHT + CELL_GAP);
   });
 
   it('places unsized cells in grid positions', () => {
@@ -178,8 +178,8 @@ describe('computeSizingLayout cell positions', () => {
     expect(unsized).toHaveLength(2);
     // Both should be on the first row (y is the same if grid has enough cols)
     if (layout.unsizedGridCols >= 2) {
-      expect(unsized[0].y).toBe(unsized[1].y);
-      expect(unsized[1].x).toBeGreaterThan(unsized[0].x);
+      expect(unsized[0]?.y).toBe(unsized[1]?.y);
+      expect(unsized[1]?.x).toBeGreaterThan(unsized[0]?.x);
     }
   });
 });
@@ -323,7 +323,7 @@ describe('computeSizingLayout filtering', () => {
     const filter: SizingFilter = { themeIds: ['t1'], hideLocked: true };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(1);
-    expect(layout.cells[0].id).toBe('r2');
+    expect(layout.cells[0]?.id).toBe('r2');
   });
 
   it('default parameter (no filter arg) returns all ribs', () => {
@@ -343,8 +343,8 @@ describe('computeSizingLayout targetWidth expansion', () => {
     expect(layout.sizedSubColsByLabel.M).toBe(1);
     const mCells = layout.cells.filter(c => c.sizeLabel === 'M').sort((a, b) => a.y - b.y);
     // All three stack vertically — same x, ascending y
-    expect(mCells[0].x).toBe(mCells[1].x);
-    expect(mCells[1].x).toBe(mCells[2].x);
+    expect(mCells[0]?.x).toBe(mCells[1]?.x);
+    expect(mCells[1]?.x).toBe(mCells[2]?.x);
   });
 
   it('with wide targetWidth, sized columns expand and pack cards into sub-columns', () => {
@@ -361,8 +361,8 @@ describe('computeSizingLayout targetWidth expansion', () => {
     const mCells = layout.cells.filter(c => c.sizeLabel === 'M');
     // First two should be on the same row (same y, different x)
     const sorted = [...mCells].sort((a, b) => a.y - b.y || a.x - b.x);
-    expect(sorted[0].y).toBe(sorted[1].y);
-    expect(sorted[1].x).toBeGreaterThan(sorted[0].x);
+    expect(sorted[0]?.y).toBe(sorted[1]?.y);
+    expect(sorted[1]?.x).toBeGreaterThan(sorted[0]?.x);
   });
 
   it('totalWidth equals max(targetWidth, gutter + min stacked content width)', () => {

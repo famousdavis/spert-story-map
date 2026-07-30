@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
+import { req } from './testHelpers';
 
 function makeProduct() {
   return {
@@ -93,24 +94,24 @@ describe('deleteReleaseFromProduct', () => {
 
   it('removes matching allocations from all ribs', () => {
     const result = deleteReleaseFromProduct(makeProduct(), 'rel-1');
-    const ribs = result.themes[0].backboneItems[0].ribItems;
+    const ribs = req(result.themes[0]?.backboneItems[0]?.ribItems, 'ribs');
     // rib-1 had rel-1 + rel-2 allocations; rel-1 removed
-    expect(ribs[0].releaseAllocations).toEqual([{ releaseId: 'rel-2', percentage: 40 }]);
+    expect(ribs[0]?.releaseAllocations).toEqual([{ releaseId: 'rel-2', percentage: 40 }]);
     // rib-2 had only rel-1 allocation; now empty
-    expect(ribs[1].releaseAllocations).toEqual([]);
+    expect(ribs[1]?.releaseAllocations).toEqual([]);
     // rib-3 unaffected (only rel-2)
-    expect(ribs[2].releaseAllocations).toEqual([{ releaseId: 'rel-2', percentage: 100 }]);
+    expect(ribs[2]?.releaseAllocations).toEqual([{ releaseId: 'rel-2', percentage: 100 }]);
   });
 
   it('removes matching progressHistory entries', () => {
     const result = deleteReleaseFromProduct(makeProduct(), 'rel-1');
-    const ribs = result.themes[0].backboneItems[0].ribItems;
+    const ribs = req(result.themes[0]?.backboneItems[0]?.ribItems, 'ribs');
     // rib-1: had 3 entries, 2 for rel-1 removed
-    expect(ribs[0].progressHistory).toEqual([
+    expect(ribs[0]?.progressHistory).toEqual([
       { sprintId: 'sp-1', releaseId: 'rel-2', percentComplete: 20 },
     ]);
     // rib-2: had 1 entry for rel-1, now empty
-    expect(ribs[1].progressHistory).toEqual([]);
+    expect(ribs[1]?.progressHistory).toEqual([]);
   });
 
   it('does not mutate the original product', () => {
@@ -138,15 +139,15 @@ describe('deleteSprintFromProduct', () => {
 
   it('removes matching progressHistory entries', () => {
     const result = deleteSprintFromProduct(makeProduct(), 'sp-1');
-    const ribs = result.themes[0].backboneItems[0].ribItems;
+    const ribs = req(result.themes[0]?.backboneItems[0]?.ribItems, 'ribs');
     // rib-1: had 3 entries, 2 for sp-1 removed
-    expect(ribs[0].progressHistory).toEqual([
+    expect(ribs[0]?.progressHistory).toEqual([
       { sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: 50 },
     ]);
     // rib-2: had 1 entry for sp-1, now empty
-    expect(ribs[1].progressHistory).toEqual([]);
+    expect(ribs[1]?.progressHistory).toEqual([]);
     // rib-3: had 1 entry for sp-2, unaffected
-    expect(ribs[2].progressHistory).toEqual([
+    expect(ribs[2]?.progressHistory).toEqual([
       { sprintId: 'sp-2', releaseId: 'rel-2', percentComplete: 50 },
     ]);
   });

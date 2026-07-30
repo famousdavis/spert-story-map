@@ -1,5 +1,43 @@
 # Changelog
 
+## Version 0.49.16 (2026-07-30)
+
+Type-annotation cleanup in the test suite — no functional, data, or interface changes, and no change
+to the application code. Only test files were touched.
+
+**641 errors removed**, taking the repository baseline from 1,166 to 525. Since this work began the
+total has come down from 2,183 — a reduction of about three quarters.
+
+This release cleared what had been the single largest remaining category: tests that reach into a
+list by position and read a field off the result, without first establishing that anything is there.
+The first theme, the first backbone, the first rib. There were around 650 such places.
+
+Two tools, chosen so that the checks are genuinely satisfied rather than switched off. Where a test
+reads a value once inside an assertion, the read is now written so that a missing element produces
+no value rather than an error — and the assertion around it then fails, which is the correct
+outcome and a clearer one than a crash. Where a test pulls something out of a list and then makes
+several assertions about it, the extraction now goes through a small shared helper that fails
+immediately and says exactly what was missing, leaving every assertion below it untouched and
+perfectly readable.
+
+Both are deliberately not the shortcut. There is a one-character way to tell the compiler "trust me,
+this is here", and it would have closed all 650 in an afternoon — but it removes the check rather
+than satisfying it, and would have left the suite looking verified while being less safe than
+before.
+
+Two cases were handled by hand because the mechanical approach would have been wrong for them:
+assertions that check something is *absent* (where a missing element would have made the assertion
+pass for the wrong reason), and one line that assigns a new value rather than reading one.
+
+All 930 tests pass, unchanged. Nothing about what any test asserts was altered.
+
+What remains is a different and final category: sample objects written inline inside individual
+tests that are missing a field or two, or that describe a mock loosely. Those are one-at-a-time
+edits with no shared fix.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming no file
+in the repository regressed and the application code is untouched at 200 errors.
+
 ## Version 0.49.15 (2026-07-30)
 
 Type-annotation cleanup in the test suite — no functional, data, or interface changes, and no change

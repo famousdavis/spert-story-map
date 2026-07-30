@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { updateProgress, removeProgress, updateComment, calculateNextSprintEndDate } from '../lib/progressMutations';
 import type { Product, ProductUpdater, Theme, Backbone, RibItem, ProgressEntry } from '../types';
+import { req } from './testHelpers';
 
 function makeProduct({ themes = [] }: { themes?: Theme[] } = {}): Product {
   return {
@@ -68,13 +69,13 @@ describe('updateProgress', () => {
       product,
     );
 
-    const history = result.themes[0].backboneItems[0].ribItems[0].progressHistory;
+    const history = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'history');
     expect(history).toHaveLength(1);
-    expect(history[0].sprintId).toBe('sp-1');
-    expect(history[0].releaseId).toBe('rel-A');
-    expect(history[0].percentComplete).toBe(50);
-    expect(history[0].comment).toBe('');
-    expect(history[0].updatedAt).toBeDefined();
+    expect(history[0]?.sprintId).toBe('sp-1');
+    expect(history[0]?.releaseId).toBe('rel-A');
+    expect(history[0]?.percentComplete).toBe(50);
+    expect(history[0]?.comment).toBe('');
+    expect(history[0]?.updatedAt).toBeDefined();
   });
 
   it('updates an existing progress entry', () => {
@@ -90,10 +91,10 @@ describe('updateProgress', () => {
       product,
     );
 
-    const history = result.themes[0].backboneItems[0].ribItems[0].progressHistory;
+    const history = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'history');
     expect(history).toHaveLength(1);
-    expect(history[0].percentComplete).toBe(75);
-    expect(history[0].comment).toBe('note'); // preserved
+    expect(history[0]?.percentComplete).toBe(75);
+    expect(history[0]?.comment).toBe('note'); // preserved
   });
 
   it('does nothing when sprintId is falsy', () => {
@@ -115,7 +116,7 @@ describe('updateProgress', () => {
       product,
     );
 
-    expect(result.themes[0].backboneItems[0].ribItems[1].progressHistory).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[1]?.progressHistory).toHaveLength(0);
   });
 });
 
@@ -134,7 +135,7 @@ describe('removeProgress', () => {
       product,
     );
 
-    expect(result.themes[0].backboneItems[0].ribItems[0].progressHistory).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory).toHaveLength(0);
   });
 
   it('zeros percent but preserves entry with comment', () => {
@@ -150,10 +151,10 @@ describe('removeProgress', () => {
       product,
     );
 
-    const history = result.themes[0].backboneItems[0].ribItems[0].progressHistory;
+    const history = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'history');
     expect(history).toHaveLength(1);
     expect(history[0].percentComplete).toBeNull();
-    expect(history[0].comment).toBe('keep me');
+    expect(history[0]?.comment).toBe('keep me');
   });
 
   it('is a no-op when entry does not exist', () => {
@@ -168,7 +169,7 @@ describe('removeProgress', () => {
     );
 
     // When updater returns null, rib is unchanged
-    expect(result.themes[0].backboneItems[0].ribItems[0].progressHistory).toHaveLength(0);
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory).toHaveLength(0);
   });
 
   it('does nothing when sprintId is falsy', () => {
@@ -194,10 +195,10 @@ describe('updateComment', () => {
       product,
     );
 
-    const history = result.themes[0].backboneItems[0].ribItems[0].progressHistory;
+    const history = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'history');
     expect(history).toHaveLength(1);
-    expect(history[0].comment).toBe('looking good');
-    expect(history[0].percentComplete).toBe(50); // preserved
+    expect(history[0]?.comment).toBe('looking good');
+    expect(history[0]?.percentComplete).toBe(50); // preserved
   });
 
   it('creates an entry with null percentComplete when none exists', () => {
@@ -211,12 +212,12 @@ describe('updateComment', () => {
       product,
     );
 
-    const history = result.themes[0].backboneItems[0].ribItems[0].progressHistory;
+    const history = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'history');
     expect(history).toHaveLength(1);
     expect(history[0].percentComplete).toBeNull();
-    expect(history[0].comment).toBe('comment only');
-    expect(history[0].sprintId).toBe('sp-1');
-    expect(history[0].releaseId).toBe('rel-A');
+    expect(history[0]?.comment).toBe('comment only');
+    expect(history[0]?.sprintId).toBe('sp-1');
+    expect(history[0]?.releaseId).toBe('rel-A');
   });
 
   it('does nothing when sprintId is falsy', () => {

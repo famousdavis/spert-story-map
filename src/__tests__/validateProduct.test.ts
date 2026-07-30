@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { validateProduct } from '../lib/validateProduct';
+import { req } from './testHelpers';
 
 function minimal(overrides = {}) {
   return {
@@ -62,7 +63,7 @@ describe('validateProduct', () => {
       releases: [{ id: 'r1', name: 'Release 1', order: 1 }],
     });
     const result = validateProduct(data);
-    expect(result.releases[0].id).toBe('r1');
+    expect(result.releases[0]?.id).toBe('r1');
   });
 
   it('rejects release with missing id', () => {
@@ -90,7 +91,7 @@ describe('validateProduct', () => {
       sprints: [{ id: 's1', name: 'Sprint 1' }],
     });
     const result = validateProduct(data);
-    expect(result.sprints[0].id).toBe('s1');
+    expect(result.sprints[0]?.id).toBe('s1');
   });
 
   it('rejects sprint with missing id', () => {
@@ -129,7 +130,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    expect(result.themes[0].backboneItems[0].ribItems[0].id).toBe('r1');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.id).toBe('r1');
   });
 
   it('rejects theme missing id', () => {
@@ -173,9 +174,9 @@ describe('validateProduct', () => {
       releases: [{ id: 'rel1', name: 'R1' }, { id: 'rel2', name: 'R2' }],
     });
     const result = validateProduct(data);
-    const allocs = result.themes[0].backboneItems[0].ribItems[0].releaseAllocations;
-    expect(allocs[0].percentage).toBe(100);
-    expect(allocs[1].percentage).toBe(0);
+    const allocs = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.releaseAllocations, 'allocs');
+    expect(allocs[0]?.percentage).toBe(100);
+    expect(allocs[1]?.percentage).toBe(0);
   });
 
   // --- Progress validation ---
@@ -194,8 +195,8 @@ describe('validateProduct', () => {
       sprints: [{ id: 's1', name: 'Sprint 1' }],
     });
     const result = validateProduct(data);
-    const progress = result.themes[0].backboneItems[0].ribItems[0].progressHistory;
-    expect(progress[0].percentComplete).toBe(100);
+    const progress = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'progress');
+    expect(progress[0]?.percentComplete).toBe(100);
   });
 
   // --- Size validation ---
@@ -211,7 +212,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    expect(result.themes[0].backboneItems[0].ribItems[0].size).toBe('');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBe('');
   });
 
   // --- Unknown field stripping ---
@@ -238,7 +239,7 @@ describe('validateProduct', () => {
       },
     });
     const result = validateProduct(data);
-    expect(result.releaseCardOrder['rel1']).toEqual(['id1', 'id2']);
+    expect(result.releaseCardOrder?.['rel1']).toEqual(['id1', 'id2']);
     expect(result.releaseCardOrder['bad']).toBeUndefined();
   });
 
@@ -296,7 +297,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    expect(result.themes[0].backboneItems[0].ribItems[0].cardColor).toBe('orange');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.cardColor).toBe('orange');
   });
 
   // --- _changeLog ---
@@ -374,7 +375,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    expect(result.themes[0].backboneItems[0].ribItems[0].category).toBe('core');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.category).toBe('core');
   });
 
   it('accepts valid rib category "non-core"', () => {
@@ -389,7 +390,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    expect(result.themes[0].backboneItems[0].ribItems[0].category).toBe('non-core');
+    expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.category).toBe('non-core');
   });
 
   it('rejects invalid rib category', () => {
@@ -415,9 +416,9 @@ describe('validateProduct', () => {
       ],
     });
     const result = validateProduct(data);
-    expect(result.releases[0].order).toBe(0);
-    expect(result.releases[1].order).toBe(10000);
-    expect(result.releases[2].order).toBe(3);
+    expect(result.releases[0]?.order).toBe(0);
+    expect(result.releases[1]?.order).toBe(10000);
+    expect(result.releases[2]?.order).toBe(3);
   });
 
   it('clamps sprint order to 0-10000', () => {
@@ -428,8 +429,8 @@ describe('validateProduct', () => {
       ],
     });
     const result = validateProduct(data);
-    expect(result.sprints[0].order).toBe(0);
-    expect(result.sprints[1].order).toBe(10000);
+    expect(result.sprints[0]?.order).toBe(0);
+    expect(result.sprints[1]?.order).toBe(10000);
   });
 
   // --- Prototype key stripping from card orders ---
@@ -438,7 +439,7 @@ describe('validateProduct', () => {
     const cardOrder = JSON.parse('{"rel1":["id1"],"__proto__":["hack"],"constructor":["hack2"],"prototype":["hack3"]}');
     const data = minimal({ releaseCardOrder: cardOrder });
     const result = validateProduct(data);
-    expect(result.releaseCardOrder['rel1']).toEqual(['id1']);
+    expect(result.releaseCardOrder?.['rel1']).toEqual(['id1']);
     expect(Object.prototype.hasOwnProperty.call(result.releaseCardOrder, '__proto__')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(result.releaseCardOrder, 'constructor')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(result.releaseCardOrder, 'prototype')).toBe(false);
@@ -448,7 +449,7 @@ describe('validateProduct', () => {
     const cardOrder = JSON.parse('{"unsized":["id1"],"__proto__":["hack"],"constructor":["hack2"]}');
     const data = minimal({ sizingCardOrder: cardOrder });
     const result = validateProduct(data);
-    expect(result.sizingCardOrder['unsized']).toEqual(['id1']);
+    expect(result.sizingCardOrder?.['unsized']).toEqual(['id1']);
     expect(Object.prototype.hasOwnProperty.call(result.sizingCardOrder, '__proto__')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(result.sizingCardOrder, 'constructor')).toBe(false);
   });
@@ -473,7 +474,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const bb = result.themes[0].backboneItems[0] as Record<string, unknown>;
+    const bb = result.themes[0]?.backboneItems[0] as Record<string, unknown>;
     expect(bb.id).toBe('b1');
     expect(Object.prototype.hasOwnProperty.call(bb, 'hidden')).toBe(false);
   });
@@ -489,7 +490,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const rib = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    const rib = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
     expect(rib.id).toBe('r1');
     expect(Object.prototype.hasOwnProperty.call(rib, 'tracker')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(rib, '_injected')).toBe(false);
@@ -506,7 +507,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const rib = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    const rib = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
     expect(rib.cardColor).toBe('rose');
   });
 
@@ -521,7 +522,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const rib = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    const rib = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(rib, 'cardColor')).toBe(false);
     expect(rib.id).toBe('r1');
   });
@@ -553,7 +554,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const alloc = result.themes[0].backboneItems[0].ribItems[0].releaseAllocations[0] as Record<string, unknown>;
+    const alloc = result.themes[0]?.backboneItems[0]?.ribItems[0]?.releaseAllocations[0] as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(alloc, 'evil')).toBe(false);
   });
 
@@ -573,7 +574,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const p = result.themes[0].backboneItems[0].ribItems[0].progressHistory[0] as Record<string, unknown>;
+    const p = result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory[0] as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(p, 'evil')).toBe(false);
   });
 
@@ -621,7 +622,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const r = result.themes[0].backboneItems[0].ribItems[0] as Record<string, unknown>;
+    const r = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(r, '__proto__')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(r, 'constructor')).toBe(false);
   });
