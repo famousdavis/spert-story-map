@@ -165,6 +165,19 @@ export interface Product {
   // Cloud-only ownership fields (never written by client save)
   owner?: string;
   members?: Record<string, MemberRole>;
+
+  /**
+   * Client-side aliases for `owner` / `members`, re-attached by the Firestore
+   * driver after `stripFirestoreFields` removes the raw fields on load
+   * (`loadProduct`, `loadProductIndex`, and the `onProductChange` echo).
+   *
+   * The alias is what the UI reads — `owner` / `members` are absent from a
+   * loaded product, so "did you mean 'owner'?" is NOT a valid fix for a type
+   * error on these. Rewriting `_owner` to `owner` silently breaks ownership
+   * checks and role discrimination in the Sharing UI. See CLAUDE.md #33(f).
+   */
+  _owner?: string | null;
+  _members?: Record<string, MemberRole>;
 }
 
 // ---------------------------------------------------------------------------

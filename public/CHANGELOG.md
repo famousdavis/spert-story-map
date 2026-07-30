@@ -1,5 +1,37 @@
 # Changelog
 
+## Version 0.49.6 (2026-07-30)
+
+Type-annotation cleanup — no functional, data, or interface changes. The app behaves identically to
+v0.49.5.
+
+v0.49.5 recorded that this repository carries 2,183 TypeScript errors, none of which had ever been
+reported because `build` is a bare `vite build` that strips types without checking them. This is the
+first instalment of paying that down. It closes out `ProductList.tsx`, the project-list screen:
+**33 errors to 0**, bringing the repository baseline from 2,183 to 2,150.
+
+Nothing here changes what the app does. The work was annotating values the compiler previously knew
+nothing about — six function parameters, five pieces of component state, and one ref. The project
+list's `products` state, for example, was declared as `useState([])`, which TypeScript reads as an
+array that can never contain anything; every read of a project's `id` or `name` off that array was
+therefore unchecked. Seventeen of the file's thirty-three errors came from that single pattern, and
+they resolved as a group once the state was given a type.
+
+One genuine gap in the data model was found and closed while doing this. The Firestore driver
+attaches `_owner` and `_members` to every project it loads — the Sharing UI reads them to work out
+who owns a project and what role each collaborator has — but the `Product` type never declared
+either field, so no use of them was ever checked. They are declared now, with a note explaining
+that the compiler's suggestion to rewrite `_owner` as `owner` is wrong: the raw `owner` field is
+deliberately removed when a project loads, and following that advice would quietly break ownership
+checks and collaborator roles. Both fields remain stripped on import, as before.
+
+Also in this release: `projectOrder` state now uses `undefined` rather than `null` for "no saved
+order", matching the two places that produce and consume it. The saved-order helper's only test is
+`if (!order || order.length === 0)`, so both values behave identically.
+
+Verified with the full ship gate: 930 tests, lint clean, and a typecheck confirming 33 errors fixed
+and no new ones introduced anywhere in the codebase.
+
 ## Version 0.49.5 (2026-07-29)
 
 Release-process hardening — no functional, data, or interface changes. The app behaves identically

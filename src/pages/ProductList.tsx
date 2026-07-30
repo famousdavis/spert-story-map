@@ -24,8 +24,9 @@ import CreateProjectModal from '../components/product/CreateProjectModal';
 import ProjectCard from '../components/product/ProjectCard';
 import ShareDialog from '../components/product/ShareDialog';
 import { Footer } from './ChangelogView';
+import type { Product } from '../types';
 
-function enrichProduct(product) {
+function enrichProduct(product: Product) {
   const allRibs = getAllRibItems(product);
   const totalPoints = getTotalProjectPoints(product);
   const unsized = allRibs.filter(r => !r.size).length;
@@ -33,12 +34,15 @@ function enrichProduct(product) {
   return { ...product, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
 }
 
+/** A Product plus the derived totals the project cards display. */
+type EnrichedProduct = ReturnType<typeof enrichProduct>;
+
 export default function ProductList() {
   const { driver, mode, storageReady } = useStorage();
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<EnrichedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState<EnrichedProduct | null>(null);
   const [cloudDataLoaded, setCloudDataLoaded] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -59,11 +63,15 @@ export default function ProductList() {
   const location = useLocation();
   const { theme, toggleTheme, isDark } = useDarkMode();
 
-  // Drag-to-reorder state
-  const [projectOrder, setProjectOrder] = useState(null);
-  const [dragId, setDragId] = useState(null);
-  const [dropBeforeId, setDropBeforeId] = useState(null);
-  const dropBeforeRef = useRef(null);
+  // Drag-to-reorder state. projectOrder uses `undefined` (not null) for "no
+  // persisted order" so it matches both UserSettings.projectOrder?: string[]
+  // and sortByOrder's `string[] | undefined` parameter — the same concept had
+  // been spelled three ways. Behaviourally identical: sortByOrder's only guard
+  // is `if (!order || order.length === 0)`, and nothing else reads the value.
+  const [projectOrder, setProjectOrder] = useState<string[] | undefined>(undefined);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
+  const dropBeforeRef = useRef<string | null>(null);
 
   const sortedProducts = useMemo(
     () => sortByOrder(products, projectOrder),
@@ -216,7 +224,7 @@ export default function ProductList() {
     dropBeforeRef.current = null;
   };
 
-  const handleCreate = async (name, desc) => {
+  const handleCreate = async (name: string, desc: string) => {
     if (!driver) return;
     const product = createNewProduct(name, desc, driver.getWorkspaceId());
     await driver.createProduct(product);
@@ -231,7 +239,7 @@ export default function ProductList() {
     refresh();
   };
 
-  const handleDuplicate = async (id) => {
+  const handleDuplicate = async (id: string) => {
     if (!driver) return;
     const original = await driver.loadProduct(id);
     if (!original) return;
@@ -240,13 +248,13 @@ export default function ProductList() {
     refresh();
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!driver) return;
     await driver.deleteProduct(id);
     refresh();
   };
 
-  const handleRename = async (id, name) => {
+  const handleRename = async (id: string, name: string) => {
     if (!driver) return;
     // Load fresh so we persist the real product, not the enriched list summary
     // (which carries derived totals). saveProductImmediate bumps updatedAt and,
@@ -257,7 +265,7 @@ export default function ProductList() {
     refresh();
   };
 
-  const handleExport = async (id) => {
+  const handleExport = async (id: string) => {
     if (!driver) return;
     const product = await driver.loadProduct(id);
     if (product) await exportProduct(product, driver, driver.getWorkspaceId());
@@ -464,7 +472,7 @@ export default function ProductList() {
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => handleDelete(deleteTarget.id)}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
         title="Delete Project"
         message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone. Consider exporting first.`}
       />
