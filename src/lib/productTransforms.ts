@@ -112,6 +112,9 @@ export function splitRibInProduct(
         const idx = b.ribItems.findIndex(r => r.id === ribId);
         if (idx < 0) return b;
         const original = b.ribItems[idx];
+        // Unreachable — idx came from findIndex — but indexed access is
+        // `RibItem | undefined` under noUncheckedIndexedAccess.
+        if (!original) return b;
 
         const { originalName, newName } = computeRibSiblingName(b.ribItems, original.name, false);
 
@@ -202,6 +205,9 @@ export function cloneRibInProduct(
         const idx = b.ribItems.findIndex(r => r.id === ribId);
         if (idx < 0) return b;
         const original = b.ribItems[idx];
+        // Unreachable — idx came from findIndex — but indexed access is
+        // `RibItem | undefined` under noUncheckedIndexedAccess.
+        if (!original) return b;
 
         const { newName } = computeRibSiblingName(b.ribItems, original.name, true);
 
@@ -237,7 +243,8 @@ export function cloneRibInProduct(
   // releaseCardOrder: splice newId after ribId in every release the original is in.
   const nextReleaseCardOrder: Record<string, string[]> = { ...(prev.releaseCardOrder || {}) };
   for (const alloc of clonedOriginal.releaseAllocations) {
-    const bucket = nextReleaseCardOrder[alloc.releaseId] ? [...nextReleaseCardOrder[alloc.releaseId]] : [];
+    const existing = nextReleaseCardOrder[alloc.releaseId];
+    const bucket = existing ? [...existing] : [];
     const pos = bucket.indexOf(ribId);
     if (pos >= 0) bucket.splice(pos + 1, 0, newId);
     else bucket.push(newId);

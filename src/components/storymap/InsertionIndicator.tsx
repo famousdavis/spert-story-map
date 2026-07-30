@@ -70,9 +70,9 @@ function RibInsertionLine({ dragState, layout }: { dragState: any; layout: MapLa
     lineY = lane.y + CELL_PAD;
   } else if (insertIndex >= laneCells.length) {
     const lastCell = laneCells[laneCells.length - 1];
-    lineY = lastCell.y + CELL_HEIGHT + CELL_GAP / 2;
+    lineY = lastCell ? lastCell.y + CELL_HEIGHT + CELL_GAP / 2 : lane.y + CELL_PAD;
   } else {
-    lineY = laneCells[insertIndex].y - CELL_GAP / 2;
+    lineY = (laneCells[insertIndex]?.y ?? lane.y + CELL_PAD) - CELL_GAP / 2;
   }
 
   return (
@@ -109,9 +109,12 @@ function ThemeInsertionLine({ dragState, layout }: { dragState: any; layout: Map
     lineX = firstSpan.x - COL_GAP / 2;
   } else if (insertIndex >= otherSpans.length) {
     const lastSpan = otherSpans[otherSpans.length - 1];
+    if (!lastSpan) return null;
     lineX = lastSpan.x + lastSpan.width + COL_GAP / 2;
   } else {
-    lineX = otherSpans[insertIndex].x - COL_GAP / 2;
+    const span = otherSpans[insertIndex];
+    if (!span) return null;
+    lineX = span.x - COL_GAP / 2;
   }
 
   return (
@@ -150,10 +153,13 @@ function BackboneInsertionLine({ dragState, layout }: { dragState: any; layout: 
   } else if (insertIndex >= themeCols.length) {
     // After last column
     const lastCol = themeCols[themeCols.length - 1];
+    if (!lastCol) return null;
     lineX = lastCol.x + COL_WIDTH + COL_GAP / 2;
   } else {
     // Between columns
-    lineX = themeCols[insertIndex].x - COL_GAP / 2;
+    const col = themeCols[insertIndex];
+    if (!col) return null;
+    lineX = col.x - COL_GAP / 2;
   }
 
   const lineTop = THEME_HEIGHT;
@@ -193,9 +199,12 @@ function ReleaseInsertionLine({ dragState, layout }: { dragState: any; layout: M
     lineY = firstLane.y;
   } else if (insertIndex >= otherLanes.length) {
     const lastLane = otherLanes[otherLanes.length - 1];
+    if (!lastLane) return null;
     lineY = lastLane.y + lastLane.height;
   } else {
-    lineY = otherLanes[insertIndex].y;
+    const laneAt = otherLanes[insertIndex];
+    if (!laneAt) return null;
+    lineY = laneAt.y;
   }
 
   return (

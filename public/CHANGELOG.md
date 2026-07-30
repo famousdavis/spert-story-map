@@ -1,5 +1,41 @@
 # Changelog
 
+## Version 0.49.18 (2026-07-30)
+
+Type cleanup in the application code — no functional, data, or interface changes. The app behaves
+identically to v0.49.17.
+
+This is the first instalment of the harder half of this work. The earlier releases were mostly about
+telling the compiler what values are; this one is about places where the code and its own
+descriptions disagreed. Application-code errors go from 200 to 137, and the repository baseline from
+486 to 422.
+
+**Two real inaccuracies in the data model were found and corrected.** A release's target date was
+described as either text or absent, but both places that create a release set it to null explicitly.
+Everything that reads it already copes, so the description was simply wrong, and is now right. And
+the two functions that add a rib item were building it with a category the compiler read as "any
+text at all" rather than one of the two categories the app defines, which meant the resulting item
+did not actually satisfy its own type. Neither was a live fault; both were places where the type
+system had been prevented from checking anything.
+
+**A shared list-reordering helper was fixed rather than worked around.** It was written to accept
+"any object with string keys", which none of the project's own types satisfy, so every use of it
+reported an error. It is now described by what it actually needs — something with an identifier and
+an ordering — and an unused parameter that no caller had ever passed was removed.
+
+**The cloud storage layer was passing its database handle to Firebase without checking it exists**,
+in eleven places, while three other places in the same file already checked. Those eleven now go
+through one small guard that reports the same message the file already used. The situation cannot
+arise in practice, because the cloud layer is only built once the database is available.
+
+Also: the map's drag-insertion lines and its canvas now handle the "nothing there" cases the
+compiler had been pointing at, and four loops that walked a list by position were rewritten to walk
+it directly, which is both safer and easier to read.
+
+All 930 tests pass, unchanged. Nine files improved and none regressed.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck.
+
 ## Version 0.49.17 (2026-07-30)
 
 Type-annotation cleanup in the test suite — no functional, data, or interface changes, and no change

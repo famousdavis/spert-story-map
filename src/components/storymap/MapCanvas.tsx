@@ -32,7 +32,7 @@ interface MapCanvasProps {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children, dragState, onDragMove, onDragEnd, onBackgroundClick, overlayControls }: MapCanvasProps) {
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
   const panDistanceRef = useRef(0);
@@ -85,12 +85,13 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
     // Don't start panning if a drag is in progress
     if (dragState) return;
     // Don't pan when clicking interactive elements (cards, headers, labels, inputs)
-    const interactive = e.target.closest('[data-rib-id], [data-backbone-id], [data-theme-id], [data-release-id], input, button, textarea, [role="menu"]');
+    const target = e.target as HTMLElement | null;
+    const interactive = target?.closest('[data-rib-id], [data-backbone-id], [data-theme-id], [data-release-id], input, button, textarea, [role="menu"]');
     if (interactive) return;
     isPanningRef.current = true;
     panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
     panDistanceRef.current = 0;
-    containerRef.current.setPointerCapture(e.pointerId);
+    containerRef.current?.setPointerCapture(e.pointerId);
     setIsPanning(true);
   }, [pan, dragState]);
 
