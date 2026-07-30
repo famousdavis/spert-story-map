@@ -3,13 +3,18 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { computeSizingLayout, CELL_HEIGHT, CELL_GAP, CELL_PAD } from '../components/sizing/useSizingLayout';
+import { computeSizingLayout, CELL_HEIGHT, CELL_GAP } from '../components/sizing/useSizingLayout';
 import type { SizingFilter } from '../components/sizing/useSizingLayout';
+import type { Product, Size } from '../types';
+import { req } from './testHelpers';
 
 interface RibInput {
   id: string;
   name?: string;
-  size?: string | null;
+  // The Size union, not a loose string: every size these fixtures use is a
+  // real Size member ('S' | 'M' | 'L'). Orphan-size behaviour is exercised by
+  // varying sizeMapping, not by passing a size outside the union.
+  size?: Size;
   progressHistory?: Array<{ sprintId: string; releaseId: string; percentComplete: number }>;
 }
 
@@ -29,7 +34,7 @@ function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, them
   sizeMapping?: Array<{ label: string; points: number }> | null;
   sizingCardOrder?: Record<string, string[]>;
   themes?: ThemeInput[] | null;
-} = {}) {
+} = {}): Product {
   const defaultMapping = [
     { label: 'S', points: 1 },
     { label: 'M', points: 3 },
@@ -40,12 +45,16 @@ function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, them
     ? themes.map(t => ({
         id: t.id,
         name: t.name,
+        order: 1,
         backboneItems: t.backbones.map(b => ({
           id: b.id,
           name: b.name,
+          order: 1,
           ribItems: b.ribs.map(r => ({
             id: r.id,
             name: r.name || r.id,
+            description: '',
+            order: 1,
             size: r.size || null,
             category: 'core' as const,
             releaseAllocations: [],
@@ -56,12 +65,16 @@ function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, them
     : [{
         id: 't1',
         name: 'Theme 1',
+        order: 1,
         backboneItems: [{
           id: 'b1',
           name: 'Backbone 1',
+          order: 1,
           ribItems: ribs.map(r => ({
             id: r.id,
             name: r.name || r.id,
+            description: '',
+            order: 1,
             size: r.size || null,
             category: 'core' as const,
             releaseAllocations: [],
@@ -71,6 +84,14 @@ function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, them
       }];
 
   return {
+    id: 'p1',
+    name: 'Test Product',
+    description: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    schemaVersion: 2,
+    releases: [],
+    sprints: [],
     themes: buildThemes,
     sizeMapping: sizeMapping ?? defaultMapping,
     sizingCardOrder,
@@ -118,8 +139,8 @@ describe('computeSizingLayout sorting by sizingCardOrder', () => {
     const mCells = layout.cells.filter(c => c.sizeLabel === 'M');
     expect(mCells.map(c => c.id)).toEqual(['r3', 'r2', 'r1']);
     // Verify Y positions are ascending (first in order = top)
-    expect(mCells[0]?.y).toBeLessThan(mCells[1]?.y);
-    expect(mCells[1]?.y).toBeLessThan(mCells[2]?.y);
+    expect(req(mCells[0], 'mCells[0]').y).toBeLessThan(req(mCells[1], 'mCells[1]').y);
+    expect(req(mCells[1], 'mCells[1]').y).toBeLessThan(req(mCells[2], 'mCells[2]').y);
   });
 
   it('falls back to default order for ribs not in sizingCardOrder', () => {
@@ -163,7 +184,7 @@ describe('computeSizingLayout cell positions', () => {
     const mCells = layout.cells.filter(c => c.sizeLabel === 'M').sort((a, b) => a.y - b.y);
     expect(mCells).toHaveLength(2);
     // Second cell should be exactly CELL_HEIGHT + CELL_GAP below first
-    expect(mCells[1]?.y - mCells[0]?.y).toBe(CELL_HEIGHT + CELL_GAP);
+    expect(req(mCells[1], 'mCells[1]').y - req(mCells[0], 'mCells[0]').y).toBe(CELL_HEIGHT + CELL_GAP);
   });
 
   it('places unsized cells in grid positions', () => {
@@ -203,7 +224,7 @@ describe('computeSizingLayout filtering', () => {
   });
 
   it('themeIds [] shows all ribs (default behavior)', () => {
-    const filter: SizingFilter = { themeIds: [], hideLocked: false };
+    const filter: SizingFilter = { themeIds: [], releaseIds: [], hideLocked: false };
     const layout = computeSizingLayout(twoThemeProduct(), filter);
     expect(layout.cells).toHaveLength(4);
   });
@@ -224,7 +245,7 @@ describe('computeSizingLayout filtering', () => {
         ] },
       ],
     });
-    const filter: SizingFilter = { themeIds: ['t1'], hideLocked: false };
+    const filter: SizingFilter = { themeIds: ['t1'], releaseIds: [], hideLocked: false };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(2);
     expect(layout.cells.every(c => c.themeId === 't1')).toBe(true);
@@ -244,7 +265,7 @@ describe('computeSizingLayout filtering', () => {
         ] },
       ],
     });
-    const filter: SizingFilter = { themeIds: ['t1', 't3'], hideLocked: false };
+    const filter: SizingFilter = { themeIds: ['t1', 't3'], releaseIds: [], hideLocked: false };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(2);
     expect(layout.cells.some(c => c.themeId === 't2')).toBe(false);
@@ -258,7 +279,7 @@ describe('computeSizingLayout filtering', () => {
         ] },
       ],
     });
-    const filter: SizingFilter = { themeIds: ['nonexistent'], hideLocked: false };
+    const filter: SizingFilter = { themeIds: ['nonexistent'], releaseIds: [], hideLocked: false };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(0);
   });
@@ -277,7 +298,7 @@ describe('computeSizingLayout filtering', () => {
         ] },
       ],
     });
-    const filter: SizingFilter = { themeIds: [], hideLocked: true };
+    const filter: SizingFilter = { themeIds: [], releaseIds: [], hideLocked: true };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(2);
     expect(layout.cells.map(c => c.id)).toEqual(['r1', 'r3']);
@@ -297,7 +318,7 @@ describe('computeSizingLayout filtering', () => {
         ] },
       ],
     });
-    const filter: SizingFilter = { themeIds: [], hideLocked: false };
+    const filter: SizingFilter = { themeIds: [], releaseIds: [], hideLocked: false };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(3);
   });
@@ -320,7 +341,7 @@ describe('computeSizingLayout filtering', () => {
         ] },
       ],
     });
-    const filter: SizingFilter = { themeIds: ['t1'], hideLocked: true };
+    const filter: SizingFilter = { themeIds: ['t1'], releaseIds: [], hideLocked: true };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(1);
     expect(layout.cells[0]?.id).toBe('r2');
@@ -393,9 +414,9 @@ describe('computeSizingLayout cell identity fields', () => {
     });
     const layout = computeSizingLayout(product);
     const byId = Object.fromEntries(layout.cells.map(c => [c.id, c]));
-    expect(byId.r1.themeId).toBe('t1');
-    expect(byId.r2.themeId).toBe('t1');
-    expect(byId.r3.themeId).toBe('t2');
+    expect(req(byId.r1, 'byId.r1').themeId).toBe('t1');
+    expect(req(byId.r2, 'byId.r2').themeId).toBe('t1');
+    expect(req(byId.r3, 'byId.r3').themeId).toBe('t2');
   });
 
   it('emits backboneId on each cell matching its parent backbone', () => {
@@ -409,7 +430,7 @@ describe('computeSizingLayout cell identity fields', () => {
     });
     const layout = computeSizingLayout(product);
     const byId = Object.fromEntries(layout.cells.map(c => [c.id, c]));
-    expect(byId.r1.backboneId).toBe('b1');
-    expect(byId.r2.backboneId).toBe('b2');
+    expect(req(byId.r1, 'byId.r1').backboneId).toBe('b1');
+    expect(req(byId.r2, 'byId.r2').backboneId).toBe('b2');
   });
 });

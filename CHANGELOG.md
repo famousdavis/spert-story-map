@@ -1,5 +1,36 @@
 # Changelog
 
+## Version 0.49.17 (2026-07-30)
+
+Type-annotation cleanup in the test suite — no functional, data, or interface changes, and no change
+to the application code. Only test files were touched.
+
+The repository baseline moves from 525 to 486. Since this work began the total has come down from
+2,183, a reduction of about 78%.
+
+This release concentrated on the sizing board's tests, which went from 41 errors to 2. Their sample
+data builder was producing projects that were missing several fields, and describing a rib's size as
+any text at all rather than as one of the sizes the application actually defines. Correcting the
+input description turned out to matter more than anything else: it removed the need for an override
+that had been telling the compiler to accept the result regardless, and it left fewer problems behind
+than the override had. Every size these tests use is a real one, so nothing about what they exercise
+changed.
+
+The remainder of that file's errors — comparisons and arithmetic between two list positions, and
+lookups in a map built on the fly — now go through the same small helper introduced in the previous
+release, which fails immediately and by name if something genuinely is not there.
+
+All 930 tests pass, unchanged.
+
+What is left is the last category, and it needs judgement rather than a sweep: sample objects written
+inline inside individual tests. Some are incomplete by accident and some are incomplete on purpose —
+there are tests that deliberately pass a bare object to check the code copes with missing fields, and
+filling those in would quietly change what is being tested. They are being left for case-by-case
+attention rather than a mechanical pass.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming no file
+in the repository regressed and the application code is untouched at 200 errors.
+
 ## Version 0.49.16 (2026-07-30)
 
 Type-annotation cleanup in the test suite — no functional, data, or interface changes, and no change
