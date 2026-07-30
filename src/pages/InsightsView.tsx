@@ -243,7 +243,7 @@ export default function InsightsView() {
   );
 }
 
-function StatCard({ label, value, accent = '' }) {
+function StatCard({ label, value, accent = '' }: { label: string; value: React.ReactNode; accent?: string }) {
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</div>
@@ -252,7 +252,7 @@ function StatCard({ label, value, accent = '' }) {
   );
 }
 
-function AttentionSection({ title, color, items }) {
+function AttentionSection({ title, color, items }: { title: string; color: string; items: string[] }) {
   return (
     <div>
       <h4 className={`text-sm font-medium ${color} mb-1`}>{title}</h4>

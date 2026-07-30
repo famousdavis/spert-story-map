@@ -20,29 +20,29 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
     rib.releaseAllocations.map(a => ({ ...a }))
   );
 
-  const parsePct = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : Math.max(0, Math.min(100, n)); };
+  const parsePct = (v: string | number) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : Math.max(0, Math.min(100, n)); };
   const total = allocations.reduce((s, a) => s + parsePct(a.percentage), 0);
   const pts = getRibItemPoints(rib, product.sizeMapping);
 
-  const addRelease = (releaseId) => {
+  const addRelease = (releaseId: string) => {
     if (allocations.some(a => a.releaseId === releaseId)) return;
     const remaining = Math.max(0, 100 - total);
     setAllocations([...allocations, { releaseId, percentage: remaining, memo: '' }]);
   };
 
-  const updatePct = (releaseId, raw) => {
+  const updatePct = (releaseId: string, raw: string) => {
     setAllocations(allocations.map(a =>
       a.releaseId === releaseId ? { ...a, percentage: raw } : a
     ));
   };
 
-  const updateMemo = (releaseId, memo) => {
+  const updateMemo = (releaseId: string, memo: string) => {
     setAllocations(allocations.map(a =>
       a.releaseId === releaseId ? { ...a, memo } : a
     ));
   };
 
-  const removeAlloc = (releaseId) => {
+  const removeAlloc = (releaseId: string) => {
     setAllocations(allocations.filter(a => a.releaseId !== releaseId));
   };
 
