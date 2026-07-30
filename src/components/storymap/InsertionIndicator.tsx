@@ -2,12 +2,13 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, COL_WIDTH, COL_GAP } from './useMapLayout';
+import { CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, COL_WIDTH, COL_GAP } from './useMapLayout';
+import type { MapLayout } from './useMapLayout';
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
+/* eslint-disable @typescript-eslint/no-explicit-any -- drag state is a four-variant union consumed across many components */
 interface InsertionIndicatorProps {
   dragState: any;
-  layout: any;
+  layout: MapLayout;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -39,8 +40,8 @@ export default function InsertionIndicator({ dragState, layout }: InsertionIndic
   return null;
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
-function RibInsertionLine({ dragState, layout }: { dragState: any; layout: any }) {
+/* eslint-disable @typescript-eslint/no-explicit-any -- drag state is a four-variant union consumed across many components */
+function RibInsertionLine({ dragState, layout }: { dragState: any; layout: MapLayout }) {
   const { targetBackboneId, targetReleaseId, insertIndex } = dragState;
   const { columns, cells, releaseLanes, unassignedLane } = layout;
 
@@ -91,7 +92,7 @@ function RibInsertionLine({ dragState, layout }: { dragState: any; layout: any }
   );
 }
 
-function ThemeInsertionLine({ dragState, layout }: { dragState: any; layout: any }) {
+function ThemeInsertionLine({ dragState, layout }: { dragState: any; layout: MapLayout }) {
   const { themeId, insertIndex } = dragState;
   const { themeSpans, totalHeight } = layout;
 
@@ -130,7 +131,7 @@ function ThemeInsertionLine({ dragState, layout }: { dragState: any; layout: any
   );
 }
 
-function BackboneInsertionLine({ dragState, layout }: { dragState: any; layout: any }) {
+function BackboneInsertionLine({ dragState, layout }: { dragState: any; layout: MapLayout }) {
   const { targetThemeId, insertIndex, backboneId } = dragState;
   const { columns, totalHeight } = layout;
 
@@ -175,7 +176,7 @@ function BackboneInsertionLine({ dragState, layout }: { dragState: any; layout: 
   );
 }
 
-function ReleaseInsertionLine({ dragState, layout }: { dragState: any; layout: any }) {
+function ReleaseInsertionLine({ dragState, layout }: { dragState: any; layout: MapLayout }) {
   const { releaseId, insertIndex } = dragState;
   const { releaseLanes, totalWidth } = layout;
 

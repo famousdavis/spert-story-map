@@ -1,5 +1,41 @@
 # Changelog
 
+## Version 0.49.9 (2026-07-30)
+
+Type-annotation cleanup, fourth instalment — no functional, data, or interface changes. The app
+behaves identically to v0.49.8.
+
+The story map's layout engine — the code that decides where every card, column, swim lane and header
+goes — is now fully described to the compiler. This is the largest single improvement so far:
+**119 errors removed**, bringing the repository baseline from 2,064 to 1,945. Since this work began
+the baseline has come down from 2,183.
+
+The layout engine returns one large object describing the whole map. That object had never been
+described, only produced, so every consumer of it was working blind: the components that draw the
+columns, the theme bands, the release lanes, the cards and the drag insertion lines all received it
+as an unchecked value, and nothing verified that what they read was what the engine actually
+produces. There are now proper definitions for each part — columns, theme spans, release lanes, the
+unassigned lane, the positioned cards and the hover "+ Rib" zones — and the two components that
+consume the layout are declared as receiving that shape.
+
+This had a large knock-on effect. The layout engine's own test suite was also unchecked, because it
+built its test projects from untyped helpers; with the engine's output described, those tests are
+checked for the first time and dropped from 143 errors to 72. The drag-insertion component and the
+map content component together lost 15 more.
+
+Two errors in the map content component are newly reported and deliberately kept. Describing the
+layout revealed that two of the components it feeds — the card and the release divider — carry their
+own separate, and slightly different, descriptions of the same objects. That disagreement was
+invisible while the layout was unchecked. It is real, it is worth fixing, and it is a decision about
+those components' interfaces rather than something to paper over here, so it is recorded and
+scheduled with the rest of that work. The file's total still fell, from 13 to 6.
+
+This reverses an earlier project decision to leave the layout objects undescribed as
+over-engineering. The equivalent work for the sizing board's layout has not been done yet.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming six
+files improved and no file in the repository regressed.
+
 ## Version 0.49.8 (2026-07-30)
 
 Type-annotation cleanup, third instalment — no functional, data, or interface changes. The app

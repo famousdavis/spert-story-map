@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useMemo } from 'react';
-import type { Product } from '../../types';
+import type { Product, RibItem, ReleaseAllocation } from '../../types';
 import { getRibItemPoints, getAllocationTotal } from '../../lib/calculations';
 
 // Layout constants (pixels in logical/unzoomed space)
@@ -26,23 +26,108 @@ const COLLAPSED_LANE_HEIGHT = 30;
 
 export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT, ADD_BUTTON_RESERVED, COLLAPSED_LANE_HEIGHT };
 
+/** One column of the map — a single backbone item. */
+export interface MapColumn {
+  backboneId: string;
+  backboneName: string;
+  themeId: string;
+  colIdx: number;
+  x: number;
+  width: number;
+}
+
+/** The theme header band spanning that theme's backbone columns. */
+export interface MapThemeSpan {
+  themeId: string;
+  themeName: string;
+  x: number;
+  width: number;
+  colStart: number;
+  colCount: number;
+  /** True for a theme with no backbones — a placeholder slot is reserved. */
+  isEmpty?: boolean;
+}
+
+/** A release swim lane. */
+export interface MapReleaseLane {
+  releaseId: string;
+  releaseName: string;
+  y: number;
+  height: number;
+  collapsed: boolean;
+  /** Ribs in this release across ALL columns — shown in the collapsed header. */
+  cardCount: number;
+}
+
+/** The always-present lane below the releases. */
+export interface MapUnassignedLane {
+  y: number;
+  height: number;
+}
+
+/** A rib plus the theme/backbone context and derived totals the map displays. */
+export interface MapRibData extends RibItem {
+  themeName: string;
+  themeId: string;
+  backboneName: string;
+  backboneId: string;
+  points: number;
+  allocTotal: number;
+}
+
+/** A rib assigned to one lane. `releaseId` is null in the unassigned lane. */
+export interface MapRibEntry extends MapRibData {
+  releaseId: string | null;
+  allocation: ReleaseAllocation | null;
+  isPartial?: boolean;
+}
+
+/** A rib entry placed at an absolute position. */
+export interface MapCell extends MapRibEntry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A hover "+ Rib" zone, one per column x lane. */
+export interface MapGapButton {
+  themeId: string;
+  backboneId: string;
+  releaseId: string | null;
+  x: number;
+  y: number;
+  width: number;
+}
+
+/** Everything the map needs to render, in logical (unzoomed) pixel space. */
+export interface MapLayout {
+  columns: MapColumn[];
+  themeSpans: MapThemeSpan[];
+  releaseLanes: MapReleaseLane[];
+  cells: MapCell[];
+  unassignedLane: MapUnassignedLane | null;
+  gapButtons: MapGapButton[];
+  totalWidth: number;
+  totalHeight: number;
+}
+
 export default function useMapLayout(product: Product, collapsedReleaseIds: string[] = []) {
   return useMemo(() => computeLayout(product, collapsedReleaseIds), [product, collapsedReleaseIds]);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- layout return type is complex and frequently evolving; explicit interface would be over-engineering
-export function computeLayout(product: Product, collapsedReleaseIds: string[] = []): any {
+export function computeLayout(product: Product, collapsedReleaseIds: string[] = []): MapLayout {
   const collapsedSet = new Set(collapsedReleaseIds);
   const themes = product.themes || [];
   const releases = [...(product.releases || [])].sort((a, b) => a.order - b.order);
 
   if (themes.length === 0) {
-    return { columns: [], themeSpans: [], releaseLanes: [], cells: [], unassignedLane: null, totalWidth: 0, totalHeight: 0 };
+    return { columns: [], themeSpans: [], releaseLanes: [], cells: [], unassignedLane: null, gapButtons: [], totalWidth: 0, totalHeight: 0 };
   }
 
   // 1. Build columns — one per backbone, grouped by theme
-  const columns = [];
-  const themeSpans = [];
+  const columns: MapColumn[] = [];
+  const themeSpans: MapThemeSpan[] = [];
   let colIdx = 0;
 
   for (const theme of themes) {
@@ -89,14 +174,14 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   const totalWidth = LANE_LABEL_WIDTH + contentWidth + RIGHT_LABEL_WIDTH;
 
   // 2. Build a lookup: backboneId -> column
-  const colByBackbone = {};
+  const colByBackbone: Record<string, MapColumn> = {};
   for (const col of columns) {
     colByBackbone[col.backboneId] = col;
   }
 
   // 3. Gather rib items with context
-  const ribsByRelCol = {}; // key: `${releaseId}:${colIdx}` -> rib[]
-  const unassignedByCol = {}; // key: colIdx -> rib[]
+  const ribsByRelCol: Record<string, MapRibEntry[]> = {}; // key: `${releaseId}:${colIdx}`
+  const unassignedByCol: Record<number, MapRibEntry[]> = {}; // key: colIdx
 
   for (const theme of themes) {
     for (const backbone of theme.backboneItems) {
@@ -115,18 +200,20 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
         };
 
         if (rib.releaseAllocations.length === 0) {
-          if (!unassignedByCol[col.colIdx]) unassignedByCol[col.colIdx] = [];
-          unassignedByCol[col.colIdx].push({ ...ribData, releaseId: null, allocation: null });
+          const bucket = unassignedByCol[col.colIdx] ?? [];
+          bucket.push({ ...ribData, releaseId: null, allocation: null });
+          unassignedByCol[col.colIdx] = bucket;
         } else {
           for (const alloc of rib.releaseAllocations) {
             const key = `${alloc.releaseId}:${col.colIdx}`;
-            if (!ribsByRelCol[key]) ribsByRelCol[key] = [];
-            ribsByRelCol[key].push({
+            const bucket = ribsByRelCol[key] ?? [];
+            bucket.push({
               ...ribData,
               releaseId: alloc.releaseId,
               allocation: alloc,
               isPartial: alloc.percentage < 100,
             });
+            ribsByRelCol[key] = bucket;
           }
         }
       }
@@ -136,7 +223,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   // 4. Compute release lane heights
   const bodyTop = THEME_HEIGHT + BACKBONE_HEIGHT;
 
-  const releaseLanes = [];
+  const releaseLanes: MapReleaseLane[] = [];
   let currentY = bodyTop;
 
   for (const release of releases) {
@@ -172,7 +259,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
     const count = unassignedByCol[ci]?.length || 0;
     if (count > maxUnassigned) maxUnassigned = count;
   }
-  const unassignedLane = {
+  const unassignedLane: MapUnassignedLane = {
     y: currentY,
     height: Math.max(
       maxUnassigned > 0 ? maxUnassigned * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 + ADD_BUTTON_RESERVED : 0,
@@ -184,15 +271,18 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   const totalHeight = currentY;
 
   // 6. Place rib cells with absolute positions
-  const cells = [];
+  const cells: MapCell[] = [];
   const cardOrder = product.releaseCardOrder || {};
 
   // Sort ribs within a lane column by releaseCardOrder position
-  const sortByCardOrder = (ribs, releaseId) => {
+  const sortByCardOrder = (ribs: MapRibEntry[], releaseId: string) => {
     const order = cardOrder[releaseId];
     if (!order || order.length === 0) return ribs;
-    const posMap = {};
-    for (let i = 0; i < order.length; i++) posMap[order[i]] = i;
+    const posMap: Record<string, number> = {};
+    for (let i = 0; i < order.length; i++) {
+      const id = order[i];
+      if (id !== undefined) posMap[id] = i;
+    }
     return [...ribs].sort((a, b) => {
       const pa = posMap[a.id] ?? Infinity;
       const pb = posMap[b.id] ?? Infinity;
@@ -242,7 +332,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   // stack, so every cell — empty or not, longest column or not — has room for
   // an affordance. Empty cells get the button at the top (just below the
   // divider); populated cells get it below the last card.
-  const gapButtons = [];
+  const gapButtons: MapGapButton[] = [];
 
   for (const lane of releaseLanes) {
     if (lane.collapsed) continue; // no "+ Rib" affordance in a collapsed lane
