@@ -17,19 +17,20 @@ interface CommentHistoryEntry {
 }
 
 interface ProgressRib extends RibItem {
-  _releaseId?: string;
+  /** Required and nullable — see ProgressRow's copy. */
+  _releaseId: string | null;
 }
 
 interface CommentPanelProps {
   rib: ProgressRib;
   sprint: Sprint | undefined;
-  selectedSprint: string;
+  selectedSprint: string | null;
   rowKey: string;
   savedComment: string;
   commentDrafts: Record<string, string>;
   setCommentDrafts: Dispatch<SetStateAction<Record<string, string>>>;
-  updateComment: (ribId: string, releaseId: string | undefined, comment: string) => void;
-  getCommentHistory: (rib: ProgressRib, releaseId?: string) => CommentHistoryEntry[];
+  updateComment: (ribId: string, releaseId: string | null, comment: string) => void;
+  getCommentHistory: (rib: ProgressRib, releaseId: string | null) => CommentHistoryEntry[];
   editable: boolean;
 }
 
@@ -56,7 +57,7 @@ export default function CommentPanel({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.target.blur();
+      (e.target as HTMLTextAreaElement).blur();
     }
   };
 

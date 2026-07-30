@@ -7,7 +7,7 @@ import type { Sprint } from '../../types';
 type GroupBy = 'release' | 'backbone' | 'theme';
 
 interface ProgressHeaderProps {
-  selectedSprint: string;
+  selectedSprint: string | null;
   setSelectedSprint: (id: string) => void;
   sprints: Sprint[];
   addSprint: (cb: (id: string) => void) => void;

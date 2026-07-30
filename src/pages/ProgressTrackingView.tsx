@@ -117,14 +117,25 @@ export default function ProgressTrackingView() {
     return map;
   }, [product.sprints]);
 
-  // Thin wrappers that bind updateProduct + selectedSprint
-  const updateProgress = (ribId: string, releaseId: string, percentComplete: number) => {
+  // Thin wrappers that bind updateProduct + selectedSprint.
+  //
+  // `releaseId` is nullable because rows in the backbone/theme groupings carry
+  // `_releaseId: null` — those rows render read-only (`_editable: false`), so
+  // these are only reached with a real id. `selectedSprint` is null only when
+  // the project has no sprints, in which case the table does not render at all.
+  // Both guards are therefore unreachable in practice; they exist so the
+  // nullability the page genuinely has stops being asserted away at the
+  // boundary with progressMutations, which requires both.
+  const updateProgress = (ribId: string, releaseId: string | null, percentComplete: number) => {
+    if (releaseId === null || selectedSprint === null) return;
     doUpdateProgress(updateProduct, ribId, releaseId, selectedSprint, percentComplete);
   };
-  const removeProgress = (ribId: string, releaseId: string) => {
+  const removeProgress = (ribId: string, releaseId: string | null) => {
+    if (releaseId === null || selectedSprint === null) return;
     doRemoveProgress(updateProduct, ribId, releaseId, selectedSprint);
   };
-  const updateComment = (ribId: string, releaseId: string, comment: string) => {
+  const updateComment = (ribId: string, releaseId: string | null, comment: string) => {
+    if (releaseId === null || selectedSprint === null) return;
     doUpdateComment(updateProduct, ribId, releaseId, selectedSprint, comment);
   };
 
