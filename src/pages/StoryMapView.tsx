@@ -15,6 +15,7 @@ import DragGhost from '../components/storymap/DragGhost';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import useMapDrag from '../components/storymap/useMapDrag';
 import useMapLayout from '../components/storymap/useMapLayout';
+import type { MapCell } from '../components/storymap/useMapLayout';
 import useMapKeyboard from '../components/storymap/useMapKeyboard';
 import useMapHandlers from '../components/storymap/useMapHandlers';
 import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
@@ -119,7 +120,7 @@ export default function StoryMapView() {
   }, [selectedIds, layout.cells]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const handleRibClick = useCallback((ribData, e) => {
+  const handleRibClick = useCallback((ribData: MapCell, e: React.MouseEvent) => {
     // Don't open detail panel if we just finished dragging
     if (recentDragRef.current) return;
 
@@ -145,7 +146,7 @@ export default function StoryMapView() {
     }
   }, []);
 
-  const handleReleaseClick = useCallback((releaseId) => {
+  const handleReleaseClick = useCallback((releaseId: string) => {
     if (recentDragRef.current) return;
     setSelectedIds(new Set());
     setSelectedRibId(null);
@@ -184,7 +185,7 @@ export default function StoryMapView() {
     }
   }, [layout]);
 
-  const handleFit = useCallback((containerWidth, containerHeight) => {
+  const handleFit = useCallback((containerWidth: number, containerHeight: number) => {
     const { width, height } = mapSizeRef.current;
     if (!width || !height) return;
     const scaleX = containerWidth / width;

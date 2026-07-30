@@ -51,7 +51,7 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
     const el = containerRef.current;
     if (!el) return;
 
-    const handleWheel = (e) => {
+    const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -79,7 +79,7 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
   }, [setZoom, setPan]);
 
   // Pointer pan (disabled when dragging a rib)
-  const handlePointerDown = useCallback((e) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
     // Only left-click pans — ignore right-click, middle-click, etc.
     if (e.button !== 0) return;
     // Don't start panning if a drag is in progress
@@ -94,7 +94,7 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
     setIsPanning(true);
   }, [pan, dragState]);
 
-  const handlePointerMove = useCallback((e) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
     // If a rib drag is active, forward to drag handler
     if (dragState) {
       if (onDragMove) onDragMove(e);
@@ -107,7 +107,7 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
     setPan({ x: newX, y: newY });
   }, [setPan, pan, dragState, onDragMove]);
 
-  const handlePointerUp = useCallback((e) => {
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
     // If a rib drag is active, forward to drag handler
     if (dragState) {
       if (onDragEnd) onDragEnd(e);
@@ -127,8 +127,9 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const handleKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
       if (e.key === '=' || e.key === '+') {
         setZoom(z => Math.min(MAX_ZOOM, z + ZOOM_STEP));
       } else if (e.key === '-') {

@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.49.12 (2026-07-30)
+
+Type-annotation cleanup, seventh instalment — no functional, data, or interface changes. The app
+behaves identically to v0.49.11.
+
+Five more files are annotated, taking the repository baseline from 1,904 to 1,881: the Insights page,
+the allocation dialog, the story map canvas, the story map page, and the size mapping settings.
+
+Twenty-nine never-annotated parameters and component properties across those files are annotated.
+The story map's click handler now knows it receives a positioned card, using the definitions written
+in v0.49.9 — the first place those layout types have been reused outside the layout system itself.
+
+One small piece of unchecked work was made explicit: the map canvas reads the tag name off whatever
+element a keypress came from, to avoid stealing keystrokes from text fields. That element was
+previously assumed rather than checked, and is now handled as something that might be absent.
+
+Verified with the full ship gate: 930 tests, lint clean, and a per-file typecheck confirming five
+files improved and no file in the repository regressed.
+
 ## Version 0.49.11 (2026-07-30)
 
 Type-annotation cleanup, sixth instalment — no functional, data, or interface changes. The app

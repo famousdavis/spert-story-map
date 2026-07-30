@@ -11,7 +11,7 @@ interface SizeMappingSectionProps {
 }
 
 export default function SizeMappingSection({ sizeMapping, updateProduct }: SizeMappingSectionProps) {
-  const updateSizeMapping = (index, field, value) => {
+  const updateSizeMapping = (index: number, field: 'label' | 'points', value: string | number) => {
     updateProduct(prev => ({
       ...prev,
       sizeMapping: prev.sizeMapping.map((m, i) =>
@@ -20,7 +20,7 @@ export default function SizeMappingSection({ sizeMapping, updateProduct }: SizeM
     }));
   };
 
-  const commitSizePoints = (index) => {
+  const commitSizePoints = (index: number) => {
     updateProduct(prev => ({
       ...prev,
       sizeMapping: prev.sizeMapping.map((m, i) =>
@@ -36,7 +36,7 @@ export default function SizeMappingSection({ sizeMapping, updateProduct }: SizeM
     }));
   };
 
-  const removeSize = (index) => {
+  const removeSize = (index: number) => {
     updateProduct(prev => ({
       ...prev,
       sizeMapping: prev.sizeMapping.filter((_, i) => i !== index),
