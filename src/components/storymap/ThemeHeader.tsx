@@ -24,7 +24,7 @@ export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelet
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(themeSpan.themeName, (name) => onRename(themeSpan.themeId, name));
 
-  const handleGripPointerDown = (e) => {
+  const handleGripPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (onDragStart) onDragStart(e, themeSpan);

@@ -76,7 +76,7 @@ export default function MapContent({
   }, [mapWidth, mapHeight, mapSizeRef]);
 
   // Build theme color lookup
-  const themeColorMap = {};
+  const themeColorMap: Record<string, ReturnType<typeof getThemeColorClasses>> = {};
   (themes || []).forEach((t, i) => { themeColorMap[t.id] = getThemeColorClasses(t, i); });
 
   // Precompute which releases have allocations (for delete button state)

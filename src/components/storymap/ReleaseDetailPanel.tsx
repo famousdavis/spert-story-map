@@ -59,7 +59,7 @@ export default function ReleaseDetailPanel({ releaseId, product, onClose, onRena
 
   // Close on Escape (but not while editing)
   useEffect(() => {
-    const handleKey = (e) => {
+    const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !editing) onClose();
     };
     window.addEventListener('keydown', handleKey);

@@ -45,7 +45,7 @@ export default function InlineEdit({ value, onSave, className = '', placeholder 
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       commit();
     } else if (e.key === 'Escape') {

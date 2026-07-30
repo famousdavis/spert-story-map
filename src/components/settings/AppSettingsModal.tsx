@@ -23,7 +23,7 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
     if (open && driver) driver.loadPreferences().then(setPrefs);
   }, [driver, open]);
 
-  const updatePref = (key, value) => {
+  const updatePref = (key: string, value: unknown) => {
     const next = { ...prefs, [key]: value };
     setPrefs(next);
     driver.savePreferences(next);

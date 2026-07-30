@@ -5,6 +5,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { Product } from '../../types';
 import type { RibCardColorKey } from '../../lib/ribCardColors';
+import type { MapLayout } from './useMapLayout';
 import { deleteReleaseFromProduct } from '../../lib/settingsMutations';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
@@ -20,7 +21,7 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
   mutations: any;
   setSelectedReleaseId: (id: string | null) => void;
   onRibAdded: (id: string) => void;
-  layout: any;
+  layout: MapLayout;
   dragState: any;
 }) {
 /* eslint-enable @typescript-eslint/no-explicit-any */

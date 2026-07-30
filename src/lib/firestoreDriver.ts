@@ -200,7 +200,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         where(`members.${uid}`, 'in', ['owner', 'editor', 'viewer']),
       );
       const snap = await getDocs(q);
-      const products = [];
+      const products: Product[] = [];
       snap.forEach(docSnap => {
         const data = docSnap.data();
         const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));

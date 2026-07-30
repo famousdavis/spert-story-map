@@ -71,13 +71,14 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
   }, []);
 
   // Find release names for allocations
-  const releaseMap = {};
+  const releaseMap: Record<string, string> = {};
   product.releases.forEach(r => { releaseMap[r.id] = r.name; });
 
   // Close on Escape (but not while editing an input or textarea)
   useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === 'Escape' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') onClose();
+    const handleKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.key === 'Escape' && target?.tagName !== 'INPUT' && target?.tagName !== 'TEXTAREA') onClose();
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);

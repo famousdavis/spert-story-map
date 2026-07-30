@@ -108,7 +108,7 @@ export default function SizingView() {
     }
   }, [layout]);
 
-  const handleFit = useCallback((containerWidth, containerHeight) => {
+  const handleFit = useCallback((containerWidth: number, containerHeight: number) => {
     const { width, height } = mapSizeRef.current;
     if (!width || !height) return;
     const scaleX = containerWidth / width;
@@ -207,8 +207,9 @@ export default function SizingView() {
 
   // Undo/redo + Escape keyboard shortcuts
   useEffect(() => {
-    const handleKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const handleKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
       const isMac = navigator.platform.toUpperCase().includes('MAC');
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (mod && e.key === 'z' && !e.shiftKey) {

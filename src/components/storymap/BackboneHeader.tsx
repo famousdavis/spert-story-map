@@ -24,7 +24,7 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(column.backboneName, (name) => onRename(column.themeId, column.backboneId, name));
 
-  const handleGripPointerDown = (e) => {
+  const handleGripPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (onDragStart) onDragStart(e, column);
