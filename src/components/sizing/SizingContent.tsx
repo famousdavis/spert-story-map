@@ -14,51 +14,16 @@ import {
 } from '../../lib/ribCardColors';
 import { isInteractiveChild } from '../../lib/domHelpers';
 import { RIB_NAME_TOOLTIP_DELAY } from '../../lib/constants';
-import { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, HEADER_HEIGHT, ZONE_GAP, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
-import type { Size, Category } from '../../types';
+import { COL_WIDTH, CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, HEADER_HEIGHT, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
+import type { SizingLayout, SizingCell } from './useSizingLayout';
 
-export interface SizingCell {
-  id: string;
-  name: string;
-  size: Size;
-  sizeLabel: string | null;
-  category: Category;
-  themeId: string;
-  backboneId: string;
-  backboneName: string;
-  locked: boolean;
-  percentComplete: number;
-  cardColor?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface SizeColumn {
-  label: string;
-  points: number;
-  count: number;
-  x: number;
-  width: number;
-}
-
-interface UnsizedZone {
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface SizingLayout {
-  sizeColumns: SizeColumn[];
-  unsizedZone: UnsizedZone;
-  unsizedCount: number;
-  unsizedGridCols: number;
-  sizeColumnsY: number;
-  cells: SizingCell[];
-  totalWidth: number;
-  totalHeight: number;
-}
+// The layout shapes are owned by useSizingLayout (the producer). This file
+// previously redeclared SizeColumn / UnsizedZone / SizingLayout locally, and
+// the copies had drifted — they were missing `unsizedRows`,
+// `sizedSubColsByLabel` and `UnsizedZone.x`, which is what the reads of those
+// fields below were erroring on. SizingCell is re-exported because SizingView
+// imports it from here.
+export type { SizingCell } from './useSizingLayout';
 
 interface SizingDragState {
   isDragging: boolean;
