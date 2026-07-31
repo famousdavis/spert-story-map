@@ -1,5 +1,25 @@
 # Changelog
 
+## Version 0.49.24 (2026-07-30)
+
+**Fixes the Delete button on release columns, which did nothing.**
+
+On the Release Planning board, each release column has a Delete button that is enabled once the
+column is empty. Clicking it was supposed to raise a confirmation dialog. Instead nothing happened
+at all — no dialog, no error, no deletion — and there was no way to remove a release from that
+screen. Clicking it repeatedly had no effect either.
+
+The cause was a missing setting on the confirmation dialog that told it whether to be visible. It
+was never passed, so the dialog always evaluated to "hidden" and rendered nothing, even though the
+button had correctly asked for it.
+
+Clicking Delete now opens the confirmation as intended, with working Delete and Cancel buttons, and
+the dialog can also be dismissed with Escape or by clicking outside it. Deleting a release from the
+project Settings screen was unaffected and continues to work as before.
+
+Three tests now cover this path — that the dialog appears, that confirming deletes the release, and
+that cancelling does not — each verified to fail against the previous code. All 944 tests pass.
+
 ## Version 0.49.23 (2026-07-30)
 
 **Fixes a bug that could stop a project file from being imported.**
