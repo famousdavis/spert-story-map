@@ -279,7 +279,21 @@ export function validateProduct(data: unknown): Product {
           assert(rib.progressHistory.length <= MAX_PROGRESS,
             `Too many progress entries on rib "${rib.name || rib.id}"`);
           for (const p of rib.progressHistory) {
-            if (p.percentComplete !== undefined) {
+            // `percentComplete` is declared `number | null`, and BOTH values are
+            // written by production code — progressMutations.removeProgress writes
+            // null when clearing the % on an entry that still has a comment, and
+            // updateComment writes null when creating a comment-only entry. The
+            // previous `isNum()` assert was false for null and therefore threw,
+            // rejecting the ENTIRE file: any project holding an assessment note
+            // without a percentage could not be re-imported.
+            //
+            // An absent field is normalised to null so the in-memory shape always
+            // matches the declared contract — callers filter on `!== null`, and an
+            // undefined slipping through is what made getRibReleaseProgress and
+            // getRibReleaseProgressAsOf disagree.
+            if (p.percentComplete === undefined || p.percentComplete === null) {
+              p.percentComplete = null;
+            } else {
               assert(isNum(p.percentComplete), 'Progress percentComplete must be a number');
               p.percentComplete = clamp(p.percentComplete, 0, 100);
             }

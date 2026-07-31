@@ -65,7 +65,12 @@ export function getRibReleaseProgressAsOf(ribItem: RibItem, releaseId: string, s
   let bestOrder = -1;
   for (const entry of ribItem.progressHistory) {
     if (entry.releaseId !== releaseId) continue;
-    if (entry.percentComplete === null) continue;
+    // Skip undefined as well as null. validateProduct now normalises absent to
+    // null on import, but a product imported before that fix can still hold an
+    // undefined here — and `best.percentComplete!` used to return it verbatim,
+    // so this function returned undefined (NaN downstream) where its sibling
+    // getRibReleaseProgress returned 0. The two now agree.
+    if (entry.percentComplete === null || entry.percentComplete === undefined) continue;
     const order = sprintOrder[entry.sprintId];
     if (order !== undefined && order <= targetOrder && order > bestOrder) {
       best = entry;
@@ -73,7 +78,9 @@ export function getRibReleaseProgressAsOf(ribItem: RibItem, releaseId: string, s
     }
   }
 
-  return best ? best.percentComplete! : 0;
+  // The guard above keeps only non-null entries, so `?? 0` is the no-match case
+  // rather than a fallback for a real entry — same shape as getRibReleaseProgress.
+  return best?.percentComplete ?? 0;
 }
 
 // Get the latest progress for a single release (last entry by array position)

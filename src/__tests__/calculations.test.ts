@@ -232,10 +232,13 @@ describe('getRibReleaseProgress', () => {
 
 // --- getRibReleaseProgressAsOf ---
 describe('getRibReleaseProgressAsOf', () => {
-  const sprints = [
-    { id: 'sp-1', order: 1 },
-    { id: 'sp-2', order: 2 },
-    { id: 'sp-3', order: 3 },
+  // Only `id` and `order` matter to the walk-back, but the fixture has to be a
+  // real Sprint[] — the function reads product sprints, and an under-specified
+  // literal was reporting against every call site in this block.
+  const sprints: Sprint[] = [
+    { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' },
+    { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: '2026-01-28' },
+    { id: 'sp-3', name: 'Sprint 3', order: 3, endDate: '2026-02-11' },
   ];
 
   it('returns 0 for no history', () => {
@@ -253,6 +256,29 @@ describe('getRibReleaseProgressAsOf', () => {
     expect(getRibReleaseProgressAsOf(rib, 'rel-1', 'sp-2', sprints)).toBe(20);
     // As of sprint 3, should use sprint 3's value
     expect(getRibReleaseProgressAsOf(rib, 'rel-1', 'sp-3', sprints)).toBe(80);
+  });
+
+  it('skips a comment-only entry (percentComplete null) and returns 0', () => {
+    const rib = makeRib('r1', {
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: null, comment: 'note' }],
+    });
+    expect(getRibReleaseProgressAsOf(rib, 'rel-1', 'sp-2', sprints)).toBe(0);
+  });
+
+  it('agrees with getRibReleaseProgress when percentComplete is absent', () => {
+    // A file imported before the validator normalised absent → null can still
+    // hold an entry with no percentComplete at all. This function used to return
+    // it verbatim through `best.percentComplete!`, i.e. undefined — which is NaN
+    // in any downstream arithmetic — while its sibling returned 0. They now agree.
+    const entry: ProgressEntry = { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 50 };
+    delete (entry as Partial<ProgressEntry>).percentComplete;
+    const rib = makeRib('r1', { history: [entry] });
+
+    const asOf = getRibReleaseProgressAsOf(rib, 'rel-1', 'sp-2', sprints);
+    expect(asOf).toBe(0);
+    expect(getRibReleaseProgress(rib, 'rel-1')).toBe(asOf);
+    // The real defect was NaN downstream, not the value itself.
+    expect(50 + asOf).toBe(50);
   });
 });
 

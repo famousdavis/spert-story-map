@@ -1,7 +1,7 @@
 {
-  "errors": 342,
-  "_measured": "2026-07-30 (v0.49.21). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
+  "errors": 339,
+  "_measured": "2026-07-30 (v0.49.23). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
   "_scope": "npx tsc -b --force — tsconfig.app.json (all of src/, strict + noUncheckedIndexedAccess) plus tsconfig.node.json",
-  "_breakdown": "285 in src/__tests__, 57 in production source. noUncheckedIndexedAccess accounts for 358 of the total (only 63 of those in production source).",
+  "_breakdown": "282 in src/__tests__, 57 in production source. The -3 in v0.49.23 is incidental: typing the local Sprint[] fixture in calculations.test.ts' getRibReleaseProgressAsOf block, which the new percentComplete tests consume. Production source is untouched by that release.",
   "_direction": "This number may only go DOWN. scripts/typecheck-baseline.mjs fails the gate if it grows, and also fails if it shrinks without being recorded here."
 }

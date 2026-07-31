@@ -2,8 +2,9 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { validateProduct } from '../lib/validateProduct';
+import { importProductFromJSON } from '../lib/importExport';
 import { req } from './testHelpers';
 
 function minimal(overrides = {}) {
@@ -197,6 +198,88 @@ describe('validateProduct', () => {
     const result = validateProduct(data);
     const progress = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'progress');
     expect(progress[0]?.percentComplete).toBe(100);
+  });
+
+  // A comment-only progress entry — percentComplete null with a comment kept —
+  // is written by progressMutations.removeProgress and .updateComment. The
+  // validator used to assert isNum() on it, which is false for null, so it threw
+  // and rejected the WHOLE file. Any project holding an assessment note without
+  // a percentage could not be re-imported.
+  function withProgress(progressHistory: unknown[]) {
+    return minimal({
+      themes: [{
+        id: 't1', backboneItems: [{
+          id: 'b1', ribItems: [{ id: 'r1', releaseAllocations: [], progressHistory }],
+        }],
+      }],
+      sprints: [{ id: 's1', name: 'Sprint 1' }],
+      releases: [{ id: 'rel1', name: 'Release 1', order: 1 }],
+    });
+  }
+  const firstEntry = (p: ReturnType<typeof validateProduct>) =>
+    req(req(p.themes[0]?.backboneItems[0]?.ribItems[0], 'rib').progressHistory[0], 'entry');
+
+  it('accepts a comment-only progress entry (percentComplete null)', () => {
+    const result = validateProduct(withProgress([
+      { sprintId: 's1', releaseId: 'rel1', percentComplete: null, comment: 'Blocked on vendor' },
+    ]));
+    const entry = firstEntry(result);
+    expect(entry.percentComplete).toBeNull();
+    expect(entry.comment).toBe('Blocked on vendor');
+  });
+
+  it('normalises an absent percentComplete to null', () => {
+    const result = validateProduct(withProgress([
+      { sprintId: 's1', releaseId: 'rel1', comment: 'No percentage given' },
+    ]));
+    expect(firstEntry(result).percentComplete).toBeNull();
+  });
+
+  it('still rejects a percentComplete that is neither a number nor null', () => {
+    expect(() => validateProduct(withProgress([
+      { sprintId: 's1', releaseId: 'rel1', percentComplete: 'abc' },
+    ]))).toThrow('percentComplete must be a number');
+    expect(() => validateProduct(withProgress([
+      { sprintId: 's1', releaseId: 'rel1', percentComplete: NaN },
+    ]))).toThrow('percentComplete must be a number');
+  });
+
+  it('round-trips a comment-only entry through JSON.stringify → import', () => {
+    // The user-facing path: a project where someone wrote an assessment note
+    // without a percentage, exported, then re-imported. This threw before the
+    // fix and took the whole file with it, not just the entry.
+    //
+    // importProductFromJSON stamps a workspace id, so it needs localStorage —
+    // stubbed only for this test, since the rest of the file exercises the pure
+    // validator and must not depend on a browser global.
+    const store: Record<string, string> = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, value: unknown) => { store[key] = String(value); },
+      removeItem: (key: string) => { delete store[key]; },
+      clear: () => { for (const key of Object.keys(store)) delete store[key]; },
+    });
+    try {
+      const exported = JSON.stringify(withProgress([
+        { sprintId: 's1', releaseId: 'rel1', percentComplete: null, comment: 'Waiting on legal' },
+      ]));
+      const reimported = importProductFromJSON(exported);
+      const entry = firstEntry(reimported);
+      expect(entry.percentComplete).toBeNull();
+      expect(entry.comment).toBe('Waiting on legal');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('preserves a real percentComplete alongside a null one', () => {
+    const result = validateProduct(withProgress([
+      { sprintId: 's1', releaseId: 'rel1', percentComplete: 40 },
+      { sprintId: 's1', releaseId: 'rel1', percentComplete: null, comment: 'note' },
+    ]));
+    const rib = req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+    expect(rib.progressHistory[0]?.percentComplete).toBe(40);
+    expect(rib.progressHistory[1]?.percentComplete).toBeNull();
   });
 
   // --- Size validation ---
