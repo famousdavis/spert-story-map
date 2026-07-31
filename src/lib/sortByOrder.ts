@@ -7,7 +7,7 @@
  * Items in the order array appear first (in order); items not in the array appear after,
  * preserving their original relative order.
  */
-export function sortByOrder<T extends { id: string }>(items: T[], order: string[] | undefined): T[] {
+export function sortByOrder<T extends { id: string }>(items: T[], order: string[] | null | undefined): T[] {
   if (!order || order.length === 0) return items;
   const orderMap = new Map(order.map((id, i) => [id, i]));
   return [...items].sort((a, b) => {

@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect, vi } from 'vitest';
+import type { RibDragState, BackboneDragState, ThemeDragState } from '../components/storymap/mapDragHelpers';
 import {
   computeInsertIndex,
   buildRibMoveState,
@@ -14,6 +15,46 @@ import {
 } from '../components/storymap/mapDragHelpers';
 
 // CELL_HEIGHT = 52, COL_WIDTH = 200 from useMapLayout constants
+
+// Fixture builders. Each drag state carries coordinates, flags and (for ribs) a
+// DOMRect that none of these tests exercise — the assertions are all about
+// target/insert-index computation. Building the full shape in one place keeps
+// the call sites readable and stops each test restating fields it does not care
+// about. `mapContainerRect` is stubbed: it is never read on these paths, and
+// DOMRect does not exist in the node test environment.
+function ribState(overrides: Partial<RibDragState> = {}): RibDragState {
+  return {
+    dragType: 'rib',
+    ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
+    selectedIds: null,
+    startScreenX: 0, startScreenY: 0, startMapX: 0, startMapY: 0,
+    currentMapX: 0, currentMapY: 0, screenX: 0, screenY: 0,
+    targetReleaseId: undefined, targetBackboneId: null, targetThemeId: null,
+    insertIndex: null, isDragging: true,
+    mapContainerRect: {} as DOMRect,
+    ...overrides,
+  };
+}
+
+function backboneState(overrides: Partial<BackboneDragState> = {}): BackboneDragState {
+  return {
+    dragType: 'backbone',
+    backboneId: 'b1', themeId: 't1',
+    startScreenX: 0, startScreenY: 0, currentMapX: 0, currentMapY: 0,
+    targetThemeId: 't1', insertIndex: 0, isDragging: true,
+    ...overrides,
+  };
+}
+
+function themeState(overrides: Partial<ThemeDragState> = {}): ThemeDragState {
+  return {
+    dragType: 'theme',
+    themeId: 't1',
+    startScreenX: 0, startScreenY: 0, currentMapX: 0, currentMapY: 0,
+    insertIndex: null, isDragging: true,
+    ...overrides,
+  };
+}
 
 describe('computeInsertIndex', () => {
   it('returns null if backboneId is null', () => {
@@ -79,16 +120,7 @@ describe('computeInsertIndex', () => {
 });
 
 describe('buildRibMoveState', () => {
-  const basePrev = {
-    ribId: 'r1',
-    themeId: 't1',
-    backboneId: 'b1',
-    releaseId: 'rel-1',
-    targetReleaseId: undefined,
-    targetBackboneId: null,
-    targetThemeId: null,
-    selectedIds: null,
-  };
+  const basePrev = ribState();
 
   it('updates targets from lane and column hit tests', () => {
     const findLane = () => ({ releaseId: 'rel-2', releaseName: 'Release 2' });
@@ -123,7 +155,7 @@ describe('buildRibMoveState', () => {
 });
 
 describe('buildBackboneMoveState', () => {
-  const basePrev = { backboneId: 'b1', targetThemeId: 't1' };
+  const basePrev = backboneState({ backboneId: 'b1', targetThemeId: 't1' });
 
   it('computes insert index among theme columns', () => {
     const findThemeSpan = () => ({ themeId: 't1' });
@@ -159,7 +191,7 @@ describe('buildBackboneMoveState', () => {
 
 describe('buildThemeMoveState', () => {
   it('computes insert index among other themes', () => {
-    const prev = { themeId: 't2' };
+    const prev = themeState({ themeId: 't2' });
     const spans = [
       { themeId: 't1', x: 0, width: 400 },     // mid = 200
       { themeId: 't2', x: 404, width: 200 },    // dragged, excluded
@@ -171,7 +203,7 @@ describe('buildThemeMoveState', () => {
   });
 
   it('inserts at 0 when before all themes', () => {
-    const prev = { themeId: 't2' };
+    const prev = themeState({ themeId: 't2' });
     const spans = [
       { themeId: 't1', x: 200, width: 400 },    // mid = 400
       { themeId: 't2', x: 604, width: 200 },    // dragged
@@ -184,49 +216,49 @@ describe('buildThemeMoveState', () => {
 describe('commitRibDrag', () => {
   it('is a no-op when nothing changed and no insertIndex', () => {
     const updateProduct = vi.fn();
-    commitRibDrag({
-      ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
-      targetReleaseId: 'rel-1', targetBackboneId: 'b1', targetThemeId: 't1',
-    }, updateProduct, []);
+    commitRibDrag(ribState({
+        releaseId: 'rel-1',
+        targetReleaseId: 'rel-1', targetBackboneId: 'b1', targetThemeId: 't1',
+      }), updateProduct, []);
     expect(updateProduct).not.toHaveBeenCalled();
   });
 
   it('reorders within same lane when insertIndex is set', () => {
     const updateProduct = vi.fn();
-    commitRibDrag({
-      ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
-      targetReleaseId: 'rel-1', targetBackboneId: 'b1', targetThemeId: 't1',
+    commitRibDrag(ribState({
+        releaseId: 'rel-1',
+        targetReleaseId: 'rel-1', targetBackboneId: 'b1', targetThemeId: 't1',
       insertIndex: 2, selectedIds: null,
-    }, updateProduct, []);
+      }), updateProduct, []);
     expect(updateProduct).toHaveBeenCalled();
   });
 
   it('is a no-op when targetReleaseId is undefined (never set)', () => {
     const updateProduct = vi.fn();
-    commitRibDrag({
-      ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
-      targetReleaseId: undefined, targetBackboneId: null,
-    }, updateProduct, []);
+    commitRibDrag(ribState({
+        releaseId: 'rel-1',
+        targetReleaseId: undefined, targetBackboneId: null,
+      }), updateProduct, []);
     expect(updateProduct).not.toHaveBeenCalled();
   });
 
   it('calls updateProduct when release changed', () => {
     const updateProduct = vi.fn();
-    commitRibDrag({
-      ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
-      targetReleaseId: 'rel-2', targetBackboneId: 'b1', targetThemeId: 't1',
+    commitRibDrag(ribState({
+        releaseId: 'rel-1',
+        targetReleaseId: 'rel-2', targetBackboneId: 'b1', targetThemeId: 't1',
       insertIndex: 0, selectedIds: null,
-    }, updateProduct, []);
+      }), updateProduct, []);
     expect(updateProduct).toHaveBeenCalled();
   });
 
   it('calls updateProduct when backbone changed', () => {
     const updateProduct = vi.fn();
-    commitRibDrag({
-      ribId: 'r1', themeId: 't1', backboneId: 'b1', releaseId: 'rel-1',
-      targetReleaseId: 'rel-1', targetBackboneId: 'b2', targetThemeId: 't1',
+    commitRibDrag(ribState({
+        releaseId: 'rel-1',
+        targetReleaseId: 'rel-1', targetBackboneId: 'b2', targetThemeId: 't1',
       insertIndex: 0, selectedIds: null,
-    }, updateProduct, []);
+      }), updateProduct, []);
     expect(updateProduct).toHaveBeenCalled();
   });
 });
@@ -234,13 +266,13 @@ describe('commitRibDrag', () => {
 describe('commitBackboneDrag', () => {
   it('is a no-op when targetThemeId is null', () => {
     const updateProduct = vi.fn();
-    commitBackboneDrag({ backboneId: 'b1', themeId: 't1', targetThemeId: null, insertIndex: 0 }, updateProduct);
+    commitBackboneDrag(backboneState({ targetThemeId: null }), updateProduct);
     expect(updateProduct).not.toHaveBeenCalled();
   });
 
   it('calls updateProduct when targetThemeId is set', () => {
     const updateProduct = vi.fn();
-    commitBackboneDrag({ backboneId: 'b1', themeId: 't1', targetThemeId: 't2', insertIndex: 0 }, updateProduct);
+    commitBackboneDrag(backboneState({ targetThemeId: 't2' }), updateProduct);
     expect(updateProduct).toHaveBeenCalled();
   });
 });
@@ -248,19 +280,19 @@ describe('commitBackboneDrag', () => {
 describe('commitThemeDrag', () => {
   it('is a no-op when insertIndex is null', () => {
     const updateProduct = vi.fn();
-    commitThemeDrag({ themeId: 't1', insertIndex: null }, updateProduct);
+    commitThemeDrag(themeState({ insertIndex: null }), updateProduct);
     expect(updateProduct).not.toHaveBeenCalled();
   });
 
   it('calls updateProduct when insertIndex is set', () => {
     const updateProduct = vi.fn();
-    commitThemeDrag({ themeId: 't1', insertIndex: 2 }, updateProduct);
+    commitThemeDrag(themeState({ insertIndex: 2 }), updateProduct);
     expect(updateProduct).toHaveBeenCalled();
   });
 
   it('calls updateProduct when insertIndex is 0', () => {
     const updateProduct = vi.fn();
-    commitThemeDrag({ themeId: 't1', insertIndex: 0 }, updateProduct);
+    commitThemeDrag(themeState({ insertIndex: 0 }), updateProduct);
     expect(updateProduct).toHaveBeenCalled();
   });
 });

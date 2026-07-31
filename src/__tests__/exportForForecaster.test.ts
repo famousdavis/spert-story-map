@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { addDays, computeFirstSprintStartDate, buildForecasterExport } from '../lib/exportForForecaster';
-import type { Theme, Backbone, RibItem, ReleaseAllocation, ProgressEntry, Size, Category } from '../types';
+import type { Product, Theme, Backbone, RibItem, ReleaseAllocation, ProgressEntry, Size, Category } from '../types';
 import { req } from './testHelpers';
 
 const SIZE_MAPPING = [
@@ -36,10 +36,15 @@ function makeTheme(id: string, backbones: Backbone[] = []): Theme {
   return { id, name: `Theme ${id}`, backboneItems: backbones, order: 1 };
 }
 
-function makeProduct(overrides = {}) {
+// Annotated both ways: an untyped `overrides` made `themes`/`releases`/`sprints`
+// infer never[], and the literal was missing `description` and `schemaVersion`,
+// so every one of the 29 call sites reported the same two absences.
+function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
     id: 'prod-1',
     name: 'Test Product',
+    description: '',
+    schemaVersion: 2,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-02-01T00:00:00.000Z',
     sprintCadenceWeeks: 2,
@@ -129,12 +134,12 @@ describe('buildForecasterExport — structure', () => {
 
   it('omits milestones when no releases', () => {
     const result = buildForecasterExport(makeProduct());
-    expect(result.projects[0].milestones).toBeUndefined();
+    expect(req(result.projects[0], 'projects[0]').milestones).toBeUndefined();
   });
 
   it('omits firstSprintStartDate when no sprints', () => {
     const result = buildForecasterExport(makeProduct());
-    expect(result.projects[0].firstSprintStartDate).toBeUndefined();
+    expect(req(result.projects[0], 'projects[0]').firstSprintStartDate).toBeUndefined();
   });
 
   it('returns empty sprints array when no sprints', () => {
@@ -468,7 +473,7 @@ describe('buildForecasterExport — edge cases', () => {
     const result = buildForecasterExport(makeProduct());
     expect(result.projects).toHaveLength(1);
     expect(result.sprints).toHaveLength(0);
-    expect(result.projects[0].milestones).toBeUndefined();
+    expect(req(result.projects[0], 'projects[0]').milestones).toBeUndefined();
   });
 
   it('handles unsized ribs (0 points)', () => {
@@ -484,7 +489,7 @@ describe('buildForecasterExport — edge cases', () => {
 
     const result = buildForecasterExport(product);
     // Release has 0 points from unsized rib, so no milestone
-    expect(result.projects[0].milestones).toBeUndefined();
+    expect(req(result.projects[0], 'projects[0]').milestones).toBeUndefined();
     expect(result.sprints[0]?.doneValue).toBe(0);
   });
 
@@ -508,13 +513,13 @@ describe('buildForecasterExport — edge cases', () => {
     const product = makeProduct({
       sprints: [
         { id: 's1', name: 'Sprint 1', order: 1, endDate: null },
-        { id: 's2', name: 'Sprint 2', order: 2 },
+        { id: 's2', name: 'Sprint 2', order: 2, endDate: null },
       ],
     });
 
     const result = buildForecasterExport(product);
     expect(result.sprints).toHaveLength(0);
-    expect(result.projects[0].firstSprintStartDate).toBeUndefined();
+    expect(req(result.projects[0], 'projects[0]').firstSprintStartDate).toBeUndefined();
   });
 
   it('rounds values to avoid floating-point noise', () => {

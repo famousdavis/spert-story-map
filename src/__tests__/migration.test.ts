@@ -71,6 +71,7 @@ vi.mock('firebase/firestore', () => ({
 
 import { migrateLocalToCloud } from '../lib/migration';
 import { setDoc } from 'firebase/firestore';
+import type { ChangeLogEntry, Product } from '../types';
 
 beforeEach(() => {
   uuidCounter = 0;
@@ -79,10 +80,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function createLocalProduct(id: string, name: string) {
+function createLocalProduct(id: string, name: string): Product {
   return {
     id,
     name,
+    description: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     schemaVersion: 2,
     themes: [],
     releases: [],
@@ -105,6 +109,18 @@ function seedLocalStorage(products: Array<{ id: string; name: string }>) {
 
 // ── migrateLocalToCloud ─────────────────────────────────────────
 
+/**
+ * The setDoc mock's argument tuple, read back for assertions. `doc()` is mocked
+ * to return `{ _path }`, so the call shape is narrower than the real overloads —
+ * hence the cast, in one place rather than at every call site.
+ */
+function findSetDocCall(pathFragment: string): Record<string, unknown> {
+  const calls = vi.mocked(setDoc).mock.calls as unknown as Array<[{ _path: string }, Record<string, unknown>]>;
+  const call = calls.find(c => c[0]._path.includes(pathFragment));
+  if (!call) throw new Error(`no setDoc call for "${pathFragment}"`);
+  return call[1];
+}
+
 describe('migrateLocalToCloud', () => {
   it('uploads local products to Firestore', async () => {
     const product = createLocalProduct('proj-1', 'My Project');
@@ -116,9 +132,9 @@ describe('migrateLocalToCloud', () => {
     expect(result.skipped).toBe(0);
     expect(setDoc).toHaveBeenCalled();
     // Verify owner and members are set
-    const call = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('proj-1'));
-    expect(call[1].owner).toBe('user-1');
-    expect(call[1].members).toEqual({ 'user-1': 'owner' });
+    const call = findSetDocCall('proj-1');
+    expect(call.owner).toBe('user-1');
+    expect(call.members).toEqual({ 'user-1': 'owner' });
   });
 
   it('skips products that already exist in cloud with user as member', async () => {
@@ -152,22 +168,22 @@ describe('migrateLocalToCloud', () => {
     expect(result.uploaded).toBe(1);
     expect(result.skipped).toBe(0);
     // Should have used a new ID (uuid-1)
-    const call = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('uuid-'));
+    const call = findSetDocCall('uuid-');
     expect(call).toBeTruthy();
   });
 
   it('appends cloud-migration to changelog', async () => {
     const product = createLocalProduct('proj-1', 'My Project');
-    product._changeLog = [{ t: 1000, op: 'create', entity: 'product' }];
+    product._changeLog = [{ t: 1000, op: 'create', entity: 'product' }] as ChangeLogEntry[];
     seedLocalStorage([product]);
 
     await migrateLocalToCloud('user-1');
 
-    const call = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('proj-1'));
-    const log = call[1]._changeLog;
+    const call = findSetDocCall('proj-1');
+    const log = call._changeLog as ChangeLogEntry[];
     expect(log.length).toBe(2);
-    expect(log[1].op).toBe('cloud-migration');
-    expect(log[1].uid).toBe('user-1');
+    expect(log[1]?.op).toBe('cloud-migration');
+    expect(log[1]?.uid).toBe('user-1');
   });
 
   it('migrates preferences', async () => {
@@ -177,8 +193,8 @@ describe('migrateLocalToCloud', () => {
 
     await migrateLocalToCloud('user-1');
 
-    const prefsCall = setDoc.mock.calls.find((c: [{ _path: string }, Record<string, unknown>]) => c[0]._path.includes('spertstorymap_settings'));
-    expect(prefsCall[1]).toEqual({ exportName: 'Alice' });
+    const prefsCall = findSetDocCall('spertstorymap_settings');
+    expect(prefsCall).toEqual({ exportName: 'Alice' });
   });
 
   it('leaves local data in place as backup', async () => {

@@ -26,6 +26,7 @@ function makeRib(id: string, allocations: ReleaseAllocation[] = []): RibItem {
   return {
     id,
     name: `Rib ${id}`,
+    description: '',
     releaseAllocations: allocations,
     size: null,
     category: 'core',
@@ -194,7 +195,7 @@ describe('computeLayout', () => {
     const result = computeLayout(product);
     expect(result.unassignedLane).not.toBeNull();
     expect(result.cells).toHaveLength(1);
-    expect(result.cells[0].releaseId).toBeNull();
+    expect(result.cells[0]?.releaseId).toBeNull();
   });
 
   it('always includes unassigned lane when themes exist even if all ribs are assigned', () => {
@@ -206,7 +207,7 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     expect(result.unassignedLane).not.toBeNull();
-    expect(result.unassignedLane.height).toBe(MIN_LANE_HEIGHT);
+    expect(req(result.unassignedLane, 'unassignedLane').height).toBe(MIN_LANE_HEIGHT);
   });
 
   it('includes unassigned lane even when no ribs exist', () => {
@@ -216,8 +217,8 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     expect(result.unassignedLane).not.toBeNull();
-    expect(result.unassignedLane.height).toBe(MIN_LANE_HEIGHT);
-    expect(result.unassignedLane.y).toBe(THEME_HEIGHT + BACKBONE_HEIGHT);
+    expect(req(result.unassignedLane, 'unassignedLane').height).toBe(MIN_LANE_HEIGHT);
+    expect(req(result.unassignedLane, 'unassignedLane').y).toBe(THEME_HEIGHT + BACKBONE_HEIGHT);
   });
 
   it('includes unassigned lane height in totalHeight even with no unassigned ribs', () => {
@@ -274,7 +275,7 @@ describe('computeLayout', () => {
     );
     expect(longest).toBeDefined();
     const longestExpectedY =
-      result.unassignedLane.y + CELL_PAD + (2 - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
+      req(result.unassignedLane, 'unassignedLane').y + CELL_PAD + (2 - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
     expect(longest!.y).toBe(longestExpectedY);
 
     // Empty release×column in column 0 (no allocations) — button at top of cell.
@@ -282,7 +283,7 @@ describe('computeLayout', () => {
       g => g.releaseId === 'rel-1' && g.backboneId === 'b0'
     );
     expect(emptyRel).toBeDefined();
-    expect(emptyRel!.y).toBe(result.releaseLanes[0]?.y + CELL_PAD);
+    expect(req(emptyRel, 'emptyRel').y).toBe(req(result.releaseLanes[0], 'releaseLanes[0]').y + CELL_PAD);
   });
 
   it('creates multiple cells for partial allocations', () => {
@@ -486,8 +487,8 @@ describe('computeLayout — collapsed release lanes', () => {
     expect(saved).toBeGreaterThan(0);
 
     // rel-2 (downstream) and the unassigned lane both move up by the saved height
-    expect(collapsed.releaseLanes[1]?.y).toBe(open.releaseLanes[1]?.y - saved);
-    expect(collapsed.unassignedLane.y).toBe(open.unassignedLane.y - saved);
+    expect(req(collapsed.releaseLanes[1], 'collapsed lane 1').y).toBe(req(open.releaseLanes[1], 'open lane 1').y - saved);
+    expect(req(collapsed.unassignedLane, 'collapsed lane').y).toBe(req(open.unassignedLane, 'open lane').y - saved);
     expect(collapsed.totalHeight).toBe(open.totalHeight - saved);
 
     // First collapsed lane still starts at bodyTop

@@ -28,6 +28,13 @@ const baseCell: Cell = {
   isPartial: false,
   allocation: { releaseId: 'rel-1', percentage: 100, memo: '' },
   allocTotal: 100,
+  // MapCell extends the rib itself, so these come with it.
+  themeName: 'Theme 1',
+  backboneName: 'Backbone 1',
+  description: '',
+  order: 1,
+  releaseAllocations: [{ releaseId: 'rel-1', percentage: 100, memo: '' }],
+  progressHistory: [],
 };
 
 function renderCell() {

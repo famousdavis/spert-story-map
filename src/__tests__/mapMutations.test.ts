@@ -80,7 +80,7 @@ describe('moveRibToRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B'),
+      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B', null),
       product,
     );
 
@@ -100,7 +100,7 @@ describe('moveRibToRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveRibToRelease(update, 'r1', 'rel-A', null),
+      (update) => moveRibToRelease(update, 'r1', 'rel-A', null, null),
       product,
     );
 
@@ -118,7 +118,7 @@ describe('moveRibToRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveRibToRelease(update, 'r1', null, 'rel-B'),
+      (update) => moveRibToRelease(update, 'r1', null, 'rel-B', null),
       product,
     );
 
@@ -137,7 +137,7 @@ describe('moveRibToRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B'),
+      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B', null),
       product,
     );
 
@@ -157,7 +157,7 @@ describe('moveRibToRelease', () => {
 
     // Try to move from rel-A to rel-B — which already has an allocation
     const result = captureUpdate(
-      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B'),
+      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B', null),
       product,
     );
 
@@ -175,7 +175,7 @@ describe('moveRibToRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B'),
+      (update) => moveRibToRelease(update, 'r1', 'rel-A', 'rel-B', null),
       product,
     );
 
@@ -238,7 +238,7 @@ describe('reorderRibInRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => reorderRibInRelease(update, 'r1', 'rel-A', 2),
+      (update) => reorderRibInRelease(update, 'r1', 'rel-A', 2, 'b1'),
       product,
     );
 
@@ -252,7 +252,7 @@ describe('reorderRibInRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => reorderRibInRelease(update, 'r3', 'rel-A', 0),
+      (update) => reorderRibInRelease(update, 'r3', 'rel-A', 0, 'b1'),
       product,
     );
 
@@ -266,7 +266,7 @@ describe('reorderRibInRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => reorderRibInRelease(update, 'r1', null, 1),
+      (update) => reorderRibInRelease(update, 'r1', null, 1, 'b1'),
       product,
     );
 
@@ -281,7 +281,7 @@ describe('reorderRibInRelease', () => {
     });
 
     const result = captureUpdate(
-      (update) => reorderRibInRelease(update, 'r1', 'rel-A', 1),
+      (update) => reorderRibInRelease(update, 'r1', 'rel-A', 1, 'b1'),
       product,
     );
 
@@ -378,7 +378,7 @@ describe('moveBackboneToTheme', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveBackboneToTheme(update, 'b1', 't1', 't2'),
+      (update) => moveBackboneToTheme(update, 'b1', 't1', 't2', null),
       product,
     );
 
@@ -404,7 +404,7 @@ describe('moveBackboneToTheme', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveBackboneToTheme(update, 'b1', 't1', 't2'),
+      (update) => moveBackboneToTheme(update, 'b1', 't1', 't2', null),
       product,
     );
 
@@ -420,7 +420,7 @@ describe('moveBackboneToTheme', () => {
     });
 
     const result = captureUpdate(
-      (update) => moveBackboneToTheme(update, 'nonexistent', 't1', 't2'),
+      (update) => moveBackboneToTheme(update, 'nonexistent', 't1', 't2', null),
       product,
     );
 
@@ -439,7 +439,7 @@ describe('moveRib2D', () => {
     const result = captureUpdate(
       (update) => moveRib2D(update, 'r1',
         { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
-        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A' }
+        { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex: null }
       ),
       product,
     );
@@ -461,7 +461,7 @@ describe('moveRib2D', () => {
     const result = captureUpdate(
       (update) => moveRib2D(update, 'r1',
         { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
-        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B' }
+        { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B', insertIndex: null }
       ),
       product,
     );
@@ -505,7 +505,7 @@ describe('moveRib2D', () => {
     const fakeUpdate = () => { called = true; };
     moveRib2D(fakeUpdate, 'r1',
       { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' },
-      { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' }
+      { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A', insertIndex: null }
     );
     expect(called).toBe(false);
   });
@@ -542,7 +542,7 @@ describe('moveRibs2D', () => {
       (update) => moveRibs2D(update, [
         { ribId: 'r1', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
         { ribId: 'r2', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
-      ], { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A' }),
+      ], { themeId: 't1', backboneId: 'b2', releaseId: 'rel-A', insertIndex: null }),
       product,
     );
 
@@ -586,7 +586,7 @@ describe('moveRibs2D', () => {
       (update) => moveRibs2D(update, [
         { ribId: 'r1', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
         { ribId: 'r2', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
-      ], { themeId: 't1', backboneId: 'b2', releaseId: 'rel-B' }),
+      ], { themeId: 't1', backboneId: 'b2', releaseId: 'rel-B', insertIndex: null }),
       product,
     );
 
@@ -612,7 +612,7 @@ describe('moveRibs2D', () => {
       (update) => moveRibs2D(update, [
         { ribId: 'r1', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
         { ribId: 'r2', fromThemeId: 't1', fromBackboneId: 'b1', fromReleaseId: 'rel-A' },
-      ], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B' }),
+      ], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-B', insertIndex: null }),
       product,
     );
 
@@ -627,7 +627,7 @@ describe('moveRibs2D', () => {
   it('is a no-op with empty entries', () => {
     let called = false;
     const fakeUpdate = () => { called = true; };
-    moveRibs2D(fakeUpdate, [], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A' });
+    moveRibs2D(fakeUpdate, [], { themeId: 't1', backboneId: 'b1', releaseId: 'rel-A', insertIndex: null });
     expect(called).toBe(false);
   });
 });
@@ -970,7 +970,7 @@ describe('end-to-end rib drag placement', () => {
     const b1Cells = layout1.cells
       .filter(c => c.backboneId === 'b1' && c.releaseId === 'rel-A')
       .sort((a, b) => a.y - b.y);
-    const lastCellY = b1Cells[b1Cells.length - 1]?.y + CELL_HEIGHT; // below last cell
+    const lastCellY = req(b1Cells[b1Cells.length - 1], 'last cell').y + CELL_HEIGHT; // below last cell
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b1', 'rel-A', new Set(['r1']), lastCellY,
     );
@@ -1016,7 +1016,7 @@ describe('end-to-end rib drag placement', () => {
     const b2Cells = layout1.cells
       .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-A')
       .sort((a, b) => a.y - b.y);
-    const belowLast = b2Cells[b2Cells.length - 1]?.y + CELL_HEIGHT;
+    const belowLast = req(b2Cells[b2Cells.length - 1], 'last cell').y + CELL_HEIGHT;
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b2', 'rel-A', new Set(['r1']), belowLast,
     );
@@ -1065,7 +1065,7 @@ describe('end-to-end rib drag placement', () => {
     const b2Cells = layout1.cells
       .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-A')
       .sort((a, b) => a.y - b.y);
-    const betweenY = b2Cells[0]?.y + CELL_HEIGHT + CELL_GAP / 2; // between r4 and r5
+    const betweenY = req(b2Cells[0], 'first cell').y + CELL_HEIGHT + CELL_GAP / 2; // between r4 and r5
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b2', 'rel-A', new Set(['r1']), betweenY,
     );
@@ -1169,7 +1169,7 @@ describe('end-to-end rib drag placement', () => {
     const b2Cells = layout1.cells
       .filter(c => c.backboneId === 'b2' && c.releaseId === 'rel-B')
       .sort((a, b) => a.y - b.y);
-    const betweenY = b2Cells[0]?.y + CELL_HEIGHT + CELL_GAP / 2;
+    const betweenY = req(b2Cells[0], 'first cell').y + CELL_HEIGHT + CELL_GAP / 2;
     const insertIndex = computeInsertIndex(
       layout1.cells, 'b2', 'rel-B', new Set(['r1']), betweenY,
     );

@@ -13,7 +13,7 @@ import {
   appendRibNoteInProduct,
 } from '../lib/productTransforms';
 import { buildAiSnapshot, selectSnapshotForWrite } from '../lib/aiSnapshot';
-import { req } from './testHelpers';
+import { req, asRecord } from './testHelpers';
 
 function makeProduct(): Product {
   return {
@@ -801,7 +801,7 @@ describe('applyAiOp — size_rib', () => {
     // Form B: '' is falsy → not "already validly sized" → sizeable.
     // A guard of !== null would skip this rib despite the UI showing it as unsized.
     const p = makeProductWithSizing();
-    (p.themes[0]!.backboneItems[0]!.ribItems[0]! as Record<string, unknown>).size = '';
+    asRecord(p.themes[0]!.backboneItems[0]!.ribItems[0]!).size = '';
     const next = applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' });
     expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.size).toBe('M');
   });
@@ -827,7 +827,7 @@ describe('applyAiOp — size_rib', () => {
     // sizeMapping is required by the type but can be absent on hand-edited products.
     // The ?? [] guard in sizeRibInProduct must prevent a throw.
     const p = makeProductWithSizing();
-    (p as Record<string, unknown>).sizeMapping = undefined;
+    asRecord(p).sizeMapping = undefined;
     expect(() => applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' })).not.toThrow();
     expect(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'M' })).toBe(p);
   });
@@ -945,7 +945,7 @@ describe('applyDrainOps — Phase 3 (size_rib)', () => {
 
   it('size_rib on absent sizeMapping in drain: no-op, no throw, cursor advances', () => {
     const p = makeProductWithSizing();
-    (p as Record<string, unknown>).sizeMapping = undefined;
+    asRecord(p).sizeMapping = undefined;
     const ops: AiOpDoc[] = [{ seq: 1, op: 'size_rib', payload: { ribId: 'r1', size: 'M' } }];
     expect(() => applyDrainOps(p, ops)).not.toThrow();
     const { nextSeq } = applyDrainOps(p, ops);
@@ -1043,7 +1043,7 @@ describe('buildAiSnapshot', () => {
   it('[EDGE] sizeMapping is [] and no throw for absent sizeMapping', () => {
     // ?? [] guard in buildAiSnapshot covers hand-edited products.
     const p = makeProduct();
-    (p as Record<string, unknown>).sizeMapping = undefined;
+    asRecord(p).sizeMapping = undefined;
     expect(() => buildAiSnapshot(p)).not.toThrow();
     expect(buildAiSnapshot(p).sizeMapping).toEqual([]);
   });
@@ -1063,7 +1063,7 @@ describe('buildAiSnapshot', () => {
 
   it('[EDGE] per-rib size is null for a rib with size "" (empty-string orphan)', () => {
     const p = makeProductWithSizing();
-    (p.themes[0]!.backboneItems[0]!.ribItems[0]! as Record<string, unknown>).size = '';
+    asRecord(p.themes[0]!.backboneItems[0]!.ribItems[0]!).size = '';
     expect(
       buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.size,
     ).toBeNull();
@@ -1071,7 +1071,7 @@ describe('buildAiSnapshot', () => {
 
   it('[EDGE] per-rib size is null for an orphan-size rib (label absent from mapping)', () => {
     const p = makeProductWithSizing(); // mapping is {S, M, L}
-    (p.themes[0]!.backboneItems[0]!.ribItems[0]! as Record<string, unknown>).size = 'XXL';
+    asRecord(p.themes[0]!.backboneItems[0]!.ribItems[0]!).size = 'XXL';
     expect(
       buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.size,
     ).toBeNull();
@@ -1329,14 +1329,14 @@ describe('applyAiOp — bulk_size', () => {
 
   it('[EDGE] a rib with size "" (orphan clear) is sizeable — Form B treats it as unsized', () => {
     const p = makeProductWithSizingMultiRib();
-    (p.themes[0]!.backboneItems[0]!.ribItems[0]! as Record<string, unknown>).size = '';
+    asRecord(p.themes[0]!.backboneItems[0]!.ribItems[0]!).size = '';
     const next = applyAiOp(p, 'bulk_size', { sizes: [{ ribId: 'r1', size: 'M' }] });
     expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBe('M');
   });
 
   it('[EDGE] no-op when sizeMapping is absent — ref-equal, no throw', () => {
     const p = makeProductWithSizingMultiRib();
-    (p as Record<string, unknown>).sizeMapping = undefined;
+    asRecord(p).sizeMapping = undefined;
     expect(() => applyAiOp(p, 'bulk_size', { sizes: [{ ribId: 'r1', size: 'M' }] })).not.toThrow();
     expect(applyAiOp(p, 'bulk_size', { sizes: [{ ribId: 'r1', size: 'M' }] })).toBe(p);
   });

@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { RibItem, Sprint } from '../types';
+import type { Sprint, ProgressSource } from '../types';
 import {
   getRibItemPercentComplete,
   getRibReleaseProgressForSprint,
@@ -12,7 +12,7 @@ import {
 /**
  * Count non-empty comments for a rib+release (or all releases if releaseId is null).
  */
-export function getCommentCount(rib: RibItem, releaseId: string | null): number {
+export function getCommentCount(rib: ProgressSource, releaseId: string | null): number {
   if (!rib.progressHistory) return 0;
   if (releaseId) {
     return rib.progressHistory.filter(p => p.releaseId === releaseId && p.comment).length;
@@ -23,7 +23,7 @@ export function getCommentCount(rib: RibItem, releaseId: string | null): number 
 /**
  * Get comment history for a rib+release, sorted newest-first by sprint order.
  */
-export function getCommentHistory(rib: RibItem, releaseId: string | null, sprintNameMap: Record<string, string>, sprintOrder: Record<string, number>) {
+export function getCommentHistory(rib: ProgressSource, releaseId: string | null, sprintNameMap: Record<string, string>, sprintOrder: Record<string, number>) {
   if (!rib.progressHistory) return [];
   const entries = releaseId
     ? rib.progressHistory.filter(p => p.releaseId === releaseId && p.comment)
@@ -50,7 +50,7 @@ export type CommentHistoryEntry = ReturnType<typeof getCommentHistory>[number];
  * Get the sprint-specific percentage for a rib+release.
  * For non-release grouping (releaseId is null), aggregates across all releases.
  */
-export function getSprintPct(rib: RibItem, releaseId: string | null, selectedSprint: string | null): number | null {
+export function getSprintPct(rib: ProgressSource, releaseId: string | null, selectedSprint: string | null): number | null {
   if (!selectedSprint) return null;
   if (releaseId) {
     return getRibReleaseProgressForSprint(rib, releaseId, selectedSprint);
@@ -63,7 +63,7 @@ export function getSprintPct(rib: RibItem, releaseId: string | null, selectedSpr
 /**
  * Get the current cumulative percentage for a rib+release.
  */
-export function getCurrentPct(rib: RibItem, releaseId: string | null): number {
+export function getCurrentPct(rib: ProgressSource, releaseId: string | null): number {
   if (releaseId) return getRibReleaseProgress(rib, releaseId);
   return getRibItemPercentComplete(rib);
 }
@@ -71,7 +71,7 @@ export function getCurrentPct(rib: RibItem, releaseId: string | null): number {
 /**
  * Get the delta (change) between the current sprint and the previous sprint.
  */
-export function getDelta(rib: RibItem, releaseId: string | null, sprint: Sprint | null, prevSprint: Sprint | null, selectedSprint: string | null): number | null {
+export function getDelta(rib: ProgressSource, releaseId: string | null, sprint: Sprint | null, prevSprint: Sprint | null, selectedSprint: string | null): number | null {
   if (!sprint || !prevSprint) return null;
   const current = getSprintPct(rib, releaseId, selectedSprint);
   if (current === null) return null;

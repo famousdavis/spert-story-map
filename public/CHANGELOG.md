@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 0.50.1 (2026-07-30)
+
+**Zero.** Every type error in the project is gone — application code and tests alike. No functional,
+data, or interface changes; the app behaves identically to v0.50.0.
+
+Two days ago this project had 2,183 of them. They had accumulated because the type checker was never
+once run against the code in the four months after the project was converted to TypeScript — the
+build strips type information without checking it, so nothing ever complained. The first run, in
+v0.49.5, found all 2,183 at once.
+
+This release clears the last 283, all of which were in the test suite. Most were not errors in any
+meaningful sense: they were test fixtures that described a project, a rib item or a drag operation
+only partially, because nothing had ever required them to be complete. Completing them means the
+tests now exercise the same shapes the real app produces.
+
+A handful were more than that. Several helper functions asked for a whole project when they only
+ever read one field of it; those now ask for what they use, which let the tests that deliberately
+pass a minimal object keep doing so instead of being padded out with irrelevant data. One test was
+found to be checking a legacy data shape on purpose, and has been marked as such so nobody
+"corrects" it later. One intermittently failing test — it had a genuine timing flaw, and had been
+failing roughly one run in twenty — was fixed along the way.
+
+The practical effect is that the type checker can now be wired into the build itself, which is the
+next and final step of this work. Once that lands, this class of problem cannot silently accumulate
+again.
+
+All 944 tests pass. `tsc` reports nothing at all.
+
 ## Version 0.50.0 (2026-07-30)
 
 **A milestone release: every type error in the application code is now gone.** No functional, data,

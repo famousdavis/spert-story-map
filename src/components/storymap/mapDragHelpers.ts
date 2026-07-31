@@ -10,7 +10,7 @@ type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
 interface MapPoint { x: number; y: number }
 
-interface RibDragState {
+export interface RibDragState {
   dragType: 'rib';
   ribId: string;
   themeId: string;
@@ -33,7 +33,7 @@ interface RibDragState {
   mapContainerRect: DOMRect;
 }
 
-interface BackboneDragState {
+export interface BackboneDragState {
   dragType: 'backbone';
   backboneId: string;
   themeId: string;
@@ -41,12 +41,12 @@ interface BackboneDragState {
   startScreenY: number;
   currentMapX: number;
   currentMapY: number;
-  targetThemeId: string;
+  targetThemeId: string | null;
   insertIndex: number;
   isDragging: boolean;
 }
 
-interface ThemeDragState {
+export interface ThemeDragState {
   dragType: 'theme';
   themeId: string;
   startScreenX: number;
@@ -67,6 +67,9 @@ interface LayoutCell {
   width: number;
   height: number;
 }
+
+/** The only fields the insert-index maths reads off a cell. */
+type InsertIndexCell = Pick<LayoutCell, 'id' | 'backboneId' | 'releaseId' | 'y'>;
 
 interface Column {
   backboneId: string;
@@ -93,7 +96,7 @@ export function buildRibMoveState(
   screenY: number,
   findReleaseLane: (y: number) => { releaseId: string | null } | null,
   findColumn: (x: number) => { backboneId: string; themeId: string } | null,
-  cells: LayoutCell[],
+  cells: InsertIndexCell[],
 ): RibDragState {
   let targetReleaseId = prev.targetReleaseId;
   let targetBackboneId = prev.targetBackboneId;
@@ -134,8 +137,11 @@ export function buildRibMoveState(
 export function buildBackboneMoveState(
   prev: BackboneDragState,
   mapPos: MapPoint,
-  findThemeSpan: (x: number) => ThemeSpan | null,
-  columns: Column[],
+  // Only `.themeId` is read off the result.
+  findThemeSpan: (x: number) => Pick<ThemeSpan, 'themeId'> | null,
+  // `width` is never read here — the insert-index maths uses the COL_WIDTH
+  // constant, not the column's own width.
+  columns: Pick<Column, 'backboneId' | 'themeId' | 'x'>[],
 ): BackboneDragState {
   const ts = findThemeSpan(mapPos.x);
   const targetThemeId = ts ? ts.themeId : prev.targetThemeId;
@@ -164,7 +170,7 @@ export function buildBackboneMoveState(
   };
 }
 
-export function computeInsertIndex(cells: LayoutCell[], backboneId: string | null, releaseId: string | null, excludeIds: Set<string>, mapY: number): number | null {
+export function computeInsertIndex(cells: InsertIndexCell[], backboneId: string | null, releaseId: string | null, excludeIds: Set<string>, mapY: number): number | null {
   if (!backboneId) return null;
   const laneCells = cells
     .filter(c =>

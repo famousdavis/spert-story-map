@@ -153,7 +153,7 @@ describe('removeProgress', () => {
 
     const history = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'history');
     expect(history).toHaveLength(1);
-    expect(history[0].percentComplete).toBeNull();
+    expect(history[0]?.percentComplete).toBeNull();
     expect(history[0]?.comment).toBe('keep me');
   });
 
@@ -214,7 +214,7 @@ describe('updateComment', () => {
 
     const history = req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory, 'history');
     expect(history).toHaveLength(1);
-    expect(history[0].percentComplete).toBeNull();
+    expect(history[0]?.percentComplete).toBeNull();
     expect(history[0]?.comment).toBe('comment only');
     expect(history[0]?.sprintId).toBe('sp-1');
     expect(history[0]?.releaseId).toBe('rel-A');
