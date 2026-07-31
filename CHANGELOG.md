@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 0.49.23 (2026-07-30)
+
+**Fixes a bug that could stop a project file from being imported.**
+
+If anyone on a project wrote an assessment note against a rib item without also entering a
+percentage, that project could not be re-imported. The import failed outright and took the whole
+file with it — not just the affected note — with the message "Progress percentComplete must be a
+number".
+
+Writing a note without a percentage is a normal, supported thing to do. Clearing the percentage on
+an item that has a note deliberately keeps the note and leaves the percentage empty, and adding a
+note to an item that has no percentage yet creates exactly the same shape. The import check
+disagreed with the rest of the app and rejected it.
+
+Anyone affected does not need to do anything. The same file that failed before will now import
+correctly, with notes and percentages intact — no re-export needed, and nothing was lost from the
+original file, which was never modified.
+
+Two related corrections came with it. An entry that carries no percentage at all is now recorded
+consistently as "empty" when a file is imported, rather than being left in an in-between state. And
+the historical "progress as of this sprint" calculation used to return a non-number for such an
+entry, which turned any total containing it into a blank figure; it now reads as zero, matching the
+equivalent current-progress calculation it had drifted apart from.
+
+Seven tests were added covering the note-without-a-percentage case, including a full export-and-
+re-import round trip, and each was confirmed to fail against the previous code. All 941 tests pass.
+The type-error baseline goes from 342 to 339.
+
 ## Version 0.49.22 (2026-07-30)
 
 Test-suite integrity fix — no functional, data, or interface changes. The app behaves identically to
