@@ -1,5 +1,37 @@
 # Changelog
 
+## Version 0.50.0 (2026-07-30)
+
+**A milestone release: every type error in the application code is now gone.** No functional, data,
+or interface changes — the app behaves identically to v0.49.24.
+
+Some background, because the number is the story. In March 2026 this project was converted to
+TypeScript, but nothing ever ran the type checker against it — the build strips types without
+checking them. When the checker was finally run for the first time in v0.49.5, it reported 2,183
+problems, 461 of them in the application code itself. Those were not crashes; the app worked. They
+were four months of type annotations that had never once been verified.
+
+This release takes the application-code count from 57 to **zero**. Twenty-two files improved; all of
+them are now clean. What remains — 283 — is entirely in the test suite, and is the last phase before
+the type checker can be wired into the build permanently so this can never accumulate again.
+
+Most of the work was reconciling places where two parts of the app described the same thing
+differently and had quietly drifted apart. The progress table, the story map cards, the release
+board columns and the structure rows each had a second, hand-written description of data that is
+produced elsewhere; each now refers to the real one, so they cannot drift again. Several values that
+are legitimately absent — a sprint with no end date yet, a release column with no release, a project
+still loading — are now described that way rather than being asserted to always exist.
+
+Two genuine defects surfaced along the way. Both were reported and fixed on their own, separately
+from this cleanup, and have already shipped: an import failure for projects containing an assessment
+note without a percentage (v0.49.23), and a Delete button on release columns that did nothing
+(v0.49.24). A third was investigated and turned out to be a false alarm.
+
+Three small pieces of dead code were removed: two settings passed to components that never declared
+them, and one unused parameter.
+
+All 944 tests pass. Every file was measured individually before and after; none regressed.
+
 ## Version 0.49.24 (2026-07-30)
 
 **Fixes the Delete button on release columns, which did nothing.**

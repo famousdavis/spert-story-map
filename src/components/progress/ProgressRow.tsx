@@ -8,6 +8,7 @@ import { getRibItemPoints } from '../../lib/calculations';
 import ProgressBar from '../ui/ProgressBar';
 import CommentPanel from './CommentPanel';
 import type { RibItem, SizeMapping, Sprint } from '../../types';
+import type { CommentHistoryEntry } from '../../lib/progressViewHelpers';
 
 /** Extended rib with display-time computed fields injected by the progress view. */
 interface ProgressRib extends RibItem {
@@ -25,20 +26,14 @@ interface ProgressRib extends RibItem {
   themeName?: string;
 }
 
-interface CommentHistoryEntry {
-  sprintId: string;
-  releaseId: string;
-  sprintName: string;
-  comment: string;
-  percentComplete: number | null;
-  updatedAt?: string;
-}
-
 interface ProgressRowProps {
   rib: ProgressRib;
   idx: number;
-  sprint: Sprint | undefined;
-  prevSprint: Sprint | undefined;
+  // `Sprint | null` throughout: the page derives these with `.find()`, which
+  // yields undefined, and normalises to null so one convention reaches both
+  // this component and the lib helpers (which already used null).
+  sprint: Sprint | null;
+  prevSprint: Sprint | null;
   selectedSprint: string | null;
   showTargetCol: boolean;
   totalCols: number;
@@ -48,11 +43,15 @@ interface ProgressRowProps {
   setCommentDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   progressDrafts: Record<string, string>;
   setProgressDrafts: Dispatch<SetStateAction<Record<string, string>>>;
-  getSprintPct: (rib: ProgressRib, releaseId: string | null) => number | null;
-  getCurrentPct: (rib: ProgressRib, releaseId: string | null) => number;
-  getDelta: (rib: ProgressRib, releaseId: string | null) => number | null;
-  getCommentCount: (rib: ProgressRib, releaseId: string | null) => number;
-  getCommentHistory: (rib: ProgressRib, releaseId: string | null) => CommentHistoryEntry[];
+  // These take a plain RibItem, which is all the progressViewHelpers behind
+  // them actually read. Declaring them against ProgressRib made the props
+  // contravariantly incompatible with CommentPanel's narrower copy — the
+  // TS2719 "two different types with this name exist" that this row reported.
+  getSprintPct: (rib: RibItem, releaseId: string | null) => number | null;
+  getCurrentPct: (rib: RibItem, releaseId: string | null) => number;
+  getDelta: (rib: RibItem, releaseId: string | null) => number | null;
+  getCommentCount: (rib: RibItem, releaseId: string | null) => number;
+  getCommentHistory: (rib: RibItem, releaseId: string | null) => CommentHistoryEntry[];
   updateProgress: (ribId: string, releaseId: string | null, value: number) => void;
   removeProgress: (ribId: string, releaseId: string | null) => void;
   updateComment: (ribId: string, releaseId: string | null, comment: string) => void;
@@ -151,9 +150,12 @@ export default function ProgressRow({
                 }}
                 onBlur={() => {
                   const raw = progressDrafts[rowKey];
-                  if (raw === '' || raw === null) {
+                  if (raw === '') {
                     removeProgress(rib.id, rib._releaseId);
-                  } else {
+                  } else if (raw !== undefined) {
+                    // An absent draft previously fell through to parseInt(undefined)
+                    // -> NaN -> no-op under the isNaN guard below. Skipping it
+                    // explicitly keeps that behaviour and satisfies the index type.
                     const val = parseInt(raw, 10);
                     if (!isNaN(val) && val >= 0 && val <= maxPct) {
                       updateProgress(rib.id, rib._releaseId, val);

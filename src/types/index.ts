@@ -119,7 +119,13 @@ export interface Sprint {
   id: string;
   name: string;
   order: number;
-  endDate: string;
+  /**
+   * Null until a date is set. addSprint writes null for the first sprint —
+   * calculateNextSprintEndDate has no previous date to extend from — so `string`
+   * alone was never true. Same class as Release.targetDate (v0.49.18); every
+   * consumer already guards with a truthiness check.
+   */
+  endDate: string | null;
 }
 
 export interface ChangeLogEntry {
@@ -240,7 +246,9 @@ export interface StorageDriver {
    * Multi-subscriber: multiple components can register independently.
    * Returns an unsubscribe function — call on effect cleanup.
    */
-  onSaveError(callback: (error: Error) => void): () => void;
+  // `unknown`, not `Error`: the source is a catch block, which can receive any
+  // thrown value. Both subscribers ignore the argument and only flip a banner.
+  onSaveError(callback: (error: unknown) => void): () => void;
   flushPendingSaves(): void;
   cancelPendingSaves(): void;
   /**

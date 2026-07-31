@@ -54,7 +54,7 @@ function renderRow(rib: Rib, overrides: Partial<Props> = {}) {
       rib,
       idx: 0,
       sprint: { id: SPRINT_ID, name: 'Sprint 4', order: 4, endDate: '2026-02-27' },
-      prevSprint: undefined,
+      prevSprint: null,
       selectedSprint: SPRINT_ID,
       showTargetCol: true,
       totalCols: 7,

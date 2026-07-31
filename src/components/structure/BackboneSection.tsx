@@ -5,6 +5,7 @@
 import React from 'react';
 import InlineEdit from '../ui/InlineEdit';
 import RibRow, { GRID_COLS } from './RibRow';
+import type { RibRowRib } from './RibRow';
 import type { Theme, Backbone, SizeMapping, ThemeColorOption } from '../../types';
 
 interface BackboneStats {
@@ -21,9 +22,16 @@ interface DragRibState {
   backboneId: string;
 }
 
+/**
+ * The backbone this section renders comes from StructureView's enrichedProduct,
+ * whose ribs carry the four derived fields RibRow reads. Declaring plain
+ * `Backbone` dropped that on the floor at the RibRow boundary.
+ */
+type EnrichedBackbone = Omit<Backbone, 'ribItems'> & { ribItems: RibRowRib[] };
+
 interface BackboneSectionProps {
   theme: Theme;
-  backbone: Backbone;
+  backbone: EnrichedBackbone;
   bbIdx: number;
   themeColor: ThemeColorOption;
   sizeMapping: SizeMapping[];

@@ -58,13 +58,18 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
   // ownerStatus advances loading → owner | not-owner | error based on outcome.
   useEffect(() => {
     if (mode !== 'cloud' || !user || !productId || !db) return;
+    // Narrowing from the guard above does not survive into the nested async
+    // function below — capture first. Same idiom as MemberRow's `database`
+    // capture (pattern #60), which this call site had never been given.
+    const database = db;
+    const currentUid = user.uid;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional load-state reset on dep change
     setOwnerStatus('loading');
 
     async function load() {
       try {
-        const snap = await getDoc(doc(db, PROJECTS_COL, productId));
+        const snap = await getDoc(doc(database, PROJECTS_COL, productId));
         if (cancelled) return;
         if (!snap.exists()) {
           setOwnerStatus('error');
@@ -73,7 +78,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
         const data = snap.data();
         setOwner(data.owner);
         setMembers(data.members || {});
-        setOwnerStatus(data.owner === user.uid ? 'owner' : 'not-owner');
+        setOwnerStatus(data.owner === currentUid ? 'owner' : 'not-owner');
       } catch (e) {
         if (cancelled) return;
         console.error('Failed to load project members:', e instanceof Error ? e.message : 'Unknown error');
@@ -100,7 +105,6 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
   }
   if (!members) return null; // ownerStatus === 'owner' but defensive null narrow
 
-  const memberUids = Object.keys(members);
 
   const handleAddMember = async () => {
     if (!email.trim() || !db) return;
@@ -119,6 +123,13 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
       }
 
       const targetDoc = snap.docs[0];
+      // Unreachable: snap.empty was checked above. Guarded rather than asserted
+      // so a future change to that check cannot turn this into a crash.
+      if (!targetDoc) {
+        setError('Unable to add member. Please try again.');
+        setAdding(false);
+        return;
+      }
       const targetUid = targetDoc.id;
 
       if (members[targetUid]) {
@@ -180,11 +191,14 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
 
       {/* Members list */}
       <div className="space-y-2 mb-4">
-        {memberUids.map(uid => (
+        {/* Object.entries, not keys-then-index: gives the uid AND a non-optional
+            role from the same read, so the row's `role: string` is satisfied
+            without asserting a lookup that is provably present. */}
+        {Object.entries(members).map(([uid, role]) => (
           <MemberRow
             key={uid}
             uid={uid}
-            role={members[uid]}
+            role={role}
             isOwner={uid === owner}
             isSelf={uid === user.uid}
             onRemove={() => handleRemoveMember(uid)}

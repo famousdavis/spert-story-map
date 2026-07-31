@@ -27,7 +27,7 @@ const firebaseConfig = {
 const isFirebaseConfigured = Boolean(firebaseConfig.apiKey);
 
 const app: FirebaseApp | null = isFirebaseConfigured
-  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0])
+  ? (getApps()[0] ?? initializeApp(firebaseConfig))
   : null;
 
 // memoryLocalCache avoids stale security rule decisions that persist in IndexedDB

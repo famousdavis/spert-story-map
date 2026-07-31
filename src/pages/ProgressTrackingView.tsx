@@ -40,8 +40,16 @@ type ProgressRibRow = ReturnType<typeof getAllRibItems>[number] & {
   _editable: boolean;
 };
 
-/** One collapsible group in the progress table. */
+/**
+ * One collapsible group in the progress table.
+ *
+ * `key` is the Record key the group was filed under and is always present —
+ * it drives collapse state and the React key. `releaseId` is set only by the
+ * release grouping (the other two have no single release), and `entityId` only
+ * by the backbone/theme groupings, so neither alone can type the group key.
+ */
 interface ProgressGroup {
+  key: string;
   label: string;
   releaseId?: string;
   entityId?: string;
@@ -51,8 +59,8 @@ interface ProgressGroup {
 export default function ProgressTrackingView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
   const { addSprint } = useProductMutations(updateProduct);
-  const [selectedSprint, setSelectedSprint] = useState(
-    product.sprints.length > 0 ? product.sprints[product.sprints.length - 1].id : null
+  const [selectedSprint, setSelectedSprint] = useState<string | null>(
+    product.sprints[product.sprints.length - 1]?.id ?? null
   );
   const [groupBy, setGroupBy] = useState<GroupBy>('release');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -99,8 +107,13 @@ export default function ProgressTrackingView() {
   const progressData = useMemo(() => getProgressOverTime(product), [product]);
   const sprintSummary = useMemo(() => getSprintSummary(product, selectedSprint), [product, selectedSprint]);
 
-  const sprint = product.sprints.find(s => s.id === selectedSprint);
-  const prevSprint = sprint ? product.sprints.find(s => s.order === sprint.order - 1) : null;
+  // Normalised to `Sprint | null`: `.find()` yields undefined, the lib helpers
+  // take null, and the row components now declare null — one convention rather
+  // than three, which is what made these two values report at every boundary.
+  const sprint = product.sprints.find(s => s.id === selectedSprint) ?? null;
+  const prevSprint = sprint
+    ? product.sprints.find(s => s.order === sprint.order - 1) ?? null
+    : null;
   const showTargetCol = groupBy === 'release';
   const totalCols = 5 + (showTargetCol ? 1 : 0) + (prevSprint ? 1 : 0);
 
@@ -163,8 +176,8 @@ export default function ProgressTrackingView() {
           const release = product.releases.find(r => r.id === alloc.releaseId);
           const key = alloc.releaseId;
           const label = release?.name || 'Unknown Release';
-          if (!groups[key]) groups[key] = { label, releaseId: key, items: [] };
-          groups[key].items.push({
+          const group = groups[key] ?? (groups[key] = { key, label, releaseId: key, items: [] });
+          group.items.push({
             ...rib,
             _releaseId: alloc.releaseId,
             _releaseName: release?.name || '',
@@ -193,8 +206,8 @@ export default function ProgressTrackingView() {
         key = rib.themeId;
         label = rib.themeName;
       }
-      if (!groups[key]) groups[key] = { label, entityId: key, items: [] };
-      groups[key].items.push({
+      const group = groups[key] ?? (groups[key] = { key, label, entityId: key, items: [] });
+      group.items.push({
         ...rib,
         _releaseId: null,
         _allocPct: null,
@@ -305,7 +318,7 @@ export default function ProgressTrackingView() {
       ) : (
         <div className="space-y-6">
           {grouped.map(group => {
-            const groupKey = group.releaseId || group.entityId;
+            const groupKey = group.key;
             const isCollapsed = collapsedGroups.has(groupKey);
             return (
               <div key={groupKey}>

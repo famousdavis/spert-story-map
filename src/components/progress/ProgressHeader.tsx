@@ -57,7 +57,7 @@ export default function ProgressHeader({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400">Group:</span>
-          {['release', 'backbone', 'theme'].map(g => (
+          {(['release', 'backbone', 'theme'] as const).map(g => (
             <button
               key={g}
               onClick={() => setGroupBy(g)}

@@ -15,26 +15,16 @@ import {
 } from '../../lib/ribCardColors';
 import { isInteractiveChild } from '../../lib/domHelpers';
 import { RIB_NAME_TOOLTIP_DELAY } from '../../lib/constants';
-import type { Size, Category, ReleaseAllocation } from '../../types';
+import type { MapCell } from './useMapLayout';
 
-interface CellData {
-  id: string;
-  name: string;
-  themeId: string;
-  backboneId: string;
-  releaseId: string | null;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  size: Size;
-  points: number;
-  category: Category;
-  isPartial: boolean;
-  allocation: ReleaseAllocation;
-  allocTotal: number;
-  cardColor?: string;
-}
+/**
+ * The cell this component renders IS a MapCell — computeLayout is the only
+ * producer. This used to be an independent redeclaration that had drifted from
+ * it (it required `isPartial` and a non-null `allocation`, neither of which the
+ * layout guarantees), which is what MapContent reported when passing cells in.
+ * Aliasing rather than restating means it cannot drift again.
+ */
+type CellData = MapCell;
 
 interface RibCellProps {
   cell: CellData;
@@ -169,7 +159,7 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
             </span>
           )}
           {cell.points > 0 && <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">{cell.points}pts</span>}
-          {cell.isPartial && <span className="text-blue-600 dark:text-blue-400 font-medium flex-shrink-0">{cell.allocation.percentage}%</span>}
+          {cell.isPartial && cell.allocation && <span className="text-blue-600 dark:text-blue-400 font-medium flex-shrink-0">{cell.allocation.percentage}%</span>}
           {allocWarning && <span className="text-amber-600 dark:text-amber-400 font-medium flex-shrink-0">{cell.allocTotal}%</span>}
           <span className={`flex-1 min-w-0 truncate text-right leading-none ${cell.category === 'core' ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
             {cell.category === 'core' ? 'Core' : 'Non-Core'}

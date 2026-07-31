@@ -38,6 +38,15 @@ export function getCommentHistory(rib: RibItem, releaseId: string | null, sprint
 }
 
 /**
+ * One row of comment history, derived from getCommentHistory rather than
+ * restated. ProgressRow and CommentPanel each used to declare their own copy,
+ * and both had drifted — they required `comment: string` where a ProgressEntry
+ * comment is optional, and neither knew about `order`. Deriving it here means
+ * the shape cannot drift again.
+ */
+export type CommentHistoryEntry = ReturnType<typeof getCommentHistory>[number];
+
+/**
  * Get the sprint-specific percentage for a rib+release.
  * For non-release grouping (releaseId is null), aggregates across all releases.
  */

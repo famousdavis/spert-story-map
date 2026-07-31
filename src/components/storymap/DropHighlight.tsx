@@ -2,6 +2,8 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
+import type { MapReleaseLane, MapUnassignedLane } from './useMapLayout';
+
 interface ColumnData {
   backboneId: string;
   x: number;
@@ -14,17 +16,14 @@ interface ThemeSpanData {
   width: number;
 }
 
-interface LaneData {
-  releaseId: string;
-  y: number;
-  height: number;
-}
+// The unassigned lane genuinely has no releaseId, so one shared LaneData
+// requiring it could not describe both. Use the layout's own types.
 
 interface DropHighlightProps {
   columns: ColumnData[];
   themeSpans: ThemeSpanData[];
-  releaseLanes: LaneData[];
-  unassignedLane: LaneData | null;
+  releaseLanes: MapReleaseLane[];
+  unassignedLane: MapUnassignedLane | null;
   totalHeight: number;
   highlightBackboneId: string | undefined;
   highlightReleaseId: string | null | undefined;

@@ -77,7 +77,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
     }
   }, [totalWidth, totalHeight, mapSizeRef]);
 
-  const isDragging = dragState?.isDragging;
+  const isDragging = dragState?.isDragging ?? false;
   const dragRibId = dragState?.ribId;
   const targetSize = dragState?.targetSize;
 
@@ -181,7 +181,7 @@ export default function SizingContent({ layout, mapSizeRef, dragState, onDragSta
       })}
 
       {/* Insertion indicator */}
-      {isDragging && dragState.insertIndex != null && (
+      {dragState?.isDragging && dragState.insertIndex != null && (
         <SizingInsertionIndicator
           dragState={dragState}
           layout={layout}
@@ -352,6 +352,11 @@ interface SizingInsertionIndicatorProps {
 function SizingInsertionIndicator({ dragState, layout }: SizingInsertionIndicatorProps) {
   const { targetSize, insertIndex, ribId } = dragState;
   const { cells, sizeColumns, unsizedGridCols, sizeColumnsY } = layout;
+
+  // No insertion point yet — the caller already gates on this
+  // (`dragState.insertIndex != null`), so this is belt-and-braces, but it is
+  // what makes the Math.min calls below honest.
+  if (insertIndex === null) return null;
 
   if (targetSize === null) {
     // Unsized zone: horizontal line at grid position

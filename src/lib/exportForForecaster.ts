@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 // Pure transformation: Story Map product → SPERT Release Forecaster import format
-import type { Product } from '../types';
+import type { Product, Sprint } from '../types';
 import { getRibItemPoints, getRibItemPercentCompleteAsOf, getPointsForRelease, getTotalProjectPoints } from './calculations';
 import { reduceRibs } from './ribHelpers';
 
@@ -67,7 +67,12 @@ export function buildForecasterExport(product: Product) {
   }
 
   // --- Sprints ---
-  const sprintsWithDates = sortedSprints.filter(s => s.endDate);
+  // Type predicate, not a bare truthiness filter: every sprint that survives
+  // this genuinely has a date, and saying so lets the reads below (startDate,
+  // sprintFinishDate) use it without re-asserting.
+  const sprintsWithDates = sortedSprints.filter(
+    (s): s is Sprint & { endDate: string } => Boolean(s.endDate)
+  );
   const cadence = product.sprintCadenceWeeks || 2;
   const firstWithDate = sprintsWithDates[0];
   const firstSprintStart = firstWithDate

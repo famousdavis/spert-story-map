@@ -271,7 +271,10 @@ export default function MapContent({
         <button
           className="absolute bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-xs font-medium rounded px-2 py-1 whitespace-nowrap transition-colors"
           style={{ left: totalWidth + COL_GAP, top: THEME_HEIGHT + 2, height: 28 }}
-          onClick={() => onAddBackbone(themeSpans[themeSpans.length - 1].themeId)}
+          onClick={() => {
+            const lastTheme = themeSpans[themeSpans.length - 1];
+            if (lastTheme) onAddBackbone(lastTheme.themeId);
+          }}
         >
           + Backbone
         </button>

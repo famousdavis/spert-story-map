@@ -10,11 +10,15 @@ import ProgressBar from '../ui/ProgressBar';
 import { useTooltip } from '../ui/Tooltip';
 import useInlineEdit from '../storymap/useInlineEdit';
 import { formatDate } from '../../lib/formatDate';
-import type { Release, RibItem, Product } from '../../types';
+import type { Release, Product } from '../../types';
+import type { EnrichedRib } from '../../lib/calculations';
 
-interface RibWithBackbone extends RibItem {
-  backboneName: string;
-}
+/**
+ * The cards in a release column come straight from getAllRibItems, which
+ * attaches theme AND backbone context. Declaring only `backboneName` here made
+ * the onCardClick handler incompatible with the page's own state setter.
+ */
+type RibWithBackbone = EnrichedRib;
 
 interface ColumnStats {
   totalPts: number;
@@ -32,12 +36,14 @@ interface ReleaseColumnProps {
   colId: string;
   release: Release | null;
   ribs: RibWithBackbone[];
-  stats: ColumnStats;
   product: Product;
   dragRibId: string | null;
   dropTarget: DropTargetState | null;
-  isColDropTarget: boolean;
-  isColDragging: boolean;
+  // Optional: the Unassigned column returns from its own branch before any of
+  // these are read, and ReleasePlanningView legitimately omits all six there.
+  stats?: ColumnStats;
+  isColDropTarget?: boolean;
+  isColDragging?: boolean;
   /**
    * Omitted by ReleasePlanningView for release columns while a COLUMN drag is
    * in flight — onColDragOver takes over in that case. The two are
@@ -45,10 +51,10 @@ interface ReleaseColumnProps {
    */
   onColumnDragOver?: (e: React.DragEvent, colId: string) => void;
   onColumnDrop: (colId: string) => void;
-  onColDragStart: (e: React.DragEvent, releaseId: string) => void;
-  onColDragEnd: () => void;
-  onColDragOver: ((e: React.DragEvent, releaseId: string) => void) | null;
-  onColDrop: ((e: React.DragEvent) => void) | null;
+  onColDragStart?: (e: React.DragEvent, releaseId: string) => void;
+  onColDragEnd?: () => void;
+  onColDragOver?: ((e: React.DragEvent, releaseId: string) => void) | null;
+  onColDrop?: ((e: React.DragEvent) => void) | null;
   onCardDragStart: (ribId: string, colId: string) => void;
   onCardDragEnd: () => void;
   onCardDragOver: (e: React.DragEvent, colId: string, ribId: string) => void;
@@ -66,7 +72,9 @@ export default function ReleaseColumn({
   colId,
   release,
   ribs,
-  stats,
+  // Defaulted rather than guarded at each of its five reads: only the release
+  // branch below reaches them, and ReleasePlanningView always supplies stats there.
+  stats = { totalPts: 0, core: 0, nonCore: 0 },
   product,
   dragRibId,
   dropTarget,
@@ -93,7 +101,7 @@ export default function ReleaseColumn({
     commit: commitNameEdit, handleKeyDown: nameKeyDown,
   } = useInlineEdit(
     release?.name || '',
-    (newName) => onRenameRelease?.(release.id, newName),
+    (newName) => { if (release) onRenameRelease?.(release.id, newName); },
   );
   const hasItems = ribs.length > 0;
   const {
@@ -102,7 +110,7 @@ export default function ReleaseColumn({
     onMouseLeave: deleteMouseLeave,
     tooltipEl: deleteTooltipEl,
   } = useTooltip<HTMLButtonElement>(
-    hasItems ? 'Move all items out first' : release ? `Delete ${release.name}` : null
+    hasItems ? 'Move all items out first' : release ? `Delete ${release.name}` : ''
   );
   const isOver = dropTarget?.col === colId && dragRibId;
   const isUnassigned = !release;
@@ -174,7 +182,7 @@ export default function ReleaseColumn({
         }`}>
           <div
             draggable={!nameEditing}
-            onDragStart={e => { if (nameEditing) { e.preventDefault(); return; } onColDragStart(e, release.id); }}
+            onDragStart={e => { if (nameEditing) { e.preventDefault(); return; } onColDragStart?.(e, release.id); }}
             onDragEnd={onColDragEnd}
             className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 ${nameEditing ? '' : 'cursor-grab active:cursor-grabbing'}`}
           >

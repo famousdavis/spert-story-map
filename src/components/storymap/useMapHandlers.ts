@@ -83,8 +83,10 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
       mutations.deleteBackbone(deleteTarget.themeId, deleteTarget.backboneId);
     } else if (deleteTarget.type === 'rib') {
       mutations.deleteRib(deleteTarget.themeId, deleteTarget.backboneId, deleteTarget.ribId);
-    } else if (deleteTarget.type === 'release') {
-      updateProduct(prev => deleteReleaseFromProduct(prev, deleteTarget.releaseId));
+    } else if (deleteTarget.type === 'release' && deleteTarget.releaseId) {
+      // Captured: narrowing does not survive into the updateProduct callback.
+      const releaseId = deleteTarget.releaseId;
+      updateProduct(prev => deleteReleaseFromProduct(prev, releaseId));
       setSelectedReleaseId(null);
     }
     setDeleteTarget(null);

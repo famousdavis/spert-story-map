@@ -24,7 +24,10 @@ export default function SizeMappingSection({ sizeMapping, updateProduct }: SizeM
     updateProduct(prev => ({
       ...prev,
       sizeMapping: prev.sizeMapping.map((m, i) =>
-        i === index ? { ...m, points: parseInt(m.points, 10) || 0 } : m
+        // String(): the points input writes e.target.value, so mid-edit this
+        // field genuinely holds a string even though the type says number.
+        // parseInt already coerced it — this just says so.
+        i === index ? { ...m, points: parseInt(String(m.points), 10) || 0 } : m
       ),
     }));
   };
