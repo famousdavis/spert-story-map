@@ -1,5 +1,49 @@
 # Changelog
 
+## Version 0.50.5 (2026-07-31)
+
+**Six files were asserting plain GPL, and a test now makes that impossible.** Comments and tooling
+only — no functional, data, or interface changes. The app behaves identically to v0.50.4.
+
+The copyright header carried by every source file in this project is three lines, and the third one
+is load-bearing. It points at `LICENSE`. That file adds four additional terms under GPL v3
+Section 7 — attribution preservation, UI notice preservation, trademark reservation, and marking of
+modified versions — and Section 7 requires that a source file carrying such terms either state them
+or say where they are found. The third line is that notice.
+
+Six files added on 2026-05-06 stopped after the second line. A header that ends at "Licensed under
+the GNU General Public License v3.0." asserts plain GPL and leaves a recipient no route to those
+clauses. The six were `InvitationBanner.tsx`, `useInvitationLanding.ts`, `useSignInWithTosGate.ts`,
+`auth-name.ts`, `firestoreUtils.ts` and `invitationErrors.ts`. Each now carries the pointer.
+
+The reason it went unnoticed for three months is that nothing checked. `license-conformance.test.ts`
+verifies the `LICENSE` file itself and never opens a source file, and no other check in the suite
+looked at per-file headers at all. The standing instructions in this project's own notes were the
+only enforcement, and a written instruction is not enforcement.
+
+`src/__tests__/copyright-headers.test.ts` replaces it. It walks every file in scope, strips comment
+framing so one comparison covers `//`, `/* */` and `<!-- -->`, and requires all three lines. It also
+requires the comment to actually close — `index.html` is parsed by neither TypeScript nor Vite, so
+an unclosed `<!--` would otherwise swallow the entire document silently. It reads untracked files as
+well as committed ones, so a missing header fails before the commit rather than after it, and it
+asserts both a file-count floor and the exact set of directory categories it expects to find, so it
+cannot quietly start checking nothing.
+
+Every failure path was exercised by mutation before the guard was accepted: a removed header, a
+two-line header, a deleted scope category, a stale exemption and an unclosed HTML comment each fail
+it, and each names the file and the reason.
+
+### Fixed
+- **Six source files carried a two-line copyright header** missing the `LICENSE` pointer that GPL v3
+  Section 7 requires. All six now carry the full three-line form.
+
+### Added
+- **`src/__tests__/copyright-headers.test.ts`** — asserts the suite-standard header on every source
+  file, with the correct comment framing for its type, including untracked files.
+- **`vite.config.*.timestamp-*` gitignored.** Vite leaves these at the project root if it is killed
+  while bundling a TypeScript config; the new guard would have scoped one as a root config file and
+  failed for a reason the message could not explain.
+
 ## Version 0.50.4 (2026-07-31)
 
 **The release checks now cover the copy of this changelog that readers actually see.** Tooling
