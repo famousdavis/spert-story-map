@@ -19,6 +19,7 @@ import {
 } from '../lib/storage';
 import { SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from '../lib/constants';
 import { req } from './testHelpers';
+import type { Product, ChangeLogEntry, ProgressEntry } from '../types';
 
 // Mock crypto.randomUUID since we're in node environment
 let uuidCounter = 0;
@@ -78,7 +79,7 @@ describe('appendChangeLogEntry', () => {
   });
 
   it('preserves existing entries', () => {
-    const product = { _changeLog: [{ t: 1000, op: 'create', entity: 'product' }] };
+    const product: Pick<Product, '_changeLog'> = { _changeLog: [{ t: 1000, op: 'create', entity: 'product' }] };
     const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 't1' });
     expect(result).toHaveLength(2);
     expect(result[0]?.op).toBe('create');
@@ -86,8 +87,8 @@ describe('appendChangeLogEntry', () => {
   });
 
   it('caps at CHANGELOG_MAX_ENTRIES', () => {
-    const log = Array.from({ length: CHANGELOG_MAX_ENTRIES }, (_, i) => ({ t: i, op: 'add', entity: 'theme', id: `t${i}` }));
-    const product = { _changeLog: log };
+    const log: ChangeLogEntry[] = Array.from({ length: CHANGELOG_MAX_ENTRIES }, (_, i) => ({ t: i, op: 'add', entity: 'theme', id: `t${i}` }));
+    const product: Pick<Product, '_changeLog'> = { _changeLog: log };
     const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 'new' });
     expect(result).toHaveLength(CHANGELOG_MAX_ENTRIES);
     expect(result[CHANGELOG_MAX_ENTRIES - 1]?.id).toBe('new');
@@ -131,10 +132,11 @@ describe('createNewProduct', () => {
 
   it('initializes _changeLog with create event', () => {
     const product = createNewProduct('Test');
-    expect(product._changeLog).toHaveLength(1);
-    expect(product._changeLog[0]?.op).toBe('create');
-    expect(product._changeLog[0]?.entity).toBe('product');
-    expect(product._changeLog[0]?.t).toBeGreaterThan(0);
+    const log = req(product._changeLog, '_changeLog');
+    expect(log).toHaveLength(1);
+    expect(log[0]?.op).toBe('create');
+    expect(log[0]?.entity).toBe('product');
+    expect(log[0]?.t).toBeGreaterThan(0);
   });
 
   it('uses workspaceIdOverride for _originRef when provided', () => {
@@ -150,15 +152,19 @@ describe('createNewProduct', () => {
 
 // --- duplicateProduct ---
 describe('duplicateProduct', () => {
-  const original = {
+  // Annotated Product: duplicateProduct takes one, and the annotation also
+  // contextually types `_changeLog`'s `op` (which otherwise widens to string).
+  const original: Product = {
     id: 'orig-id',
     name: 'Original',
     description: 'desc',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
     schemaVersion: SCHEMA_VERSION,
     sizeMapping: [...DEFAULT_SIZE_MAPPING],
     sprintCadenceWeeks: 2,
-    releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
-    sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1 }],
+    releases: [{ id: 'rel-1', name: 'Release 1', description: '', order: 1, targetDate: null }],
+    sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null }],
     themes: [{
       id: 't1',
       name: 'Theme 1',
@@ -166,10 +172,12 @@ describe('duplicateProduct', () => {
       backboneItems: [{
         id: 'b1',
         name: 'Backbone 1',
+        description: '',
         order: 1,
         ribItems: [{
           id: 'r1',
           name: 'Rib 1',
+          description: '',
           size: 'M',
           category: 'core',
           order: 1,
@@ -220,12 +228,14 @@ describe('duplicateProduct', () => {
 
   it('remaps releaseCardOrder keys and values', () => {
     const dup = duplicateProduct(original);
-    const newRelId = dup.releases[0]?.id;
-    const newRibId = dup.themes[0]?.backboneItems[0]?.ribItems[0]?.id;
-    expect(dup.releaseCardOrder?.[newRelId]).toEqual([newRibId]);
-    expect(dup.releaseCardOrder?.['unassigned']).toEqual([]);
-    // Old keys should not exist
-    expect(dup.releaseCardOrder['rel-1']).toBeUndefined();
+    const newRelId = req(dup.releases[0], 'dup.releases[0]').id;
+    const newRibId = req(dup.themes[0]?.backboneItems[0]?.ribItems[0], 'dupRib').id;
+    const order = req(dup.releaseCardOrder, 'dup.releaseCardOrder');
+    expect(order[newRelId]).toEqual([newRibId]);
+    expect(order['unassigned']).toEqual([]);
+    // Old keys should not exist. Bound, not `?.` — toBeUndefined() passes on
+    // undefined, so a missing map would satisfy this for the wrong reason.
+    expect(order['rel-1']).toBeUndefined();
   });
 
   it('preserves rib data (size, category, name)', () => {
@@ -237,19 +247,19 @@ describe('duplicateProduct', () => {
   });
 
   it('handles multiple releases with cross-references', () => {
-    const multi = {
+    const multi: Product = {
       ...original,
       releases: [
-        { id: 'rel-1', name: 'R1', order: 1 },
-        { id: 'rel-2', name: 'R2', order: 2 },
-        { id: 'rel-3', name: 'R3', order: 3 },
+        { id: 'rel-1', name: 'R1', description: '', order: 1, targetDate: null },
+        { id: 'rel-2', name: 'R2', description: '', order: 2, targetDate: null },
+        { id: 'rel-3', name: 'R3', description: '', order: 3, targetDate: null },
       ],
       themes: [{
         id: 't1', name: 'T1', order: 1,
         backboneItems: [{
-          id: 'b1', name: 'B1', order: 1,
+          id: 'b1', name: 'B1', description: '', order: 1,
           ribItems: [{
-            id: 'r1', name: 'Rib', size: 'M', category: 'core', order: 1,
+            id: 'r1', name: 'Rib', description: '', size: 'M', category: 'core', order: 1,
             releaseAllocations: [
               { releaseId: 'rel-1', percentage: 40 },
               { releaseId: 'rel-2', percentage: 60 },
@@ -275,8 +285,9 @@ describe('duplicateProduct', () => {
     expect(dupRib.progressHistory[0]?.releaseId).toBe(newRel1);
     expect(dupRib.progressHistory[1]?.releaseId).toBe(newRel2);
     // Card order keys remapped
-    expect(dup.releaseCardOrder?.[newRel1]).toBeDefined();
-    expect(dup.releaseCardOrder?.[newRel2]).toBeDefined();
+    const order = req(dup.releaseCardOrder, 'dup.releaseCardOrder');
+    expect(order[req(newRel1, 'newRel1')]).toBeDefined();
+    expect(order[req(newRel2, 'newRel2')]).toBeDefined();
   });
 
   it('handles empty releaseCardOrder', () => {
@@ -287,17 +298,20 @@ describe('duplicateProduct', () => {
   });
 
   it('handles progressHistory entries without releaseId (legacy)', () => {
-    const legacy = {
+    const legacy: Product = {
       ...original,
       themes: [{
         id: 't1', name: 'T1', order: 1,
         backboneItems: [{
-          id: 'b1', name: 'B1', order: 1,
+          id: 'b1', name: 'B1', description: '', order: 1,
           ribItems: [{
-            id: 'r1', name: 'Rib', size: 'M', category: 'core', order: 1,
+            id: 'r1', name: 'Rib', description: '', size: 'M', category: 'core', order: 1,
             releaseAllocations: [],
+            // DELIBERATELY missing releaseId — that is the whole point of this
+            // test (pre-v2 entries predate per-release progress). Cast rather
+            // than completed, so the fixture keeps describing legacy data.
             progressHistory: [
-              { sprintId: 'sp-1', percentComplete: 50 },
+              { sprintId: 'sp-1', percentComplete: 50 } as unknown as ProgressEntry,
             ],
           }],
         }],
@@ -331,10 +345,11 @@ describe('duplicateProduct', () => {
 
   it('initializes fresh _changeLog with duplicate event', () => {
     const dup = duplicateProduct(original);
-    expect(dup._changeLog).toHaveLength(1);
-    expect(dup._changeLog[0]?.op).toBe('duplicate');
-    expect(dup._changeLog[0]?.entity).toBe('product');
-    expect(dup._changeLog[0]?.source).toBe('orig-id');
+    const log = req(dup._changeLog, '_changeLog');
+    expect(log).toHaveLength(1);
+    expect(log[0]?.op).toBe('duplicate');
+    expect(log[0]?.entity).toBe('product');
+    expect(log[0]?.source).toBe('orig-id');
   });
 
   it('uses workspaceIdOverride for _originRef when provided', () => {
@@ -465,9 +480,10 @@ describe('importProductFromJSON', () => {
       _changeLog: [{ t: 1000, op: 'create', entity: 'product' }],
     });
     const result = importProductFromJSON(json);
-    expect(result._changeLog).toHaveLength(2);
-    expect(result._changeLog[1]?.op).toBe('import');
-    expect(result._changeLog[1]?.source).toBe('file');
+    const log = req(result._changeLog, '_changeLog');
+    expect(log).toHaveLength(2);
+    expect(log[1]?.op).toBe('import');
+    expect(log[1]?.source).toBe('file');
   });
 
   it('creates _changeLog with import event if none existed', () => {
@@ -475,8 +491,9 @@ describe('importProductFromJSON', () => {
       id: 'x', name: 'N', themes: [], schemaVersion: SCHEMA_VERSION,
     });
     const result = importProductFromJSON(json);
-    expect(result._changeLog).toHaveLength(1);
-    expect(result._changeLog[0]?.op).toBe('import');
+    const log = req(result._changeLog, '_changeLog');
+    expect(log).toHaveLength(1);
+    expect(log[0]?.op).toBe('import');
   });
 
   it('strips _storageRef and attribution fields on import', () => {
@@ -566,25 +583,25 @@ describe('exportProduct', () => {
   });
 
   it('uses storageRefOverride for _storageRef when provided', async () => {
-    const product = { id: 'p1', name: 'Test', themes: [] };
+    const product = { id: 'p1', name: 'Test', themes: [] } as unknown as Product;
     await exportProduct(product, mockDriver, 'firebase-uid-789');
-    const text = await capturedBlob.text();
+    const text = await req(capturedBlob, 'capturedBlob').text();
     const data = JSON.parse(text);
     expect(data._storageRef).toBe('firebase-uid-789');
   });
 
   it('falls back to getWorkspaceId() when storageRefOverride is not provided', async () => {
-    const product = { id: 'p1', name: 'Test', themes: [] };
+    const product = { id: 'p1', name: 'Test', themes: [] } as unknown as Product;
     await exportProduct(product, mockDriver);
-    const text = await capturedBlob.text();
+    const text = await req(capturedBlob, 'capturedBlob').text();
     const data = JSON.parse(text);
     expect(data._storageRef).toBe(getWorkspaceId());
   });
 
   it('uses cachedPrefs when provided (batch-export path)', async () => {
-    const product = { id: 'p1', name: 'Test', themes: [] };
+    const product = { id: 'p1', name: 'Test', themes: [] } as unknown as Product;
     await exportProduct(product, mockDriver, undefined, { exportName: 'Alice', exportId: 'UF001' });
-    const text = await capturedBlob.text();
+    const text = await req(capturedBlob, 'capturedBlob').text();
     const data = JSON.parse(text);
     expect(data._exportedBy).toBe('Alice');
     expect(data._exportedById).toBe('UF001');

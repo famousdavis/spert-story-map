@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 // All computed values - pure functions, no side effects
-import type { Product, RibItem, SizeMapping, Sprint, Theme, Backbone } from '../types';
+import type { Product, RibItem, SizeMapping, Sprint, Theme, Backbone, ProgressSource } from '../types';
 import { forEachRib, reduceRibs } from './ribHelpers';
 
 export function getRibItemPoints(ribItem: Pick<RibItem, 'size'>, sizeMapping: SizeMapping[]): number {
@@ -49,7 +49,7 @@ export function getCoreNonCorePoints(product: Product) {
 // --- Per-release progress helpers ---
 
 // Get a single release's progress for a specific sprint
-export function getRibReleaseProgressForSprint(ribItem: RibItem, releaseId: string, sprintId: string): number | null {
+export function getRibReleaseProgressForSprint(ribItem: ProgressSource, releaseId: string, sprintId: string): number | null {
   const entry = ribItem.progressHistory?.find(
     p => p.sprintId === sprintId && p.releaseId === releaseId
   );
@@ -57,7 +57,7 @@ export function getRibReleaseProgressForSprint(ribItem: RibItem, releaseId: stri
 }
 
 // Get a single release's progress "as of" a given sprint (walk-back)
-export function getRibReleaseProgressAsOf(ribItem: RibItem, releaseId: string, sprintId: string, sprints: Sprint[]): number {
+export function getRibReleaseProgressAsOf(ribItem: ProgressSource, releaseId: string, sprintId: string, sprints: Sprint[]): number {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
   if (!sprintId || !sprints) return getRibReleaseProgress(ribItem, releaseId);
 
@@ -90,7 +90,7 @@ export function getRibReleaseProgressAsOf(ribItem: RibItem, releaseId: string, s
 }
 
 // Get the latest progress for a single release (last entry by array position)
-export function getRibReleaseProgress(ribItem: RibItem, releaseId: string): number {
+export function getRibReleaseProgress(ribItem: ProgressSource, releaseId: string): number {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
   const entries = ribItem.progressHistory.filter(
     p => p.releaseId === releaseId && p.percentComplete !== null
@@ -104,7 +104,7 @@ export function getRibReleaseProgress(ribItem: RibItem, releaseId: string): numb
 // --- Overall rib % (sum of per-release entries) ---
 
 // Sum per-release entries for the latest sprint to get overall rib %
-export function getRibItemPercentComplete(ribItem: RibItem): number {
+export function getRibItemPercentComplete(ribItem: ProgressSource): number {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
   const realEntries = ribItem.progressHistory.filter(e => e.percentComplete !== null);
   if (realEntries.length === 0) return 0;
@@ -116,7 +116,7 @@ export function getRibItemPercentComplete(ribItem: RibItem): number {
 }
 
 // Sum all per-release entries for a given sprint
-export function getRibItemPercentCompleteForSprint(ribItem: RibItem, sprintId: string): number | null {
+export function getRibItemPercentCompleteForSprint(ribItem: ProgressSource, sprintId: string): number | null {
   if (!ribItem.progressHistory) return null;
   const entries = ribItem.progressHistory.filter(
     p => p.sprintId === sprintId && p.percentComplete !== null
@@ -126,7 +126,8 @@ export function getRibItemPercentCompleteForSprint(ribItem: RibItem, sprintId: s
 }
 
 // Get overall progress "as of" a given sprint — sum per-release walk-backs
-export function getRibItemPercentCompleteAsOf(ribItem: RibItem, sprintId: string, sprints: Sprint[]): number {
+// sprintId accepts null — the guard below already treats it as "no sprint".
+export function getRibItemPercentCompleteAsOf(ribItem: ProgressSource, sprintId: string | null, sprints: Sprint[]): number {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
   if (!sprintId || !sprints) return getRibItemPercentComplete(ribItem);
 
@@ -144,7 +145,7 @@ export function getRibItemPercentCompleteAsOf(ribItem: RibItem, sprintId: string
 }
 
 // Fallback for any un-migrated entries (shouldn't happen after migration, but safe)
-function _legacyPercentCompleteAsOf(ribItem: RibItem, sprintId: string, sprints: Sprint[]): number {
+function _legacyPercentCompleteAsOf(ribItem: ProgressSource, sprintId: string, sprints: Sprint[]): number {
   const sprintOrder: Record<string, number> = {};
   for (const s of sprints) sprintOrder[s.id] = s.order;
 
@@ -153,7 +154,8 @@ function _legacyPercentCompleteAsOf(ribItem: RibItem, sprintId: string, sprints:
 
   let best = null;
   let bestOrder = -1;
-  for (const entry of ribItem.progressHistory) {
+  // Its only caller guards this, but the guard does not survive the call.
+  for (const entry of ribItem.progressHistory ?? []) {
     if (entry.percentComplete === null) continue;
     const order = sprintOrder[entry.sprintId];
     if (order !== undefined && order <= targetOrder && order > bestOrder) {

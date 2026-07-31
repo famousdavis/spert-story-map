@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { validateProduct } from '../lib/validateProduct';
 import { importProductFromJSON } from '../lib/importExport';
-import { req } from './testHelpers';
+import { req, asRecord } from './testHelpers';
 
 function minimal(overrides = {}) {
   return {
@@ -302,8 +302,10 @@ describe('validateProduct', () => {
   it('strips unknown top-level fields', () => {
     const data = minimal({ _malicious: 'payload', injected: true });
     const result = validateProduct(data);
-    expect(result._malicious).toBeUndefined();
-    expect(result.injected).toBeUndefined();
+    // asRecord: these keys are supposed to be GONE, so the Product type
+    // rightly has no idea about them.
+    expect(asRecord(result)._malicious).toBeUndefined();
+    expect(asRecord(result).injected).toBeUndefined();
   });
 
   it('preserves known export-time fields for later stripping', () => {
@@ -323,7 +325,9 @@ describe('validateProduct', () => {
     });
     const result = validateProduct(data);
     expect(result.releaseCardOrder?.['rel1']).toEqual(['id1', 'id2']);
-    expect(result.releaseCardOrder['bad']).toBeUndefined();
+    // Bound, not optional-chained: toBeUndefined() PASSES on undefined, so
+    // `?.` here would make the assertion pass if the map itself vanished.
+    expect(req(result.releaseCardOrder, 'releaseCardOrder')['bad']).toBeUndefined();
   });
 
   // --- cardColorLabels ---
@@ -347,7 +351,8 @@ describe('validateProduct', () => {
   it('caps color labels at the max length', () => {
     const data = minimal({ cardColorLabels: { violet: 'x'.repeat(200) } });
     const result = validateProduct(data);
-    expect(result.cardColorLabels.violet.length).toBe(80);
+    const labels = req(result.cardColorLabels, 'cardColorLabels');
+    expect(req(labels.violet, 'violet').length).toBe(80);
   });
 
   it('strips dangerous keys from cardColorLabels', () => {
@@ -543,7 +548,7 @@ describe('validateProduct', () => {
       themes: [{ id: 't1', name: 'T1', backboneItems: [], junk: 'evil', tracking: 1 }],
     });
     const result = validateProduct(data);
-    const theme = result.themes[0] as Record<string, unknown>;
+    const theme = asRecord(req(result.themes[0], 'result.themes[0]'));
     expect(theme.id).toBe('t1');
     expect(Object.prototype.hasOwnProperty.call(theme, 'junk')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(theme, 'tracking')).toBe(false);
@@ -557,7 +562,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const bb = result.themes[0]?.backboneItems[0] as Record<string, unknown>;
+    const bb = asRecord(req(result.themes[0]?.backboneItems[0], 'result.themes[0]?.backboneItems[0]'));
     expect(bb.id).toBe('b1');
     expect(Object.prototype.hasOwnProperty.call(bb, 'hidden')).toBe(false);
   });
@@ -573,7 +578,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const rib = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
+    const rib = asRecord(req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'result.themes[0]?.backboneItems[0]?.ribItems[0]'));
     expect(rib.id).toBe('r1');
     expect(Object.prototype.hasOwnProperty.call(rib, 'tracker')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(rib, '_injected')).toBe(false);
@@ -590,7 +595,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const rib = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
+    const rib = asRecord(req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'result.themes[0]?.backboneItems[0]?.ribItems[0]'));
     expect(rib.cardColor).toBe('rose');
   });
 
@@ -605,7 +610,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const rib = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
+    const rib = asRecord(req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'result.themes[0]?.backboneItems[0]?.ribItems[0]'));
     expect(Object.prototype.hasOwnProperty.call(rib, 'cardColor')).toBe(false);
     expect(rib.id).toBe('r1');
   });
@@ -637,7 +642,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const alloc = result.themes[0]?.backboneItems[0]?.ribItems[0]?.releaseAllocations[0] as Record<string, unknown>;
+    const alloc = asRecord(req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.releaseAllocations[0], 'result.themes[0]?.backboneItems[0]?.ribItems[0]?.releaseAllocations[0]'));
     expect(Object.prototype.hasOwnProperty.call(alloc, 'evil')).toBe(false);
   });
 
@@ -657,7 +662,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const p = result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory[0] as Record<string, unknown>;
+    const p = asRecord(req(result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory[0], 'result.themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory[0]'));
     expect(Object.prototype.hasOwnProperty.call(p, 'evil')).toBe(false);
   });
 
@@ -666,7 +671,7 @@ describe('validateProduct', () => {
       sizeMapping: [{ label: 'M', points: 3, evil: 'x' }],
     });
     const result = validateProduct(data);
-    const sm = result.sizeMapping[0] as Record<string, unknown>;
+    const sm = asRecord(req(result.sizeMapping[0], 'result.sizeMapping[0]'));
     expect(Object.prototype.hasOwnProperty.call(sm, 'evil')).toBe(false);
   });
 
@@ -680,7 +685,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const entry = (result._changeLog ?? [])[0] as Record<string, unknown>;
+    const entry = asRecord(req((result._changeLog ?? [])[0], '(result._changeLog ?? [])[0]'));
     expect(entry.op).toBe('add');
     expect(Object.prototype.hasOwnProperty.call(entry, 'evil')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(entry, 'source')).toBe(false);
@@ -690,7 +695,7 @@ describe('validateProduct', () => {
   it('strips __proto__/constructor/prototype from theme object', () => {
     const theme = JSON.parse('{"id":"t1","name":"T1","backboneItems":[],"__proto__":{"polluted":true},"constructor":1,"prototype":"x"}');
     const result = validateProduct(minimal({ themes: [theme] }));
-    const t = result.themes[0] as Record<string, unknown>;
+    const t = asRecord(req(result.themes[0], 'result.themes[0]'));
     expect(Object.prototype.hasOwnProperty.call(t, '__proto__')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(t, 'constructor')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(t, 'prototype')).toBe(false);
@@ -705,7 +710,7 @@ describe('validateProduct', () => {
       }],
     });
     const result = validateProduct(data);
-    const r = result.themes[0]?.backboneItems[0]?.ribItems[0] as Record<string, unknown>;
+    const r = asRecord(req(result.themes[0]?.backboneItems[0]?.ribItems[0], 'result.themes[0]?.backboneItems[0]?.ribItems[0]'));
     expect(Object.prototype.hasOwnProperty.call(r, '__proto__')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(r, 'constructor')).toBe(false);
   });

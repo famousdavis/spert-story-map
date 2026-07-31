@@ -10,14 +10,17 @@ import {
   RIB_CARD_COLOR_KEYS,
 } from '../lib/ribCardColors';
 import { req } from './testHelpers';
+import type { Product, RibItem } from '../types';
 
-function rib(id: string, cardColor?: string) {
-  return { id, name: id, size: null, category: 'core', order: 1, releaseAllocations: [], progressHistory: [], ...(cardColor ? { cardColor } : {}) };
+function rib(id: string, cardColor?: string): RibItem {
+  return { id, name: id, description: '', size: null, category: 'core', order: 1, releaseAllocations: [], progressHistory: [], ...(cardColor ? { cardColor } : {}) };
 }
 
-function product(ribs: unknown[], cardColorLabels?: Record<string, string>) {
+function product(ribs: RibItem[], cardColorLabels?: Record<string, string>): Product {
   return {
-    id: 'p1', name: 'P', themes: [{ id: 't1', name: 'T', order: 1, backboneItems: [{ id: 'b1', name: 'B', order: 1, ribItems: ribs }] }],
+    id: 'p1', name: 'P', description: '', createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z', schemaVersion: 2,
+    themes: [{ id: 't1', name: 'T', order: 1, backboneItems: [{ id: 'b1', name: 'B', description: '', order: 1, ribItems: ribs }] }],
     releases: [], sprints: [], sizeMapping: [],
     ...(cardColorLabels ? { cardColorLabels } : {}),
   };
@@ -54,7 +57,7 @@ describe('migrateCardColors', () => {
     const ribs = req(next.themes[0]?.backboneItems[0]?.ribItems, 'ribs');
     expect(ribs[0]?.cardColor).toBe('orange');
     expect(ribs[1]?.cardColor).toBe('rose');
-    expect(ribs[2].cardColor).toBeUndefined();
+    expect(req(ribs[2], 'ribs[2]').cardColor).toBeUndefined();
   });
 
   it('remaps the cardColorLabels amber key to orange', () => {

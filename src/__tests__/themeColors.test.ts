@@ -43,13 +43,17 @@ describe('getThemeColorClasses', () => {
   });
 
   it('falls back to index-based cycling when theme.color is not set', () => {
-    const theme = { id: 't1', name: 'Test' };
+    // `color: undefined` marks this as a theme WITHOUT a colour. The param is
+    // a weak type, so a literal sharing no property with it is rejected outright.
+    const theme = { id: 't1', name: 'Test', color: undefined };
     const result = getThemeColorClasses(theme, 0);
     expect(result.key).toBe('blue');
   });
 
   it('cycles index-based colors beyond palette length', () => {
-    const theme = { id: 't1', name: 'Test' };
+    // `color: undefined` marks this as a theme WITHOUT a colour. The param is
+    // a weak type, so a literal sharing no property with it is rejected outright.
+    const theme = { id: 't1', name: 'Test', color: undefined };
     const result = getThemeColorClasses(theme, 8);
     expect(result.key).toBe('blue'); // wraps to index 0
   });

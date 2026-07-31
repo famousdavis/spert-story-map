@@ -72,6 +72,19 @@ export interface ProgressEntry {
   updatedAt?: string;
 }
 
+/**
+ * The only part of a rib the progress calculations actually read.
+ *
+ * Declared separately, and with `progressHistory` OPTIONAL, because a rib that
+ * has never been assessed legitimately has none — the helpers all open with an
+ * `if (!rib.progressHistory)` guard for exactly that. Taking this instead of a
+ * full RibItem is what lets those functions be called with the minimum they
+ * need rather than forcing every caller to fabricate the rest of a rib.
+ */
+export interface ProgressSource {
+  progressHistory?: ProgressEntry[];
+}
+
 export interface RibItem {
   id: string;
   name: string;

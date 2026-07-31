@@ -9,27 +9,27 @@ import type { ProgressEntry } from '../types';
 const product = {
   themes: [
     {
-      id: 't1', name: 'Theme 1',
+      id: 't1', name: 'Theme 1', order: 1,
       backboneItems: [
         {
-          id: 'b1', name: 'Backbone 1',
+          id: 'b1', name: 'Backbone 1', description: '', order: 1,
           ribItems: [
-            { id: 'r1', name: 'Rib 1' },
-            { id: 'r2', name: 'Rib 2' },
+            { id: 'r1', name: 'Rib 1', description: '', order: 1, size: null, category: 'core' as const, releaseAllocations: [], progressHistory: [] },
+            { id: 'r2', name: 'Rib 2', description: '', order: 2, size: null, category: 'core' as const, releaseAllocations: [], progressHistory: [] },
           ],
         },
         {
-          id: 'b2', name: 'Backbone 2',
-          ribItems: [{ id: 'r3', name: 'Rib 3' }],
+          id: 'b2', name: 'Backbone 2', description: '', order: 2,
+          ribItems: [{ id: 'r3', name: 'Rib 3', description: '', order: 3, size: null, category: 'core' as const, releaseAllocations: [], progressHistory: [] }],
         },
       ],
     },
     {
-      id: 't2', name: 'Theme 2',
+      id: 't2', name: 'Theme 2', order: 2,
       backboneItems: [
         {
-          id: 'b3', name: 'Backbone 3',
-          ribItems: [{ id: 'r4', name: 'Rib 4' }],
+          id: 'b3', name: 'Backbone 3', description: '', order: 1,
+          ribItems: [{ id: 'r4', name: 'Rib 4', description: '', order: 4, size: null, category: 'core' as const, releaseAllocations: [], progressHistory: [] }],
         },
       ],
     },
@@ -38,7 +38,7 @@ const product = {
 
 describe('forEachRib', () => {
   it('visits every rib with correct context', () => {
-    const visited: Array<Record<string, string>> = [];
+    const visited: Array<{ ribId: string; themeId: string; backboneId: string }> = [];
     forEachRib(product, (rib, { theme, backbone }) => {
       visited.push({ ribId: rib.id, themeId: theme.id, backboneId: backbone.id });
     });
@@ -51,14 +51,14 @@ describe('forEachRib', () => {
   });
 
   it('handles empty themes', () => {
-    const visited: Array<Record<string, string>> = [];
+    const visited: string[] = [];
     forEachRib({ themes: [] }, (rib) => visited.push(rib.id));
     expect(visited).toEqual([]);
   });
 
   it('handles themes with no backbones', () => {
-    const visited: Array<Record<string, string>> = [];
-    forEachRib({ themes: [{ id: 't1', backboneItems: [] }] }, (rib) => visited.push(rib.id));
+    const visited: string[] = [];
+    forEachRib({ themes: [{ id: 't1', name: 'Theme 1', order: 1, backboneItems: [] }] }, (rib) => visited.push(rib.id));
     expect(visited).toEqual([]);
   });
 });
@@ -73,7 +73,7 @@ describe('reduceRibs', () => {
     const names = reduceRibs(product, (acc, rib, { backbone }) => {
       acc.push(`${backbone.name}/${rib.name}`);
       return acc;
-    }, []);
+    }, [] as string[]);
     expect(names).toEqual([
       'Backbone 1/Rib 1',
       'Backbone 1/Rib 2',

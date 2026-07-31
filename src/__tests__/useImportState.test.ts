@@ -4,6 +4,7 @@
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { renderHook, act, waitFor, cleanup } from '@testing-library/react';
 import { useImportState } from '../hooks/useImportState';
 import type { StorageDriver, Product } from '../types';
@@ -59,11 +60,11 @@ function makeJsonFile(product: Product, name = 'test.json') {
 
 describe('useImportState', () => {
   let driver: StorageDriver;
-  let onRefresh: ReturnType<typeof vi.fn>;
+  let onRefresh: Mock<() => Promise<void>>;
 
   beforeEach(() => {
     driver = makeDriver();
-    onRefresh = vi.fn().mockResolvedValue(undefined);
+    onRefresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     uuidCounter = 0;
   });
 

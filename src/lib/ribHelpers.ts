@@ -13,7 +13,8 @@ import type { Product, RibItem, RibContext } from '../types';
  * Iterate over every rib item in the product hierarchy.
  */
 export function forEachRib(
-  product: Product,
+  // Only `themes` is read, so a caller need not build a whole Product.
+  product: Pick<Product, 'themes'>,
   callback: (rib: RibItem, ctx: RibContext) => void,
 ): void {
   for (const theme of product.themes) {
@@ -29,7 +30,8 @@ export function forEachRib(
  * Reduce over all rib items across the product hierarchy.
  */
 export function reduceRibs<T>(
-  product: Product,
+  // Only `themes` is read — same as forEachRib, which this delegates to.
+  product: Pick<Product, 'themes'>,
   reducer: (accumulator: T, rib: RibItem, ctx: RibContext) => T,
   initial: T,
 ): T {

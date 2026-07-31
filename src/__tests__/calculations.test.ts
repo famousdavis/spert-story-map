@@ -346,7 +346,7 @@ describe('getReleasePercentComplete', () => {
     });
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
-      sprints: [{ id: 'sp-1', order: 1 }],
+      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null }],
     });
     expect(getReleasePercentComplete(product, 'rel-1')).toBe(50);
   });
@@ -498,8 +498,8 @@ describe('getProgressOverTime', () => {
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
       sprints: [
-        { id: 'sp-1', name: 'Sprint 1', order: 1 },
-        { id: 'sp-2', name: 'Sprint 2', order: 2 },
+        { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null },
+        { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: null },
       ],
     });
     const data = getProgressOverTime(product);
@@ -528,7 +528,7 @@ describe('getSprintSummary', () => {
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
       releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
-      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1 }],
+      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null }],
     });
     const summary = req(getSprintSummary(product, 'sp-1'), 'summary');
     expect(summary.totalPoints).toBe(20);
@@ -554,8 +554,8 @@ describe('getSprintSummary', () => {
       themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
       releases: [{ id: 'rel-1', name: 'Release 1', order: 1 }],
       sprints: [
-        { id: 'sp-1', name: 'Sprint 1', order: 1 },
-        { id: 'sp-2', name: 'Sprint 2', order: 2 },
+        { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null },
+        { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: null },
       ],
     });
     const summary = req(getSprintSummary(product, 'sp-2'), 'summary');
@@ -582,7 +582,7 @@ describe('getReleaseProgressOverTime', () => {
     });
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
-      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1 }],
+      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null }],
     });
     const data = getReleaseProgressOverTime(product, 'rel-1');
     expect(data).toHaveLength(1);
@@ -593,9 +593,9 @@ describe('getReleaseProgressOverTime', () => {
 
 // --- getRibItemPercentCompleteAsOf ---
 describe('getRibItemPercentCompleteAsOf', () => {
-  const sprints = [
-    { id: 'sp-1', order: 1 },
-    { id: 'sp-2', order: 2 },
+  const sprints: Sprint[] = [
+    { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' },
+    { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: '2026-01-28' },
   ];
 
   it('returns 0 for no history', () => {
@@ -623,8 +623,8 @@ describe('getRibItemPercentCompleteAsOf', () => {
 // --- getReleasePercentComplete with sprintId ---
 describe('getReleasePercentComplete with sprint history', () => {
   const sprints = [
-    { id: 'sp-1', name: 'Sprint 1', order: 1 },
-    { id: 'sp-2', name: 'Sprint 2', order: 2 },
+    { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null },
+    { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: null },
   ];
 
   it('uses historical walk-back when sprintId is provided', () => {
@@ -719,7 +719,7 @@ describe('getSprintSummary core/nonCore breakdown', () => {
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [coreRib, nonCoreRib])])],
       releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
-      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1 }],
+      sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null }],
     });
 
     const summary = req(getSprintSummary(product, 'sp-1'), 'summary');
@@ -751,8 +751,8 @@ describe('getSprintSummary core/nonCore breakdown', () => {
       themes: [makeTheme('t1', [makeBackbone('b1', [updated, notUpdated])])],
       releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
       sprints: [
-        { id: 'sp-1', name: 'Sprint 1', order: 1 },
-        { id: 'sp-2', name: 'Sprint 2', order: 2 },
+        { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null },
+        { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: null },
       ],
     });
 

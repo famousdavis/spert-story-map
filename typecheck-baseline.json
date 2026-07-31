@@ -1,7 +1,7 @@
 {
-  "errors": 283,
-  "_measured": "2026-07-30 (v0.50.0). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
+  "errors": 0,
+  "_measured": "2026-07-30 (v0.50.1). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
   "_scope": "npx tsc -b --force — tsconfig.app.json (all of src/, strict + noUncheckedIndexedAccess) plus tsconfig.node.json",
-  "_breakdown": "283 in src/__tests__, 0 in production source. PRODUCTION SOURCE REACHED ZERO in v0.50.0. Phase 3 (tests) is all that remains before build can become `tsc -b && vite build`.",
-  "_direction": "This number may only go DOWN. scripts/typecheck-baseline.mjs fails the gate if it grows, and also fails if it shrinks without being recorded here."
+  "_breakdown": "ZERO. Production source reached zero at v0.50.0; the test suite followed at v0.50.1. `npx tsc -b --force` now exits 0 with no output.",
+  "_direction": "This number may only go DOWN, and it is now at the floor. The ratchet still fails the gate if it grows. Phase 4 replaces it with `tsc -b` in `build`; until that ships and a Vercel deploy is confirmed green, this stays."
 }

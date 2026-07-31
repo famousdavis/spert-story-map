@@ -19,7 +19,9 @@ type UpdateProduct = (updater: (prev: Product) => Product) => void;
 function updateRibProgress(
   updateProduct: UpdateProduct,
   ribId: string,
-  sprintId: string,
+  // Null is a real caller input — the `if (!sprintId) return` below is the
+  // documented "do nothing when no sprint is selected" path.
+  sprintId: string | null,
   releaseId: string,
   updater: (history: ProgressEntry[], existingIdx: number) => { history: ProgressEntry[] } | null,
 ): void {
@@ -46,7 +48,10 @@ function updateRibProgress(
 }
 
 /** Write a per-release progress entry. */
-export function updateProgress(updateProduct: UpdateProduct, ribId: string, releaseId: string, sprintId: string, percentComplete: number): void {
+export function updateProgress(updateProduct: UpdateProduct, ribId: string, releaseId: string, sprintId: string | null, percentComplete: number): void {
+  // Guarded here as well as in updateRibProgress: the narrowing has to hold
+  // inside the updater closure below, which writes sprintId into a new entry.
+  if (!sprintId) return;
   updateRibProgress(updateProduct, ribId, sprintId, releaseId, (history, existingIdx) => {
     const now = new Date().toISOString();
     const existing = existingIdx >= 0 ? history[existingIdx] : undefined;
@@ -75,7 +80,9 @@ export function removeProgress(updateProduct: UpdateProduct, ribId: string, rele
 }
 
 /** Write a comment to a progress entry (creates one if none exists). */
-export function updateComment(updateProduct: UpdateProduct, ribId: string, releaseId: string, sprintId: string, comment: string): void {
+export function updateComment(updateProduct: UpdateProduct, ribId: string, releaseId: string, sprintId: string | null, comment: string): void {
+  // Same reason as updateProgress: the closure below writes sprintId.
+  if (!sprintId) return;
   updateRibProgress(updateProduct, ribId, sprintId, releaseId, (history, existingIdx) => {
     const now = new Date().toISOString();
     const existing = existingIdx >= 0 ? history[existingIdx] : undefined;

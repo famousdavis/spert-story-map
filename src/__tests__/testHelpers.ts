@@ -35,3 +35,20 @@ export function req<T>(value: T | null | undefined, what: string): T {
   }
   return value;
 }
+
+/**
+ * View a typed object as a bare record, so a test can reach a field the type
+ * does not declare.
+ *
+ * Two legitimate uses, both about data the type system deliberately excludes:
+ * writing a malformed fixture on purpose (an orphan `size: ''`, an unknown key
+ * an importer is supposed to strip), and asserting that such a key was in fact
+ * removed. `x as Record<string, unknown>` alone does not compile — a domain
+ * interface and an index signature do not sufficiently overlap — so this routes
+ * through `unknown` once, here, instead of at every call site.
+ *
+ * `req` first if the value may be absent: this does not check for that.
+ */
+export function asRecord(value: object): Record<string, unknown> {
+  return value as unknown as Record<string, unknown>;
+}

@@ -7,8 +7,11 @@ import {
   getCommentCount, getCommentHistory,
   getSprintPct, getCurrentPct, getDelta,
 } from '../lib/progressViewHelpers';
+import type { ProgressEntry } from '../types';
 
-const makeRib = (progressHistory = []) => ({
+// `progressHistory = []` with no annotation inferred never[], so every call
+// below that passed real entries reported against it.
+const makeRib = (progressHistory: ProgressEntry[] = []) => ({
   id: 'rib1',
   progressHistory,
   releaseAllocations: [{ releaseId: 'r1', percentage: 50 }],
@@ -16,24 +19,24 @@ const makeRib = (progressHistory = []) => ({
 
 describe('getCommentCount', () => {
   it('returns 0 when no progressHistory', () => {
-    expect(getCommentCount({ id: 'r' }, 'r1')).toBe(0);
+    expect(getCommentCount({}, 'r1')).toBe(0);
   });
 
   it('counts comments for a specific release', () => {
     const rib = makeRib([
-      { releaseId: 'r1', sprintId: 's1', comment: 'hello' },
-      { releaseId: 'r1', sprintId: 's2', comment: '' },
-      { releaseId: 'r1', sprintId: 's3', comment: 'world' },
-      { releaseId: 'r2', sprintId: 's1', comment: 'other' },
+      { releaseId: 'r1', sprintId: 's1', comment: 'hello', percentComplete: null },
+      { releaseId: 'r1', sprintId: 's2', comment: '', percentComplete: null },
+      { releaseId: 'r1', sprintId: 's3', comment: 'world', percentComplete: null },
+      { releaseId: 'r2', sprintId: 's1', comment: 'other', percentComplete: null },
     ]);
     expect(getCommentCount(rib, 'r1')).toBe(2);
   });
 
   it('counts all comments when releaseId is null', () => {
     const rib = makeRib([
-      { releaseId: 'r1', sprintId: 's1', comment: 'a' },
-      { releaseId: 'r2', sprintId: 's2', comment: 'b' },
-      { releaseId: 'r1', sprintId: 's3' },
+      { releaseId: 'r1', sprintId: 's1', comment: 'a', percentComplete: null },
+      { releaseId: 'r2', sprintId: 's2', comment: 'b', percentComplete: null },
+      { releaseId: 'r1', sprintId: 's3', percentComplete: null },
     ]);
     expect(getCommentCount(rib, null)).toBe(2);
   });
@@ -44,7 +47,7 @@ describe('getCommentHistory', () => {
   const sprintOrder = { s1: 1, s2: 2, s3: 3 };
 
   it('returns empty array when no progressHistory', () => {
-    expect(getCommentHistory({ id: 'r' }, 'r1', sprintNameMap, sprintOrder)).toEqual([]);
+    expect(getCommentHistory({}, 'r1', sprintNameMap, sprintOrder)).toEqual([]);
   });
 
   it('returns comments sorted newest-first by sprint order', () => {
@@ -62,8 +65,8 @@ describe('getCommentHistory', () => {
 
   it('filters by releaseId', () => {
     const rib = makeRib([
-      { releaseId: 'r1', sprintId: 's1', comment: 'yes' },
-      { releaseId: 'r2', sprintId: 's2', comment: 'no' },
+      { releaseId: 'r1', sprintId: 's1', comment: 'yes', percentComplete: null },
+      { releaseId: 'r2', sprintId: 's2', comment: 'no', percentComplete: null },
     ]);
     const result = getCommentHistory(rib, 'r1', sprintNameMap, sprintOrder);
     expect(result).toHaveLength(1);
@@ -72,8 +75,8 @@ describe('getCommentHistory', () => {
 
   it('returns all comments when releaseId is null', () => {
     const rib = makeRib([
-      { releaseId: 'r1', sprintId: 's1', comment: 'a' },
-      { releaseId: 'r2', sprintId: 's2', comment: 'b' },
+      { releaseId: 'r1', sprintId: 's1', comment: 'a', percentComplete: null },
+      { releaseId: 'r2', sprintId: 's2', comment: 'b', percentComplete: null },
     ]);
     const result = getCommentHistory(rib, null, sprintNameMap, sprintOrder);
     expect(result).toHaveLength(2);
@@ -142,8 +145,8 @@ describe('getCurrentPct', () => {
 });
 
 describe('getDelta', () => {
-  const sprint = { id: 's2', order: 2, name: 'Sprint 2' };
-  const prevSprint = { id: 's1', order: 1, name: 'Sprint 1' };
+  const sprint = { id: 's2', order: 2, name: 'Sprint 2', endDate: '2026-01-28' };
+  const prevSprint = { id: 's1', order: 1, name: 'Sprint 1', endDate: '2026-01-14' };
 
   it('returns null when no sprint', () => {
     expect(getDelta(makeRib(), 'r1', null, prevSprint, 's2')).toBeNull();

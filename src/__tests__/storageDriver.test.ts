@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createLocalStorageDriver } from '../lib/storageDriver';
+import type { Product } from '../types';
 
 // Mock storage.ts — each function is a vi.fn()
 vi.mock('../lib/storage', () => ({
@@ -75,7 +76,7 @@ describe('createLocalStorageDriver', () => {
   });
 
   it('loadProductIndex filters out null products', async () => {
-    storage.loadProduct.mockReturnValueOnce(null);
+    vi.mocked(storage.loadProduct).mockReturnValueOnce(null);
     const driver = createLocalStorageDriver();
     const result = await driver.loadProductIndex();
     expect(result).toEqual([]);
@@ -90,21 +91,24 @@ describe('createLocalStorageDriver', () => {
 
   it('createProduct delegates to saveProductImmediate', async () => {
     const driver = createLocalStorageDriver();
-    const product = { id: 'p1', name: 'New Product' };
+    // Only the id is read on these driver paths.
+    const product = { id: 'p1', name: 'New Product' } as unknown as Product;
     await driver.createProduct(product);
     expect(storage.saveProductImmediate).toHaveBeenCalledWith(product);
   });
 
   it('saveProduct delegates and returns a resolved promise', async () => {
     const driver = createLocalStorageDriver();
-    const product = { id: 'p1', name: 'Save Me' };
+    // Only the id is read on these driver paths.
+    const product = { id: 'p1', name: 'Save Me' } as unknown as Product;
     await driver.saveProduct(product);
     expect(storage.saveProduct).toHaveBeenCalledWith(product);
   });
 
   it('saveProductImmediate delegates and returns a resolved promise', async () => {
     const driver = createLocalStorageDriver();
-    const product = { id: 'p1', name: 'Save Now' };
+    // Only the id is read on these driver paths.
+    const product = { id: 'p1', name: 'Save Now' } as unknown as Product;
     await driver.saveProductImmediate(product);
     expect(storage.saveProductImmediate).toHaveBeenCalledWith(product);
   });

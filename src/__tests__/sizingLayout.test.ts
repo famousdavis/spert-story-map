@@ -200,7 +200,7 @@ describe('computeSizingLayout cell positions', () => {
     // Both should be on the first row (y is the same if grid has enough cols)
     if (layout.unsizedGridCols >= 2) {
       expect(unsized[0]?.y).toBe(unsized[1]?.y);
-      expect(unsized[1]?.x).toBeGreaterThan(unsized[0]?.x);
+      expect(req(unsized[1], 'unsized[1]').x).toBeGreaterThan(req(unsized[0], 'unsized[0]').x);
     }
   });
 });
@@ -387,7 +387,7 @@ describe('computeSizingLayout targetWidth expansion', () => {
     // First two should be on the same row (same y, different x)
     const sorted = [...mCells].sort((a, b) => a.y - b.y || a.x - b.x);
     expect(sorted[0]?.y).toBe(sorted[1]?.y);
-    expect(sorted[1]?.x).toBeGreaterThan(sorted[0]?.x);
+    expect(req(sorted[1], 'sorted[1]').x).toBeGreaterThan(req(sorted[0], 'sorted[0]').x);
   });
 
   it('totalWidth equals max(targetWidth, gutter + min stacked content width)', () => {

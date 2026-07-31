@@ -231,7 +231,9 @@ describe('moveItem', () => {
 
 // --- addReleaseAfter (updater logic) ---
 // Simulates the updater function from useProductMutations.addReleaseAfter
-function applyAddReleaseAfter(product: Product, afterReleaseId: string | null): Product {
+// Generic over the product shape: this simulation reads and rewrites only
+// `releases`, so the fixtures need not be whole Products.
+function applyAddReleaseAfter<T extends Pick<Product, 'releases'>>(product: T, afterReleaseId: string | null): T {
   const sorted = [...product.releases].sort((a, b) => a.order - b.order);
   const afterIdx = afterReleaseId
     ? sorted.findIndex(r => r.id === afterReleaseId)
@@ -254,9 +256,9 @@ function applyAddReleaseAfter(product: Product, afterReleaseId: string | null): 
 describe('addReleaseAfter', () => {
   const product = {
     releases: [
-      { id: 'rel-1', name: 'R1', order: 1 },
-      { id: 'rel-2', name: 'R2', order: 2 },
-      { id: 'rel-3', name: 'R3', order: 3 },
+      { id: 'rel-1', name: 'R1', description: '', order: 1, targetDate: null },
+      { id: 'rel-2', name: 'R2', description: '', order: 2, targetDate: null },
+      { id: 'rel-3', name: 'R3', description: '', order: 3, targetDate: null },
     ],
   };
 
@@ -287,7 +289,7 @@ describe('addReleaseAfter', () => {
   });
 
   it('inserts at beginning when afterReleaseId is null and no releases', () => {
-    const empty = { releases: [] };
+    const empty: Pick<Product, 'releases'> = { releases: [] };
     const result = applyAddReleaseAfter(empty, null);
     expect(result.releases).toHaveLength(1);
     expect(result.releases[0]?.order).toBe(1);
@@ -385,13 +387,13 @@ describe('splitRibInProduct', () => {
       sizingCardOrder: { unsized: ['r1', 'r2', 'r3'] },
     };
     const result = splitRibInProduct(product, 't1', 'b1', 'r2', 'new-uuid');
-    expect(result.sizingCardOrder.unsized).toEqual(['r1', 'r2', 'new-uuid', 'r3']);
+    expect(req(result.sizingCardOrder, 'sizingCardOrder').unsized).toEqual(['r1', 'r2', 'new-uuid', 'r3']);
   });
 
   it('sizingCardOrder bootstrap when unsized array was empty', () => {
     const product = makeProductWithRibs([makeRibNamed('r1', 'Solo')]);
     const result = splitRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
-    expect(result.sizingCardOrder.unsized).toEqual(['r1', 'new-uuid']);
+    expect(req(result.sizingCardOrder, 'sizingCardOrder').unsized).toEqual(['r1', 'new-uuid']);
   });
 
   it("changelog entry uses op: 'split' with source pointing at original", () => {
@@ -560,8 +562,8 @@ describe('cloneRibInProduct', () => {
       },
     };
     const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
-    expect(result.releaseCardOrder.rel1).toEqual(['r1', 'new-uuid', 'r2']);
-    expect(result.releaseCardOrder.rel2).toEqual(['r2', 'r1', 'new-uuid']);
+    expect(req(result.releaseCardOrder, 'releaseCardOrder').rel1).toEqual(['r1', 'new-uuid', 'r2']);
+    expect(req(result.releaseCardOrder, 'releaseCardOrder').rel2).toEqual(['r2', 'r1', 'new-uuid']);
   });
 
   it('releaseCardOrder falls back to append when original is missing from the bucket', () => {
@@ -575,7 +577,7 @@ describe('cloneRibInProduct', () => {
       releaseCardOrder: { rel1: ['r2', 'r3'] },
     };
     const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
-    expect(result.releaseCardOrder.rel1).toEqual(['r2', 'r3', 'new-uuid']);
+    expect(req(result.releaseCardOrder, 'releaseCardOrder').rel1).toEqual(['r2', 'r3', 'new-uuid']);
   });
 
   it('unassigned clone (no releaseAllocations) leaves releaseCardOrder untouched', () => {
@@ -596,7 +598,7 @@ describe('cloneRibInProduct', () => {
       sizingCardOrder: { M: ['r1', 'r2'] },
     };
     const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
-    expect(result.sizingCardOrder.M).toEqual(['r1', 'new-uuid', 'r2']);
+    expect(req(result.sizingCardOrder, 'sizingCardOrder').M).toEqual(['r1', 'new-uuid', 'r2']);
   });
 
   it("sizingCardOrder uses 'unsized' bucket when original size is null", () => {
@@ -605,7 +607,7 @@ describe('cloneRibInProduct', () => {
       sizingCardOrder: { unsized: ['r1'] },
     };
     const result = cloneRibInProduct(product, 't1', 'b1', 'r1', 'new-uuid');
-    expect(result.sizingCardOrder.unsized).toEqual(['r1', 'new-uuid']);
+    expect(req(result.sizingCardOrder, 'sizingCardOrder').unsized).toEqual(['r1', 'new-uuid']);
   });
 
   it('returns prev unchanged when rib not found', () => {
