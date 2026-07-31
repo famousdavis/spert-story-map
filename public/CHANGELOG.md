@@ -1,5 +1,25 @@
 # Changelog
 
+## Version 0.50.2 (2026-07-30)
+
+**The type checker now runs as part of every build, so this can never happen again.** No functional,
+data, or interface changes.
+
+This is the last step of the work described in the previous four entries. The whole problem was that
+the build never checked types — it stripped them out and carried on — so mistakes could accumulate
+unnoticed for four months and reach 2,183 before anyone counted. Every one of those has now been
+fixed, which finally makes it safe to do the obvious thing: have the build refuse to produce output
+if the types are wrong.
+
+From this release, a type error stops the deployment. Previously it would have shipped.
+
+The temporary safety net built while the backlog was being cleared — a recorded count that was
+allowed to fall but never rise — has been removed along with it. It existed only to stop the number
+growing while it was still large. A recorded number and the compiler can drift apart; the compiler
+is the one that matters, and it is now the thing being asked.
+
+Nothing about the app changes. All 944 tests pass.
+
 ## Version 0.50.1 (2026-07-30)
 
 **Zero.** Every type error in the project is gone — application code and tests alike. No functional,
