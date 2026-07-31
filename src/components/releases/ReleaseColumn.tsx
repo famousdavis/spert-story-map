@@ -243,15 +243,19 @@ export default function ReleaseColumn({
           </div>
         </div>
       </div>
-      {confirmDelete && (
-        <ConfirmDialog
-          title={`Delete "${release.name}"?`}
-          message="This release will be permanently removed."
-          confirmLabel="Delete"
-          onConfirm={() => { setConfirmDelete(false); onDeleteRelease(release.id); }}
-          onCancel={() => setConfirmDelete(false)}
-        />
-      )}
+      {/* `open` is REQUIRED. ConfirmDialog renders <Modal open={open}>, and Modal
+          returns null when open is falsy — so omitting it (as this call did)
+          rendered nothing at all and the Delete button did nothing. `onClose`
+          backs Escape and backdrop dismissal; `onCancel` alone does not. */}
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        title={`Delete "${release.name}"?`}
+        message="This release will be permanently removed."
+        confirmLabel="Delete"
+        onConfirm={() => { setConfirmDelete(false); onDeleteRelease?.(release.id); }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }
