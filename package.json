@@ -1,20 +1,19 @@
 {
   "name": "spert-story-map",
   "private": true,
-  "version": "0.50.1",
+  "version": "0.50.2",
   "type": "module",
   "engines": {
     "node": "24.x"
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --force",
-    "typecheck:baseline": "node scripts/typecheck-baseline.mjs",
     "shipgate": "node scripts/shipgate.mjs"
   },
   "dependencies": {

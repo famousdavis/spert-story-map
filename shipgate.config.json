@@ -16,15 +16,15 @@
   "commands": [
     { "name": "lint", "run": "npm run lint" },
     {
-      "name": "typecheck (ratchet)",
-      "run": "npm run typecheck:baseline",
-      "_note": "NOT `tsc -b`. Nothing had ever typechecked this repo — `build` is a bare `vite build` — and the first run found 2,183 errors. The ratchet holds that number from growing; see scripts/typecheck-baseline.mjs and typecheck-baseline.json. Wiring tsc into `build` today would fail every Vercel deploy."
+      "name": "typecheck",
+      "run": "npm run typecheck",
+      "_note": "Plain `tsc -b --force`. The ratchet (scripts/typecheck-baseline.mjs + typecheck-baseline.json) was retired in v0.50.2 once the repo reached zero — a recorded baseline number and the compiler can disagree, and the compiler is the one that matters. Kept ahead of the tests so a type error is attributed precisely instead of surfacing as a build failure; `build` below enforces the same thing again, and the two cannot disagree because both run tsc."
     },
     { "name": "test", "run": "npm test" },
     {
-      "name": "build (vite build — does NOT typecheck)",
+      "name": "build (tsc -b && vite build)",
       "run": "npm run build",
-      "_note": "Kept as a bare vite build deliberately. The typecheck step above is what covers types, at a baseline, until the debt is paid down."
+      "_note": "As of v0.50.2 `build` typechecks. This is the real gate: Vercel runs `npm run build` on every deploy, so a type error now stops the deploy instead of being stripped silently by esbuild. It took 2,183 -> 0 across v0.49.5..v0.50.1 to make this safe to turn on."
     }
   ]
 }
