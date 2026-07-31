@@ -86,6 +86,10 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   };
 
   const confirmUpload = async () => {
+    // Unreachable — the upload flow is only reachable while signed in — but the
+    // migration needs a uid, and returning is honest where the previous code
+    // would have thrown on `user.uid`.
+    if (!user) return;
     setShowUploadConfirm(false);
     setMigrating(true);
     setMigrateResult(null);
@@ -120,6 +124,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   };
 
   const handleDownloadAll = async () => {
+    if (!driver) return;
     setExporting(true);
     try {
       const result = await exportAllProducts(driver, user?.uid);

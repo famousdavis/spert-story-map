@@ -293,7 +293,7 @@ export default function SettingsView() {
               <button onClick={() => deleteSprint(s.id)} className="text-red-400 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 text-sm">Delete</button>
             </div>
           ))}
-          <button onClick={addSprint} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2">+ Add Sprint</button>
+          <button onClick={() => addSprint()} className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2">+ Add Sprint</button>
         </div>
       </Section>
 

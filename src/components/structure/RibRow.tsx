@@ -12,7 +12,8 @@ const GRID_COLS = '24px minmax(120px, 1fr) 48px 44px 80px 56px 56px 56px 36px';
 
 export { GRID_COLS };
 
-interface RibRowRib extends RibItem {
+/** StructureView's enrichedProduct adds these four before rendering. */
+export interface RibRowRib extends RibItem {
   _pts: number;
   _allocTotal: number;
   _pctComplete: number;

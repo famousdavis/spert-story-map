@@ -382,8 +382,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     },
 
     /** Debounced save (200ms). */
+    // async so the returned value matches StorageDriver's Promise<void>; the
+    // write itself stays debounced and fire-and-forget, as before.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
-    savePreferences(prefs: any) {
+    async savePreferences(prefs: any) {
       prefsPending = prefs;
       if (prefsTimer) clearTimeout(prefsTimer);
       prefsTimer = setTimeout(() => {

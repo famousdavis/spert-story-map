@@ -16,11 +16,16 @@ interface AllocationModalProps {
 }
 
 export default function AllocationModal({ rib, product, onSave, onUpdateCategory, onClose }: AllocationModalProps) {
-  const [allocations, setAllocations] = useState(
+  // While a percentage field is being typed it genuinely holds a string — the
+  // input writes e.target.value straight into state, and parsePct only runs on
+  // blur and on save. The draft type says so; ReleaseAllocation (percentage:
+  // number) is restored by the parsePct pass in the Save handler below.
+  type DraftAllocation = Omit<ReleaseAllocation, 'percentage'> & { percentage: string | number };
+  const [allocations, setAllocations] = useState<DraftAllocation[]>(
     rib.releaseAllocations.map(a => ({ ...a }))
   );
 
-  const parsePct = (v: string | number) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : Math.max(0, Math.min(100, n)); };
+  const parsePct = (v: string | number) => { const n = parseInt(String(v), 10); return isNaN(n) ? 0 : Math.max(0, Math.min(100, n)); };
   const total = allocations.reduce((s, a) => s + parsePct(a.percentage), 0);
   const pts = getRibItemPoints(rib, product.sizeMapping);
 
@@ -30,7 +35,7 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
     setAllocations([...allocations, { releaseId, percentage: remaining, memo: '' }]);
   };
 
-  const updatePct = (releaseId: string, raw: string) => {
+  const updatePct = (releaseId: string, raw: string | number) => {
     setAllocations(allocations.map(a =>
       a.releaseId === releaseId ? { ...a, percentage: raw } : a
     ));

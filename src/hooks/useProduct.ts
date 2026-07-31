@@ -17,7 +17,9 @@ interface ProductState {
   loading: boolean;
 }
 
-export function useProduct(productId: string) {
+// `productId` may be undefined — it comes from useParams(), and every use of
+// it below is already inside an `if (productId && driver)` guard.
+export function useProduct(productId: string | undefined) {
   const { driver, mode, storageReady } = useStorage();
   const navigate = useNavigate();
   const [state, setState] = useState<ProductState>({ product: null, lastSaved: null, loading: true });

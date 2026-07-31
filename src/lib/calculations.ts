@@ -20,6 +20,12 @@ export function getAllRibItems(product: Product) {
   return items;
 }
 
+/**
+ * A rib as getAllRibItems returns it — the rib plus its theme/backbone context.
+ * Derived rather than restated so consumers cannot drift from the producer.
+ */
+export type EnrichedRib = ReturnType<typeof getAllRibItems>[number];
+
 export function getTotalProjectPoints(product: Product): number {
   return reduceRibs(product, (total, rib) => total + getRibItemPoints(rib, product.sizeMapping), 0);
 }
@@ -104,7 +110,9 @@ export function getRibItemPercentComplete(ribItem: RibItem): number {
   if (realEntries.length === 0) return 0;
   const lastEntry = realEntries[realEntries.length - 1];
   if (!lastEntry) return 0; // unreachable: realEntries.length was checked above
-  return getRibItemPercentCompleteForSprint(ribItem, lastEntry.sprintId);
+  // `?? 0` is unreachable: the sprint below is lastEntry's own, so its filtered
+  // set contains at least that entry and the callee cannot return null here.
+  return getRibItemPercentCompleteForSprint(ribItem, lastEntry.sprintId) ?? 0;
 }
 
 // Sum all per-release entries for a given sprint
@@ -158,7 +166,10 @@ function _legacyPercentCompleteAsOf(ribItem: RibItem, sprintId: string, sprints:
 
 // --- Release-level calculations ---
 
-export function getReleasePercentComplete(product: Product, releaseId: string, sprintId?: string): number {
+// `sprintId` accepts null as well as undefined — the progress view represents
+// "no sprint selected" as null, and the branch below is a truthy check that
+// already treated the two identically.
+export function getReleasePercentComplete(product: Product, releaseId: string, sprintId?: string | null): number {
   const { totalAllocatedPoints, totalCompletedPoints } = reduceRibs(product, (acc, rib) => {
     const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
     if (!alloc) return acc;
@@ -271,7 +282,9 @@ export function getProgressOverTime(product: Product) {
   });
 }
 
-export function getSprintSummary(product: Product, sprintId: string) {
+// `sprintId` accepts null — the progress view represents "no sprint selected"
+// that way, and the lookup below already returns null for an id it cannot find.
+export function getSprintSummary(product: Product, sprintId: string | null) {
   const sprints = product.sprints;
   const sprint = sprints.find(s => s.id === sprintId);
   if (!sprint) return null;
@@ -284,7 +297,9 @@ export function getSprintSummary(product: Product, sprintId: string) {
     a.totalPoints += pts;
     a.itemsTotal++;
 
-    const pctAsOf = getRibItemPercentCompleteAsOf(rib, sprintId, sprints);
+    // sprint.id, not sprintId — same value (the lookup matched on it), but
+    // already narrowed to string by the `if (!sprint) return null` above.
+    const pctAsOf = getRibItemPercentCompleteAsOf(rib, sprint.id, sprints);
     const completed = pts * (pctAsOf / 100);
     a.completedPointsAsOf += completed;
 

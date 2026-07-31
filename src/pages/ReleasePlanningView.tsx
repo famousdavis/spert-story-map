@@ -115,7 +115,7 @@ export default function ReleasePlanningView() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">Filter:</span>
-          {['all', 'core', 'non-core'].map(f => (
+          {(['all', 'core', 'non-core'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}

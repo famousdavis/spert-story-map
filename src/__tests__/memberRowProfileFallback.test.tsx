@@ -142,11 +142,15 @@ describe('MemberRow profile resolution', () => {
   it('still falls back to the uid when neither profile exists', async () => {
     render(<ProjectSharingPanel productId="p1" />);
 
+    // Both lookups must be awaited INSIDE waitFor. The uid is what MemberRow
+    // renders before either profile resolves (`profile?.displayName ||
+    // profile?.email || uid`), so waiting on the uid alone is satisfied by the
+    // very first render and the reads below could race it — an intermittent
+    // failure seen once in ~20 full-suite runs.
     await waitFor(() => {
-      expect(screen.getByText(MEMBER_UID)).toBeInTheDocument();
+      expect(reads).toContain(`spertstorymap_profiles/${MEMBER_UID}`);
+      expect(reads).toContain(`spertsuite_profiles/${MEMBER_UID}`);
     });
-    // Both lookups were attempted before giving up.
-    expect(reads).toContain(`spertstorymap_profiles/${MEMBER_UID}`);
-    expect(reads).toContain(`spertsuite_profiles/${MEMBER_UID}`);
+    expect(screen.getByText(MEMBER_UID)).toBeInTheDocument();
   });
 });

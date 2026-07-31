@@ -167,7 +167,10 @@ export function migrateToV2(product: any): any {
 export function loadProduct(id: string, ns?: string): Product | null {
   const namespace = ns ?? activeNamespace;
   const key = productKeyFor(id, namespace);
-  let product = immediatelyLoad(key);
+  // Boundary cast: immediatelyLoad returns `unknown` because localStorage JSON
+  // is untrusted. This is the same validation boundary validateProduct sits on
+  // for imports — the migration below is what normalises an older shape.
+  let product = immediatelyLoad(key) as Product | null;
   if (product && (product.schemaVersion || 1) < SCHEMA_VERSION) {
     product = migrateToV2(product);
     // Save immediately so migration only runs once

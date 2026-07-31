@@ -26,7 +26,9 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
   const updatePref = (key: string, value: unknown) => {
     const next = { ...prefs, [key]: value };
     setPrefs(next);
-    driver.savePreferences(next);
+    // Local state still updates without a driver; there is simply nothing to
+    // persist to. Previously this threw rather than no-op'd.
+    driver?.savePreferences(next);
   };
 
   return (

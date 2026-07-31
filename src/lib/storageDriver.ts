@@ -128,7 +128,7 @@ export function createLocalStorageDriver(): StorageDriver {
       _cancelPendingSaves();
     },
 
-    onSaveError(cb: (error: Error) => void) {
+    onSaveError(cb: (error: unknown) => void) {
       return _onSaveError(cb);
     },
 

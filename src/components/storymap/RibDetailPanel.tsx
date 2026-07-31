@@ -24,7 +24,7 @@ interface RibDetailPanelProps {
   product: Product;
   onClose: () => void;
   onRename?: (themeId: string, backboneId: string, ribId: string, name: string) => void;
-  onUpdate?: (themeId: string, backboneId: string, ribId: string, updates: { category?: Category; size?: Size | string; notes?: string; description?: string }) => void;
+  onUpdate?: (themeId: string, backboneId: string, ribId: string, updates: { category?: Category; size?: Size; notes?: string; description?: string }) => void;
   autoEdit?: boolean;
 }
 
@@ -180,7 +180,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
             <DetailRow label="Theme" value={rib.themeName} />
             <DetailRow label="Category">
               <div className="flex gap-1">
-                {['core', 'non-core'].map(cat => (
+                {(['core', 'non-core'] as const).map(cat => (
                   <button
                     key={cat}
                     onClick={() => onUpdate?.(rib.themeId, rib.backboneId, rib.id, { category: cat })}
@@ -202,7 +202,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
                 <SizePicker
                   value={rib.size || null}
                   sizeMapping={product.sizeMapping}
-                  onChange={(size) => onUpdate?.(rib.themeId, rib.backboneId, rib.id, { size: size || '' })}
+                  onChange={(size) => onUpdate?.(rib.themeId, rib.backboneId, rib.id, { size })}
                 />
                 {rib.points > 0 && <span className="text-sm text-gray-500 dark:text-gray-400">{rib.points} pts</span>}
               </div>

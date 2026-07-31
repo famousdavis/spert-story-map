@@ -89,7 +89,7 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
     const mapPos = screenToMap(e.clientX, e.clientY, rect);
 
     // If the dragged item is part of a multi-selection, drag them all
-    const bulkIds = selectedIds?.size > 0 && selectedIds.has(cell.id) ? selectedIds : null;
+    const bulkIds = selectedIds && selectedIds.size > 0 && selectedIds.has(cell.id) ? selectedIds : null;
 
     const state = {
       dragType: 'rib',
@@ -195,7 +195,10 @@ export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedI
   }, [screenToMap, getContainerRect]);
 
   // --- Shared move handler ---
-  const handleDragMove = useCallback((e: PointerEvent) => {
+  // React.PointerEvent, not the DOM one: this is only ever passed to
+  // MapCanvas's `onDragMove`, which React invokes with a synthetic event. Only
+  // clientX/clientY are read, which both carry.
+  const handleDragMove = useCallback((e: React.PointerEvent) => {
     const prev = dragRef.current;
     if (!prev) return;
 

@@ -117,7 +117,9 @@ export default function useSizingDrag({ layout, zoom, pan, updateProduct }: { la
 
   // --- Drag move ---
 
-  const handleDragMove = useCallback((e: PointerEvent) => {
+  // React.PointerEvent, not the DOM one — same reason as useMapDrag's copy:
+  // this is passed to MapCanvas's `onDragMove` and only reads clientX/clientY.
+  const handleDragMove = useCallback((e: React.PointerEvent) => {
     const prev = dragRef.current;
     if (!prev) return;
 

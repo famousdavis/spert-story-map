@@ -70,7 +70,7 @@ export default function SizingView() {
   const layout = useSizingLayout(product, filter, containerWidth);
 
   const { dragState, dragPointerRef, handleDragStart, handleDragMove, handleDragEnd, cancelDrag } =
-    useSizingDrag({ layout, zoom, pan, mutations, updateProduct });
+    useSizingDrag({ layout, zoom, pan, updateProduct });
 
   useEdgeAutoPan({
     isDragging: !!dragState?.isDragging,
@@ -169,9 +169,8 @@ export default function SizingView() {
     let presetBackboneId: string | undefined;
     if (presetThemeId) {
       const theme = product.themes.find(t => t.id === presetThemeId);
-      if (theme && theme.backboneItems.length === 1) {
-        presetBackboneId = theme.backboneItems[0].id;
-      }
+      const onlyBackbone = theme?.backboneItems.length === 1 ? theme.backboneItems[0] : undefined;
+      if (onlyBackbone) presetBackboneId = onlyBackbone.id;
     }
     setCreatePresets({ presetThemeId, presetBackboneId });
   }, [filter, product.themes]);

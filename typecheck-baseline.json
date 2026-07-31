@@ -1,7 +1,7 @@
 {
-  "errors": 338,
-  "_measured": "2026-07-30 (v0.49.24). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
+  "errors": 283,
+  "_measured": "2026-07-30 (v0.50.0). First measured 2026-07-29 at 2183 — the first time tsc had ever been run against this repository.",
   "_scope": "npx tsc -b --force — tsconfig.app.json (all of src/, strict + noUncheckedIndexedAccess) plus tsconfig.node.json",
-  "_breakdown": "282 in src/__tests__, 57 in production source. The -3 in v0.49.23 is incidental: typing the local Sprint[] fixture in calculations.test.ts' getRibReleaseProgressAsOf block, which the new percentComplete tests consume. Production source is untouched by that release.",
+  "_breakdown": "283 in src/__tests__, 0 in production source. PRODUCTION SOURCE REACHED ZERO in v0.50.0. Phase 3 (tests) is all that remains before build can become `tsc -b && vite build`.",
   "_direction": "This number may only go DOWN. scripts/typecheck-baseline.mjs fails the gate if it grows, and also fails if it shrinks without being recorded here."
 }

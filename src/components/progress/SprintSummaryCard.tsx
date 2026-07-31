@@ -18,7 +18,7 @@ interface SprintSummary {
   remainingPoints: number;
   itemsUpdated: number;
   itemsTotal: number;
-  endDate?: string;
+  endDate?: string | null;
   percentComplete: number;
   core: CategorySummary;
   nonCore: CategorySummary;

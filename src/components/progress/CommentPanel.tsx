@@ -6,15 +6,7 @@ import React, { useId } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { formatDate } from '../../lib/formatDate';
 import type { RibItem, Sprint } from '../../types';
-
-interface CommentHistoryEntry {
-  sprintId: string;
-  releaseId: string;
-  sprintName: string;
-  comment: string;
-  percentComplete: number | null;
-  updatedAt?: string;
-}
+import type { CommentHistoryEntry } from '../../lib/progressViewHelpers';
 
 interface ProgressRib extends RibItem {
   /** Required and nullable — see ProgressRow's copy. */
@@ -23,14 +15,14 @@ interface ProgressRib extends RibItem {
 
 interface CommentPanelProps {
   rib: ProgressRib;
-  sprint: Sprint | undefined;
+  sprint: Sprint | null;
   selectedSprint: string | null;
   rowKey: string;
   savedComment: string;
   commentDrafts: Record<string, string>;
   setCommentDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   updateComment: (ribId: string, releaseId: string | null, comment: string) => void;
-  getCommentHistory: (rib: ProgressRib, releaseId: string | null) => CommentHistoryEntry[];
+  getCommentHistory: (rib: RibItem, releaseId: string | null) => CommentHistoryEntry[];
   editable: boolean;
 }
 

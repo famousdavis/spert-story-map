@@ -234,7 +234,6 @@ export default function StoryMapView() {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEndExpand}
         onBackgroundClick={handleBackgroundDeselect}
-        layoutCells={layout.cells}
         overlayControls={product.releases.length >= 2 ? (
           <button
             type="button"

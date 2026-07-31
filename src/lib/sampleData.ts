@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, Category, Size, ChangeLogEntry } from '../types';
+import type { Product, Category, Size, ChangeLogEntry, Theme } from '../types';
 import { DEFAULT_SIZE_MAPPING, SCHEMA_VERSION } from './constants';
 import { getWorkspaceId } from './storage';
 
@@ -38,8 +38,11 @@ export function createSampleProduct(): Product {
   ];
 
   // progress entries: [sprintIdx, releaseIdx, percentComplete, comment?]
+  // `category: Category`, not `Category | string` — every caller below passes a
+  // real member, and the union was widening the result to string so no rib
+  // literal satisfied RibItem. Fixing the INPUT beats casting the output.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- factory function uses tuple arrays for concise test data
-  function makeRib(name: string, size: Size, category: Category | string, allocations: any[], progress: any[]) {
+  function makeRib(name: string, size: Size, category: Category, allocations: any[], progress: any[]) {
     return {
       id: crypto.randomUUID(),
       name,
@@ -66,7 +69,9 @@ export function createSampleProduct(): Product {
     };
   }
 
-  const themes = [
+  // Annotated so the `color` literals stay ColorKey rather than widening to
+  // string, which is what stopped this object satisfying Product.
+  const themes: Theme[] = [
     {
       id: crypto.randomUUID(),
       name: 'Customer Management',
