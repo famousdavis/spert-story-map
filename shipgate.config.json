@@ -8,7 +8,17 @@
 
   "changelog": {
     "file": "CHANGELOG.md",
-    "headingPattern": "^## Version (\\d+\\.\\d+\\.\\d+)\\s*\\("
+    "headingPattern": "^## Version (\\d+\\.\\d+\\.\\d+)\\s*\\(",
+
+    "_extraSurfacesNote": "public/CHANGELOG.md is NOT a backup here — it is the surface users read. src/pages/ChangelogView.tsx does fetch('/CHANGELOG.md') at runtime, which resolves to the public/ copy. The root CHANGELOG.md is the one nothing renders. If they drift, the app shows the STALE one.",
+
+    "extraSurfaces": [
+      {
+        "file": "public/CHANGELOG.md",
+        "match": "identical",
+        "note": "Fetched at runtime by ChangelogView.tsx — this is what users see. Keep byte-identical."
+      }
+    ]
   },
 
   "claudeMdVersionPatterns": [],

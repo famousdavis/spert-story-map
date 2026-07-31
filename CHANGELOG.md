@@ -1,5 +1,29 @@
 # Changelog
 
+## Version 0.50.4 (2026-07-31)
+
+**The release checks now cover the copy of this changelog that readers actually see.** Tooling
+only — no functional, data, or interface changes. The app behaves identically to v0.50.3.
+
+The ship gate could only ever be told about one changelog file, and in this project it was told
+about the wrong one. `src/pages/ChangelogView.tsx` fetches `/CHANGELOG.md` when a reader opens
+the version history, which resolves to the served copy under `public/`. That copy is the surface
+users read; the file the gate was watching is the one nothing renders.
+
+Had the two drifted apart, readers would have been shown the stale copy while every check
+reported success. `shipgate.config.json` now declares the served copy as a
+`changelog.extraSurfaces` entry in `identical` mode, so the gate fails if they differ by a single
+byte.
+
+Each failure path was verified by mutation before the change was accepted — a drifted copy, a
+removed entry and a deleted file each fail the gate. SPERT® Scheduler's served copy had already
+gone five months stale from exactly this cause.
+
+### Changed
+- **The ship gate now checks `public/CHANGELOG.md`.** `changelog.extraSurfaces` added to
+  `shipgate.config.json`; `scripts/shipgate.mjs` gains support for it and stays byte-identical
+  across all nine suite repositories.
+
 ## Version 0.50.3 (2026-07-31)
 
 **The release checks now read this project's own Node version.** Tooling only — no functional,
