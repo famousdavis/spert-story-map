@@ -1,5 +1,50 @@
 # Changelog
 
+## Version 0.50.6 (2026-08-02)
+
+**The licence gains two conditions, and one that asked too much was rewritten.** Licensing only —
+no functional, data, or interface changes. The app behaves identically to v0.50.5.
+
+`LICENSE` remains a byte-for-byte copy of the canonical file in the SPERT® Suite landing-page
+repository, differing only in the project repository URL on line 4. It goes from 726 lines to 756.
+What the licence permits is unchanged: anyone may still use, study, modify and share this software
+freely. What changed is the set of conditions attached to it, which now number six rather than
+four, and each now follows the wording of the GPL v3 Section 7 subsection that authorises it.
+
+That wording matters more than it sounds. Section 7 lists the kinds of additional term a project
+may attach, and its closing paragraph lets whoever receives the software **delete** any condition
+that strays outside that list. A condition worded too ambitiously does not merely fail — it
+evaporates, silently, in the hands of the one reader it was written for.
+
+### Added
+- **The author's name may not be used to endorse or promote a product built from this software**
+  without permission (Section 7(d)). Nothing else in the licence covered this. The project's
+  trademarks are protected whether the licence mentions them or not, but a personal name has no
+  such protection — and another condition requires that name to stay in the source code, so anyone
+  forking the project already has it in hand.
+- **Anyone who resells this software with a warranty or support contract of their own covers any
+  liability those promises impose on the original author** (Section 7(f)). The standard licence
+  already permits a reseller to make such promises; this makes clear they are theirs to stand
+  behind.
+
+### Changed
+- **The condition covering on-screen credit was rewritten.** It used to require any modified
+  version with a user interface to *display* a notice. Section 7(b) authorises requiring that
+  existing notices be *preserved*, not that new ones be created, and Section 5(d) says outright
+  that a modified work need not add such notices where the original had none. It now requires that
+  where a modified version already displays Appropriate Legal Notices, the original author's name
+  is preserved among them — and the repository link is conditional on the original displaying one,
+  so the same defect is not reintroduced by the back door.
+- **A modified version may no longer misrepresent where this software came from**, claiming
+  Section 7(c)'s previously unused first half.
+- **The trademark condition gains a narrow carve-out**: naming this project in order to describe
+  honestly what a fork was derived from is not itself prohibited, provided it does not suggest this
+  project endorses the result. This resolves the tension where the trademark condition granted no
+  rights to the marks while the marking condition required a fork to distinguish itself from them.
+- **The registration recital is now date-stamped**, since asserting live USPTO registration as bare
+  present fact acquires a shelf life, and the preamble now says "terms" rather than "restrictions"
+  — the noun Section 7 reserves for the deletable category.
+
 ## Version 0.50.5 (2026-07-31)
 
 **Six files were asserting plain GPL, and a test now makes that impossible.** Comments and tooling
