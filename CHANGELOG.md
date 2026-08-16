@@ -1,5 +1,58 @@
 # Changelog
 
+## Version 0.50.9 (2026-08-16)
+
+**Nothing changes for anyone using the app, and no installed version moved.** This release edits
+twelve lines in `package.json` and the twelve lines in `package-lock.json` that mirror them. Every
+package in the project resolves to exactly the version it resolved to before.
+
+Twelve dependencies were declared with a caret — `^19.2.4` rather than `19.2.4` — which permits
+`npm install` to fetch any later compatible release. This project only adopts a dependency release
+after it has been published for sixty days, and a caret has no way to know that. An ordinary
+install could therefore pull a version nobody had reviewed, on a day nobody had chosen. All twelve
+are now pinned to the exact version already in use.
+
+### Why exact rather than a narrower range
+A range wider than exact does not buy convenience under a policy like this one; it buys violations
+that then have to be caught. Under `~19.2.4`, a `19.2.5` published this morning is installed this
+afternoon — sixty days early — so every install needs its lockfile inspected and the change backed
+out. Backing a change out is not a durable fix, so the same version arrives again on the next
+install.
+
+**The two options also fail in opposite directions, which is what settles it.** A missed revert
+under a caret or tilde **fails open**: an unreviewed version ships. A missed edit under an exact
+pin **fails closed**: the project stays on the version it was already running, which is safe and
+shows up in the next dependency review. These are not equivalent risks.
+
+This is also not a new convention here — the project was already fifteen exact to twelve caret
+before this change, and the dependencies that move most often (ESLint, Vitest, TypeScript,
+Tailwind, jsdom, Firebase) were among those already pinned. This makes an existing practice
+consistent rather than introducing one.
+
+### Changed
+- **Pinned to their installed versions:** `exceljs` 4.4.0, `react` 19.2.4, `react-dom` 19.2.4,
+  `recharts` 3.8.0, `@testing-library/dom` 10.4.1, `@testing-library/jest-dom` 6.9.1,
+  `@testing-library/react` 16.3.2, `@testing-library/user-event` 14.6.1, `@types/react` 19.2.14,
+  `@types/react-dom` 19.2.3, `@vitejs/plugin-react` 5.1.4, `eslint-plugin-react-refresh` 0.5.2.
+
+### What this does not do
+Three qualifications, because the change is narrower than "dependency versions are now controlled".
+
+- **It closes the direct hole completely and the indirect one not at all.** Packages that arrive
+  underneath another dependency — `postcss`, `nanoid`, `rollup` and `picomatch` among them — have
+  no line in `package.json` to pin, and still re-resolve on every install. All four moved during
+  the previous release. **Inspecting the lockfile after every install remains necessary.**
+- **`npm update` no longer does anything for these twelve.** That is the intended behaviour, not a
+  fault: an exact version has nothing to update to. Updating one is now a deliberate edit on a
+  chosen date. Indirect dependencies are unaffected and `npm update <package>` still works for them.
+- **The real cost is that staleness stops announcing itself.** Under carets, a project drifts
+  forward on its own and you notice. Under exact pins nothing moves and nothing complains, so a
+  project can sit on old-but-safe dependencies indefinitely without anyone noticing. Keeping the
+  dependency review on a regular cadence is what replaces the drift, and it is now the only thing
+  that will surface an ageing dependency.
+
+This is a decision for this project, not a general recommendation.
+
 ## Version 0.50.8 (2026-08-16)
 
 **A dependency security release. Nothing changes in how the app works** — no functional, data or
