@@ -1,5 +1,67 @@
 # Changelog
 
+## Version 0.51.0 (2026-08-16)
+
+**Nothing changes in how the app works.** This release adds a code-quality measurement to the
+build, and a command for inspecting it. No functional, data or interface changes.
+
+A new check measures **cognitive complexity** — roughly, how much of a function you have to hold
+in your head at once to follow it. It is not a line count: a long flat sequence of steps scores
+low, while a short function with nested conditions inside a loop scores high. Anything above 15 is
+reported. Across the project, **22 functions** are.
+
+### Why this is being added now, and why it covers everything
+
+Parts of this app have not yet been used in earnest. They will be over the coming months, and that
+is expected to bring a steady stream of tweaks, fixes and enhancements — to which parts, nobody can
+currently say. The check exists to give confidence in *those* changes.
+
+An earlier plan limited the check to `src/lib/`, the well-tested core, on the reasoning that
+findings in untested code are not safe to act on. That was rejected. It assumed the untested parts
+of the app were static, so a check there would guard code nobody was going to change. The opposite
+is true — **untested code that is about to be edited is exactly where this earns its keep, because
+nothing else is watching it.**
+
+For context rather than justification: `src/lib/` sits at 68.78% branch coverage against 16.51%
+everywhere else, and 72 of the 97 files outside it are never executed by any test. That describes
+the state being guarded. It is not the reason for guarding it.
+
+### ⚠️ A finding is not an instruction to refactor
+**Zero is explicitly not the target**, and this matters most where the code is untested. **9 of the
+22 findings — 41% — are in files where no test executes a single statement.** Rewriting one of
+those to get under the threshold, with nothing in place to catch a behaviour change, is the wrong
+trade in the direction that ships bugs.
+
+For those, the correct response is to **add tests first**. The check's job is to stop complexity
+getting *worse* during the work ahead, not to demand that it get better. Declining to change an
+individual function, with the reasoning recorded at the site, is a legitimate outcome. The nine
+files are named in `eslint.config.ts`.
+
+### Added
+- **`eslint-plugin-sonarjs` 4.0.3**, with a single rule enabled: `sonarjs/cognitive-complexity` at
+  a threshold of 15. The plugin's wider recommended set is deliberately not adopted. This matches
+  the version already used by the other projects in the suite.
+- **`npm run cc`** — reports every function's complexity, not only those over the threshold, and
+  can measure what a block of code *would* cost if it were pulled out into its own function. Useful
+  before moving any code, rather than after.
+
+### Changed
+- **`npm run lint` now exits non-zero, by design.** The release gate reads the *number* of findings
+  and holds it steady at 22; it does not read the exit code. The check fails in both directions —
+  a new finding must be fixed rather than accepted, and a resolved one must be accounted for by
+  lowering the recorded number, so an improvement cannot be quietly absorbed.
+
+### On the dependency gap v0.50.9 left open
+The previous release pinned every directly-declared dependency but noted it could do nothing about
+packages that arrive underneath them, which still re-resolve on every install. Installing the new
+plugin was the first real install since, and so the first chance to observe that gap in practice.
+
+Nothing moved: thirteen packages were added, none removed, and none changed version — including the
+four named last time. That is not reassurance. It is npm declining to re-resolve four ranges it had
+no reason to touch, which is a different thing from those ranges being safe. **A clean diff here
+accumulates no evidence, and I'd resist reading two of them as a trend.** Checking after every
+install remains necessary.
+
 ## Version 0.50.9 (2026-08-16)
 
 **Nothing changes for anyone using the app, and no installed version moved.** This release edits
