@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 0.50.7 (2026-08-16)
+
+**Nothing changes for anyone using the app.** Tooling only — no functional, data, or interface
+changes. The app behaves identically to v0.50.6.
+
+The tool that measures how much of this project the test suite actually exercises,
+`@vitest/coverage-v8`, was never declared as a dependency. It appeared in `package-lock.json` only
+as an *optional peer* of `vitest` — a note about what `vitest` can work with, not an instruction to
+install anything. So `npm ci` did not install it, and a fresh checkout of this repository could not
+measure coverage at all.
+
+Undeclared dependencies do not stay put, either. Installing it by hand worked until the next
+`npm install`, which pruned it away again as a package nothing had asked for. Any coverage figure
+produced in between rested on a package that a clean checkout did not have.
+
+### Fixed
+- **`@vitest/coverage-v8` is now a declared devDependency, pinned to the exact version `4.1.5`.**
+  A clean `npm ci` produces a working coverage instrument, and it survives subsequent installs.
+  The pin is exact rather than a caret range because `vitest` names its coverage peer as an exact
+  version, so the two have to move together or not at all.
+
 ## Version 0.50.6 (2026-08-02)
 
 **The licence gains two conditions, and one that asked too much was rewritten.** Licensing only —
