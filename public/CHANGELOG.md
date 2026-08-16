@@ -1,5 +1,52 @@
 # Changelog
 
+## Version 0.50.8 (2026-08-16)
+
+**A dependency security release. Nothing changes in how the app works** — no functional, data or
+interface changes, and the app behaves identically to v0.50.7.
+
+Nineteen of the twenty-two published security advisories affecting this project's dependency tree
+are now closed. Seven packages moved. Three of them reach users as part of the shipped app:
+`react-router-dom`, which the app depends on directly, and `protobufjs` and `brace-expansion`,
+which arrive underneath Firebase and ExcelJS. The remaining four — `vite`, `postcss`, `nanoid` and
+`undici` — are build and test tooling and never reach a browser.
+
+### Security
+- **`react-router-dom` 7.16.0 → 7.18.0**, closing four advisories: an unauthenticated denial of
+  service via inefficient path matching (high); an open redirect via backslashes in `<Link>` and
+  `useNavigate` (moderate); a missing protocol validation in error handling (moderate); and an
+  arbitrary constructor injection during route error deserialisation (moderate).
+- **`brace-expansion` → 1.1.18, 2.1.4 and 5.0.9** across all three major lines present in the tree,
+  closing three denial-of-service advisories (all high). It is reached through ExcelJS in the
+  shipped app and through ESLint in the toolchain.
+- **`undici` 7.28.0 → 7.29.0**, closing five advisories: cross-user information disclosure (high),
+  and response desynchronisation, cookie attribute injection, CRLF injection and whitespace-based
+  disclosure (all moderate). Test tooling only.
+- **`postcss` 8.5.15 → 8.5.26**, closing a path traversal in source-map auto-loading (high) and an
+  incomplete fix for an earlier issue (moderate). Build tooling only.
+- **`nanoid` 3.3.15 → 3.3.18**, closing two advisories in which non-secure and custom generators
+  could loop indefinitely (both high). Build tooling only.
+- **`vite` 7.3.2 → 7.3.5**, closing a `server.fs.deny` bypass on Windows alternate paths (high) and
+  an NTLMv2 hash disclosure via UNC path handling (moderate). Both affect the development server.
+- **`protobufjs` 7.6.4 → 7.6.5**, closing a denial of service via an infinite loop when parsing
+  `.proto` option values (moderate). Reached through Firebase.
+
+`react-router-dom` and `vite` are now pinned to exact versions rather than caret ranges.
+
+### Known remaining
+Three advisories stay open, and a security scan of this project will still report them.
+
+The one worth explaining is **GHSA-qwww-vcr4-c8h2** (high), a CSRF bypass in React Router's RSC
+mode. Its fix ships in 7.18.2, which is still inside this project's sixty-day window for adopting
+a new dependency release. **It is not reachable here:** React Server Components are not compiled
+into this app. The router is mounted as a plain `<BrowserRouter>`, the build produces no server
+bundle, and none of the entry points the advisory describes exist anywhere in the source. It will
+be closed when 7.18.2 clears the window.
+
+The other two are unchanged from previous releases: a low-severity development-server file read in
+`esbuild`, whose fix is not yet compatible with the Vite release adopted here, and a moderate
+bounds-check issue in `uuid` reached through ExcelJS, for which no compatible fix is published.
+
 ## Version 0.50.7 (2026-08-16)
 
 **Nothing changes for anyone using the app.** Tooling only — no functional, data, or interface
