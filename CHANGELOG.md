@@ -1,5 +1,51 @@
 # Changelog
 
+## Version 0.52.1 (2026-08-17)
+
+**Nothing changes in how the app works.** Two safety fixes — one test, one compile-time check — and
+no runtime behaviour change of any kind.
+
+### The check that caught something while it was being written
+Importing a project file strips any field the app doesn't recognise, using hand-maintained lists of
+known field names. If a field is added to the app but not to its list, **that field is silently
+discarded from every imported file.** That has happened before: `seq` shipped missing from one list
+and was quietly stripped on import until it was noticed.
+
+This release ties each of those ten lists to the data shape it is supposed to mirror, so the
+mismatch now stops the build instead of shipping. **The check found a real gap the moment it was
+switched on** — two fields (`_owner`, `_members`) that were missing from the exclusion list because
+their declarations sit below a long comment and were missed by eye. Both carry account permissions,
+which is exactly the category that must never be accepted from an imported file.
+
+### The theme palette is now pinned
+`themeColors.ts` holds the eight theme colours and their styling. Its tests checked that the table
+had eight entries with the right field names — and never checked a single value. **31 of its 32
+styling strings could have been emptied without any test failing.** One assertion against the whole
+table now covers all of them.
+
+That is not hypothetical: this palette was already changed once, in v0.38.0. A table nothing checks
+is exactly where the next change breaks quietly — every colour still renders, just unstyled.
+
+### ⚠️ Worth stating plainly: the cheap fix scored better than the valuable one
+Measured against the mutation baseline:
+
+- the **one-line table assertion** improved the score by **1.86 points**
+- the **ten compile-time checks** improved it by **0.15 points**
+
+The assertion outperformed the ten structural checks by more than twelvefold on the metric — while
+the checks are the more valuable change. **The checks make a whole class of bug impossible; the
+assertion makes one kind of bug detectable.** Anyone treating the score as the goal would write the
+assertion and skip the checks, and that would be exactly backwards. It is the clearest illustration
+we have of what that number is and is not for.
+
+### Fixed
+- **Ten field lists in `validateProduct.ts` are now tied to their data shapes at build time.** Adding
+  a field without adding it to its list fails the build, naming the field.
+- **`themeColors.ts` has every styling value asserted**, closing all 31 gaps the baseline found.
+
+Full record, including what the compile-time checks cost in measurement terms, is in
+`docs/mutation-baseline.md`.
+
 ## Version 0.52.0 (2026-08-17)
 
 **Nothing changes in how the app works.** This release adds a measurement tool and records what it
