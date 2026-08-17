@@ -90,3 +90,10 @@ _planning/
 !/SECURITY.md
 !/CONTRIBUTING.md
 !/CODE_OF_CONDUCT.md
+
+# Stryker mutation testing output. Sandboxes are full project copies containing
+# mutated source; reports/ holds the JSON survivor list the guard reads. Both are
+# also excluded in vite.config.ts (test.exclude) and eslint.config.ts (ignores) —
+# a gitignore entry alone does not stop vitest discovering them or ESLint linting them.
+.stryker-tmp
+reports

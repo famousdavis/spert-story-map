@@ -1,7 +1,7 @@
 {
   "name": "spert-story-map",
   "private": true,
-  "version": "0.51.0",
+  "version": "0.52.0",
   "type": "module",
   "engines": {
     "node": "24.x"
@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings 0",
     "cc": "node scripts/measure-complexity.mjs",
+    "mutate": "node scripts/mutation-guard.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -27,6 +28,9 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/typescript-checker": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
     "@tailwindcss/vite": "4.2.4",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "6.9.1",
