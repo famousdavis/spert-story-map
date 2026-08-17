@@ -16,6 +16,11 @@ export default defineConfig({
     // worktrees there for parallel feature work and Vitest would otherwise
     // discover their src/__tests__/*.test.ts files alongside the main copy,
     // inflating test counts ~4–5× when `npm test` runs from the repo root.
-    exclude: [...configDefaults.exclude, '**/.claude/**'],
+    // `.stryker-tmp` holds Stryker's sandboxes — full copies of the project,
+    // including this test suite and, mid-run, MUTATED SOURCE. Vitest's default
+    // exclude is only node_modules and .git, so without this line `npm test`
+    // discovers every sandbox copy of every test file: the suite inflates several
+    // times over and reports "failures" that are actually surviving mutants.
+    exclude: [...configDefaults.exclude, '**/.claude/**', '**/.stryker-tmp/**'],
   },
 })

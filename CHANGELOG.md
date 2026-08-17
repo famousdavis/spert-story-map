@@ -1,5 +1,43 @@
 # Changelog
 
+## Version 0.52.0 (2026-08-17)
+
+**Nothing changes in how the app works.** This release adds a measurement tool and records what it
+found. No functional, data or interface changes.
+
+Test coverage answers *"was this line run by a test?"* — which is a weaker question than it sounds,
+because a line can run without anything checking what it did. **Mutation testing asks the harder
+one: if this code were quietly changed, would any test notice?** It works by making thousands of
+small deliberate changes — flipping a comparison, emptying a string, deleting a condition — and
+recording how many the suite catches.
+
+Run once over the 21 best-tested files in the shared logic layer: **3,439 changes made, 71.6%
+caught.**
+
+### Added
+- **`npm run mutate`** — runs the measurement and refuses to report a result it cannot stand behind.
+  ⚠️ A run that fails to *start* produces no failures and no score, which looks exactly like a
+  perfect result; the wrapper exists to tell those two apart, and was itself tested against four
+  distinct ways a run can be hollow.
+- **`docs/mutation-baseline.md`** — the full record: every file's score, how to reproduce it, what
+  was decided and why, and two findings examined in detail.
+
+### The most useful thing it found
+`themeColors.ts` — the theme colour palette — sits at **83% line coverage but only 11% of changes
+caught.** The tests run the whole 8×4 table of colour values and check exactly one cell of it. The
+other 31 values could each be silently emptied and nothing would fail.
+
+That matters concretely rather than theoretically: this palette was already changed once, in
+v0.38.0. A table nothing checks is exactly where the next change breaks quietly. It is also the
+cheapest thing to fix in the codebase — a single assertion against the whole table would cover all
+31.
+
+### What this is not
+**This is a baseline, not a gate.** It does not run on every build, it has no pass mark, and it
+cannot fail a release. There is no score target: a low score on a given file is a prompt to look,
+not an instruction to change anything. The point of recording it now is to have a fixed reference
+for later, not to start work.
+
 ## Version 0.51.0 (2026-08-16)
 
 **Nothing changes in how the app works.** This release adds a code-quality measurement to the

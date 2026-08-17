@@ -15,7 +15,16 @@ export default tseslint.config(
   // built `dist/` bundles caused ESLint to scan ~30k minified-bundle errors
   // when run from the repo root. Worktrees lint themselves; we don't lint
   // them through the parent.
-  { ignores: ['dist', '.claude/**'] },
+  // ⚠️ `.stryker-tmp` and `reports` are Stryker output and MUST stay ignored here,
+  // not only in .gitignore. The sandboxes are full project copies containing mutated
+  // source, so linting them adds hundreds of findings from files with no source of
+  // truth. That is worse in this repo than in a sibling: the lint gate is held at an
+  // accepted baseline (see below), so the extra findings do not read as "Stryker
+  // output leaked in" — the ship gate fails with "new problems were introduced",
+  // names Stryker nowhere, and points at the wrong thing entirely.
+  // Anything added later that copies the project tree belongs in this list AND in
+  // vite.config.ts's test.exclude.
+  { ignores: ['dist', '.claude/**', '.stryker-tmp/**', 'reports/**'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{js,jsx,ts,tsx}'],
