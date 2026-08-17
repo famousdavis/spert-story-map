@@ -1,5 +1,95 @@
 # Mutation baseline — `src/lib/**` well-covered subset
 
+**Current: v0.52.1, 73.58%.** Superseding the v0.52.0 first baseline of 71.57%.
+
+> ⚠️ **The v0.52.0 figures are kept throughout, not overwritten.** The delta is the finding, and a
+> baseline is the one document where a silently-replaced number destroys the only evidence that a
+> change did anything.
+
+## Delta, v0.52.0 → v0.52.1
+
+| | v0.52.0 | v0.52.1 | |
+|---|---:|---:|---|
+| mutation score | 71.57% | **73.58%** | +2.01pp |
+| covered score | 75.12% | **77.36%** | +2.24pp |
+| total mutants | 3439 | 3440 | +1 |
+| killed | 1560 | 1550 | **−10** |
+| survived | 517 | **454** | −63 |
+| no coverage | 103 | 103 | — |
+| compile error | 1258 | **1332** | +74 |
+| **valid denominator** | 2181 | **2108** | **−73** |
+
+**Only two files moved.** The scoped include (`vitest.stryker.config.ts`) and `stryker.config.mjs`
+were **untouched** — verified by diff, not asserted. That is what makes this a comparison rather
+than a coincidence; the other nineteen files are byte-identical across the two runs.
+
+| file | before | after | |
+|---|---|---|---|
+| `themeColors.ts` | 4 / 31 / 0 / 23 | **35 / 0 / 0 / 23** | 11.43% → **100%** |
+| `validateProduct.ts` | 298 / 174 / 35 / 82 | **257 / 142 / 35 / 156** | 58.78% → **59.22%** |
+
+*(killed / survived / nocov / compileError)*
+
+### ⚠️ Why the denominator FELL — read this before treating it as a broken run
+
+**A denominator that drops with no recorded cause reads as a broken run forever.** This one has a
+structural cause.
+
+v0.52.1 added compile-time guards tying each field allowlist in `validateProduct.ts` to the
+interface it mirrors. Those allowlists previously carried **74 valid mutants — 41 killed and 33
+survived.** A mutation of an allowlist member now fails to compile (`TS2322`, *"not assignable to
+type 'never'"*), so those mutants report as `CompileError` and leave the denominator entirely.
+
+⚠️ **The guard removed KILLED mutants as well as survivors, and that is the part worth
+understanding.** It does not discriminate between a mutation tests would have caught and one they
+would not — it makes the whole class unmutatable. `validateProduct` lost 41 kills and 32 survivors,
+almost exactly the block measured beforehand.
+
+> **Those 41 kills were positive evidence that the tests catch allowlist corruption. That evidence
+> is gone** — not because the tests got worse, but because the mutation can no longer exist to be
+> caught. **A guarantee replaced a measurement.** The guarantee is strictly stronger, and the cost
+> is that mutation is blind on those fields permanently.
+>
+> ⚠️ So a future reader comparing profiles will see 73 mutants vanish from one file. **The absence
+> of mutants there is the guard working, not coverage that was lost.** The same note is recorded at
+> the site in `validateProduct.ts`.
+
+This is the sharpest instance of the three-scales finding below: mutation buys least where a rule
+has a second expression, and here a second expression was *deliberately manufactured*.
+
+### ⚠️ The score-vs-value inversion — measured
+
+| change | effect on survivors | effect on score |
+|---|---|---:|
+| one `toEqual` on a palette table | 31 killed | **+1.86pp** |
+| ten compile-time structural guards | 32 removed | **+0.15pp** |
+
+**The single cheap assertion outperforms the ten structural guards by more than 12× on the metric
+— while the guards are the more valuable change.** The guards make a class of bug *impossible*; the
+assertion makes one *detectable*.
+
+A reader optimising the score would write the assertion and skip the guards. **That is exactly
+backwards**, and it is the clearest available statement of what this score is and is not for.
+
+### Predictions, registered before the run
+
+All directions correct; magnitudes landed within one mutant, against a pre-registered expectation of
+missing. ⚠️ **An unnecessary hedge is also a calibration error** — a hedge that is systematically too
+wide stops carrying information, and the next one gets discounted whichever way it lands.
+
+| | predicted | measured |
+|---|---|---|
+| `themeColors` survivors | 31 → 0 | 31 → 0 |
+| `validateProduct` survived | → ~141 | **142** |
+| `validateProduct` killed | → ~257 | **257** |
+| `validateProduct` denominator | → ~433 | **434** |
+| repo denominator | → ~2107 | **2108** |
+| repo score | → ~73.6% | **73.58%** |
+
+---
+
+## The original first baseline
+
 **Recorded 2026-08-17 at v0.52.0.** First mutation measurement ever taken of this repository.
 
 > ⚠️ **This is a BASELINE, not a gate.** `npm run mutate` carries no score threshold, is not part
@@ -72,7 +162,37 @@ tests actually reach, how much is really checked?*
 
 ---
 
-## Per-file, ranked by survivors
+## Per-file — CURRENT (v0.52.1), ranked by survivors
+
+| file | score | valid | killed | timeout | survived | nocov | compileErr |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `validateProduct.ts` | 59.22% | 434 | 257 | 0 | 142 | 35 | 156 |
+| `aiOps.ts` | 79.43% | 350 | 278 | 0 | 67 | 5 | 449 |
+| `exportForExcel.ts` | 46.62% | 133 | 62 | 0 | 58 | 13 | 24 |
+| `calculations.ts` | 76.14% | 264 | 201 | 0 | 53 | 10 | 152 |
+| `productTransforms.ts` | 88.22% | 348 | 307 | 0 | 39 | 2 | 204 |
+| `ribCardColors.ts` | 46.81% | 47 | 22 | 0 | 25 | 0 | 35 |
+| `exportForForecaster.ts` | 64.38% | 73 | 47 | 0 | 14 | 12 | 38 |
+| `invitationErrors.ts` | 88.31% | 77 | 68 | 0 | 9 | 0 | 23 |
+| `progressMutations.ts` | 80.43% | 46 | 37 | 0 | 8 | 1 | 42 |
+| `formatDate.ts` | 80.00% | 40 | 32 | 0 | 7 | 1 | 22 |
+| `firestoreUtils.ts` | 61.11% | 18 | 10 | 1 | 7 | 0 | 1 |
+| `migration.ts` | 62.07% | 29 | 18 | 0 | 6 | 5 | 18 |
+| `ribHelpers.ts` | 85.71% | 42 | 36 | 0 | 6 | 0 | 17 |
+| `aiSnapshot.ts` | 83.33% | 36 | 30 | 0 | 5 | 1 | 34 |
+| `progressViewHelpers.ts` | 66.10% | 59 | 39 | 0 | 4 | 16 | 53 |
+| `sortByOrder.ts` | 75.00% | 8 | 6 | 0 | 2 | 0 | 8 |
+| `driverCleanupRegistry.ts` | 50.00% | 6 | 3 | 0 | 1 | 2 | 3 |
+| `signOutCleanup.ts` | 87.50% | 8 | 7 | 0 | 1 | 0 | 5 |
+| **`themeColors.ts`** | **100.00%** | 35 | 35 | 0 | **0** | 0 | 23 |
+| `auth-name.ts` | 100.00% | 15 | 15 | 0 | 0 | 0 | 2 |
+| `settingsMutations.ts` | 100.00% | 40 | 40 | 0 | 0 | 0 | 23 |
+| **total** | **73.58%** | **2108** | **1550** | **1** | **454** | **103** | **1332** |
+
+⚠️ `themeColors.ts` at 100% on 35 valid mutants is a **complete** result, not a thin-denominator
+one: the file *is* a lookup table, so 35 is its whole population rather than a sample of it.
+
+## Per-file — v0.52.0 first baseline, kept for comparison
 
 | file | score | valid | killed | timeout | survived | nocov | compileErr |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -289,6 +409,11 @@ gaps or mostly equivalent-mutant noise?**
 
 **Answer: mostly real gaps.** A remediation item is worth opening. It is not opened here.
 
+> ✅ **CLOSED in v0.52.1.** `themeColors.ts` is now 100% (0 survivors) — one whole-table `toEqual`
+> in the already-included `themeColors.test.ts`. The classification below is the v0.52.0 record of
+> why. `validateProduct`'s allowlist survivors are closed by compile-time guard rather than by test;
+> see the delta section at the top for what that costs.
+
 ### `themeColors.ts` — 31/31, exhaustive. The canonical finding.
 
 **83.33% branch coverage. 11.43% kill rate.** All 31 survivors are Tailwind class strings in the
@@ -347,4 +472,14 @@ Both have no compile-time link to what the app actually writes, and **both have 
   own comments record this shipping in a sibling app.
 
 One each side of the boundary, same structure. Recorded as a named pair so the connection is not
-rediscovered. **Neither is opened here.**
+rediscovered.
+
+> ✅ **The client half is CLOSED as of v0.52.1** — ten compile-time guards, one per allowlist, each
+> falsified in both directions. ⚠️ **The server half is NOT, and cannot be by the same means:**
+> Firestore rules have no type system, so nothing can tie `spertStoryMapProjectFields()` to what the
+> app writes. It remains open, in another repository, and is not this project's to close.
+>
+> ⚠️ **`PROTO_KEYS` deliberately has no guard** and now reads as the one allowlist without one. It
+> mirrors no interface — `__proto__` / `constructor` / `prototype` are prototype-chain names, not
+> domain fields — so any guard written there would pin nothing. Recorded at the site so nobody
+> "completes the set".
