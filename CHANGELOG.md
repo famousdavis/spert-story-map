@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.52.2 (2026-08-19)
+
+**Nothing changes in how the app works.** One security header value.
+
+### This app can no longer be embedded in a frame on another site
+The `X-Frame-Options` header goes from `SAMEORIGIN` to `DENY`. `SAMEORIGIN` already blocked other
+sites from embedding the app; it additionally permitted the app to embed *itself*, which it never
+does — nothing in this codebase creates a frame, and neither does any other SPERT® Suite app.
+
+The value was set in v0.46.2, when this was the first Suite app to get security headers at all. The
+six apps that followed chose `DENY`, so this brings the app into line with the rest of the Suite and
+removes a difference that had no reason behind it.
+
 ## Version 0.52.1 (2026-08-17)
 
 **Nothing changes in how the app works.** Two safety fixes — one test, one compile-time check — and
