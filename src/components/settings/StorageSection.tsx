@@ -206,6 +206,13 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
               Sign in with Microsoft
             </button>
           </div>
+          {/* Microsoft is restricted to work/school accounts at the app
+              registration, so a personal account is refused by Microsoft
+              before a password is entered. Saying so spares a dead end. */}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Microsoft sign-in requires a work or school account. For a personal
+            account, use Google.
+          </p>
           {tos.authError && (
             <p className="text-xs text-red-500 dark:text-red-400">{tos.authError}</p>
           )}
