@@ -31,7 +31,10 @@ import type { SpertModelsChangedDetail } from '../types';
  * Fire-and-forget: call claimPendingInvitations and dispatch spert:models-changed
  * if invitations were claimed.
  *
- * Matches AHP's AuthContext.tsx:147-167 pattern:
+ * Matches AHP's AuthContext.tsx:claimPendingInvitationsAndNotify pattern
+ * (named by symbol, not line — that file is in another repository, so nothing
+ * here can verify a line number and it does not stay correct; the previous
+ * citation, :147-167, had drifted off the function onto AuthProvider):
  *  - Module-level (stable reference, no per-render closure)
  *  - Takes firebaseUser as a parameter
  *  - emailVerified guard INSIDE this function (Lesson 26):
