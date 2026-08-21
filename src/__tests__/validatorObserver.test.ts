@@ -204,6 +204,30 @@ describe('C8 — didMigrate at both seams', () => {
     });
   }
 
+  /**
+   * ⚠️ The six rows above build their pairs in this file, so they pin the FORMULA
+   * but not the production capture POINT. This one drives `storage.loadProduct`
+   * itself: with the capture moved to the `:183` observe point it reads 2 (the
+   * post-migration value) and `didMigrate` goes false. local-`1` is the row the
+   * brief names as the one shape that detects a late local capture, so this is
+   * where it belongs.
+   */
+  it('local-1 through the REAL seam — pins the capture point, not just the formula', () => {
+    const id = nextId();
+    localStorage.setItem(`rp:local:product_${id}`, JSON.stringify({
+      id, name: 'V1 Product', schemaVersion: 1,
+      themes: [], releases: [], sprints: [], sizeMapping: [{ label: 'M', points: 20 }],
+    }));
+    registerObserver(observe);
+    const s = spyConsole();
+
+    loadProduct(id);
+
+    const m = payloadOf(s.infoCalls(), '[observer] measure');
+    expect(m?.rawSchemaVersion).toBe(1);
+    expect(m?.didMigrate).toBe(true);
+  });
+
   it('stamps APP_VERSION on every measurement record', async () => {
     const { APP_VERSION } = await import('../lib/version');
     expect(measure(pristineFixture(), 2).appVersion).toBe(APP_VERSION);
