@@ -5,6 +5,7 @@
 import type { Product, ChangeLogEntry, UserSettings } from '../types';
 import { STORAGE_KEYS, SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from './constants';
 import { runObserver } from './validatorObserverRegistry';
+import { needsV2Migration } from './schemaVersion';
 
 // ── localStorage namespace ──────────────────────────────────────────
 //
@@ -124,11 +125,25 @@ export function saveProductIndex(index: { id: string; name: string; updatedAt?: 
 // Schema migration: v1 → v2 (per-release progress)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pre-schema data may not match Product interface
 export function migrateToV2(product: any): any {
-  if (!product || (product.schemaVersion || 1) >= 2) return product;
+  // ⚠️ ONE predicate, shared with the three call sites — see schemaVersion.ts. The
+  // inline `(sv || 1) >= 2` this replaced disagreed with the local and import gates
+  // for a truthy non-numeric value, and this function is DESTRUCTIVE, so the cloud
+  // (which calls it unguarded) zeroed progress history where the others did nothing.
+  if (!product || !needsV2Migration(product.schemaVersion)) return product;
+
+  // ⚠️ Shape guards, not paranoia. The cloud calls this inside `snap.forEach`, so a
+  // non-array `themes` threw `TypeError: … is not iterable` and took down the WHOLE
+  // project-index load — every project, not just the malformed one — before any
+  // per-item isolation could see it. Returning early leaves the product untouched and
+  // unmigrated, which is idempotent and harmless on the next load.
+  if (!Array.isArray(product.themes)) return product;
 
   for (const theme of product.themes) {
+    if (!Array.isArray(theme?.backboneItems)) continue;
     for (const backbone of theme.backboneItems) {
+      if (!Array.isArray(backbone?.ribItems)) continue;
       for (const rib of backbone.ribItems) {
+        if (!rib) continue;
         if (!rib.progressHistory || rib.progressHistory.length === 0) continue;
         const allocations = rib.releaseAllocations || [];
         if (allocations.length === 0) {
@@ -176,7 +191,7 @@ export function loadProduct(id: string, ns?: string): Product | null {
   // IN PLACE, so a capture taken at the `return` would already read the
   // post-migration value — measured wrong in 18 of 24 cases.
   const rawSchemaVersion = product?.schemaVersion;
-  if (product && (product.schemaVersion || 1) < SCHEMA_VERSION) {
+  if (product && needsV2Migration(product.schemaVersion)) {
     product = migrateToV2(product);
     // Save immediately so migration only runs once
     try {

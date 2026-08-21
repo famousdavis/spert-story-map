@@ -3,8 +3,9 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product, StorageDriver, UserSettings } from '../types';
-import { DEFAULT_SIZE_MAPPING, SCHEMA_VERSION } from './constants';
+import { DEFAULT_SIZE_MAPPING } from './constants';
 import { getWorkspaceId, migrateToV2, appendChangeLogEntry } from './storage';
+import { needsV2Migration } from './schemaVersion';
 import { validateProduct } from './validateProduct';
 
 /**
@@ -72,8 +73,8 @@ export function importProductFromJSON(jsonString: string): Product {
   if (!product.releases) product.releases = [];
   if (!product.sprints) product.sprints = [];
 
-  // Migrate if needed
-  if (!product.schemaVersion || product.schemaVersion < SCHEMA_VERSION) {
+  // Migrate if needed — the same predicate the local and cloud read paths use.
+  if (needsV2Migration(product.schemaVersion)) {
     product = migrateToV2(product);
   }
 

@@ -39,6 +39,7 @@ const { observe, measure, classify, assertIdentity, capProximities } =
 const { diff } = await import('../lib/validatorObserverDiff');
 const { stripFirestoreFields } = await import('../lib/firestoreDriver');
 const { SCHEMA_VERSION } = await import('../lib/constants');
+const { needsV2Migration } = await import('../lib/schemaVersion');
 
 import type { Product } from '../types';
 
@@ -178,11 +179,14 @@ describe('C8 — didMigrate at both seams', () => {
     return { product, rawSchemaVersion };
   };
 
-  /** Local: capture BEFORE the storage.ts:174 gate, then run the gate. */
+  /** Local: capture BEFORE the storage.ts gate, then run the gate. The gate calls
+   *  `needsV2Migration` as of v0.52.5, so this mirrors it rather than duplicating the
+   *  old inline `(sv || 1) < SCHEMA_VERSION` — a stale duplicate is what the whole
+   *  divergence was. */
   const localPair = (schemaVersion: unknown) => {
     let product = body(schemaVersion) as unknown as Product;
     const rawSchemaVersion = product?.schemaVersion;
-    if (product && ((product.schemaVersion as number) || 1) < SCHEMA_VERSION) {
+    if (product && needsV2Migration(product.schemaVersion)) {
       product = migrateToV2(product) as Product;
     }
     return { product, rawSchemaVersion };
@@ -192,9 +196,21 @@ describe('C8 — didMigrate at both seams', () => {
     ['schemaVersion: undefined', undefined, 'cloud', true],
     ['schemaVersion: 1', 1, 'cloud', true],
     ['schemaVersion: 2', 2, 'cloud', false],
-    ["schemaVersion: 'abc'", 'abc', 'cloud', true],
+    // ⚠️ CHANGED IN v0.52.5, and the old value was documenting a DEFECT. Until then
+    // the cloud called migrateToV2 unguarded, so 'abc' migrated there (didMigrate
+    // true) and not locally (false) — that asymmetry WAS the bug. Both seams now
+    // share `needsV2Migration`, so both are false and the table is symmetric.
+    ["schemaVersion: 'abc'", 'abc', 'cloud', false],
     ['schemaVersion: 1', 1, 'local', true],
     ["schemaVersion: 'abc'", 'abc', 'local', false],
+    // ⚠️ ADDED IN v0.52.5 TO REPLACE A LOST DISCRIMINATOR. Before the fix, cloud-'abc'
+    // was the row that separated the adopted formula from the superseded
+    // `raw === undefined || raw < 2`; once it became false, that formula passed it.
+    // NaN is falsy, so it migrates and didMigrate is true, while the old formula says
+    // false. Measured: post-fix it is the ONLY value that still separates the two.
+    // Do not delete this row without checking what else covers that formula.
+    ['schemaVersion: NaN', NaN, 'cloud', true],
+    ['schemaVersion: NaN', NaN, 'local', true],
   ];
 
   for (const [label, sv, seam, required] of cases) {
