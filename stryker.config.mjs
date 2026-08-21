@@ -92,6 +92,12 @@ export default {
     'src/lib/signOutCleanup.ts',
     'src/lib/auth-name.ts',
     'src/lib/driverCleanupRegistry.ts',
+    // Added v0.52.5. 100% statements/branches/functions/lines, and it is pure rule
+    // content — it is the SINGLE predicate deciding whether the destructive v1→v2
+    // migration runs, after four inline copies of that decision disagreed and the
+    // cloud silently zeroed progress history. Exactly the kind of file where a
+    // surviving mutant would matter.
+    'src/lib/schemaVersion.ts',
   ],
 
   // Run only the tests that cover the mutated files. ⚠️ Omitting this reports every

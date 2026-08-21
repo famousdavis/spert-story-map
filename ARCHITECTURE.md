@@ -30,6 +30,7 @@ src/
 │   ├── importExport.ts               # Export product JSON, bundled export, legacy single-file import helper
 │   ├── import-utils.ts               # Multi-project import: parse, conflict detection, applyImport (Layer 2 drift re-validation)
 │   ├── validateProduct.ts            # Comprehensive schema validation for imported products
+│   ├── schemaVersion.ts              # THE single predicate deciding if the destructive v1→v2 migration runs
 │   ├── validatorObserver.ts          # Flag-gated observer: runs validateProduct against a CLONE at the read seams, reports only
 │   ├── validatorObserverDiff.ts      # Own-key structural diff (live vs. validated clone) used by the observer
 │   ├── validatorObserverRegistry.ts  # Synchronous no-op-unless-registered slot the read seams call

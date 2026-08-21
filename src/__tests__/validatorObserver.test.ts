@@ -209,6 +209,12 @@ describe('C8 — didMigrate at both seams', () => {
     // NaN is falsy, so it migrates and didMigrate is true, while the old formula says
     // false. Measured: post-fix it is the ONLY value that still separates the two.
     // Do not delete this row without checking what else covers that formula.
+    //
+    // ⚠️ NARROWING, recorded deliberately. The discriminator moved from a value
+    // reachable on BOTH the import and cloud paths ('abc') to one reachable only via
+    // cloud: `JSON.parse` rejects NaN, so no imported file can carry it. C8 still
+    // discriminates implementations — it just no longer does so through an input that
+    // arrives on every path.
     ['schemaVersion: NaN', NaN, 'cloud', true],
     ['schemaVersion: NaN', NaN, 'local', true],
   ];

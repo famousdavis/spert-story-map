@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 0.52.5 (2026-08-21)
+
+**A data-loss bug fix.** It affects cloud projects whose internal version marker had been corrupted —
+rare, but the consequence was silent and permanent, so the fix is worth stating plainly.
+
+### Progress history could be wiped when a cloud project loaded
+Every project carries an internal marker recording which data format it uses. Projects created before
+release planning gained per-release progress are upgraded automatically the first time they load.
+
+If that marker held a value that was neither a number nor empty — something only corruption or hand
+editing produces — the browser disagreed with itself about what to do. Loading from the cloud ran the
+upgrade; loading from this browser's own storage, or importing from a file, did not. Running that
+upgrade on a project that did not need it **cleared the recorded progress for every item not assigned
+to a release**, and the loss was permanent once the project saved again.
+
+All four places that make this decision now share one answer, and the answer is the cautious one: a
+marker that cannot be read is left alone rather than treated as old data needing an upgrade.
+
+### A malformed project no longer takes the whole project list down with it
+Loading the project list read every project in turn. A project whose internal structure was damaged
+threw an error that stopped the entire list from loading — so one bad project hid all the others.
+Damaged projects are now skipped over, and the rest of the list loads normally.
+
+### Importing a file with a damaged version marker
+The marker is repaired on import instead of the file being rejected, so a damaged file still opens.
+
 ## Version 0.52.4 (2026-08-21)
 
 **Nothing changes in how the app works.** This release adds an internal diagnostic that is switched
