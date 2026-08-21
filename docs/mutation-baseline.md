@@ -162,11 +162,11 @@ tests actually reach, how much is really checked?*
 
 ---
 
-## Per-file — CURRENT (v0.52.1), ranked by survivors
+## Per-file — CURRENT (v0.52.5), ranked by survivors
 
 | file | score | valid | killed | timeout | survived | nocov | compileErr |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `validateProduct.ts` | 59.22% | 434 | 257 | 0 | 142 | 35 | 156 |
+| `validateProduct.ts` | 59.59% | 438 | 261 | 0 | 142 | 35 | 156 |
 | `aiOps.ts` | 79.43% | 350 | 278 | 0 | 67 | 5 | 449 |
 | `exportForExcel.ts` | 46.62% | 133 | 62 | 0 | 58 | 13 | 24 |
 | `calculations.ts` | 76.14% | 264 | 201 | 0 | 53 | 10 | 152 |
@@ -187,10 +187,36 @@ tests actually reach, how much is really checked?*
 | **`themeColors.ts`** | **100.00%** | 35 | 35 | 0 | **0** | 0 | 23 |
 | `auth-name.ts` | 100.00% | 15 | 15 | 0 | 0 | 0 | 2 |
 | `settingsMutations.ts` | 100.00% | 40 | 40 | 0 | 0 | 0 | 23 |
-| **total** | **73.58%** | **2108** | **1550** | **1** | **454** | **103** | **1332** |
+| **`schemaVersion.ts`** | **100.00%** | 14 | 14 | 0 | **0** | 0 | 9 |
+| **total** | **73.80%** | **2126** | **1568** | **1** | **454** | **103** | **1341** |
 
 ⚠️ `themeColors.ts` at 100% on 35 valid mutants is a **complete** result, not a thin-denominator
 one: the file *is* a lookup table, so 35 is its whole population rather than a sample of it.
+
+### v0.52.4 → v0.52.5 delta — fully attributed
+
+| scope | v0.52.4 | v0.52.5 | delta |
+|---|---|---|---|
+| whole run | 73.58% · 2108 valid · 1550 killed · **454 survived** | 73.80% · 2126 valid · 1568 killed · **454 survived** | +18 valid, +18 killed, **survivors unchanged** |
+| `validateProduct.ts` | 59.22% · 434 valid · 257 killed · **142 survived** | 59.59% · 438 valid · 261 killed · **142 survived** | +4 valid, +4 killed, **survivors unchanged** |
+
+**Every one of the 18 new valid mutants is killed, and no survivor count moved in either scope.**
+The score rose only because killed mutants were added to the numerator with nothing added to the
+denominator's survivor side. The +18 decomposes exactly:
+
+- **14 from `schemaVersion.ts`**, mutate target #22 as of v0.52.5 — 100% on all four metrics, 0
+  survivors, plus 9 compile errors (which is the whole of the run's +9 there, 1332 → 1341).
+- **4 from `validateProduct.ts`**, all on the single new line `:548`
+  (`if (d.schemaVersion !== undefined)`), all Killed: two `ConditionalExpression`, one
+  `EqualityOperator`, one `BlockStatement`. That guard is load-bearing — a bare assignment
+  introduces the key with value `undefined` on a legacy product — so having all four killed is the
+  result that matters.
+- **Nothing else moved.** No other target changed any figure.
+
+⚠️ `schemaVersion.ts` was added to `stryker.config.mjs` only after measuring it at 100%
+statements/branches/functions/lines, per the "MEASURED SUBSET" policy in that file's own comment.
+`schemaVersion.test.ts` joined `vitest.stryker.config.ts` in the same change; `validatorObserver.test.ts`
+remains excluded from both, which is what keeps the observer's killing power at zero.
 
 ## Per-file — v0.52.0 first baseline, kept for comparison
 
@@ -293,11 +319,14 @@ rise (71.39% → **71.57%**), `validateProduct`'s survivors and `NoCoverage` cou
 
 **The 21-target exact match above no longer holds for one target, deliberately.** As of v0.52.4:
 
-| target | scoped config | full suite |
-|---|---:|---:|
-| `validateProduct.ts` | **89.53%** | **95.93%** |
+| target | scoped config | full suite | as of |
+|---|---:|---:|---|
+| `validateProduct.ts` | 89.53% | 95.93% | v0.52.4 |
+| `validateProduct.ts` | **89.65%** | **95.97%** | **v0.52.5** |
 
-Every other target still matches to the digit.
+Every other target still matches to the digit — re-verified across all **22** targets at v0.52.5.
+The v0.52.5 figures moved because that release added branches to `validateProduct.ts` and put
+`schemaVersion.test.ts` into the scoped config; the *gap* is unchanged in cause and size.
 
 **Cause.** v0.52.4 added the validator observer (CLAUDE.md #61). Its test file,
 `src/__tests__/validatorObserver.test.ts`, is kept **out of `vitest.stryker.config.ts` on purpose** —
@@ -305,8 +334,9 @@ it is the one file permitted to register the observer, and excluding it is what 
 never registers and therefore gains no killing power over `validateProduct.ts`. The gap is that
 mechanism working, not a scoping defect.
 
-**Confirmed sole cause.** Re-running the full suite with `--exclude='**/validatorObserver.test.ts'`
-returns `validateProduct.ts` to **89.53%**, identical to the scoped config. No other test file moved.
+**Confirmed sole cause, re-run at v0.52.5.** The full suite with
+`--exclude='**/validatorObserver.test.ts'` returns `validateProduct.ts` to **89.65%** — identical
+to the scoped config, exactly as it returned **89.53%** at v0.52.4. No other test file moved.
 
 **The eleven branches, named.** All are reached by the observer corpus's `danglingFixture`, which
 populates fields no other fixture in the repo sets together:
@@ -320,9 +350,11 @@ populates fields no other fixture in the repo sets together:
 | `:411` | progress entry naming a sprint that does not exist | carries a `GHOST-SPR` `sprintId` |
 
 **Why this does not contaminate the figures.** Stryker runs under the scoped config, so these
-branches are not exercised during mutation. Both recorded figures are unchanged at v0.52.4 —
-`validateProduct.ts` **59.22% / 142 survived / 434 valid**, whole run **73.58% / 454 survived /
-2108 valid** — verified on a full non-incremental run.
+branches are not exercised during mutation. At v0.52.4 both recorded figures were unchanged by the
+observer — `validateProduct.ts` 59.22% / 142 survived / 434 valid, whole run 73.58% / 454 survived /
+2108 valid. At v0.52.5 they moved for an unrelated and attributed reason (see the delta table
+above), and **the survivor counts still did not move**, which is the number this gap could have
+contaminated.
 
 **⚠️ When re-running the standing method, expect this one gap and check it is still exactly this
 one.** A gap on any other target, or a different figure on this one, is unattributed and is a

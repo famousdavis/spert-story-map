@@ -7,6 +7,7 @@ import type {
   ReleaseAllocation, ProgressEntry, ChangeLogEntry, SizeMapping,
 } from '../types';
 import { isRibCardColorKey, resolveCardColorKey } from './ribCardColors';
+import { normalizeSchemaVersion } from './schemaVersion';
 
 /**
  * Comprehensive schema validation for imported product data.
@@ -523,6 +524,29 @@ export function validateProduct(data: unknown): Product {
     assert(isNum(d.sprintCadenceWeeks) && d.sprintCadenceWeeks > 0,
       'sprintCadenceWeeks must be a positive number');
     d.sprintCadenceWeeks = clamp(d.sprintCadenceWeeks, 1, 52);
+  }
+
+  // --- schemaVersion ---
+  // ⚠️ NORMALISED, NOT ASSERTED, and the difference is deliberate. `schemaVersion` is
+  // the field that decides whether the DESTRUCTIVE v1→v2 waterfall runs, so the
+  // instinct is to reject a malformed one — but the destructive path is already
+  // closed by `needsV2Migration` (schemaVersion.ts), which every read and import path
+  // now shares. An assert here would add nothing to that and would turn a corrupted
+  // field into a rejection of the entire file, which for this app's users lands
+  // mid-assignment. This matches the file's own convention for an uninterpretable
+  // value — `size` (:364) and `cardColor` (:374-379) are both cleared, not rejected.
+  //
+  // ⚠️ ABSENT MUST STAY ABSENT. A pre-schemaVersion product is a genuine v1 and its
+  // migration gate reads the missing field; stamping a version on it here would skip
+  // the migration forever. Only a truthy non-numeric value is replaced.
+  //
+  // ⚠️ The `!== undefined` guard is load-bearing, not stylistic. A bare assignment
+  // INTRODUCES the key with value `undefined` on a legacy product that never had it —
+  // `Object.keys` then reports it, which the validator-observer's diff reads as an
+  // ADDED field on every such load (it distinguishes a deleted key from a key present
+  // with value `undefined` on purpose). Measured while writing this.
+  if (d.schemaVersion !== undefined) {
+    d.schemaVersion = normalizeSchemaVersion(d.schemaVersion);
   }
 
   // --- Strip unknown top-level fields ---

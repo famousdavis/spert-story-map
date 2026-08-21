@@ -97,3 +97,8 @@ _planning/
 # a gitignore entry alone does not stop vitest discovering them or ESLint linting them.
 .stryker-tmp
 reports
+# Vitest --coverage output. Not a build artifact of any npm script the gate runs,
+# so it only appears when someone measures coverage by hand (e.g. the standing
+# scoped-vs-full parity check in docs/mutation-baseline.md) — and then lingers
+# untracked. Folded in here rather than shipped on its own.
+coverage

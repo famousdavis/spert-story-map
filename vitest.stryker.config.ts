@@ -74,6 +74,7 @@ export default defineConfig({
       'src/__tests__/signOutCleanup.test.ts',
       'src/__tests__/sortByOrder.test.ts',
       // Reaches validateProduct.ts through src/lib/storage.ts — see the note above.
+      'src/__tests__/schemaVersion.test.ts',
       'src/__tests__/storage.test.ts',
       'src/__tests__/themeColors.test.ts',
       'src/__tests__/useProductMutations.test.ts',
