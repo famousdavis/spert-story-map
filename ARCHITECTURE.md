@@ -30,6 +30,9 @@ src/
 │   ├── importExport.ts               # Export product JSON, bundled export, legacy single-file import helper
 │   ├── import-utils.ts               # Multi-project import: parse, conflict detection, applyImport (Layer 2 drift re-validation)
 │   ├── validateProduct.ts            # Comprehensive schema validation for imported products
+│   ├── validatorObserver.ts          # Flag-gated observer: runs validateProduct against a CLONE at the read seams, reports only
+│   ├── validatorObserverDiff.ts      # Own-key structural diff (live vs. validated clone) used by the observer
+│   ├── validatorObserverRegistry.ts  # Synchronous no-op-unless-registered slot the read seams call
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory

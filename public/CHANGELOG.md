@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 0.52.4 (2026-08-21)
+
+**Nothing changes in how the app works.** This release adds an internal diagnostic that is switched
+off by default, and touches no feature, screen or stored file.
+
+### Why it exists
+Projects are checked for structural problems when you import one from a file, but not when they are
+loaded from your browser's storage or from the cloud. This release adds an observer that runs the
+same check against loaded projects and reports what it finds, so the gaps can be measured on real
+data before anything starts acting on them.
+
+### What it does not do
+The observer never modifies a project. It works from a copy, reports to the developer console, and
+writes nothing anywhere. It stays completely inactive unless it is deliberately switched on, and it
+is off for everyone by default — so for every user this release is a no-op.
+
 ## Version 0.52.3 (2026-08-19)
 
 **Nothing changes in how the app works**, unless you sign in with a personal Microsoft account.

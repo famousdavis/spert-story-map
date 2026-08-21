@@ -39,6 +39,7 @@ function requireDb(): Firestore {
 }
 import type { PendingInvite } from '../types';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
+import { runObserver } from './validatorObserverRegistry';
 
 /** Remove Firestore-only fields from product data. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
@@ -230,7 +231,17 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       const products: Product[] = [];
       snap.forEach(docSnap => {
         const data = docSnap.data();
+        // Brief 10 §3d: `data` is an independent pre-migration source — the object
+        // literal below is a fresh shallow spread, so `migrateToV2` mutating the
+        // product cannot reach this read.
+        const rawSchemaVersion = data.schemaVersion;
         const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
+        // ⚠️ OBSERVE HERE, BEFORE THE _owner/_members RE-ATTACH BELOW — never at the
+        // `return`. PRODUCT_FIELDS (validateProduct.ts:106-114) omits both fields
+        // deliberately (:115-120 calls them authorisation state), so the strip loop
+        // at :529-533 deletes them; observing after the re-attach would report two
+        // spurious `repaired` paths on every single cloud observation.
+        runObserver(product, { rawSchemaVersion });
         // Re-attach owner/members from the raw doc — stripFirestoreFields
         // removed them. Use `?? null` so the field shape is stable for the
         // UI's strict-equality ownership checks. (Lessons 38, 49.)
@@ -250,7 +261,11 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       const snap = await getDoc(ref);
       if (!snap.exists()) return null;
       const data = snap.data();
+      const rawSchemaVersion = data.schemaVersion;
       const product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
+      // ⚠️ Observe BEFORE the _owner/_members re-attach below, not at the `return`
+      // on the line after it — see the note at loadProductIndex.
+      runObserver(product, { rawSchemaVersion });
       // Seed _owner/_members on cold load too — without these the Share UI
       // and ownership-gated affordances would briefly render in their
       // "no access" state until the first onProductChange snapshot arrives.
@@ -491,7 +506,12 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           if (snap.metadata.hasPendingWrites) return;
           if (!snap.exists()) return;
           const data = snap.data();
+          const rawSchemaVersion = data.schemaVersion;
           const product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
+          // ⚠️ Observe BEFORE the _owner/_members re-attach — see loadProductIndex.
+          // This site is behind the `hasPendingWrites` gate above, so the observer
+          // only ever sees server-confirmed snapshots.
+          runObserver(product, { rawSchemaVersion });
           product._owner = data.owner ?? null;
           product._members = (data.members as Record<string, string>) ?? {};
           // Re-sync the changelog baseline with the server's authoritative

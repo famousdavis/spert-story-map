@@ -289,6 +289,45 @@ Three directional predictions were made before the re-run and all three held: th
 rise (71.39% → **71.57%**), `validateProduct`'s survivors and `NoCoverage` could only fall
 (176→174, 37→35), and **exactly one file could move** — one did. The effect was small: **0.18pp**.
 
+### ATTRIBUTED PARITY GAP — `validateProduct.ts`, from v0.52.4 onward
+
+**The 21-target exact match above no longer holds for one target, deliberately.** As of v0.52.4:
+
+| target | scoped config | full suite |
+|---|---:|---:|
+| `validateProduct.ts` | **89.53%** | **95.93%** |
+
+Every other target still matches to the digit.
+
+**Cause.** v0.52.4 added the validator observer (CLAUDE.md #61). Its test file,
+`src/__tests__/validatorObserver.test.ts`, is kept **out of `vitest.stryker.config.ts` on purpose** —
+it is the one file permitted to register the observer, and excluding it is what guarantees Stryker
+never registers and therefore gains no killing power over `validateProduct.ts`. The gap is that
+mechanism working, not a scoping defect.
+
+**Confirmed sole cause.** Re-running the full suite with `--exclude='**/validatorObserver.test.ts'`
+returns `validateProduct.ts` to **89.53%**, identical to the scoped config. No other test file moved.
+
+**The eleven branches, named.** All are reached by the observer corpus's `danglingFixture`, which
+populates fields no other fixture in the repo sets together:
+
+| line | branch | why only this corpus reaches it |
+|---|---|---|
+| `:350`, `:351` ×2 | rib `description` present + its two `&&` operands | the fixture sets `description: ''` |
+| `:355`, `:356` ×2 | rib `notes` present + its two operands | sets `notes: ''` |
+| `:362` | orphan-size clear | sets `size: 'M'` against a one-entry `sizeMapping` |
+| `:398`, `:399` ×2 | allocation `memo` present + its two operands | sets `memo: ''` on both allocations |
+| `:411` | progress entry naming a sprint that does not exist | carries a `GHOST-SPR` `sprintId` |
+
+**Why this does not contaminate the figures.** Stryker runs under the scoped config, so these
+branches are not exercised during mutation. Both recorded figures are unchanged at v0.52.4 —
+`validateProduct.ts` **59.22% / 142 survived / 434 valid**, whole run **73.58% / 454 survived /
+2108 valid** — verified on a full non-incremental run.
+
+**⚠️ When re-running the standing method, expect this one gap and check it is still exactly this
+one.** A gap on any other target, or a different figure on this one, is unattributed and is a
+failure.
+
 ---
 
 ## `excludedMutations` — nothing is excluded, deliberately
