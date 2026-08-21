@@ -4,6 +4,7 @@
 
 import type { Product, ChangeLogEntry, UserSettings } from '../types';
 import { STORAGE_KEYS, SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from './constants';
+import { runObserver } from './validatorObserverRegistry';
 
 // ── localStorage namespace ──────────────────────────────────────────
 //
@@ -171,6 +172,10 @@ export function loadProduct(id: string, ns?: string): Product | null {
   // is untrusted. This is the same validation boundary validateProduct sits on
   // for imports — the migration below is what normalises an older shape.
   let product = immediatelyLoad(key) as Product | null;
+  // Brief 10 §3d: capture BEFORE the gate below. `migrateToV2` mutates `product`
+  // IN PLACE, so a capture taken at the `return` would already read the
+  // post-migration value — measured wrong in 18 of 24 cases.
+  const rawSchemaVersion = product?.schemaVersion;
   if (product && (product.schemaVersion || 1) < SCHEMA_VERSION) {
     product = migrateToV2(product);
     // Save immediately so migration only runs once
@@ -180,6 +185,10 @@ export function loadProduct(id: string, ns?: string): Product | null {
       console.error('Failed to save migrated product:', e instanceof Error ? e.message : 'Unknown error');
     }
   }
+  // Called FOR EFFECT — never `return runObserver(...)`. A no-op unless something
+  // registered the observer at bootstrap (§3a); `null` is routine here and the
+  // observer guards it (§3b.2).
+  runObserver(product, { rawSchemaVersion });
   return product;
 }
 
