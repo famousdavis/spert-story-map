@@ -97,7 +97,8 @@ export default tseslint.config(
   //
   // ⚠️ If this ever reaches a true zero, DELETE the `expectProblems` key. ESLint
   // prints no `✖ N problems` line when there is nothing to report, and the gate fails
-  // at shipgate.mjs:333 looking for one ("could not read a problem count").
+  // in shipgate.mjs's `expectProblems` branch, at its `count === null` guard, looking
+  // for one ("could not read a problem count").
   //
   // The scope matches the block above, which means `.mjs` is not covered — so
   // scripts/shipgate.mjs is outside it. Measured: including `.mjs` gives the same

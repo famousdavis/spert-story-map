@@ -1,5 +1,56 @@
 # Changelog
 
+## Version 0.52.6 (2026-08-22)
+
+**Development and release tooling only.** No application code changed and nothing about how the app
+behaves is different.
+
+### The release-checking script no longer says there is no automated checking
+The script that checks a release before it ships is deliberately the same file in all nine SPERT®
+Suite projects. The note at the top of it said there was no automated checking anywhere in the
+suite — that a green tick on a proposed change meant only that a preview copy had been built, and
+that nothing ran the tests.
+
+That has not been true since the script existed. Automated checking runs on every one of the nine
+projects, on every proposed change and on every merge, and what it runs is this very script.
+
+The statement did not go out of date. It was untrue on the day it was written: the same set of edits
+that added the script also switched the automated checking on, so the file contradicted a change
+sitting beside it. That distinction decides the remedy, which is why it is recorded here. A statement
+that decays can be helped by writing down when it was made; a statement that was never true cannot.
+What went wrong was that a claim about the projects was written into an explanation without being
+checked against them, and an explanation is read as background rather than as an assertion somebody
+has to verify.
+
+The danger was specific: the note told a reader that a green check means nothing. Anyone reading it
+would discount a real signal, or repeat work already checked — a correct-looking pause resting on a
+false premise, which produces no error and simply spends a round trip.
+
+### Two explanations were added to the same file
+The first records that automated checking and a check run by hand are complementary rather than
+ranked. The automated one works from a clean copy, so it catches anything that quietly depends on a
+file existing only on the author's own machine; but it also has less of the project to look at, so
+certain checks step aside there and only a hand-run finds what those cover.
+
+The second explains how the code-style step is judged. That step compares the number of reported
+issues against an agreed figure instead of reading pass or fail, and it does so for opposite reasons
+in different projects: here the step reports failure at the agreed figure of twenty-two, so reading
+pass-or-fail would be too strict; in one sibling project it reports success at its figure, because
+those findings are all advisories, so reading pass-or-fail would be too lenient and would let new
+issues through unnoticed. The note also warns that the figure counts every kind of issue rather than
+the one kind a project set it for, and that when it reaches zero the setting must be removed rather
+than set to zero — at zero the tool prints no count at all, and the step then fails asking for a
+number that was never printed.
+
+### Two notes in this project stopped pointing at line numbers
+Adding lines to the top of the shared script moved every reference to a position inside it. Two
+notes in this project — one in the release-gate configuration, one in the code-style configuration —
+cited a line number there. Both now name the part of the script they mean.
+
+They were converted rather than renumbered. A renumbered pointer reproduces the fault on a delay,
+and its failure mode is that a stale pointer lands on a real line: a reader follows it, finds
+plausible code, and concludes the reference was sound. Landing on something reads as success.
+
 ## Version 0.52.5 (2026-08-21)
 
 **A data-loss bug fix.** It affects cloud projects whose internal version marker had been corrupted —
