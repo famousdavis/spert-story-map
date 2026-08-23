@@ -1,5 +1,51 @@
 # Changelog
 
+## Version 0.52.7 (2026-08-22)
+
+**Development tooling only.** No application code changed and nothing about how the app behaves is
+different.
+
+### The mutation-testing safety check no longer passes the run it exists to catch
+Mutation testing makes small deliberate changes to the code and asks whether any test notices. A
+wrapper around it exists to refuse a run that produced no real results but reports a clean-looking
+one, because that failure is silent and flattering — the worst combination.
+
+The wrapper counted "no test reaches this code" as a real result. So a run in which every single
+change went unchecked — a score of zero per cent, nothing actually tested — was reported as having
+produced real verdicts. The precise failure it was written to prevent, surviving inside it.
+
+The fix separates two questions that had been sharing one sum. Whether a change was left untested is
+a real fact about the code, and still counts towards the score exactly as before. Whether the test
+suite ever ran at all is a different question, and an untested change is silence rather than
+evidence. Only the second question changed.
+
+### The cause originally recorded for this was wrong, and that matters more than the fix
+This project's own notes, and the suite rule they came from, said the all-unchecked state came from
+one specific misconfiguration — omitting the setting that tells the runner which test configuration
+to use. Five attempts were made to produce that state deliberately, across two projects.
+
+None produced it. This project is the strongest test of the claim, because its test configuration is
+at a non-standard filename and there is no standard one to fall back on, so omitting the setting
+should do the most damage here. It scored 79.49 per cent, with thirty-one changes caught.
+
+What actually happens is one of two things, never anything between them: if no test covers the
+changed code, the runner finds no tests and stops before writing any result at all; and if it is
+told not to narrow the tests it runs, it runs the whole suite and reports the changes as surviving
+rather than as unchecked.
+
+So the replacement note describes the state being refused and names no cause for it. A note that
+explains a fault by pointing at one trigger stops being true when the trigger changes; a note that
+describes what is being refused does not. The hole was real however a run reaches it.
+
+### What was verified, and what was not
+Four hand-built cases were run through the real checking script, before and after the change: the
+faulty case now fails and says why, an ordinary run containing some unchecked code still passes, and
+two already-failing cases are unchanged. Running them against the unfixed script too is what makes
+this evidence rather than assertion — only the first case changes.
+
+Every stored measurement still passes, with an identical score. This project's stored measurement is
+one of only two that contain unchecked code, which is the case the change had to leave alone.
+
 ## Version 0.52.6 (2026-08-22)
 
 **Development and release tooling only.** No application code changed and nothing about how the app
