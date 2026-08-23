@@ -28,7 +28,7 @@
       "name": "lint",
       "run": "npm run lint",
       "expectProblems": 22,
-      "_note": "As of v0.51.0 `npm run lint` exits NON-ZERO by design: eslint-plugin-sonarjs contributes 22 cognitive-complexity findings at threshold 15, and this key holds that NUMBER steady instead of gating on the exit code. It is a two-way ratchet — new findings fail the gate (fix them, do not raise this), and resolved findings ALSO fail it (lower this, so the improvement is accounted for). Zero is not the target: 9 of the 22 are in files with no test coverage at all, where the correct response is to add tests, not to refactor. Rationale and the named list of those nine are in eslint.config.ts. IF THIS EVER REACHES TRUE ZERO, DELETE THIS KEY — ESLint prints no `✖ N problems` line when there is nothing to report, and the gate fails at scripts/shipgate.mjs:333 looking for one."
+      "_note": "As of v0.51.0 `npm run lint` exits NON-ZERO by design: eslint-plugin-sonarjs contributes 22 cognitive-complexity findings at threshold 15, and this key holds that NUMBER steady instead of gating on the exit code. It is a two-way ratchet — new findings fail the gate (fix them, do not raise this), and resolved findings ALSO fail it (lower this, so the improvement is accounted for). Zero is not the target: 9 of the 22 are in files with no test coverage at all, where the correct response is to add tests, not to refactor. Rationale and the named list of those nine are in eslint.config.ts. IF THIS EVER REACHES TRUE ZERO, DELETE THIS KEY — ESLint prints no `✖ N problems` line when there is nothing to report, and the gate fails in scripts/shipgate.mjs's `expectProblems` branch, at its `count === null` guard, looking for one."
     },
     {
       "name": "typecheck",
