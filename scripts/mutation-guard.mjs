@@ -17,8 +17,9 @@
  *
  *   1. No report written at all             -> Stryker died before reporting.
  *   2. Report written, zero mutants         -> `mutate` globs matched nothing.
- *   3. Mutants generated, none executed     -> every mutant is CompileError /
- *      RuntimeError / Ignored, i.e. the runner never really ran the suite.
+ *   3. Mutants generated, none executed     -> every mutant is NoCoverage /
+ *      CompileError / RuntimeError / Ignored, i.e. not one of them was ever run
+ *      against the suite.
  *
  * Usage:  node scripts/mutation-guard.mjs [extra stryker args...]
  *         npm run mutate
@@ -93,14 +94,23 @@ const compileError = counts.CompileError ?? 0;
 const runtimeError = counts.RuntimeError ?? 0;
 const ignored = counts.Ignored ?? 0;
 
-// "Executed" means the test suite genuinely ran against the mutant and returned a
-// verdict. NoCoverage counts: it is a real verdict (no test reaches this code).
-const executed = killed + survived + timeout + noCoverage;
+// "Executed" means the suite genuinely ran against the mutant and returned a
+// verdict. NoCoverage does NOT count: it records that no test reached the mutant,
+// so the suite never ran for it, and absence of a run cannot evidence a working
+// harness. An ALL-NoCoverage run is therefore vacuous however it arose — every
+// mutant reads "untested", the score reads 0.00%, and that is precisely the
+// flattering-and-silent result this wrapper exists to refuse.
+// ⚠️ NoCoverage still belongs in the SCORE denominator below, and that is not an
+// inconsistency: there it is a real verdict ABOUT THE CODE, here it is an absence
+// of evidence ABOUT THE RUN. Two questions. Do not collapse them into one sum.
+const executed = killed + survived + timeout;
 if (executed === 0) {
   fail(
-    `${total} mutants were generated but NONE were executed ` +
-      `(CompileError ${compileError}, RuntimeError ${runtimeError}, Ignored ${ignored}). ` +
-      'The runner never exercised the suite — this is a broken harness, not a clean result.',
+    `${total} mutants were generated but NONE were executed against the suite ` +
+      `(NoCoverage ${noCoverage}, CompileError ${compileError}, ` +
+      `RuntimeError ${runtimeError}, Ignored ${ignored}). ` +
+      'Not one mutant produced a verdict from a real test run — treat this as NO ' +
+      'RESULT, not as a clean one.',
   );
 }
 
