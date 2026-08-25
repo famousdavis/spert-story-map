@@ -40,6 +40,7 @@ function requireDb(): Firestore {
 import type { PendingInvite } from '../types';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 import { runObserver } from './validatorObserverRegistry';
+import { normalizeUpdatedAt } from './updated-at';
 
 /** Remove Firestore-only fields from product data. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
@@ -242,6 +243,13 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         // at :529-533 deletes them; observing after the re-attach would report two
         // spurious `repaired` paths on every single cloud observation.
         runObserver(product, { rawSchemaVersion });
+        // Normalize AFTER the observer, deliberately: the observer reports what the
+        // stored document actually contains, and normalizing first would hide a
+        // degraded `updatedAt` from it. `normalizeUpdatedAt` returns `undefined` for
+        // any shape with no recoverable instant, which is why `Product.updatedAt` is
+        // optional — the render sites branch on it and print an em dash rather than
+        // substituting today. See `lib/updated-at.ts`.
+        product.updatedAt = normalizeUpdatedAt(product.updatedAt);
         // Re-attach owner/members from the raw doc — stripFirestoreFields
         // removed them. Use `?? null` so the field shape is stable for the
         // UI's strict-equality ownership checks. (Lessons 38, 49.)
@@ -266,6 +274,8 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       // ⚠️ Observe BEFORE the _owner/_members re-attach below, not at the `return`
       // on the line after it — see the note at loadProductIndex.
       runObserver(product, { rawSchemaVersion });
+      // Normalize after the observer — see the note at loadProductIndex.
+      product.updatedAt = normalizeUpdatedAt(product.updatedAt);
       // Seed _owner/_members on cold load too — without these the Share UI
       // and ownership-gated affordances would briefly render in their
       // "no access" state until the first onProductChange snapshot arrives.
@@ -512,6 +522,8 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           // This site is behind the `hasPendingWrites` gate above, so the observer
           // only ever sees server-confirmed snapshots.
           runObserver(product, { rawSchemaVersion });
+          // Normalize after the observer — see the note at loadProductIndex.
+          product.updatedAt = normalizeUpdatedAt(product.updatedAt);
           product._owner = data.owner ?? null;
           product._members = (data.members as Record<string, string>) ?? {};
           // Re-sync the changelog baseline with the server's authoritative

@@ -1,5 +1,32 @@
 # Changelog
 
+## Version 0.52.9 (2026-08-25)
+
+**Project list only.** Nothing about how you build a story map changed.
+
+### A project card could show today's date for a project you had not touched in months
+
+Each project card carries an "Updated" date. If the stored date was missing or in a shape this app
+could not read, the card quietly filled the gap with the current date. There was no error and nothing
+looked wrong — the card simply told you the project had been updated today, and there was no way to
+tell that apart from a project that genuinely had been.
+
+A wrong date that looks right is worse than a visibly missing one, so cards now show a dash when
+there is no real date to show, and never invent one.
+
+### Some cards showed the literal words "Invalid Date"
+
+The same field could also arrive in shapes left behind by earlier versions of the cloud storage, or
+written by the invitation system when someone shares a project with you. Those did not get replaced
+with today's date — they printed the words "Invalid Date" onto the card instead. Those now show the
+same dash.
+
+### Importing a project without a date no longer produces a made-up one
+
+This was the way to reach the problem without any cloud storage involved at all. A project file
+exported without an "Updated" date imported perfectly happily, and its card then showed the day you
+imported it as though that were when the work was last changed.
+
 ## Version 0.52.8 (2026-08-24)
 
 **Cloud storage only.** Nothing about how you build a story map is different, and nothing about
