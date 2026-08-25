@@ -3,7 +3,13 @@
 // See LICENSE file in the project root for full license text.
 
 import React, { useState, useRef, useEffect } from 'react';
-import { parseDate } from '../../lib/formatDate';
+import { normalizeUpdatedAt } from '../../lib/updated-at';
+
+// Every no-instant shape renders this, never a substituted date. It has to be a
+// TRUTHY string so the `Updated ${}` template below still fires: landing the
+// empty case in a falsy branch would render a bare "Updated" with nothing after
+// it. Matches spert-cfd's UPDATED_AT_FALLBACK.
+const UPDATED_AT_FALLBACK = '\u2014';
 
 interface ProjectSummary {
   name: string;
@@ -11,7 +17,23 @@ interface ProjectSummary {
   totalPoints: number;
   unsized: number;
   pctComplete: number;
-  updatedAt: string;
+  /** ISO 8601, or absent when the stored value carried no recoverable instant. */
+  updatedAt?: string;
+}
+
+// `||` could not do this job: an unparseable value produces an Invalid Date,
+// which is a TRUTHY object, so `parseDate(x) || new Date()` let it through and
+// printed the literal "Invalid Date" — while a falsy value took the `new Date()`
+// branch and fabricated TODAY for a project untouched in months. Normalizing
+// first collapses both into `undefined`. Applied HERE and not only in the
+// Firestore converter because local-mode and JSON-imported projects never pass
+// through that converter, and the import path is the one a user can actually
+// reach: `importProductFromJSON` never backfills `updatedAt`.
+function formatUpdatedAt(value: unknown): string {
+  const iso = normalizeUpdatedAt(value);
+  return iso === undefined
+    ? UPDATED_AT_FALLBACK
+    : new Date(iso).toLocaleDateString();
 }
 
 interface ProjectCardProps {
@@ -128,7 +150,7 @@ export default function ProjectCard({
         <span className="text-amber-600 dark:text-amber-400">{p.unsized} unsized</span>
       )}
       <span>{Math.round(p.pctComplete)}% complete</span>
-      <span>Updated {(parseDate(p.updatedAt) || new Date()).toLocaleDateString()}</span>
+      <span>Updated {formatUpdatedAt(p.updatedAt)}</span>
     </div>
   );
 

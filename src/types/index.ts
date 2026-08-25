@@ -162,7 +162,20 @@ export interface Product {
   name: string;
   description: string;
   createdAt: string;
-  updatedAt: string;
+  /**
+   * ISO 8601. OPTIONAL since v0.52.9: the Firestore read path normalizes every
+   * stored shape through `normalizeUpdatedAt` (`lib/updated-at.ts`), which
+   * returns `undefined` when the value carries no recoverable instant — a
+   * persisted serverTimestamp sentinel, a degraded `{seconds,nanoseconds}` map,
+   * or a string `Date.parse` rejects. It was previously declared non-optional,
+   * and that was a lie at the import boundary: `validateProduct` requires only
+   * `id`/`name`/`themes` and `importProductFromJSON` never backfills this
+   * field, so a JSON import produced `undefined` here regardless of the type.
+   * Renderers must branch; they must NOT substitute the current date or
+   * `createdAt`. Never `''` — it is falsy, which is what made the old
+   * `|| new Date()` render fabricate today's date.
+   */
+  updatedAt?: string;
   schemaVersion: number;
   sizeMapping: SizeMapping[];
   releases: Release[];
