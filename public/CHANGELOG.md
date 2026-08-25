@@ -1,5 +1,43 @@
 # Changelog
 
+## Version 0.52.8 (2026-08-24)
+
+**Cloud storage only.** Nothing about how you build a story map is different, and nothing about
+locally-stored projects changed.
+
+### Projects now record when they changed as plain text, like the rest of the suite
+
+When a project is saved to the cloud, the time it was last changed used to be recorded by asking the
+database to stamp the moment it received the write. That produces a database-specific object rather
+than plain text — and this app's own description of a project says that field holds text. The two
+have disagreed since cloud storage shipped.
+
+The disagreement was not harmless elsewhere in the suite. Another SPERT® app reads the same field
+and formats it as a date, and formatting refuses rather than shrugs when handed an object, so that
+app's project list could fail to draw a row after someone was invited to a shared project.
+
+All four places this app writes that time now write plain text.
+
+### The fourth place was nearly missed, and it is the one that would have been silent
+
+Three of the four are in the cloud storage code. The fourth is in the one-off upload that moves
+locally-stored projects into the cloud, and it was missed in the first pass of this work while its
+exact counterpart in SPERT® Scheduler was caught. Had it stayed as it was, everything would have
+looked converted while a user moving their projects to the cloud quietly re-acquired the old shape —
+no error, no visible symptom, and nothing to notice until the same crash reappeared somewhere else.
+
+### What was verified
+
+- Each of the four is checked separately rather than one check per file. A single check per file
+  passes while one of two places in that file is still wrong, which is the shape of the original
+  defect.
+- The checks were run against the old code first and all four failed. They were then run with only
+  the local-to-cloud upload left unconverted, and **exactly one** failed — which is what shows they
+  test four separate places rather than four times reading the same one.
+- The temporary connection used by the AI features writes the same kind of stamp deliberately and is
+  untouched. It was confirmed still present afterwards, so the count of zero in the changed files
+  means the search worked rather than that it found nothing.
+
 ## Version 0.52.7 (2026-08-22)
 
 **Development tooling only.** No application code changed and nothing about how the app behaves is

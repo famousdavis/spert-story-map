@@ -16,7 +16,7 @@ import type { Product, ChangeLogEntry, StorageDriver } from '../types';
 import {
   doc, getDoc, setDoc, deleteDoc, getDocs, updateDoc,
   collection, query, where,
-  onSnapshot, serverTimestamp,
+  onSnapshot,
   deleteField, runTransaction, arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -177,7 +177,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         ),
         'updatedAt',
       ];
-      await setDoc(ref, { ...sanitized, updatedAt: serverTimestamp() }, { mergeFields });
+      await setDoc(ref, { ...sanitized, updatedAt: new Date().toISOString() }, { mergeFields });
 
       // Changelog delta — push only entries new to the server.
       const newEntries = getNewChangeLogEntries(product.id, product._changeLog ?? []);
@@ -308,7 +308,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           ...data,
           owner: uid,
           members: { [uid]: 'owner' },
-          updatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString(),
         });
         // Seed the baseline with the create-time changelog so future saves
         // send only the delta — without this, the first updateProduct after
@@ -374,7 +374,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           members: existing.members ?? { [uid]: 'owner' },
           createdAt: existing.createdAt ?? data.createdAt,
           _originRef: (existing._originRef as string | undefined) ?? data._originRef,
-          updatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString(),
         });
       });
       // Baseline reset AFTER transaction commits — the new server-side log
