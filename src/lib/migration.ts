@@ -12,7 +12,6 @@
 
 import {
   doc, getDoc, setDoc,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Firestore } from 'firebase/firestore';
@@ -104,7 +103,7 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
       ...sanitizeForFirestore(rest),
       owner: uid,
       members: { [uid]: 'owner' },
-      updatedAt: serverTimestamp(),
+      updatedAt: new Date().toISOString(),
     });
 
     uploaded++;
