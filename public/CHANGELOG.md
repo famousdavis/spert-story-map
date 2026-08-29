@@ -1,5 +1,41 @@
 # Changelog
 
+## Version 0.52.11 (2026-08-28)
+
+### Added — a reachability register for the SPERT Release Forecaster handoff
+
+No change to how the app behaves. This release adds the test scaffolding that makes
+the previous one hold.
+
+Version 0.52.10 fixed six ways a Story Map export could be refused by SPERT Release
+Forecaster. Each was found by hand — try an input, see whether Forecaster rejects it.
+That worked, and it does not compose: nothing made a seventh announce itself.
+
+`src/lib/forecasterReachability.ts` now records **one row for every way Forecaster can
+refuse an import** — 33 of them, plus 3 further checks the importer applies before
+validation. Each row says whether this app can actually produce a file that trips it,
+and when it cannot, records the property of Story Map that makes it so. Those
+properties are executable and each one is paired with a deliberate counterexample that
+must break it, so a change to the exporter that quietly re-opens a gap now fails a test
+that names the property it broke.
+
+**It found a seventh mismatch on its first run.** A sprint end date that *looks* like a
+date but is not a real one — `2026-13-45` — passes straight through to Forecaster
+unchecked, but only on the **last** sprint: every other sprint's date is read while
+calculating the next sprint's start, which catches it. Story Map never validates the
+format of a sprint end date, so a project imported from a hand-edited file can carry
+one. **This is recorded, not yet fixed** — the export is unchanged in this release, and
+blocking it is a behaviour change that belongs in its own.
+
+The export is also now pinned to a committed fixture, so a change to its shape has to
+be a deliberate edit rather than a silent one.
+
+**What this does not do:** the register is not self-validating. Its row count is a
+recorded fact, checked against SPERT Release Forecaster at a stated version — not
+something this app can re-derive on its own. If Forecaster adds a new rejection, nothing
+here goes red. Closing that needs matching work in Forecaster, which is deliberately a
+separate piece.
+
 ## Version 0.52.10 (2026-08-28)
 
 ### Fixed — the SPERT Release Forecaster handoff
