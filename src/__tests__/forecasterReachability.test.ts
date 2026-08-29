@@ -12,6 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { buildForecasterExport } from '../lib/exportForForecaster';
 import { checkForecasterCompatibility } from '../lib/forecasterLimits';
 import {
@@ -20,6 +21,8 @@ import {
 } from '../lib/forecasterReachability';
 import {
   CANONICAL_PRODUCT, BOUNDARY_PAIRS, normaliseExport, withSizedReleases, makeProduct,
+  vendoredPayloads, serialise, FIXTURE_DIR, VENDORED_MANIFEST, VENDORED_MANIFEST_SHA256,
+  type VendoredEntry,
 } from './fixtures/forecasterFixtures';
 
 const built = () => buildForecasterExport(CANONICAL_PRODUCT);
@@ -220,5 +223,57 @@ describe('F32 — the gap this register found, now closed', () => {
         { id: 'sp-3', name: 'Sprint 3', order: 3, endDate: '2026-03-11' },
       ],
     }))).toThrow(RangeError);
+  });
+});
+
+// ── Vendoring: the only signal either repo has that the far copy went stale ──
+describe('vendored fixtures', () => {
+  const sha = (body: string) => createHash('sha256').update(body).digest('hex');
+  const manifestBody = () => readFileSync(VENDORED_MANIFEST, 'utf8');
+  const manifest = () => JSON.parse(manifestBody()) as { entries: VendoredEntry[] };
+
+  it('lists every vendored payload, and nothing else', () => {
+    expect(manifest().entries.map((e) => e.file))
+      .toEqual(vendoredPayloads().map((e) => e.file));
+  });
+
+  // Regenerates each payload and compares BYTES. This is what makes the
+  // spert-forecaster copies meaningful: they are this exporter's real output.
+  it.each(vendoredPayloads().map((e) => [e.file, e] as const))(
+    '%s is exactly what the exporter produces today', (file, entry) => {
+      expect(readFileSync(`${FIXTURE_DIR}/${file}`, 'utf8')).toBe(serialise(entry.payload));
+    });
+
+  it('records a correct SHA-256 for every file', () => {
+    for (const entry of manifest().entries) {
+      expect(sha(readFileSync(`${FIXTURE_DIR}/${entry.file}`, 'utf8')), entry.file)
+        .toBe(entry.sha256);
+    }
+  });
+
+  // ⚠️ THE PIN. C5 stays green when the exporter and the fixture change
+  // together — the normal way this contract evolves, and exactly when the
+  // vendored copies in spert-forecaster go stale. This is what fails then.
+  it('matches the pinned manifest SHA — if this fails, RE-VENDOR to spert-forecaster', () => {
+    expect(sha(manifestBody())).toBe(VENDORED_MANIFEST_SHA256);
+  });
+
+  // The far side asserts its real validator accepts/rejects per this field, so
+  // a wrong value there would make a green run over there prove the opposite.
+  it('agrees with our own checker about which payloads are exportable', () => {
+    for (const entry of manifest().entries) {
+      const payload = JSON.parse(readFileSync(`${FIXTURE_DIR}/${entry.file}`, 'utf8')) as never;
+      const blocked = checkForecasterCompatibility(payload).length > 0;
+      expect(blocked, `${entry.file} expected ${entry.forecasterShould}`)
+        .toBe(entry.forecasterShould === 'reject');
+    }
+  });
+
+  it('covers both halves of every boundary pair', () => {
+    for (const pair of BOUNDARY_PAIRS) {
+      const files = manifest().entries.filter((e) => e.row === pair.row);
+      expect(files.map((f) => f.forecasterShould).sort(), pair.row)
+        .toEqual(['accept', 'reject']);
+    }
   });
 });
