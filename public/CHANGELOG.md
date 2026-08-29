@@ -1,5 +1,44 @@
 # Changelog
 
+## Version 0.52.10 (2026-08-28)
+
+### Fixed — the SPERT Release Forecaster handoff
+
+**Story Map exports now identify themselves to Forecaster.** Forecaster has always
+carried a dedicated code path for Story Map files, keyed on a `source` field this app
+never sent. Every export therefore arrived as an unrecognised "legacy" file, which
+pre-selected Forecaster's *replace entire workspace* mode and hid the per-project merge
+controls behind a toggle the user had to find. Exports now send
+`source: "spert-story-map"`, so Forecaster shows the merge controls directly and the
+workspace-wide replace path is no longer offered for these files. Forecaster's audit
+trail also records the file's true origin instead of logging it as a generic upload.
+
+**The export is now checked against Forecaster's import limits before it downloads.**
+The two apps disagree about several limits, and every disagreement produced a file
+Forecaster refused whole — with the failure surfacing as a raw error in the other app,
+long after the download. The export button now blocks and explains, naming the field
+and both numbers:
+
+| | Story Map allowed | Forecaster accepts |
+|---|---|---|
+| Releases carrying story points | 100 | **10** |
+| Project and release names | 1,000 characters | **200** |
+| Story-point totals | unbounded | **999,999** |
+| Sprint velocity | may be negative | **0 or more** |
+
+Blocking rather than warning is deliberate: a file over these limits is one Forecaster
+is guaranteed to reject, so downloading it only moves the failure. Truncating to fit
+would silently discard data.
+
+Two of these are reachable with ordinary data, not just large projects. **Negative
+velocity** occurs whenever a rib item's progress is revised *downward* between sprints —
+a routine re-assessment, previously invisible at the export button. And releases with
+no story points are **not** counted toward the 10-milestone limit, so a project can
+carry more than ten releases and still export cleanly.
+
+Also fixed: an export could fail silently with no message if a sprint carried a
+malformed end date. It now reports the problem and points at the Sprints settings.
+
 ## Version 0.52.9 (2026-08-25)
 
 **Project list only.** Nothing about how you build a story map changed.
