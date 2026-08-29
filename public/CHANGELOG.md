@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 0.52.18 (2026-08-29)
+
+### Fixed — a check now enforces the citation rule that three hand-fixes in a row got wrong
+
+No change to how the app behaves. The last two releases corrected notes in the source
+that pointed at SPERT Release Forecaster. Reviewing 0.52.17 found the same class of
+mistake inside the correction itself, for the third time running.
+
+The note said a constant lives at `constants.ts:39`, meaning Forecaster's file. This app
+has its own `constants.ts`, and line 39 of it holds a real setting — so anyone following
+that reference opens the obvious local file and lands somewhere that looks right and
+isn't. That is the version of the mistake that does not announce itself, and it is why
+reading more carefully kept failing to catch it.
+
+Reading is now not what catches it. A test derives which files talk to the other app —
+any file mentioning Forecaster — and requires every reference in them to carry a full
+path. A file pointing at its own lines is exempt, because that cannot be mistaken for
+anything. Five references were rewritten to comply, and the test fails if a bare one comes
+back.
+
+The rule is narrower than the one a person would state, deliberately. "Use a full path
+whenever the name is ambiguous" cannot be checked by a machine, because deciding which
+references are ambiguous is the judgment that keeps going wrong. Twenty-six of this app's
+twenty-seven references are short names, and almost all of them are fine. Only the ones
+crossing between the two apps are the problem, and those can be identified without
+guessing.
+
+
 ## Version 0.52.17 (2026-08-29)
 
 ### Fixed — a note added in 0.52.16 gave the wrong reason for its own conclusion

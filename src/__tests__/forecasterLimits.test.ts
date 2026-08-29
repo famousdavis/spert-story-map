@@ -52,7 +52,8 @@ const check = (p: Product) => checkForecasterCompatibility(buildForecasterExport
 // ── C1 + C3: the source discriminator ────────────────────────────────────────
 // C1 alone is vacuous — it proves the field is written, not that Forecaster
 // reads it. C3 is the load-bearing half and it lives in Forecaster's repo
-// (`isStoryMapExport`, import-utils.ts:29), which this suite cannot import
+// (`isStoryMapExport`,
+// spert-forecaster/src/shared/state/import-utils.ts:29), which this suite cannot import
 // without assuming a sibling checkout. So this asserts the exact literal that
 // function tests for; brief 30's shared fixture is what closes the gap.
 describe('source discriminator', () => {
