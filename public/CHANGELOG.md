@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 0.52.19 (2026-08-29)
+
+### Fixed — two holes in the check added in 0.52.18
+
+No change to how the app behaves. The check added yesterday makes sure references to
+SPERT Release Forecaster's code carry a full path, so nobody follows one into the
+similarly-named file in this app. It worked, but it had two weaknesses, and one of them
+meant it could quietly stop working.
+
+**The check's own self-test was checking a copy of itself.** It re-implemented the search
+rather than calling it. Deleting the real search entirely left every test still passing —
+so if the search were ever broken or narrowed, nothing would have gone red and the check
+would have sat there looking healthy while enforcing nothing. It now runs the real search,
+and deleting that search fails the suite.
+
+**An exception was resting on the assumption the check exists to distrust.** A file
+referring to its own lines was allowed to use the short name, on the grounds that this
+cannot be confused with anything. That is true except when the other app has a file of the
+same name — which is the exact situation the check is for. It is not a rare situation:
+twenty-six file names exist in both apps, including several this app refers to across most
+often. The exception is gone; every reference in these files now carries a path, which
+costs two lines and removes a judgment call that had already gone wrong twice.
+
+Neither hole was letting a bad reference through today. Both were removed because a check
+that can quietly stop working is worth less than no check, since it also stops anyone
+looking.
+
+
 ## Version 0.52.18 (2026-08-29)
 
 ### Fixed — a check now enforces the citation rule that three hand-fixes in a row got wrong

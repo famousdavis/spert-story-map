@@ -64,23 +64,42 @@ export interface BareCitation {
   readonly citation: string;
 }
 
-/** Bare (separator-less) citations in cross-repo files, excluding self-citations. */
-export function findBareCrossRepoCitations(files: readonly string[]): BareCitation[] {
+export interface Source {
+  readonly path: string;
+  readonly text: string;
+}
+
+/**
+ * Every separator-less citation inside a cross-repo file.
+ *
+ * ⚠️ Takes SOURCES, not paths, so the control below can drive THIS function
+ * rather than a replica of it. v0.52.18's control defined its own inline copy
+ * of this logic: gutting this function to `return []` left all three tests
+ * green, so the guard could go vacuous with nothing red. That is the exact
+ * failure the control exists to prevent, one level up — it proved a copy of the
+ * classifier worked, not the classifier.
+ *
+ * ⚠️ There is deliberately NO self-citation exemption. v0.52.18 exempted
+ * `cited === basename(file)` on the reasoning that a file citing its own lines
+ * cannot be ambiguous. That is false in exactly one case — when the FOREIGN
+ * file shares the basename — so the exemption fired for the collision it was
+ * meant to catch. And the collision is not rare: 26 basenames exist in BOTH
+ * repos, `constants.ts`, `import-utils.ts`, `useImportState.ts` and `storage.ts`
+ * among them. Requiring a path on self-citations too costs two lines in
+ * `aiOps.ts` and removes an undecidable predicate from the rule.
+ */
+export function findBareCrossRepoCitations(sources: readonly Source[]): BareCitation[] {
   const out: BareCitation[] = [];
-  for (const file of files) {
-    // This file is the one source that cannot be scanned by itself: it must
-    // contain example citations of both the illegal and the legal form for its
-    // own control to mean anything. Excluded deliberately, and it is the only
-    // exclusion — a growing skip list would hollow the guard out.
-    if (basename(file) === 'crossRepoCitations.test.ts') continue;
-    const text = readFileSync(file, 'utf-8');
+  for (const { path, text } of sources) {
+    // The guard's own file is the single exclusion: it must contain examples of
+    // both the legal and the illegal form for its control to mean anything.
+    if (basename(path) === 'crossRepoCitations.test.ts') continue;
     if (!CROSS_REPO.test(text)) continue;
     text.split('\n').forEach((line, i) => {
       for (const m of line.matchAll(CITATION)) {
         const cited = m[1];
         if (!cited || cited.includes('/')) continue;
-        if (cited === basename(file)) continue; // self-citation: unambiguous
-        out.push({ file, line: i + 1, citation: m[0] });
+        out.push({ file: path, line: i + 1, citation: m[0] });
       }
     });
   }
@@ -88,45 +107,46 @@ export function findBareCrossRepoCitations(files: readonly string[]): BareCitati
 }
 
 describe('cross-repo citations carry a path', () => {
-  const files = sourceFiles(SRC);
+  const sources: Source[] = sourceFiles(SRC).map((path) => ({
+    path,
+    text: readFileSync(path, 'utf-8'),
+  }));
 
   it('finds source to check at all (guards against a vacuous pass)', () => {
-    expect(files.length).toBeGreaterThan(50);
-    expect(files.filter((f) => CROSS_REPO.test(readFileSync(f, 'utf-8'))).length)
-      .toBeGreaterThan(5);
+    expect(sources.length).toBeGreaterThan(50);
+    expect(sources.filter((s) => CROSS_REPO.test(s.text)).length).toBeGreaterThan(5);
   });
 
   it('no cross-repo file cites a bare basename', () => {
-    const bare = findBareCrossRepoCitations(files);
     expect(
-      bare.map((b) => `${b.file.replace(SRC, 'src')}:${b.line} → ${b.citation}`),
+      findBareCrossRepoCitations(sources).map(
+        (b) => `${b.file.replace(SRC, 'src')}:${b.line} → ${b.citation}`,
+      ),
     ).toEqual([]);
   });
 
-  // ── The control must exercise the DISCRIMINATOR, not just the answer ──────
-  // Measured twice in this campaign: a control that only confirms "rows of the
-  // expected class exist" passes while the classifier is broken for the other
-  // class. So assert BOTH directions on a synthetic file.
-  it('flags a bare foreign citation and spares the two legitimate forms', () => {
-    const tmp = join(SRC, '__tests__', 'fixtures', '__citation_probe__.ts');
-    // Not written to disk — exercise the matcher directly on known input.
-    const probe = (text: string): number => {
-      const hits: string[] = [];
-      text.split('\n').forEach((line) => {
-        for (const m of line.matchAll(CITATION)) {
-          const cited = m[1];
-          if (!cited || cited.includes('/')) continue;
-          if (cited === basename(tmp)) continue;
-          hits.push(m[0]);
-        }
-      });
-      return hits.length;
-    };
-    // MUST flag: bare basename naming another repo's file.
-    expect(probe('// Forecaster: see constants.ts:39')).toBe(1);
-    // MUST NOT flag: full path.
-    expect(probe('// Forecaster: spert-forecaster/src/features/forecast/constants.ts:39')).toBe(0);
-    // MUST NOT flag: self-citation.
-    expect(probe('// Forecaster: __citation_probe__.ts:12')).toBe(0);
+  // ── The control drives the REAL function, in every direction ──────────────
+  // Measured three times in this campaign: a control that exercises a copy, or
+  // only the class you expect, passes while the shipped classifier is broken.
+  describe('the shipped finder itself', () => {
+    const probe = (text: string) => findBareCrossRepoCitations([{ path: 'src/lib/probe.ts', text }]);
+
+    it('FLAGS a bare basename in a cross-repo file', () => {
+      expect(probe('// Forecaster: see constants.ts:39')).toHaveLength(1);
+    });
+
+    it('SPARES a full path', () => {
+      expect(
+        probe('// Forecaster: spert-forecaster/src/features/forecast/constants.ts:39'),
+      ).toHaveLength(0);
+    });
+
+    it('SPARES a file outside cross-repo scope — the scope discriminator', () => {
+      expect(probe('// unrelated note: constants.ts:39')).toHaveLength(0);
+    });
+
+    it('FLAGS a self-citation — the v0.52.18 exemption is gone on purpose', () => {
+      expect(probe('// Forecaster: probe.ts:12')).toHaveLength(1);
+    });
   });
 });
