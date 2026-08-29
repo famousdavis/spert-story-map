@@ -138,55 +138,116 @@ export function normaliseExport(data: unknown): Record<string, unknown> {
   return clone;
 }
 
+export type BuiltExport = ReturnType<typeof buildForecasterExport>;
+
 /**
- * Boundary PAIRS. `at` must export cleanly; `over` must be blocked, and the
- * message must name `names`.
+ * Boundary PAIRS. `at` must export cleanly; `over` must be blocked and name `names`.
+ *
+ * ⚠️ `atProof`/`atExpected` exist because asserting the at-half merely EXPORTS is
+ * not enough: a half built comfortably under the limit accepts for the wrong
+ * reason, and the pair is one-sided in disguise. That is not hypothetical — the
+ * F29 at-half shipped in v0.52.13 at doneValue 1 when the floor is 0, and it
+ * passed every check here. spert-forecaster caught it by asserting the at-halves
+ * sit exactly AT the limit; this is that assertion, adopted.
+ *
+ * A `variant` lets one register row carry more than one pair. Both F32 pairs
+ * report row 'F32', so the far side's per-row message guard still matches.
  */
-export const BOUNDARY_PAIRS: ReadonlyArray<{
+export interface BoundaryPair {
   readonly row: string;
+  readonly variant?: string;
   readonly label: string;
   readonly at: () => Product;
   readonly over: () => Product;
   readonly names: readonly string[];
-}> = [
+  /** Pulls the value under test out of a BUILT at-half payload. */
+  readonly atProof: (built: BuiltExport) => unknown;
+  /** What `atProof` must return — the limit itself, not merely a value under it. */
+  readonly atExpected: unknown;
+}
+
+/** Stable identity for a pair: the register row, plus a variant when one row has several. */
+export const pairKey = (p: Pick<BoundaryPair, 'row' | 'variant'>): string =>
+  p.variant ? `${p.row}-${p.variant}` : p.row;
+
+const firstMilestone = (b: BuiltExport) =>
+  (b.projects[0]?.milestones as Array<{ name: string; backlogSize: number }> | undefined)?.[0];
+
+export const BOUNDARY_PAIRS: readonly BoundaryPair[] = [
   {
     row: 'F14', label: 'milestone count',
     at: () => withSizedReleases(10),
     over: () => withSizedReleases(11),
     names: ['11', '10'],
+    atProof: (b) => (b.projects[0]?.milestones as unknown[] | undefined)?.length,
+    atExpected: 10,
   },
   {
     row: 'F08', label: 'project name length',
     at: () => makeProduct({ ...CANONICAL_PRODUCT, name: 'N'.repeat(200) }),
     over: () => makeProduct({ ...CANONICAL_PRODUCT, name: 'N'.repeat(201) }),
     names: ['201', '200'],
+    atProof: (b) => (b.projects[0]?.name as string | undefined)?.length,
+    atExpected: 200,
   },
   {
     row: 'F19', label: 'release name length',
     at: () => withSizedReleases(1, () => 'R'.repeat(200)),
     over: () => withSizedReleases(1, () => 'R'.repeat(201)),
     names: ['201', '200'],
+    atProof: (b) => firstMilestone(b)?.name.length,
+    atExpected: 200,
   },
   {
     row: 'F20', label: 'milestone backlogSize ceiling',
     at: () => bigPoints(999999),
     over: () => bigPoints(1000000),
     names: ['1,000,000', '999,999'],
+    atProof: (b) => firstMilestone(b)?.backlogSize,
+    atExpected: 999999,
   },
   {
-    row: 'F32', label: 'sprint end date validity',
-    // The pair must differ ONLY in the date's realness: both are regex-shaped,
-    // both sit on the LAST sprint. Anything else and the pair would be testing
-    // the wrong axis.
+    // Sized but UNALLOCATED ribs: total points stay large while zero milestones
+    // are emitted, so this trips F30 and CANNOT alias onto F20. The v0.52.13
+    // F20-over payload happened to carry an over-cap backlogAtSprintEnd too, but
+    // it throws the F20 message first — milestone validation precedes sprint
+    // validation — so F30 had no payload of its own.
+    row: 'F30', label: 'remaining backlog ceiling (no milestones)',
+    at: () => unallocatedPoints(999999),
+    over: () => unallocatedPoints(1000000),
+    names: ['Sprint 1', '1,000,000', '999,999'],
+    atProof: (b) => b.sprints[0]?.backlogAtSprintEnd,
+    atExpected: 999999,
+  },
+  {
+    row: 'F32', label: 'sprint end date shape',
     at: () => lastSprintEndDate('2026-01-28'),
     over: () => lastSprintEndDate('2026-13-45'),
     names: ['Sprint 2', '2026-13-45'],
+    atProof: (b) => b.sprints[b.sprints.length - 1]?.sprintFinishDate,
+    atExpected: '2026-01-28',
   },
   {
+    // '2026-13-45' is an Invalid Date and dies at Forecaster's isNaN guard,
+    // never reaching its auto-correction check. Only a non-leap Feb 29 parses
+    // cleanly and then silently shifts (2027-02-29 -> 2027-03-01 UTC), so this
+    // pair is the one that exercises the SECOND half of that rule. The at-half
+    // is a real leap day, which is the adjacent valid value.
+    row: 'F32', variant: 'leap', label: 'sprint end date calendar validity',
+    at: () => lastSprintEndDate('2028-02-29'),
+    over: () => lastSprintEndDate('2027-02-29'),
+    names: ['Sprint 2', '2027-02-29'],
+    atProof: (b) => b.sprints[b.sprints.length - 1]?.sprintFinishDate,
+    atExpected: '2028-02-29',
+  },
+  {
+    // The floor is 0, not 1. v0.52.13 shipped this at 1 and nothing here noticed.
     row: 'F29', label: 'sprint velocity floor',
-    at: () => revisedProgress(60),
+    at: () => revisedProgress(55),
     over: () => revisedProgress(50),
     names: ['Sprint 2'],
+    atProof: (b) => Math.min(...b.sprints.map((x) => x.doneValue)),
+    atExpected: 0,
   },
 ];
 
@@ -203,8 +264,9 @@ function bigPoints(points: number): Product {
 }
 
 /**
- * A rib at 55% in sprint 1, then `second` in sprint 2. `second` below 55
- * produces a negative delta — i.e. negative velocity — which Forecaster rejects.
+ * A rib at 55% in sprint 1, then `second` in sprint 2. `second` EQUAL to 55
+ * gives a delta of exactly 0 — the floor. Below 55 gives negative velocity,
+ * which Forecaster rejects.
  */
 function revisedProgress(second: number): Product {
   return makeProduct({
@@ -257,7 +319,7 @@ export const VENDORED_MANIFEST = `${FIXTURE_DIR}/vendored-manifest.json`;
  * without re-vendoring silences the only signal either repo has.
  */
 export const VENDORED_MANIFEST_SHA256 =
-  '8f33579560ca3b2b156880f1af6b865d91ab322731696994739d9c7e30b44e5f';
+  '5d27d8dd1ed8e0aeead7f36bc72a9f0cbfa8f393e94a742e8659eed2a5ac7cd5';
 
 export interface VendoredEntry {
   /** Register row this payload exercises, or 'canonical' for the baseline. */
@@ -279,12 +341,12 @@ export function vendoredPayloads(): Array<Omit<VendoredEntry, 'sha256'> & { payl
   for (const pair of BOUNDARY_PAIRS) {
     out.push({
       row: pair.row, label: `${pair.label} — at the limit`,
-      file: `boundary-${pair.row}-at.json`, forecasterShould: 'accept',
+      file: `boundary-${pairKey(pair)}-at.json`, forecasterShould: 'accept',
       payload: normaliseExport(buildForecasterExport(pair.at())),
     });
     out.push({
       row: pair.row, label: `${pair.label} — one past the limit`,
-      file: `boundary-${pair.row}-over.json`, forecasterShould: 'reject',
+      file: `boundary-${pairKey(pair)}-over.json`, forecasterShould: 'reject',
       payload: normaliseExport(buildForecasterExport(pair.over())),
     });
   }
@@ -294,4 +356,19 @@ export function vendoredPayloads(): Array<Omit<VendoredEntry, 'sha256'> & { payl
 /** Byte-exact serialisation. Generation and checking MUST use this one function. */
 export function serialise(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+/**
+ * One rib sized at `points` and allocated to NOTHING. `getPointsForRelease`
+ * returns 0 for every release so no milestones are emitted at all, while
+ * `getTotalProjectPoints` still counts the rib — which is what drives
+ * `backlogAtSprintEnd` over the cap without any milestone being involved.
+ */
+function unallocatedPoints(points: number): Product {
+  return makeProduct({
+    sizeMapping: [{ label: 'S', points }],
+    themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('r1', { size: 'S' })])])],
+    releases: [],
+    sprints: [{ id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' }],
+  });
 }

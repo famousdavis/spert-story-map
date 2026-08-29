@@ -1,5 +1,35 @@
 # Changelog
 
+## Version 0.52.14 (2026-08-28)
+
+### Fixed — three gaps in the SPERT Forecaster export samples
+
+No change to how the app behaves. The samples added in 0.52.13 are what SPERT Release
+Forecaster checks its importer against, and reviewing them from that side found three
+things wrong with them.
+
+**A sample meant to sit exactly at a limit was sitting just inside it.** The sprint
+velocity sample was built one point above the floor rather than on it, so it passed for
+the wrong reason and the pair only really tested one side. Corrected, and — more
+usefully — every sample now has to prove it sits *on* its limit, not merely under it.
+That check is what was missing; without it, correcting the one value would have left the
+next one free to drift the same way.
+
+**A limit had no sample of its own.** The check on remaining backlog was only ever
+exercised by a sample that also broke a different limit and reported that one instead. It
+now has a pair built so no release milestones exist at all, which is the only way to
+reach it on its own.
+
+**A date sample was testing the shallower half of the rule.** `2026-13-45` is not a date
+at all and gets rejected immediately, so it never reached the part of the check that
+catches dates that *look* real and quietly shift — like February 29th in a non-leap year.
+A second pair now covers that, using a genuine leap day as its valid half.
+
+Also recorded: some of Forecaster's rejections can never be reached by anything this app
+exports — that is what makes them unreachable — so their absence from the sample set is
+permanent by construction and not a gap to be closed. That is now written down where
+somebody would otherwise file it as work.
+
 ## Version 0.52.13 (2026-08-28)
 
 ### Added — the SPERT Forecaster export contract is now pinned on both sides

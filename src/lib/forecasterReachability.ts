@@ -33,6 +33,22 @@
  * INFERENCE. It can pass while the reasoning that connected it to the throw was
  * wrong from the start. It is a regression detector, not a proof.
  *
+ * ── WHAT AN UNREACHABLE/PRECLUDED ROW MEANS FOR THE VENDORED FIXTURES ───────
+ * `spert-forecaster` runs this repo's committed payloads through its real
+ * validator, so a natural question is why those payloads do not cover all 33
+ * rows. They cannot, and this is a PARTITION rather than a deficit:
+ *
+ *   SHIPPED / REACHABLE  -> a payload tripping the row can exist, so one is
+ *                           published as a boundary pair.
+ *   UNREACHABLE / PRECLUDED -> no such payload can exist by definition. That
+ *                           is what the status asserts. Those rows are
+ *                           necessarily covered by hand-built inputs on the far
+ *                           side, and no amount of re-vendoring changes it.
+ *
+ * So the far side's "not every row is covered by real output" is closed for the
+ * publishable rows and permanently open for the rest — by construction, not by
+ * omission. Do not file it as work.
+ *
  * ── MAINTENANCE ─────────────────────────────────────────────────────────────
  * Match rows on `message`, never on `line`: a cross-repo line number decays on
  * the other repo's next edit, and the thrown string is the stable symbol.
