@@ -6,6 +6,7 @@
 import type { Product, Sprint } from '../types';
 import { getRibItemPoints, getRibItemPercentCompleteAsOf, getPointsForRelease, getTotalProjectPoints } from './calculations';
 import { reduceRibs } from './ribHelpers';
+import { checkForecasterCompatibility } from './forecasterLimits';
 
 // Hex colors matching THEME_COLOR_OPTIONS Tailwind-600 shades
 const MILESTONE_HEX_COLORS = [
@@ -134,14 +135,32 @@ export function buildForecasterExport(product: Product) {
   return {
     version: '1.0',
     exportedAt: now,
+    // Forecaster's importer discriminates on this exact literal
+    // (`isStoryMapExport`, import-utils.ts:29). Without it every export
+    // classifies as `legacy`, which pre-selects the workspace-wide
+    // replace-all path and hides the per-project merge controls.
+    source: 'spert-story-map',
     projects: [project],
     sprints: sprintRecords,
   };
 }
 
-/** Download the Forecaster export as a JSON file. */
-export function downloadForecasterExport(product: Product): void {
+/**
+ * Download the Forecaster export as a JSON file.
+ *
+ * Blocked rather than warned: a payload over Forecaster's limits is one it is
+ * GUARANTEED to refuse, so handing the user the file only moves the failure to
+ * the other app, where the message is a raw validator string. Truncating to fit
+ * would silently drop their data. Returning the reasons costs them an export
+ * they could not have used, and names the remedy.
+ *
+ * @returns [] when the file downloaded; otherwise the reasons it did not.
+ */
+export function downloadForecasterExport(product: Product): string[] {
   const data = buildForecasterExport(product);
+  const issues = checkForecasterCompatibility(data);
+  if (issues.length > 0) return issues;
+
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -150,4 +169,5 @@ export function downloadForecasterExport(product: Product): void {
   a.download = `${product.name.replace(/[^a-zA-Z0-9]/g, '_')}_forecaster_${timestamp}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  return [];
 }

@@ -22,6 +22,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importConfirm, setImportConfirm] = useState<Product | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [forecasterIssues, setForecasterIssues] = useState<string[] | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   // Ref-based double-submission guard. Using useState would race because two
   // rapid synchronous clicks both read the same stale `false` from the closure
@@ -166,6 +167,22 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
     URL.revokeObjectURL(url);
   };
 
+  // Blocks rather than warns — see downloadForecasterExport. The try/catch is
+  // not defensive: a sprint endDate that is present but malformed reaches
+  // `addDays` and throws RangeError, and validateProduct checks the field's
+  // presence but never its format.
+  const handleForecasterExport = () => {
+    setForecasterIssues(null);
+    try {
+      const issues = downloadForecasterExport(product);
+      if (issues.length > 0) setForecasterIssues(issues);
+    } catch {
+      setForecasterIssues([
+        'The export could not be built. A sprint may have an invalid end date — check the Sprints section in Settings.',
+      ]);
+    }
+  };
+
   return (
     <>
       <input
@@ -181,13 +198,21 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Export and import this project's data.</p>
         <div className="flex flex-wrap gap-3">
           <button onClick={handleExport} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Export as JSON</button>
-          <button onClick={() => downloadForecasterExport(product)} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Export for SPERT Forecaster</button>
+          <button onClick={handleForecasterExport} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Export for SPERT Forecaster</button>
           <button onClick={handleExcelExport} disabled={isExporting} className="px-4 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg">{isExporting ? 'Exporting…' : 'Export as Excel'}</button>
           <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Project from JSON</button>
           <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
         </div>
         {importError && (
           <p className="text-sm text-red-600 dark:text-red-400 mt-3 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{importError}</p>
+        )}
+        {forecasterIssues && (
+          <div role="alert" className="text-sm text-red-600 dark:text-red-400 mt-3 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+            <p className="font-medium">This project cannot be exported to SPERT Forecaster yet:</p>
+            <ul className="list-disc list-inside mt-1 space-y-1">
+              {forecasterIssues.map((issue, i) => <li key={i}>{issue}</li>)}
+            </ul>
+          </div>
         )}
       </Section>
 
