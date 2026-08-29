@@ -136,7 +136,8 @@ export function buildForecasterExport(product: Product) {
     version: '1.0',
     exportedAt: now,
     // Forecaster's importer discriminates on this exact literal
-    // (`isStoryMapExport`, import-utils.ts:29). Without it every export
+    // (`isStoryMapExport`,
+    // spert-forecaster/src/shared/state/import-utils.ts:29). Without it every export
     // classifies as `legacy`, which pre-selects the workspace-wide
     // replace-all path and hides the per-project merge controls.
     source: 'spert-story-map',

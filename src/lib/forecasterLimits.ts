@@ -39,8 +39,10 @@
  * these numbers are private and therefore uncopyable — the validator's two are
  * (`MAX_STRING_LENGTH`, `MAX_NUMERIC_VALUE`, declared without `export`) and its
  * milestone cap is a bare literal `10` written twice at
- * `import-validation.ts:211-212`, at the commit pinned above. But Forecaster
- * DOES export one of the three: `MAX_MILESTONES` at `constants.ts:39`, cited at
+ * `spert-forecaster/src/shared/state/import-validation.ts:211-212`, at the
+ * commit pinned above. But Forecaster
+ * DOES export one of the three: `MAX_MILESTONES` at
+ * `spert-forecaster/src/features/forecast/constants.ts:39`, cited at
  * the top of this header. It is still uncopyable here, because **no build in
  * either repo can resolve a module in the other.** Export status is incidental;
  * the boundary is the reason.
@@ -88,7 +90,7 @@ const { MAX_MILESTONES, MAX_STRING_LENGTH, MAX_NUMERIC_VALUE } = FORECASTER_LIMI
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Forecaster's date rule, mirroring `isValidIsoDate` (import-validation.ts:32-44).
+ * Forecaster's date rule, mirroring `isValidIsoDate` (spert-forecaster/src/shared/state/import-validation.ts:32-44).
  *
  * The second half is the part that matters and the part a regex alone misses:
  * `2026-13-45` satisfies the shape and is not a real day, so `new Date()`
