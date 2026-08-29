@@ -157,6 +157,15 @@ export const BOUNDARY_PAIRS: ReadonlyArray<{
     names: ['1,000,000', '999,999'],
   },
   {
+    row: 'F32', label: 'sprint end date validity',
+    // The pair must differ ONLY in the date's realness: both are regex-shaped,
+    // both sit on the LAST sprint. Anything else and the pair would be testing
+    // the wrong axis.
+    at: () => lastSprintEndDate('2026-01-28'),
+    over: () => lastSprintEndDate('2026-13-45'),
+    names: ['Sprint 2', '2026-13-45'],
+  },
+  {
     row: 'F29', label: 'sprint velocity floor',
     at: () => revisedProgress(60),
     over: () => revisedProgress(50),
@@ -195,6 +204,24 @@ function revisedProgress(second: number): Product {
     sprints: [
       { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' },
       { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: '2026-01-28' },
+    ],
+  });
+}
+
+/**
+ * Two dated sprints, the SECOND carrying `endDate`. Only the last sprint's date
+ * can reach the payload unparsed — every earlier one is read by `addDays` while
+ * deriving the next sprint's start, which throws on a malformed value.
+ */
+function lastSprintEndDate(endDate: string): Product {
+  return makeProduct({
+    themes: [makeTheme('t1', [makeBackbone('b1', [
+      makeRib('r1', { size: 'S', allocations: [{ releaseId: 'rel-1', percentage: 100 }] }),
+    ])])],
+    releases: [{ id: 'rel-1', name: 'Release One', order: 1, targetDate: null }],
+    sprints: [
+      { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' },
+      { id: 'sp-2', name: 'Sprint 2', order: 2, endDate },
     ],
   });
 }

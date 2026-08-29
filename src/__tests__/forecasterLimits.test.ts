@@ -228,3 +228,66 @@ describe('a realistic product', () => {
     expect(issues).toHaveLength(2);
   });
 });
+
+// ── Sprint end date — the only verbatim, unvalidated passthrough in the payload
+describe('sprint end date', () => {
+  const lastSprint = (endDate: string) => makeProduct({
+    themes: [makeTheme('t1', [makeBackbone('b1', [
+      makeRib('r1', { size: 'S', allocations: [{ releaseId: 'rel-1', percentage: 100 }] }),
+    ])])],
+    releases: [{ id: 'rel-1', name: 'Release One', order: 1, targetDate: null }],
+    sprints: [
+      { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' },
+      { id: 'sp-2', name: 'Sprint 2', order: 2, endDate },
+    ],
+  });
+
+  it('accepts a real date', () => {
+    expect(check(lastSprint('2026-01-28'))).toEqual([]);
+  });
+
+  it('accepts a leap day in a leap year', () => {
+    expect(check(lastSprint('2028-02-29'))).toEqual([]);
+  });
+
+  // Regex-shaped but not a real day — the case a format check alone misses.
+  it.each(['2026-13-45', '2026-02-30', '2027-02-29', '2026-00-10', '2026-01-32'])(
+    'blocks %s, naming the sprint and the value', (bad) => {
+      const issues = check(lastSprint(bad));
+      expect(issues).toHaveLength(1);
+      expect(issues[0]).toContain('Sprint 2');
+      expect(issues[0]).toContain(bad);
+    });
+
+  // ⚠️ Asserts the SCOPE of the check, by handing it a payload only a scope-crept
+  // check would complain about. An earlier version of this test asserted that
+  // buildForecasterExport throws on a mid-list bad date — which is true whether
+  // or not the check also inspects sprintStartDate, so it did not test its own
+  // name. A deliberate scope-creep mutation passed the whole suite.
+  it('inspects sprintFinishDate ONLY, not sprintStartDate', () => {
+    const payload = {
+      projects: [{ name: 'P', milestones: [] }],
+      sprints: [{
+        sprintNumber: 1,
+        sprintStartDate: '2026-13-45', // malformed, and deliberately ignored
+        sprintFinishDate: '2026-01-28',
+        doneValue: 0,
+        backlogAtSprintEnd: 0,
+      }],
+    };
+    expect(checkForecasterCompatibility(payload)).toEqual([]);
+  });
+
+  it('cannot receive a malformed non-last date at all — the export throws first', () => {
+    // Why the scope above is safe: every start date comes from addDays, which
+    // throws rather than emit a bad one. This is register row F31, PRECLUDED.
+    expect(() => buildForecasterExport(makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('r1', { size: 'S' })])])],
+      releases: [],
+      sprints: [
+        { id: 'sp-1', name: 'S1', order: 1, endDate: '2026-13-45' },
+        { id: 'sp-2', name: 'S2', order: 2, endDate: '2026-02-11' },
+      ],
+    }))).toThrow(RangeError);
+  });
+});
