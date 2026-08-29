@@ -15,9 +15,35 @@
  * here would contradict that app's product decision. The remedy is always
  * Story-Map-side.
  *
- * This duplication is a deliberate stopgap. The end state is a golden fixture
- * generated here and consumed by Forecaster's real validator, pinned in both
- * repos, which retires this table.
+ * ⚠️ THE GOLDEN FIXTURE ARRIVED AND DID NOT RETIRE THIS TABLE.
+ *
+ * This header used to predict that it would, and so does commit `7244d55`'s
+ * body: "It is a stopgap; a golden fixture pinned in both repos is what retires
+ * it." A commit body cannot be amended, so THIS is the correctable copy and it
+ * contradicts that one. The end state shipped — v0.52.13/.14 publish the
+ * boundary fixtures, and `spert-forecaster` v0.40.5-.8 runs them through its
+ * REAL validator — and the constants below are still hand-typed, still
+ * destructured into the block-message helpers, and still drive every message
+ * this file emits. (No line number on purpose: a same-file citation decays on
+ * the next edit to this header. The first draft of THIS correction said ":48"
+ * and was wrong by 22 lines before it was ever committed.)
+ *
+ * WHY the prediction was wrong, and why no fixture set can ever retire this:
+ * Forecaster holds all three numbers as PRIVATE constants (`MAX_STRING_LENGTH`
+ * and `MAX_NUMERIC_VALUE`, declared without `export`) or as a bare literal (the
+ * milestone cap, written `10` twice at `import-validation.ts:211-212`, at the
+ * commit pinned above). None
+ * can be imported. A fixture can therefore only probe BEHAVIOUR at the boundary
+ * — 200 accepted, 201 rejected — never read the value. A fixture set and a
+ * shared constant are different instruments, and only the second could retire
+ * this table. Forecaster says the same from its side, in
+ * `src/shared/state/storymap-contract/register.ts`.
+ *
+ * What the fixtures DID buy is drift DETECTION, which is not elimination:
+ * change a limit here without changing Forecaster and the boundary pair fails
+ * over there. Keeping the copy was then measured and DECLINED as work, not
+ * merely left undone. Do not re-open this as "the fixture never landed" — it
+ * landed. Re-open it only if Forecaster ever exports these constants.
  */
 
 /** Forecaster's `import-validation.ts` limits. See the file comment before editing. */

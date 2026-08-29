@@ -1,5 +1,39 @@
 # Changelog
 
+## Version 0.52.16 (2026-08-29)
+
+### Fixed — three notes about the SPERT Release Forecaster handoff that had gone out of date
+
+No change to how the app behaves. These are notes in the source code, and all three
+described a future that had already arrived. That makes them worse than no note at all,
+because each one quietly tells the next person not to look.
+
+**One note promised that a set of shared samples would retire a hand-copied table of
+Forecaster's import limits.** Those samples shipped in 0.52.13 and 0.52.14, and the table
+is still hand-copied and still decides every message this app shows when it blocks an
+export. Looking into why turned up something better than the correction: it could never
+have worked that way. Forecaster keeps those three numbers private to its own file, so a
+shared sample can only prove the behaviour at a limit is right — it can never read the
+number itself. Samples and a shared constant are different tools, and only the second
+could have retired the table. The note now says so, and says what the samples did buy
+instead, which is real: change a limit on one side without the other and a check fails.
+
+**A second note called the matching check on the Forecaster side future work.** It shipped
+the following day. The gap it was written about is still open, because that check was never
+the thing that would close it — Forecaster counts its own rejection points automatically,
+so a new one shows up over there and stays invisible here. That asymmetry is now written
+down plainly, along with a measurement: as of Forecaster 0.41.0 the count still matches, so
+the list in this app is accurate today. What it cannot do is notice the day that changes.
+
+**A third note called a number "derived, not assumed."** It was derived once, by hand, when
+it was written, and then frozen. Nothing in this app re-derives it and nothing can, because
+this app's tests cannot read the other app's source. It now reads as what it is: a
+transcription with a date on it.
+
+One of the three was also written into a commit message, which cannot be edited after the
+fact. The note in the file now quotes that claim and contradicts it directly, so whichever
+one a reader finds first, they end up in the right place.
+
 ## Version 0.52.15 (2026-08-29)
 
 ### Fixed — a project name, release name, or sprint name can no longer be left blank
