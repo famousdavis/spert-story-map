@@ -29,21 +29,33 @@
  * and was wrong by 22 lines before it was ever committed.)
  *
  * WHY the prediction was wrong, and why no fixture set can ever retire this:
- * Forecaster holds all three numbers as PRIVATE constants (`MAX_STRING_LENGTH`
- * and `MAX_NUMERIC_VALUE`, declared without `export`) or as a bare literal (the
- * milestone cap, written `10` twice at `import-validation.ts:211-212`, at the
- * commit pinned above). None
- * can be imported. A fixture can therefore only probe BEHAVIOUR at the boundary
- * — 200 accepted, 201 rejected — never read the value. A fixture set and a
- * shared constant are different instruments, and only the second could retire
- * this table. Forecaster says the same from its side, in
+ * a fixture can only probe BEHAVIOUR at a boundary — 200 accepted, 201
+ * rejected — it can never read a value. A fixture set and a shared constant
+ * are different instruments, and only the second could retire this table.
+ * Forecaster says the same from its side, in
  * `src/shared/state/storymap-contract/register.ts`.
+ *
+ * ⚠️ THE BLOCKER IS THE REPO BOUNDARY, NOT `export`. It is tempting to say
+ * these numbers are private and therefore uncopyable — the validator's two are
+ * (`MAX_STRING_LENGTH`, `MAX_NUMERIC_VALUE`, declared without `export`) and its
+ * milestone cap is a bare literal `10` written twice at
+ * `import-validation.ts:211-212`, at the commit pinned above. But Forecaster
+ * DOES export one of the three: `MAX_MILESTONES` at `constants.ts:39`, cited at
+ * the top of this header. It is still uncopyable here, because **no build in
+ * either repo can resolve a module in the other.** Export status is incidental;
+ * the boundary is the reason.
+ *
+ * (An earlier draft of this paragraph closed "re-open only if Forecaster ever
+ * exports these constants." That was already false for one of the three on the
+ * day it shipped, and would have sent a reader who checked it to re-open a
+ * question the boundary settles anyway. Recorded because this header exists to
+ * stop exactly that.)
  *
  * What the fixtures DID buy is drift DETECTION, which is not elimination:
  * change a limit here without changing Forecaster and the boundary pair fails
  * over there. Keeping the copy was then measured and DECLINED as work, not
  * merely left undone. Do not re-open this as "the fixture never landed" — it
- * landed. Re-open it only if Forecaster ever exports these constants.
+ * landed. Re-open it only if the two repos ever share a build.
  */
 
 /** Forecaster's `import-validation.ts` limits. See the file comment before editing. */
