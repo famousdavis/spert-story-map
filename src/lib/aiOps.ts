@@ -244,7 +244,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     }
     case 'size_rib': {
       // Payload: { ribId: string, size: string }
-      // typeof guards reject non-string payloads (mirrors allocate_rib, aiOps.ts:185–186).
+      // typeof guards reject non-string payloads (mirrors allocate_rib, src/lib/aiOps.ts:185–186).
       // sizeMapping validation, lock guard, and Form B additive guard are in sizeRibInProduct.
       if (typeof p.ribId !== 'string' || !p.ribId) return prev;
       if (typeof p.size !== 'string' || !p.size) return prev;
@@ -368,7 +368,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
         if (typeof e.ribId !== 'string' || !e.ribId) continue;
         // Per-entry all-fields-undefined skip: a bare {ribId} entry is a true no-op.
         // Prevents spurious didUpdate + changelog churn (mirrors update_rib top guard
-        // aiOps.ts:137-140).
+        // src/lib/aiOps.ts:137-140).
         if (
           e.description === undefined &&
           e.category === undefined &&
