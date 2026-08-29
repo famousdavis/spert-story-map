@@ -13,11 +13,28 @@
  * `exportedAt` is the ONLY remaining non-determinism — measured, not assumed.
  * `normaliseExport` strips exactly that field and nothing else.
  *
- * These are also the payloads a future Forecaster-side consumer would run
- * through its real validator, which is why the boundary cases come in PAIRS:
- * at the limit (must be produced) and one past it (must be blocked). A
- * one-sided case passes just as happily with the limit set wrong.
+ * ── ⚠️ THESE FILES ARE VENDORED INTO `spert-forecaster` ─────────────────────
+ * `canonical-export.json` and the twelve `boundary-*.json` payloads are copied
+ * byte-for-byte into that repo, which runs them through its REAL
+ * `validateImportData`. Nothing automated keeps the two copies in step — no
+ * test in either repo can read the other — so `vendored-manifest.json` records
+ * a SHA-256 per file, and `VENDORED_MANIFEST_SHA256` pins the manifest.
+ *
+ * A change to the exporter changes a payload, which changes the manifest, which
+ * fails that pin. Updating the pinned constant is the moment you re-vendor.
+ *
+ * The pin exists because `C5` alone does not catch this. C5 asserts
+ * built === committed, so regenerating BOTH the exporter and the fixture keeps
+ * it green — and that co-ordinated change is the NORMAL way this contract
+ * evolves, i.e. exactly when the far copy goes stale.
+ *
+ * The boundary cases come in PAIRS: at the limit (must export) and one past it
+ * (must be blocked). A one-sided case passes just as happily with the limit set
+ * wrong. Both halves are real exporter output — the `over` halves are what
+ * `buildForecasterExport` produces before `downloadForecasterExport` refuses
+ * them, which is what lets the far side assert its validator rejects them.
  */
+import { buildForecasterExport } from '../../lib/exportForForecaster';
 import type {
   Product, Theme, Backbone, RibItem, ReleaseAllocation, ProgressEntry, Size, Category,
 } from '../../types';
@@ -224,4 +241,57 @@ function lastSprintEndDate(endDate: string): Product {
       { id: 'sp-2', name: 'Sprint 2', order: 2, endDate },
     ],
   });
+}
+
+// ── Vendoring ───────────────────────────────────────────────────────────────
+
+export const FIXTURE_DIR = 'src/__tests__/fixtures';
+export const VENDORED_MANIFEST = `${FIXTURE_DIR}/vendored-manifest.json`;
+
+/**
+ * SHA-256 of `vendored-manifest.json`.
+ *
+ * ⚠️ When this fails: a vendored payload changed. Re-generate the fixtures, copy
+ * all of them into `spert-forecaster/src/__tests__/fixtures/` (or wherever that
+ * repo keeps them), and update this constant in the same commit. Bumping it
+ * without re-vendoring silences the only signal either repo has.
+ */
+export const VENDORED_MANIFEST_SHA256 =
+  '8f33579560ca3b2b156880f1af6b865d91ab322731696994739d9c7e30b44e5f';
+
+export interface VendoredEntry {
+  /** Register row this payload exercises, or 'canonical' for the baseline. */
+  readonly row: string;
+  readonly label: string;
+  readonly file: string;
+  /** What the far side's real `validateImportData` must do with it. */
+  readonly forecasterShould: 'accept' | 'reject';
+  readonly sha256: string;
+}
+
+/** Every payload vendored across, in a stable order. Drives generation AND checking. */
+export function vendoredPayloads(): Array<Omit<VendoredEntry, 'sha256'> & { payload: unknown }> {
+  const out: Array<Omit<VendoredEntry, 'sha256'> & { payload: unknown }> = [{
+    row: 'canonical', label: 'canonical export', file: 'canonical-export.json',
+    forecasterShould: 'accept',
+    payload: normaliseExport(buildForecasterExport(CANONICAL_PRODUCT)),
+  }];
+  for (const pair of BOUNDARY_PAIRS) {
+    out.push({
+      row: pair.row, label: `${pair.label} — at the limit`,
+      file: `boundary-${pair.row}-at.json`, forecasterShould: 'accept',
+      payload: normaliseExport(buildForecasterExport(pair.at())),
+    });
+    out.push({
+      row: pair.row, label: `${pair.label} — one past the limit`,
+      file: `boundary-${pair.row}-over.json`, forecasterShould: 'reject',
+      payload: normaliseExport(buildForecasterExport(pair.over())),
+    });
+  }
+  return out;
+}
+
+/** Byte-exact serialisation. Generation and checking MUST use this one function. */
+export function serialise(value: unknown): string {
+  return `${JSON.stringify(value, null, 2)}\n`;
 }

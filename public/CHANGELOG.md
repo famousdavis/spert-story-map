@@ -1,5 +1,29 @@
 # Changelog
 
+## Version 0.52.13 (2026-08-28)
+
+### Added — the SPERT Forecaster export contract is now pinned on both sides
+
+No change to how the app behaves. SPERT Release Forecaster now runs a copy of this
+app's real export files through its own importer, and this release supplies them and
+keeps them honest.
+
+Twelve new export samples are committed alongside the existing one — a matched pair for
+each limit the two apps share, one sample sitting exactly at the limit and one just past
+it. Forecaster checks that it accepts every sample on one side and refuses every sample
+on the other. Previously Forecaster had only a single sample that sat at no limit at
+all, so both halves of every boundary had to be hand-written over there rather than
+being real output from this app.
+
+A checksum now covers the whole set. It exists to catch the case the previous release
+could not: when the export format changes and the samples are regenerated **together**,
+every other check stays green — and that is precisely the moment Forecaster's copies go
+stale. The checksum fails then, and updating it is the step that says "copy these over".
+
+Nothing automated can keep the two copies in step — neither app's tests can read the
+other's files — so this is a deliberate manual step at each contract change, and it is
+now written into the files themselves rather than living in somebody's memory.
+
 ## Version 0.52.12 (2026-08-28)
 
 ### Fixed — an invalid sprint end date no longer produces an export SPERT Forecaster refuses
