@@ -25,9 +25,20 @@
  * The row count is a STATED fact pinned to a stated commit, not a derived one.
  * Story Map's CI cannot see Forecaster's source, so if a 34th throw is added
  * over there, this register is silently short and NOTHING HERE GOES RED.
- * Closing that needs a consumer inside `spert-forecaster` running these
- * fixtures through its real validator — the other direction, deliberately not
- * in this release.
+ * ⚠️ THAT CONSUMER SHIPPED, AND IT DID NOT CLOSE THIS. This paragraph used
+ * to call it "the other direction, deliberately not in this release." It
+ * arrived in `spert-forecaster` v0.40.5-.8 and the gap above is still open,
+ * because it was never the instrument that would close it: Forecaster DERIVES
+ * its own count by grepping its validator source (test C5, "the register row
+ * count") and checks it against its OWN 33-row register. So a 34th throw goes
+ * red THERE and stays green HERE. This file is the copy that goes short.
+ *
+ * Nothing automatic can close it — no test in either repo can read the other's
+ * source, so re-vendoring is manual, forever.
+ *
+ * Measured at `spert-forecaster` v0.41.0: the count is still 33 and
+ * `import-validation.ts` is unchanged since the pinned commit, so this register
+ * is accurate TODAY. The exposure is the NEXT Forecaster release, not this one.
  *
  * A second limit, smaller but real: a `basis` guard pins the PROPERTY, not the
  * INFERENCE. It can pass while the reasoning that connected it to the throw was
@@ -61,7 +72,13 @@ export const PINNED_FORECASTER = {
   commit: '75f40e3',
   version: '0.40.4',
   file: 'src/shared/state/import-validation.ts',
-  /** Derived, not assumed: `grep -c "throw new Error"` at the pinned commit. */
+  /**
+   * ⚠️ Derived ONCE, at write time — `grep -c "throw new Error"` at the pinned
+   * commit — then frozen here as a literal. Nothing in this repo re-derives it,
+   * and nothing can: Story Map's CI cannot read Forecaster's source. Read this
+   * as a transcription with a date on it, NOT as a computed value. The live
+   * count is derived on the far side, by C5 in `storymap-contract.test.ts`.
+   */
   throwCount: 33,
 } as const;
 
