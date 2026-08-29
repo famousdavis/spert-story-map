@@ -5,9 +5,9 @@
 import { useState, useRef, useId, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
+import BufferedText from '../components/ui/BufferedText';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { useStorage } from '../lib/StorageProvider';
-import { useBufferedField } from '../hooks/useBufferedField';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { Section, Field } from '../components/ui/Section';
 import SharingSection from '../components/settings/SharingSection';
@@ -15,67 +15,6 @@ import SizeMappingSection from '../components/settings/SizeMappingSection';
 import DataSection from '../components/settings/DataSection';
 import type { OutletContextValue, Release, Sprint } from '../types';
 
-// ──────────────────────────────────────────────────────────────────
-// Buffered input wrappers
-//
-// Each field is its own component so useBufferedField's local state is
-// keyed per element. Without this isolation, switching focus between rows
-// would leak draft text between sibling rows of the same kind. SettingsView
-// holds the per-row commit handlers; the wrappers just route value/handlers.
-// ──────────────────────────────────────────────────────────────────
-
-interface BufferedTextProps {
-  value: string;
-  onCommit: (v: string) => void;
-  id?: string;
-  name?: string;
-  className?: string;
-  rows?: number;
-  multiline?: boolean;
-}
-
-function BufferedText({ value, onCommit, id, name, className, rows, multiline }: BufferedTextProps) {
-  const { localValue, setLocalValue, handleFocus, handleBlur, revertValue } =
-    useBufferedField(value, onCommit);
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (e.key === 'Escape') {
-      revertValue();
-      (e.target as HTMLElement).blur();
-    } else if (e.key === 'Enter' && !multiline) {
-      (e.target as HTMLElement).blur();
-    }
-  };
-
-  if (multiline) {
-    return (
-      <textarea
-        id={id}
-        name={name}
-        value={localValue}
-        onChange={e => setLocalValue(e.target.value)}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={onKeyDown}
-        rows={rows}
-        className={className}
-      />
-    );
-  }
-  return (
-    <input
-      id={id}
-      name={name}
-      type="text"
-      value={localValue}
-      onChange={e => setLocalValue(e.target.value)}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      onKeyDown={onKeyDown}
-      className={className}
-    />
-  );
-}
 
 export default function SettingsView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
@@ -184,6 +123,7 @@ export default function SettingsView() {
             <BufferedText
               id={`${baseId}-projectName`}
               name="projectName"
+              required
               value={product.name}
               onCommit={commitName}
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-blue-400 dark:focus:border-blue-500 outline-none"
@@ -227,6 +167,7 @@ export default function SettingsView() {
                 </div>
                 <BufferedText
                   name="releaseName"
+                  required
                   value={r.name}
                   onCommit={(name) => updateRelease(r.id, { name })}
                   className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
@@ -275,6 +216,7 @@ export default function SettingsView() {
             <div key={s.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
               <BufferedText
                 name="sprintName"
+                required
                 value={s.name}
                 onCommit={(name) => updateSprint(s.id, { name })}
                 className="w-64 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
