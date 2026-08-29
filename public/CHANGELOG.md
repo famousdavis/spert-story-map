@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.52.17 (2026-08-29)
+
+### Fixed — a note added in 0.52.16 gave the wrong reason for its own conclusion
+
+No change to how the app behaves. Yesterday's release corrected three notes that had gone
+out of date. One of those corrections closed by saying the question should only be
+reopened "if SPERT Release Forecaster ever exports these constants" — and Forecaster
+already exports one of the three. The same note cites that exact line thirty lines above.
+
+The conclusion was right and is unchanged: this app cannot read those numbers from
+Forecaster and has to keep its own copy. But the reason is that the two apps are separate
+projects with separate builds, so neither can reach into the other's code at all. Whether
+a value is exported has nothing to do with it. As written, the note would have sent the
+next person who checked it off to reopen a settled question.
+
+The note now says the boundary is the reason, and records the wrong version underneath it,
+since this is a note whose whole purpose is to stop that from happening.
+
+
 ## Version 0.52.16 (2026-08-29)
 
 ### Fixed — three notes about the SPERT Release Forecaster handoff that had gone out of date
