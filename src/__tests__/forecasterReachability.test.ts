@@ -11,6 +11,7 @@
  * non-vacuousness mechanical rather than a matter of picking one to break.
  */
 import { describe, it, expect } from 'vitest';
+import { req } from './testHelpers';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { buildForecasterExport } from '../lib/exportForForecaster';
@@ -22,7 +23,7 @@ import {
 import {
   CANONICAL_PRODUCT, BOUNDARY_PAIRS, normaliseExport, withSizedReleases, makeProduct,
   vendoredPayloads, serialise, FIXTURE_DIR, VENDORED_MANIFEST, VENDORED_MANIFEST_SHA256,
-  type VendoredEntry,
+  pairKey, type VendoredEntry,
 } from './fixtures/forecasterFixtures';
 
 const built = () => buildForecasterExport(CANONICAL_PRODUCT);
@@ -173,12 +174,46 @@ describe('boundary pairs', () => {
       expect(checkForecasterCompatibility(buildForecasterExport(pair.at()))).toEqual([]);
     });
 
+  // ⚠️ THE CHECK WHOSE ABSENCE SHIPPED A BAD FIXTURE. Exporting cleanly proves
+  // the at-half is under the limit, not AT it — and a half comfortably under
+  // accepts for the wrong reason, making the pair one-sided in disguise. The
+  // v0.52.13 F29 at-half sat at doneValue 1 against a floor of 0 and passed
+  // everything above. spert-forecaster found it by asserting this separately.
+  it.each(BOUNDARY_PAIRS.map((p) => [p.label, p] as const))(
+    '%s: at-half sits exactly AT the limit', (_label, pair) => {
+      expect(pair.atProof(buildForecasterExport(pair.at()))).toEqual(pair.atExpected);
+    });
+
+  // The complement: the over-half must be one step past, not merely somewhere
+  // beyond — otherwise the pair does not pin the edge from above either.
+  it.each(BOUNDARY_PAIRS.map((p) => [p.label, p] as const))(
+    '%s: over-half differs from the at-half', (_label, pair) => {
+      expect(pair.atProof(buildForecasterExport(pair.over()))).not.toEqual(pair.atExpected);
+    });
+
   it.each(BOUNDARY_PAIRS.map((p) => [p.label, p] as const))(
     '%s: one past the limit is blocked and names both numbers', (_label, pair) => {
       const issues = checkForecasterCompatibility(buildForecasterExport(pair.over()));
       expect(issues.length).toBeGreaterThan(0);
       for (const token of pair.names) expect(issues.join(' ')).toContain(token);
     });
+});
+
+// ── F30 must be reachable WITHOUT F20, or its pair proves nothing ───────────
+describe('F30 — remaining backlog, independent of any milestone', () => {
+  const pair = BOUNDARY_PAIRS.find((p) => p.row === 'F30');
+
+  it('emits no milestones at all, so it cannot alias onto F20', () => {
+    const built = buildForecasterExport(req(pair, 'F30 pair').over());
+    expect(built.projects[0]?.milestones).toBeUndefined();
+  });
+
+  it('is blocked for the backlog, not for a milestone', () => {
+    const issues = checkForecasterCompatibility(buildForecasterExport(req(pair, 'F30 pair').over()));
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain('remaining backlog');
+    expect(issues[0]).not.toContain('Release');
+  });
 });
 
 // ── F32: found REACHABLE by this register in v0.52.11, blocked in v0.52.12 ──
@@ -269,11 +304,17 @@ describe('vendored fixtures', () => {
     }
   });
 
+  // Grouped by pairKey, not row: F32 carries two pairs (shape, and calendar
+  // validity), and both legitimately report row 'F32' so the far side's per-row
+  // message guard still matches.
   it('covers both halves of every boundary pair', () => {
     for (const pair of BOUNDARY_PAIRS) {
-      const files = manifest().entries.filter((e) => e.row === pair.row);
-      expect(files.map((f) => f.forecasterShould).sort(), pair.row)
-        .toEqual(['accept', 'reject']);
+      const key = pairKey(pair);
+      // Exact filenames, not a prefix: `boundary-F32-` also prefixes
+      // `boundary-F32-leap-at.json`, which silently merged the two F32 pairs.
+      const byFile = new Map(manifest().entries.map((e) => [e.file, e.forecasterShould]));
+      expect(byFile.get(`boundary-${key}-at.json`), `${key} at-half`).toBe('accept');
+      expect(byFile.get(`boundary-${key}-over.json`), `${key} over-half`).toBe('reject');
     }
   });
 });
