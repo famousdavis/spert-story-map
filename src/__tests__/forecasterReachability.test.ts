@@ -178,33 +178,40 @@ describe('boundary pairs', () => {
     });
 });
 
-// ── F32: the open gap, pinned so it cannot be quietly forgotten ─────────────
-describe('F32 — the open gap this register found', () => {
-  const lastSprintBadDate = () => makeProduct({
+// ── F32: found REACHABLE by this register in v0.52.11, blocked in v0.52.12 ──
+describe('F32 — the gap this register found, now closed', () => {
+  const lastSprint = (endDate: string) => makeProduct({
     ...withSizedReleases(1),
     sprints: [
       { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' },
-      { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: '2026-13-45' },
+      { id: 'sp-2', name: 'Sprint 2', order: 2, endDate },
     ],
   });
 
-  it('is recorded as REACHABLE, not UNREACHABLE', () => {
-    expect(REGISTER.find((r) => r.id === 'F32')?.status).toBe('REACHABLE');
+  it('is recorded as SHIPPED', () => {
+    expect(REGISTER.find((r) => r.id === 'F32')?.status).toBe('SHIPPED');
   });
 
-  // Pins the CURRENT behaviour so the gap is visible. When a future release
-  // blocks it, this test fails and is updated to assert the block — which is
-  // the point: closing the gap must be a deliberate edit here.
-  it('still emits a malformed sprintFinishDate that our own check passes', () => {
-    const out = buildForecasterExport(lastSprintBadDate());
+  // The mechanism, pinned: the malformed date still REACHES the payload — the
+  // export is unchanged. What changed is that the compatibility check now
+  // refuses to hand it over.
+  it('still emits the malformed date, but the check now blocks it', () => {
+    const out = buildForecasterExport(lastSprint('2026-13-45'));
     // `toBe` fails on undefined, so the optional chain stays a real assertion.
     expect(out.sprints[out.sprints.length - 1]?.sprintFinishDate).toBe('2026-13-45');
-    expect(checkForecasterCompatibility(out)).toEqual([]);
+    const issues = checkForecasterCompatibility(out);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain('Sprint 2');
+    expect(issues[0]).toContain('2026-13-45');
+  });
+
+  it('lets a real last-sprint date through', () => {
+    expect(checkForecasterCompatibility(buildForecasterExport(lastSprint('2026-01-28')))).toEqual([]);
   });
 
   it('throws instead when the malformed date is NOT last', () => {
     // The asymmetry is the whole mechanism: addDays reads every endDate except
-    // the last one's, so only the last can escape into the payload.
+    // the last one's, so only the last could ever escape into the payload.
     expect(() => buildForecasterExport(makeProduct({
       ...withSizedReleases(1),
       sprints: [

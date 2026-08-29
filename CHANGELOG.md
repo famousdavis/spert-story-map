@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 0.52.12 (2026-08-28)
+
+### Fixed — an invalid sprint end date no longer produces an export SPERT Forecaster refuses
+
+Exporting to SPERT Release Forecaster now checks that every sprint's end date is a
+**real calendar date**, not merely something date-shaped.
+
+What you would have seen before: the export downloads normally, and then Forecaster
+refuses the whole file with a raw technical message — long after the moment you could
+connect it to anything. The export now blocks up front and names the sprint and the
+offending value.
+
+The gap was narrow and easy to miss, which is why it survived the previous release.
+A sprint's end date is the one value copied into the export untouched, and Story Map
+has never checked its format — only that it is present. Every sprint's date *except the
+last* is read while working out the next sprint's start date, so a bad one is normally
+caught there. The last sprint has no next sprint, so its date was never examined by
+anything. A date like `2026-13-45` — right shape, no such day — went straight through.
+
+Reachable only for a project imported from a hand-edited file; the date picker in
+Settings cannot produce one.
+
+This was found by the reachability register added in 0.52.11, on its first run, which
+is what that register is for. Its entry for this rejection flips from *reachable* to
+*blocked* in the same change.
+
 ## Version 0.52.11 (2026-08-28)
 
 ### Added — a reachability register for the SPERT Release Forecaster handoff

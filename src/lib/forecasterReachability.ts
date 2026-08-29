@@ -38,6 +38,8 @@
  * the other repo's next edit, and the thrown string is the stable symbol.
  */
 
+import { isRealIsoDate } from './forecasterLimits';
+
 /** The Forecaster commit every `line` and `message` below was transcribed from. */
 export const PINNED_FORECASTER = {
   commit: '75f40e3',
@@ -105,15 +107,8 @@ const milestonesOf = (p: unknown): Record<string, unknown>[] =>
     return Array.isArray(raw) ? raw.map(asObj).filter((x): x is Record<string, unknown> => !!x) : [];
   });
 const nonEmptyStr = (v: unknown): boolean => typeof v === 'string' && v.length > 0;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-/** Forecaster's own date rule: regex-shaped AND a real calendar date. */
-const realIsoDate = (v: unknown): boolean => {
-  if (typeof v !== 'string' || !ISO_DATE.test(v)) return false;
-  const [y, m, d] = v.split('-').map(Number);
-  const dt = new Date(v);
-  return !Number.isNaN(dt.getTime()) &&
-    dt.getUTCFullYear() === y && dt.getUTCMonth() === (m as number) - 1 && dt.getUTCDate() === d;
-};
+/** Forecaster's date rule — imported, not restated. See forecasterLimits.ts. */
+const realIsoDate = isRealIsoDate;
 /** Structured-clone a payload so a counterexample never mutates the caller's object. */
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const withProject = (p: unknown, edit: (proj: Record<string, unknown>) => void): unknown => {
@@ -334,14 +329,14 @@ export const REGISTER: readonly RegisterRow[] = [
     note: 'sprintStartDate is always addDays output or firstSprintStartDate; a bad source date throws first.' },
   {
     id: 'F32', line: 293, message: 'Sprint at index ${i} has invalid sprintFinishDate (must be YYYY-MM-DD format).',
-    status: 'REACHABLE', basis: null,
-    note: 'OPEN GAP, found by this register. `sprintFinishDate: sprint.endDate` is a VERBATIM ' +
-      'passthrough and nothing validates its format — `validateProduct`\'s sprint block asserts ' +
-      'id/name/order only. A regex-shaped but unreal date ("2026-13-45") on the LAST sprint ' +
-      'escapes: every other position is read by addDays, which throws first, but the last sprint ' +
-      'has no successor. checkForecasterCompatibility returns [] and Forecaster refuses the file. ' +
-      'Import-reachable; UI-unreachable (input type="date"). NOT fixed here — a new block ' +
-      'condition is runtime behaviour, out of scope for this release.',
+    status: 'SHIPPED', basis: null,
+    note: 'Found by this register as REACHABLE in v0.52.11 and blocked in v0.52.12. ' +
+      '`sprintFinishDate: sprint.endDate` is the payload\'s only verbatim, unvalidated ' +
+      'passthrough — `validateProduct`\'s sprint block asserts id/name/order, never the ' +
+      'format. A regex-shaped but unreal date ("2026-13-45") survives ONLY on the last ' +
+      'sprint: every other position is read by addDays while deriving the next start, and ' +
+      'throws RangeError first. Covered by forecasterLimits.test.ts "sprint end date" and ' +
+      'the F32 boundary pair.',
   },
   { id: 'F33', line: 296, message: 'Sprint at index ${i} has invalid customFinishDate (must be YYYY-MM-DD format).', status: 'UNREACHABLE', basis: 'noCustomFinishDate' },
 ];

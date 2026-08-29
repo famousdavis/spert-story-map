@@ -39,12 +39,33 @@ interface CheckableExport {
   }>;
   sprints: Array<{
     sprintNumber?: unknown;
+    sprintFinishDate?: unknown;
     doneValue?: unknown;
     backlogAtSprintEnd?: unknown;
   }>;
 }
 
 const { MAX_MILESTONES, MAX_STRING_LENGTH, MAX_NUMERIC_VALUE } = FORECASTER_LIMITS;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Forecaster's date rule, mirroring `isValidIsoDate` (import-validation.ts:32-44).
+ *
+ * The second half is the part that matters and the part a regex alone misses:
+ * `2026-13-45` satisfies the shape and is not a real day, so `new Date()`
+ * auto-corrects or rejects it. Exported because the reachability register needs
+ * the SAME rule — one statement of it, not two.
+ */
+export function isRealIsoDate(value: unknown): boolean {
+  if (typeof value !== 'string' || !ISO_DATE.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === (month as number) - 1 &&
+    parsed.getUTCDate() === day;
+}
 
 /** Describe a name for a message: quoted, and elided if it is one of the long ones. */
 function label(name: string): string {
@@ -113,9 +134,27 @@ function sprintFieldIssues(value: unknown, sprint: number | string, negative: st
   return reason ? [`Sprint ${sprint} has ${positive} that ${reason}.`] : [];
 }
 
+/**
+ * `sprintFinishDate` is `sprint.endDate` passed through VERBATIM — the only field
+ * in the payload that is neither derived nor validated on the way in
+ * (`validateProduct`'s sprint block asserts id/name/order, never the date's
+ * format). A regex-shaped but unreal date survives only on the LAST sprint:
+ * every other position is read by `addDays` while deriving the next sprint's
+ * start, which throws first. Scoped to this field for that reason —
+ * `sprintStartDate` cannot arrive malformed without throwing.
+ */
+function finishDateIssues(value: unknown, sprint: number | string): string[] {
+  if (isRealIsoDate(value)) return [];
+  return [
+    `Sprint ${sprint} has an invalid end date (${JSON.stringify(value)}). ` +
+    'SPERT Forecaster requires a real calendar date in YYYY-MM-DD form.',
+  ];
+}
+
 function sprintIssues(sprint: CheckableExport['sprints'][number]): string[] {
   const n = typeof sprint.sprintNumber === 'number' ? sprint.sprintNumber : '?';
   return [
+    ...finishDateIssues(sprint.sprintFinishDate, n),
     ...sprintFieldIssues(
       sprint.doneValue, n,
       `has negative velocity (${String(sprint.doneValue)} points), which happens when a rib item's ` +
