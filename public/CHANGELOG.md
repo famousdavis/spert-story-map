@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 0.52.15 (2026-08-29)
+
+### Fixed — a project name, release name, or sprint name can no longer be left blank
+
+Clearing one of those three fields and clicking away used to save the blank. The project
+kept working, but it could no longer be read back in: importing a project requires all
+three to have a name, so a project could reach a state where exporting it and importing
+it again would fail. Blanking a field now simply restores what was there, the same as
+pressing Escape.
+
+Theme, backbone and rib item names are deliberately unchanged — those are allowed to be
+blank, and nothing downstream objects.
+
+This only prevents new blanks. A name already saved as blank stays blank until you type
+one in; the field will not invent a name you never entered.
+
 ## Version 0.52.14 (2026-08-28)
 
 ### Fixed — three gaps in the SPERT Forecaster export samples
