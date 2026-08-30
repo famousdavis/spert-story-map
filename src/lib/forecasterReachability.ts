@@ -293,11 +293,17 @@ export const BASES: Record<string, Basis> = {
   },
 };
 
-// ── Pre-validator gates ─────────────────────────────────────────────────────
-// `handleFileChange` refuses a file on three content-dependent conditions
-// BEFORE `validateImportData` runs. They are not throws, so they are outside
-// the 33 — but they are Forecaster rejections, and the register's promise is
-// about rejections, not about throws.
+// ── Non-throw refusals ──────────────────────────────────────────────────────
+// Forecaster's importer refuses some payloads without the validator throwing. They are
+// outside the 33 — but they are Forecaster rejections, and the register's promise is about
+// rejections, not about throws.
+//
+// ⚠️ They are NOT all "before `validateImportData`", which is what this comment used to say.
+// P03/P05 fire AFTER it, on the classified result; P04 and P06 fire before. What unites them
+// is that the validator does not raise them, not their position in the sequence.
+//
+// ⚠️ Since Forecaster v0.42.0 a payload can also arrive over the crosslink transport rather
+// than as a file, so the refusals now come in two wordings for one condition.
 
 export const PRE_VALIDATOR_BASES: Record<string, Basis> = {
   jsonExtension: {
@@ -312,6 +318,17 @@ export const PRE_VALIDATOR_BASES: Record<string, Basis> = {
       'far under the importer\'s 10 MB limit.',
     check: (p) => JSON.stringify(p, null, 2).length <= 10 * 1024 * 1024,
     counterexample: (p) => ({ ...(asObj(p) ?? {}), __pad: 'x'.repeat(10 * 1024 * 1024 + 1) }),
+  },
+  validJson: {
+    description: 'Both routes out of this repo serialise with `serialiseForecasterExport`, so ' +
+      'what Forecaster parses is always `JSON.stringify` output. The file download and the ' +
+      'crosslink transport share that one function precisely so neither can emit something ' +
+      'the other would not.',
+    check: (p) => {
+      try { JSON.parse(JSON.stringify(p, null, 2)); return true; } catch { return false; }
+    },
+    // A value JSON.stringify cannot round-trip: BigInt throws on serialisation.
+    counterexample: () => ({ bad: BigInt(1) }),
   },
 };
 
@@ -374,9 +391,19 @@ export const REGISTER: readonly RegisterRow[] = [
   { id: 'F33', line: 296, message: 'Sprint at index ${i} has invalid customFinishDate (must be YYYY-MM-DD format).', status: 'UNREACHABLE', basis: 'noCustomFinishDate' },
 ];
 
-/** Gates in `useImportState.handleFileChange` that refuse a file before the validator runs. */
+/**
+ * Refusals `useImportState` raises without the validator throwing. See the section comment
+ * above for why "pre-validator" was the wrong name for them.
+ *
+ * ⚠️ `line` points into Forecaster's `useImportState.ts` and is a pointer that decays; match
+ * on `message`. Re-derived at Forecaster v0.42.0, which moved every one of them. P03 and P05
+ * share a line: one condition, two wordings.
+ */
 export const PRE_VALIDATOR_REGISTER: readonly RegisterRow[] = [
-  { id: 'P01', line: 215, message: 'Import failed: Please select a JSON file (.json)', status: 'UNREACHABLE', basis: 'jsonExtension' },
-  { id: 'P02', line: 220, message: 'Import failed: File exceeds the 10 MB limit', status: 'UNREACHABLE', basis: 'underSizeCap' },
-  { id: 'P03', line: 247, message: 'The file contains no projects to import.', status: 'UNREACHABLE', basis: 'singleProject' },
+  { id: 'P01', line: 380, message: 'Import failed: Please select a JSON file (.json)', status: 'UNREACHABLE', basis: 'jsonExtension' },
+  { id: 'P02', line: 385, message: 'Import failed: File exceeds the 10 MB limit', status: 'UNREACHABLE', basis: 'underSizeCap' },
+  { id: 'P03', line: 336, message: 'The file contains no projects to import.', status: 'UNREACHABLE', basis: 'singleProject' },
+  { id: 'P04', line: 315, message: 'Import failed: The project data exceeds the 10 MB limit', status: 'UNREACHABLE', basis: 'underSizeCap' },
+  { id: 'P05', line: 336, message: 'The transfer contains no projects to import.', status: 'UNREACHABLE', basis: 'singleProject' },
+  { id: 'P06', line: 321, message: 'Import failed: Invalid JSON format.', status: 'UNREACHABLE', basis: 'validJson' },
 ];

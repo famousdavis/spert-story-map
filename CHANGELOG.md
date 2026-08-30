@@ -1,5 +1,46 @@
 # Changelog
 
+## Version 0.53.0 (2026-08-29)
+
+### Added — send a project straight to SPERT Forecaster
+
+There is a new button in Settings → Data, beside the existing export: **Send to SPERT Forecaster**.
+It opens the Forecaster in a new tab and hands this project over directly, so you no longer have to
+download a file, find it, and upload it on the other side.
+
+This is a one-time handover. Nothing stays attached afterwards and nothing runs
+in the background; closing either tab ends it. Send the project again later and it is treated as a
+fresh import over there, with the same choices you get from a file.
+
+**Export for SPERT Forecaster is unchanged and is staying.** It is still the only way to move a
+project to a different machine, to keep a copy, or to give the project to somebody else. The new
+button works only between two tabs in the same browser, so the file remains the general answer and
+this is the convenient one.
+
+What gets sent is byte-for-byte what the download writes — both routes now go through one
+serialisation function, so neither can produce something the other would not. The same
+compatibility check runs first, too: a project the download refuses to export is a project this
+refuses to send, for the same stated reasons.
+
+The Forecaster reports back, and the button tells you what happened:
+
+- If the project was imported, nothing further is shown.
+- If it conflicts with a project already over there, the Forecaster opens its import review screen
+  and imports nothing until you confirm. You are told that, rather than being told it worked.
+- If the Forecaster refuses — its cloud projects are still loading, say — the reason comes back and
+  is shown here.
+- If it never answers, you are told, and pointed at the file export as the way through.
+
+### Notes
+
+- The transfer is addressed to the Forecaster's exact web address and to the specific tab this
+  button opened; a reply from any other page or window is ignored. If your browser blocks the new
+  tab you are told to allow pop-ups, rather than being left with a button that appears to do
+  nothing.
+- The development server's port is now fixed at 5173. The Forecaster recognises that address by
+  name when both apps run locally, and a port that quietly moved when 5173 was busy would have
+  broken the handover with nothing to indicate why.
+
 ## Version 0.52.20 (2026-08-29)
 
 ### Fixed — a stray invisible character made one source file unsearchable
