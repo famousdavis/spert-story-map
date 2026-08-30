@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.52.20 (2026-08-29)
+
+### Fixed — a stray invisible character made one source file unsearchable
+
+No change to how the app behaves. One file, `validatorObserver.ts`, had a raw zero byte typed
+directly into it rather than written as the two-character escape that means the same thing.
+The string the code builds is identical either way, so nothing the app does changes.
+
+What it did affect was tooling. A file containing a zero byte is treated as binary rather than
+text, and the standard search tools on macOS skip it — silently, reporting no matches and no
+warning rather than saying they declined to look. Every project-wide search of this app's source
+has therefore been quietly missing that one file, which is the sort of gap that only shows up
+when two people search for the same thing and get different answers. That is exactly how it was
+found: a count of one common word came out as sixteen files one way and seventeen the other, and
+the difference was this file.
+
+Written as an escape, the file is ordinary text again and searches include it.
+
+
 ## Version 0.52.19 (2026-08-29)
 
 ### Fixed — two holes in the check added in 0.52.18

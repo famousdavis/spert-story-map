@@ -307,7 +307,7 @@ function emitClassification(
 ): void {
   const cls: Classification = identity !== null ? 'rejected' : (repaired?.cls ?? 'ok');
   const paths = repaired?.paths ?? [];
-  const key = `${product.id}|${cls}|${identity ?? ''}|${hash(paths.join(' '))}`;
+  const key = `${product.id}|${cls}|${identity ?? ''}|${hash(paths.join('\0'))}`;
   if (seenClassifications.has(key)) return;
   seenClassifications.add(key);
 
