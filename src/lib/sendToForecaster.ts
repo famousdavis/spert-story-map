@@ -22,10 +22,14 @@ import type { Product } from '../types';
  * satisfy the receiver's origin check would reach its zero-conflict fast path, which applies
  * an import with no user interaction at all.
  *
- * The dev value assumes Forecaster's dev server is pinned to :3000 (its `.claude/launch.json`
- * no longer uses `autoPort`). If you must run it elsewhere, set `VITE_FORECASTER_ORIGIN` —
- * that is the escape hatch for a busy port, and it is dev-only by construction because the
- * production branch never reads it.
+ * The dev value targets :3000, but ⚠️ **nothing in either repo can guarantee that port**.
+ * Forecaster's `.claude/launch.json` is gitignored in both repos and uses `autoPort`, so a
+ * busy 3000 silently moves it — observed live at 49496, 53220 and 53580 across three starts,
+ * because an unrelated three-day-old `next-server` was holding the port.
+ *
+ * ⚠️ **If the handshake times out in dev, check Forecaster's actual port first** and set
+ * `VITE_FORECASTER_ORIGIN`. The escape hatch is the real mechanism here; the pin is not one.
+ * It is dev-only by construction, because the production branch never reads it.
  */
 export const FORECASTER_ORIGIN: string = import.meta.env.PROD
   ? 'https://forecaster.spertsuite.com'
