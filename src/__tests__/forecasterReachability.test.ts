@@ -52,6 +52,29 @@ describe('register completeness', () => {
     expect(new Set(messages).size).toBe(messages.length);
   });
 
+  // ⚠️ The hole these two close: the check below verifies bases for REGISTER rows, and that
+  // no declared basis is dead — but nothing ever verified that a PRE_VALIDATOR_REGISTER row's
+  // OWN basis resolves. A P-row could carry a garbage string and stay green in BOTH repos.
+  // Closed BEFORE P04–P06 were added, so those rows arrived guarded rather than being added
+  // under a check that could not see them.
+  it('resolves every PRE-VALIDATOR basis reference', () => {
+    const known = new Set([...Object.keys(BASES), ...Object.keys(PRE_VALIDATOR_BASES)]);
+    for (const row of PRE_VALIDATOR_REGISTER) {
+      expect(row.basis, `${row.id} must claim a basis`).toBeTruthy();
+      expect([...known], `${row.id} claims basis "${row.basis}", which does not exist`)
+        .toContain(row.basis as string);
+    }
+  });
+
+  it('uses every declared PRE-VALIDATOR basis', () => {
+    // The other direction: a basis nobody references is dead weight that still reads as
+    // coverage — the same argument the check below already makes for BASES.
+    const referenced = new Set(PRE_VALIDATOR_REGISTER.map((r) => r.basis));
+    for (const key of Object.keys(PRE_VALIDATOR_BASES)) {
+      expect([...referenced], `basis "${key}" is declared but unreferenced`).toContain(key);
+    }
+  });
+
   it('resolves every basis reference, and uses every declared basis', () => {
     const referenced = new Set(REGISTER.map((r) => r.basis).filter((b): b is string => !!b));
     for (const key of referenced) expect(Object.keys(BASES)).toContain(key);

@@ -147,6 +147,21 @@ export function buildForecasterExport(product: Product) {
 }
 
 /**
+ * The export as bytes. The download and the crosslink transport MUST produce identical text,
+ * or a payload could fit one route and not the other.
+ *
+ * ⚠️ Do NOT reuse `serialise` from `src/__tests__/fixtures/forecasterFixtures.ts`. It looks
+ * like the same function and is not: it appends a trailing newline that this does not write,
+ * and it is the byte-exact basis for the SHA-pinned vendored-fixture comparison in
+ * `forecasterReachability.test.ts`. Consolidating them breaks `VENDORED_MANIFEST_SHA256`, and
+ * reusing it here would add one byte in exactly the quantity the receiver's size ceiling
+ * measures. Two functions, deliberately.
+ */
+export function serialiseForecasterExport(data: ReturnType<typeof buildForecasterExport>): string {
+  return JSON.stringify(data, null, 2);
+}
+
+/**
  * Download the Forecaster export as a JSON file.
  *
  * Blocked rather than warned: a payload over Forecaster's limits is one it is
@@ -162,7 +177,7 @@ export function downloadForecasterExport(product: Product): string[] {
   const issues = checkForecasterCompatibility(data);
   if (issues.length > 0) return issues;
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const blob = new Blob([serialiseForecasterExport(data)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);

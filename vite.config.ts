@@ -9,6 +9,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Pinned because the Forecaster crosslink allowlists this origin BY NAME in dev. Vite's
+  // default is to walk to 5174+ when 5173 is busy, and a soft port with a hard allowlist
+  // entry fails together, silently. If 5173 is genuinely taken, change the receiver's dev
+  // allowlist rather than letting this drift.
+  server: { port: 5173, strictPort: true },
   test: {
     environment: 'node',
     // Skip nested git worktrees under .claude/ in addition to vitest's

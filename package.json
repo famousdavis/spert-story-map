@@ -1,7 +1,7 @@
 {
   "name": "spert-story-map",
   "private": true,
-  "version": "0.52.20",
+  "version": "0.53.0",
   "type": "module",
   "engines": {
     "node": "24.x"

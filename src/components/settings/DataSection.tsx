@@ -5,6 +5,7 @@
 import { useState, useRef, type ChangeEvent } from 'react';
 import { exportProduct } from '../../lib/storage';
 import { downloadForecasterExport } from '../../lib/exportForForecaster';
+import { sendToForecaster } from '../../lib/sendToForecaster';
 import { downloadExcelExport } from '../../lib/exportForExcel';
 import { parseImportFile } from '../../lib/import-utils';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -23,6 +24,12 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
   const [importConfirm, setImportConfirm] = useState<Product | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [forecasterIssues, setForecasterIssues] = useState<string[] | null>(null);
+  // A separate channel from `forecasterIssues` on purpose. The two buttons fail in different
+  // vocabularies — the export path can only refuse the data, while the send path can also
+  // report a blocked pop-up, a timeout, or a preview waiting for the user in the other tab.
+  // Sharing one banner would file "Forecaster opened this for review" under "cannot export".
+  const [sendIssues, setSendIssues] = useState<string[] | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   // Ref-based double-submission guard. Using useState would race because two
   // rapid synchronous clicks both read the same stale `false` from the closure
@@ -183,6 +190,24 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
     }
   };
 
+  // Hands the export straight to a Forecaster tab instead of routing it through a file the
+  // user has to download and re-upload. Deliberately NOT a persistent connection: one
+  // transfer, then nothing. `sendToForecaster` returns reasons and never throws, so there is
+  // no try/catch here — adding one would report a blocked pop-up as a data problem.
+  const handleSendToForecaster = () => {
+    setForecasterIssues(null);
+    setSendIssues(null);
+    setIsSending(true);
+    // `window.open` runs inside `sendToForecaster` before its first await, so it is still in
+    // this click's own task and the pop-up blocker leaves it alone. Kept as a `.then` rather
+    // than an async handler for exactly that reason: an `await` here would move the open.
+    void sendToForecaster(product)
+      .then((reasons) => {
+        if (reasons.length > 0) setSendIssues(reasons);
+      })
+      .finally(() => setIsSending(false));
+  };
+
   return (
     <>
       <input
@@ -199,6 +224,14 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
         <div className="flex flex-wrap gap-3">
           <button onClick={handleExport} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Export as JSON</button>
           <button onClick={handleForecasterExport} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Export for SPERT Forecaster</button>
+          <button
+            onClick={handleSendToForecaster}
+            disabled={isSending}
+            title="Opens SPERT Forecaster in a new tab and hands this project over once. Nothing stays connected afterwards."
+            className="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg"
+          >
+            {isSending ? 'Sending…' : 'Send to SPERT Forecaster'}
+          </button>
           <button onClick={handleExcelExport} disabled={isExporting} className="px-4 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg">{isExporting ? 'Exporting…' : 'Export as Excel'}</button>
           <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Project from JSON</button>
           <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
@@ -211,6 +244,14 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
             <p className="font-medium">This project cannot be exported to SPERT Forecaster yet:</p>
             <ul className="list-disc list-inside mt-1 space-y-1">
               {forecasterIssues.map((issue, i) => <li key={i}>{issue}</li>)}
+            </ul>
+          </div>
+        )}
+        {sendIssues && (
+          <div role="alert" className="text-sm text-amber-700 dark:text-amber-400 mt-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+            <p className="font-medium">The project was not imported:</p>
+            <ul className="list-disc list-inside mt-1 space-y-1">
+              {sendIssues.map((issue, i) => <li key={i}>{issue}</li>)}
             </ul>
           </div>
         )}
