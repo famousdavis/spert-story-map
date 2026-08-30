@@ -45,6 +45,8 @@ src/
 │   ├── firestoreCollections.ts      # Centralized Firestore collection-name constants (PROJECTS/PROFILES/SETTINGS/SESSIONS)
 │   ├── themeColors.ts               # Centralized 8-color palette for themes (solid, light, dot, swatch)
 │   ├── exportForForecaster.ts       # Pure transformation: Story Map → SPERT Release Forecaster import format
+│   ├── sendToForecaster.ts          # Direct handover to a Forecaster tab (postMessage); returns reasons, never throws
+│   ├── crosslinkProtocol.ts         # Pure sender-side handshake reducer (shared shape with Forecaster's copy)
 │   ├── exportForExcel.ts            # Excel export: buildExcelWorkbook (pure, testable) + downloadExcelExport (dynamic import)
 │   ├── tosConstants.ts              # ToS version, URLs, localStorage keys, app ID
 │   └── tosHelpers.ts                # ToS acceptance state management (localStorage + Firestore)
@@ -219,3 +221,20 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 19. **Excel export** — `exportForExcel.ts` transforms a `Product` into a two-sheet ExcelJS workbook: Sheet 1 (Rib Items) has one data row per rib item with a color-coded theme group header row before each theme; Sheet 2 (Release Summary) has one row per release. `buildExcelWorkbook(product, ExcelJS)` accepts the ExcelJS constructor as a parameter so it is a pure async function testable in Vitest without a browser. `downloadExcelExport(product)` owns the dynamic `import('exceljs')` so ExcelJS (~1 MB) stays out of the initial bundle and loads on demand. Theme group header rows span all 9 columns via `mergeCells` (called before setting value/style). % Complete cells are conditionally filled: green (`FFD1FAE5`) at 100%, yellow (`FFFEF3C7`) for partial progress. Notes column (width 80) uses `wrapText: true` + `vertical: 'top'` alignment on data cells only.
 
 18. **Workspace reconciliation** — Each browser gets a persistent workspace token (`rp_workspace_id` in localStorage, generated once via `getWorkspaceId()`). Products carry `_originRef` (set at creation, preserved across imports) for data provenance tracking. `_storageRef` is injected at export time from the current workspace token for cross-session identification. `appendChangeLogEntry()` maintains a capped (500-entry) structural operation log (`_changeLog`) for export pipeline diagnostics. Export Attribution preferences (`exportName`, `exportId`) are stored in `rp_app_preferences` and injected as `_exportedBy`/`_exportedById` at export time for team workflow traceability.
+
+20. **Crosslink transport to SPERT Forecaster (v0.53.0)** — `sendToForecaster.ts` hands a project
+directly to a Forecaster tab in the same browser, replacing the JSON download/upload round trip.
+`window.open` targets Forecaster with `?crosslink=storymap&xid=…`, then the export is transferred
+over `postMessage`: `OPEN → OFFER → ACK|NACK`, keyed on `opcode` / `protocol` / `exchangeId`.
+`crosslinkProtocol.ts` holds the handshake as a **pure reducer**, which is what makes the state
+machine testable without a browser (jsdom's `window.open` returns `undefined`, so the real one is
+injected via `SendDeps`).
+**The JSON download is retained deliberately** — `postMessage` is same-browser only, so the file
+remains the cross-device path; removing it would remove a capability.
+`sendToForecaster` **returns reasons and never throws**, matching `downloadForecasterExport`: a
+malformed sprint date throws out of the builder while a blocked popup is the house `if (!w) throw`
+pattern, so a single try/catch would tell a popup-blocked user their sprint dates are invalid.
+Both paths serialise through the **one** `serialiseForecasterExport`, so the bytes Forecaster
+receives are identical to the bytes the file would have contained.
+`window.opener` is the transport, so the `window.open` deliberately omits `noopener`/`noreferrer`
+— unlike every other `_blank` in this app.
