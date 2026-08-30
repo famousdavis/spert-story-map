@@ -55,7 +55,23 @@ export function buildForecasterExport(product: Product) {
   const milestones = [];
   for (const release of sortedReleases) {
     const backlogSize = round2(getPointsForRelease(product, release.id));
-    if (backlogSize < 0.01) continue; // Forecaster requires > 0
+    // ⚠️ KEEP THIS SKIP — but NOT for the reason this comment used to give.
+    // It said "Forecaster requires > 0". That is FALSE: Forecaster's floor is
+    // ZERO (spert-forecaster/src/shared/state/import-validation.ts, the
+    // `isValidNumber(m.backlogSize, 0, …)` check), and it accepts 0 deliberately.
+    //
+    // The real reason is a SEMANTIC MISMATCH between the two apps, which share
+    // the field name and mean different quantities by it:
+    //   - here, `backlogSize` is the release's TOTAL points (getPointsForRelease)
+    //   - in Forecaster, a milestone's `backlogSize` is work REMAINING, and
+    //     `backlogSize === 0` is the user-maintained "milestone COMPLETED" sentinel
+    // So a release with no points estimated would arrive over there as a
+    // milestone reporting itself FINISHED. Skipping it is the conservative
+    // reading; sending it would assert something we do not know.
+    //
+    // ⚠️ Do not "fix" this by deleting the skip on the grounds that Forecaster
+    // accepts 0 — that is exactly the wrong inference from the corrected fact.
+    if (backlogSize < 0.01) continue;
     milestones.push({
       id: release.id,
       name: release.name,

@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 0.53.1 (2026-08-30)
+
+### Fixed — a code comment that stated the wrong reason for correct behaviour
+
+No change to what the app does. When a project is sent or exported to SPERT Forecaster, releases with
+no points estimated are left out — and they should be. The note in the code explaining *why* said the
+Forecaster refuses a zero, which is not true: it accepts one.
+
+The real reason is that the two apps mean different things by the same field. Here, a release's figure
+is its **total** points. Over there, a milestone's figure is the work **remaining**, and a zero is how
+the Forecaster records a milestone as **finished**. Sending a release with nothing estimated would
+therefore announce it as complete — so leaving it out is the honest choice, not a workaround for a
+validation rule.
+
+The reason this matters enough to correct: anyone who checked the old note against the Forecaster
+would find it false, and the obvious conclusion — that the exclusion is unnecessary — is precisely the
+wrong one. The comment now says which behaviour depends on it and warns against removing it.
+
 ## Version 0.53.0 (2026-08-29)
 
 ### Added — send a project straight to SPERT Forecaster
