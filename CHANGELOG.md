@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 0.53.7 (2026-09-14)
+
+### Fixed — a duplicated cloud project could not be replaced by importing a file
+
+Cloud storage only. If you have never signed in, nothing here affects you and your projects were never involved.
+
+When a project is open in cloud mode, the app keeps two extra bookkeeping fields alongside it — a copy of who owns the project and a copy of who it is shared with. They are working copies, meant to live only in the browser for as long as the project is on screen. Duplicating a project copied them along with everything else, and the duplicate then saved them into cloud storage, where they were never supposed to go.
+
+That had a consequence nobody would have connected to duplication. Settings → Data → Import, and the homepage Import when you choose to replace an existing project, both work by writing the whole project back at once. Cloud storage compares the incoming version against the stored one and refuses the write if it removes a field. The two stray fields were exactly that: the incoming version did not have them, so removing them is what the write looked like, and it was refused. Any project made with Duplicate while signed in would report **“Import failed: Missing or insufficient permissions.”** every time, with no way to fix it from inside the app — deleting the stray fields was refused for the same reason.
+
+Two changes, and they pull in opposite directions on purpose:
+
+- **Duplicate no longer saves the two fields.** New duplicates are clean. The same fix also stops three export-only fields — the workspace marker and the name and identifier you enter under Export Attribution — from being written to cloud storage, where they served no purpose.
+- **Replacing a project now keeps whatever the stored copy already has.** This is what repairs the projects already affected. Rather than removing the stray fields, an import carries them through untouched, so the write is no longer seen as a removal and is accepted. **Existing duplicates are usable again with no action from you** — just run the import that previously failed.
+
+Projects created before this release keep the two stray fields permanently. They are invisible everywhere outside cloud storage — they are already dropped from every file the app exports — and now that replacing works they cost nothing. Removing them would have required temporarily relaxing the rule that protects sharing permissions, which is not a trade worth making.
+
+What did **not** change: the record of who owns and who may edit a project, the creation date, the workspace marker, and the project's change history are all still preserved exactly as before, and the change history is still written when a project is created. Nothing about how the app looks or behaves is different.
+
 ## Version 0.53.6 (2026-09-13)
 
 ### Changed — A note in the release checks said the licence is copied into nine projects. It is eight.

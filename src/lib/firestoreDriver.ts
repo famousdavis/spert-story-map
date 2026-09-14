@@ -312,8 +312,31 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       productPending = null;
       try {
         const ref = doc(requireDb(), PROJECTS_COL, product.id);
-        const { id: _id, ...rest } = product;
+        const {
+          id: _id,
+          // Cloud-only / export-only fields that must never be written at create.
+          // _owner/_members are in-memory ALIASES re-attached on read (loadProduct,
+          // loadProductIndex, onProductChange). A cloud-mode Duplicate spreads the
+          // loaded product wholesale (storage.ts duplicateProduct), so before this
+          // strip every cloud Duplicate persisted both — which also made the new
+          // document permanently un-replaceable by import, since an unmerged
+          // replace omitting a stored key is a REMOVAL and `allow update`'s
+          // hasOnly() denies it (deleteField() is denied too, so the client could
+          // not clean up after itself). replaceProduct carries them forward.
+          _owner: _o, _members: _m,
+          // Export-time attribution, injected by exportProduct. Never Firestore's.
+          _storageRef: _sr, _exportedBy: _eb, _exportedById: _ebi,
+          ...rest
+        } = product;
         const data = sanitizeForFirestore(rest);
+        // ⚠️ These five, and ONLY these five. This is NOT doSaveProduct's strip:
+        // that one additionally removes `owner`, `members` and `_changeLog`, and
+        // all three MUST survive here. `owner`/`members` are set below and are
+        // what `allow create` binds against; `_changeLog` is written for real at
+        // create, and resetChangeLogBaseline() below then records those entries as
+        // already-on-server — so stripping it would drop the create-time
+        // provenance entry from the document AND stop arrayUnion ever re-sending
+        // it, with no test in this repo able to see the loss.
         await setDoc(ref, {
           ...data,
           owner: uid,
@@ -361,6 +384,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      *   owner, members — collaborator permissions (Firestore-only)
      *   createdAt      — original creation timestamp
      *   _originRef     — workspace provenance fingerprint (academic integrity)
+     *   _owner,        — alias junk persisted by pre-v0.53.7 cloud Duplicate.
+     *   _members         Carried forward ONLY when already stored, never
+     *                    introduced. The unmerged tx.set makes an omission a
+     *                    removal, and `allow update`'s hasOnly() denies that.
      *
      * Errors propagate to applyImport's per-write try/catch and surface in the
      * import done banner (outcome.errors). NOT routed through handleWriteError.
@@ -384,6 +411,27 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           members: existing.members ?? { [uid]: 'owner' },
           createdAt: existing.createdAt ?? data.createdAt,
           _originRef: (existing._originRef as string | undefined) ?? data._originRef,
+          // ⚠️ CARRY FORWARD — do NOT strip, and do NOT copy the `??` idiom above.
+          //
+          // Why carry forward: this tx.set is UNMERGED, so omitting a key the
+          // stored document already has is a REMOVAL, and a removal counts in
+          // diff().affectedKeys() — which `allow update`'s hasOnly() then denies.
+          // Documents created by a pre-v0.53.7 cloud Duplicate store _owner and
+          // _members, so before this an import-replace onto one of them failed
+          // with "Missing or insufficient permissions", and deleteField() was
+          // denied too, leaving no way to repair them from the client. Those
+          // documents are kept as-is (owner's ruling); this is what makes them
+          // usable again.
+          //
+          // Why a conditional spread and not `existing._owner ?? data._owner`:
+          // validateProduct drops both aliases, so data._owner is always absent
+          // and that expression is `undefined` on a clean document. firebase.ts
+          // does not set ignoreUndefinedProperties, so the write would throw
+          // "Unsupported field value: undefined" on the COMMON path. Spreading
+          // conditionally also keeps the promise never to INTRODUCE an alias the
+          // document did not already carry.
+          ...(existing._owner !== undefined ? { _owner: existing._owner } : {}),
+          ...(existing._members !== undefined ? { _members: existing._members } : {}),
           updatedAt: new Date().toISOString(),
         });
       });
