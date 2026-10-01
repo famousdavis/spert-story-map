@@ -168,17 +168,31 @@ function _legacyPercentCompleteAsOf(ribItem: ProgressSource, sprintId: string, s
 
 // --- Release-level calculations ---
 
-// `sprintId` accepts null as well as undefined — the progress view represents
-// "no sprint selected" as null, and the branch below is a truthy check that
-// already treated the two identically.
-export function getReleasePercentComplete(product: Product, releaseId: string, sprintId?: string | null): number {
-  const { totalAllocatedPoints, totalCompletedPoints } = reduceRibs(product, (acc, rib) => {
+/**
+ * A release's allocated points, and how many of them are done: as of `sprintId`
+ * (walking back through earlier sprints), or the latest recorded progress when
+ * no sprint is given.
+ *
+ * The ONE statement of how per-release progress counts against an allocation.
+ * A progress entry records the share of the WHOLE rib finished under that
+ * release (the Progress tab caps it at the allocation), so it completes the
+ * release's portion on reaching the allocation percentage and counts nothing
+ * beyond it. `getReleasePercentComplete`, `getReleaseProgressOverTime` and the
+ * Forecaster export all read this, so the percentage the Progress tab shows
+ * and the remaining work the export sends cannot disagree.
+ *
+ * `sprintId` accepts null as well as undefined — the progress view represents
+ * "no sprint selected" as null, and the branch below is a truthy check that
+ * already treated the two identically.
+ */
+export function getReleasePoints(product: Product, releaseId: string, sprintId?: string | null): { allocated: number; completed: number } {
+  return reduceRibs(product, (acc, rib) => {
     const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
     if (!alloc) return acc;
 
     const ribPoints = getRibItemPoints(rib, product.sizeMapping);
     const allocatedPoints = ribPoints * (alloc.percentage / 100);
-    acc.totalAllocatedPoints += allocatedPoints;
+    acc.allocated += allocatedPoints;
 
     const releaseProgress = sprintId
       ? getRibReleaseProgressAsOf(rib, releaseId, sprintId, product.sprints)
@@ -186,11 +200,14 @@ export function getReleasePercentComplete(product: Product, releaseId: string, s
     const releasePortionComplete = alloc.percentage > 0
       ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
       : 0;
-    acc.totalCompletedPoints += allocatedPoints * releasePortionComplete;
+    acc.completed += allocatedPoints * releasePortionComplete;
     return acc;
-  }, { totalAllocatedPoints: 0, totalCompletedPoints: 0 });
+  }, { allocated: 0, completed: 0 });
+}
 
-  return totalAllocatedPoints > 0 ? (totalCompletedPoints / totalAllocatedPoints) * 100 : 0;
+export function getReleasePercentComplete(product: Product, releaseId: string, sprintId?: string | null): number {
+  const { allocated, completed } = getReleasePoints(product, releaseId, sprintId);
+  return allocated > 0 ? (completed / allocated) * 100 : 0;
 }
 
 export function getProjectPercentComplete(product: Product, sprintId?: string): number {
@@ -366,26 +383,11 @@ export function getReleaseProgressOverTime(product: Product, releaseId: string) 
   if (!product.sprints.length) return [];
 
   return product.sprints.map(sprint => {
-    const { totalAllocatedPoints, completedPoints } = reduceRibs(product, (acc, rib) => {
-      const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-      if (!alloc) return acc;
-
-      const ribPoints = getRibItemPoints(rib, product.sizeMapping);
-      const allocatedPoints = ribPoints * (alloc.percentage / 100);
-      acc.totalAllocatedPoints += allocatedPoints;
-
-      const releaseProgress = getRibReleaseProgressAsOf(rib, releaseId, sprint.id, product.sprints);
-      const releasePortionComplete = alloc.percentage > 0
-        ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
-        : 0;
-      acc.completedPoints += allocatedPoints * releasePortionComplete;
-      return acc;
-    }, { totalAllocatedPoints: 0, completedPoints: 0 });
-
+    const { allocated, completed } = getReleasePoints(product, releaseId, sprint.id);
     return {
       sprintName: sprint.name,
-      totalPoints: Math.round(totalAllocatedPoints * 10) / 10,
-      completedPoints: Math.round(completedPoints * 10) / 10,
+      totalPoints: Math.round(allocated * 10) / 10,
+      completedPoints: Math.round(completed * 10) / 10,
     };
   });
 }

@@ -319,7 +319,7 @@ export const VENDORED_MANIFEST = `${FIXTURE_DIR}/vendored-manifest.json`;
  * without re-vendoring silences the only signal either repo has.
  */
 export const VENDORED_MANIFEST_SHA256 =
-  '5d27d8dd1ed8e0aeead7f36bc72a9f0cbfa8f393e94a742e8659eed2a5ac7cd5';
+  '824d831abef919e88cab4814ca889020e074057fbe27f76e6af1b543841ca7a9';
 
 export interface VendoredEntry {
   /** Register row this payload exercises, or 'canonical' for the baseline. */
@@ -359,8 +359,8 @@ export function serialise(value: unknown): string {
 }
 
 /**
- * One rib sized at `points` and allocated to NOTHING. `getPointsForRelease`
- * returns 0 for every release so no milestones are emitted at all, while
+ * One rib sized at `points` and allocated to NOTHING. `getReleasePoints`
+ * allocates 0 to every release so no milestones are emitted at all, while
  * `getTotalProjectPoints` still counts the rib — which is what drives
  * `backlogAtSprintEnd` over the cap without any milestone being involved.
  */

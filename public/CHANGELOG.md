@@ -1,5 +1,27 @@
 # Changelog
 
+## Version 0.53.8 (2026-10-01)
+
+### Fixed — Forecaster milestones showed each release's whole size instead of the work left in it
+
+Affects **Send to SPERT Forecaster** and **Export for SPERT Forecaster**, which produce the same data.
+
+In SPERT Forecaster, a milestone's backlog figure means the work still to do before that release is delivered. Story Map was sending each release's **total** points in that field. Work already finished in Story Map therefore arrived in Forecaster as if it were still outstanding: every milestone looked as large as its whole release, and every milestone forecast came out later than it should. Because Forecaster adds the milestones up in order, the later ones could also add up to more than the project's real remaining backlog, and Forecaster would then report them as unreachable.
+
+Each milestone now carries the work **remaining** in its release: the points allocated to it, less the progress recorded against them, counted exactly as the Progress tab counts it. For example, a 60-point release with 50 points done now arrives as 10, not 60. The figure is taken as of the last sprint sent to Forecaster. That is the sprint Forecaster reads the project's remaining backlog from when the project arrives, so both describe the same moment.
+
+- **A release whose work is all done now arrives as a completed milestone** (0 remaining), which Forecaster shows as completed. It used to arrive at its full size.
+- **A release with no estimated points is still left out**, as before. Sending it would tell Forecaster it was finished, which nobody knows.
+
+**Until SPERT Forecaster is updated to match**, two things to know:
+
+- **Sending again does not refresh milestone figures.** When the project already exists in Forecaster, its default for a repeat send is **Update**, and Update keeps the milestone figures Forecaster already has. That includes correct figures from a send made with this version: they will not follow your progress on later sends. To refresh them, choose **Replace** for that project when you send it, or edit each milestone's remaining work by hand in Forecaster. Replace also discards what you have set up for the project inside Forecaster, such as productivity adjustments, sprint exclusions, custom sprint finish dates and burn-up chart settings.
+- **Do not subtract completed work by hand.** Forecaster's on-screen note and its guide still say that milestone figures from Story Map are total scope. From this version they are not, so correcting them as those notes suggest would count finished work twice.
+
+**Work that is not planned into any release.** Forecaster's forecast for the whole project ends at the last milestone. If some of your work is not allocated to a release, that finish date leaves it out and comes out early. Before this release the inflated figures usually pushed the last milestone past the end of the backlog, which hid this.
+
+The export now also says which meaning its milestone figures carry. Files exported before this release hold totals in the same field, and the numbers alone cannot tell the two apart. Forecaster does not read this marker yet; it is there so that Forecaster can tell new files from old ones.
+
 ## Version 0.53.7 (2026-09-14)
 
 ### Fixed — a duplicated cloud project could not be replaced by importing a file

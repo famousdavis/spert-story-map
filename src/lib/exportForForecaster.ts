@@ -4,7 +4,7 @@
 
 // Pure transformation: Story Map product → SPERT Release Forecaster import format
 import type { Product, Sprint } from '../types';
-import { getRibItemPoints, getRibItemPercentCompleteAsOf, getPointsForRelease, getTotalProjectPoints } from './calculations';
+import { getRibItemPoints, getRibItemPercentCompleteAsOf, getReleasePoints, getTotalProjectPoints } from './calculations';
 import { reduceRibs } from './ribHelpers';
 import { checkForecasterCompatibility } from './forecasterLimits';
 
@@ -51,31 +51,44 @@ export function buildForecasterExport(product: Product) {
   const sortedReleases = [...(product.releases || [])].sort((a, b) => a.order - b.order);
   const sortedSprints = [...(product.sprints || [])].sort((a, b) => a.order - b.order);
 
+  // Only sprints with an end date become sprint records.
+  // Type predicate, not a bare truthiness filter: every sprint that survives
+  // this genuinely has a date, and saying so lets the reads below (startDate,
+  // sprintFinishDate) use it without re-asserting.
+  const sprintsWithDates = sortedSprints.filter(
+    (s): s is Sprint & { endDate: string } => Boolean(s.endDate)
+  );
+
   // --- Milestones from releases ---
+  // `backlogSize` is the work REMAINING in the release, because that is what
+  // Forecaster reads it as: it sums the milestones in order to get the delivery
+  // each one needs, and treats `backlogSize === 0` as "milestone COMPLETED".
+  // Until v0.53.8 this sent the release's TOTAL points, so every milestone
+  // arrived with its finished work still counted as outstanding.
+  //
+  // Measured at the LAST EXPORTED sprint. Every exported sprint arrives
+  // included in Forecaster's forecast, so this is the sprint whose
+  // `backlogAtSprintEnd` Forecaster defaults the remaining backlog to: the
+  // milestones and that backlog describe the same moment. A user can later
+  // exclude sprints or type a backlog over there, which this cannot see. With
+  // no dated sprint there is no backlog to match, so the latest sprint is used.
+  const asOfSprint = sprintsWithDates[sprintsWithDates.length - 1]
+    ?? sortedSprints[sortedSprints.length - 1];
   const milestones = [];
   for (const release of sortedReleases) {
-    const backlogSize = round2(getPointsForRelease(product, release.id));
-    // ⚠️ KEEP THIS SKIP — but NOT for the reason this comment used to give.
-    // It said "Forecaster requires > 0". That is FALSE: Forecaster's floor is
-    // ZERO (spert-forecaster/src/shared/state/import-validation.ts, the
-    // `isValidNumber(m.backlogSize, 0, …)` check), and it accepts 0 deliberately.
-    //
-    // The real reason is a SEMANTIC MISMATCH between the two apps, which share
-    // the field name and mean different quantities by it:
-    //   - here, `backlogSize` is the release's TOTAL points (getPointsForRelease)
-    //   - in Forecaster, a milestone's `backlogSize` is work REMAINING, and
-    //     `backlogSize === 0` is the user-maintained "milestone COMPLETED" sentinel
-    // So a release with no points estimated would arrive over there as a
-    // milestone reporting itself FINISHED. Skipping it is the conservative
-    // reading; sending it would assert something we do not know.
-    //
-    // ⚠️ Do not "fix" this by deleting the skip on the grounds that Forecaster
-    // accepts 0 — that is exactly the wrong inference from the corrected fact.
-    if (backlogSize < 0.01) continue;
+    const { allocated, completed } = getReleasePoints(product, release.id, asOfSprint?.id);
+    // ⚠️ KEEP THIS SKIP, and keep it on the release's TOTAL (`allocated`), never
+    // on what remains. Forecaster's floor is ZERO, not positive (the
+    // `isValidNumber(m.backlogSize, 0, …)` check in its import-validation.ts),
+    // but its 0 means "COMPLETED". So a release with no points estimated would
+    // arrive claiming to be finished, which we do not know. A release whose
+    // estimated work is all DONE is the opposite case and IS sent, because
+    // there the 0 is true.
+    if (round2(allocated) < 0.01) continue;
     milestones.push({
       id: release.id,
       name: release.name,
-      backlogSize,
+      backlogSize: round2(allocated - completed),
       color: MILESTONE_HEX_COLORS[milestones.length % MILESTONE_HEX_COLORS.length],
       showOnChart: true,
       createdAt,
@@ -84,12 +97,6 @@ export function buildForecasterExport(product: Product) {
   }
 
   // --- Sprints ---
-  // Type predicate, not a bare truthiness filter: every sprint that survives
-  // this genuinely has a date, and saying so lets the reads below (startDate,
-  // sprintFinishDate) use it without re-asserting.
-  const sprintsWithDates = sortedSprints.filter(
-    (s): s is Sprint & { endDate: string } => Boolean(s.endDate)
-  );
   const cadence = product.sprintCadenceWeeks || 2;
   const firstWithDate = sprintsWithDates[0];
   const firstSprintStart = firstWithDate
@@ -152,11 +159,18 @@ export function buildForecasterExport(product: Product) {
     version: '1.0',
     exportedAt: now,
     // Forecaster's importer discriminates on this exact literal
-    // (`isStoryMapExport`,
-    // spert-forecaster/src/shared/state/import-utils.ts:29). Without it every export
+    // (`isStoryMapExport` in spert-forecaster/src/shared/state/import-utils.ts).
+    // Without it every export
     // classifies as `legacy`, which pre-selects the workspace-wide
     // replace-all path and hides the per-project merge controls.
     source: 'spert-story-map',
+    // Says what each milestone's `backlogSize` means. Exports before v0.53.8
+    // sent each release's TOTAL points in that field, and those files still
+    // exist; the numbers alone cannot show which one a payload carries.
+    // Forecaster up to v0.43.8 keeps no top-level allowlist and drops unknown
+    // top-level keys when it classifies a payload, so sending this before
+    // Forecaster read it was safe.
+    milestoneBacklog: 'remaining',
     projects: [project],
     sprints: sprintRecords,
   };

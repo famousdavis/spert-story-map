@@ -255,6 +255,163 @@ describe('buildForecasterExport — milestones', () => {
   });
 });
 
+// --- buildForecasterExport: milestone backlogSize is REMAINING work ---
+// Forecaster reads a milestone's backlogSize as the work still to deliver for
+// that release, and 0 as "completed". Until v0.53.8 the export sent each
+// release's TOTAL points, so finished work arrived counted as outstanding.
+describe('buildForecasterExport — milestone remaining work', () => {
+  const sizedBacklogs = (product: Product) =>
+    buildForecasterExport(product).projects[0]?.milestones.map(
+      (m: { backlogSize: number }) => m.backlogSize);
+
+  it('sends the work remaining in each release, not its total', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [
+        makeRib('r1', { // 40 pts, 30 done
+          size: 'L', allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+          history: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 75 }],
+        }),
+        makeRib('r2', { size: 'M', allocations: [{ releaseId: 'rel-1', percentage: 100 }] }), // 20 pts, none done
+        makeRib('r3', { // 10 pts, 4 done
+          size: 'S', allocations: [{ releaseId: 'rel-2', percentage: 100 }],
+          history: [{ sprintId: 's1', releaseId: 'rel-2', percentComplete: 40 }],
+        }),
+      ])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }, { id: 'rel-2', name: 'R2', order: 2 }],
+      sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' }],
+    });
+    // Totals would be [60, 10].
+    expect(sizedBacklogs(product)).toEqual([30, 6]);
+  });
+
+  it('sends a fully done release as 0, which Forecaster reads as completed, rather than skipping it', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [
+        makeRib('r1', {
+          size: 'S', allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+          history: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 100 }],
+        }),
+        makeRib('r2', { size: 'M', allocations: [{ releaseId: 'rel-2', percentage: 100 }] }),
+      ])])],
+      releases: [{ id: 'rel-1', name: 'Done', order: 1 }, { id: 'rel-2', name: 'Open', order: 2 }],
+      sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' }],
+    });
+    const milestones = buildForecasterExport(product).projects[0]?.milestones;
+    expect(milestones.map((m: { name: string }) => m.name)).toEqual(['Done', 'Open']);
+    expect(sizedBacklogs(product)).toEqual([0, 20]);
+  });
+
+  it('counts a split rib only against the share allocated to each release', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('r1', {
+        size: 'M', // 20 pts: 10 to each release
+        allocations: [{ releaseId: 'rel-1', percentage: 50 }, { releaseId: 'rel-2', percentage: 50 }],
+        history: [
+          { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 }, // rel-1's half is done
+          { sprintId: 's1', releaseId: 'rel-2', percentComplete: 20 }, // 4 of rel-2's 10
+        ],
+      })])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }, { id: 'rel-2', name: 'R2', order: 2 }],
+      sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' }],
+    });
+    expect(sizedBacklogs(product)).toEqual([0, 6]);
+  });
+
+  it('measures at the last exported sprint, the one whose backlogAtSprintEnd Forecaster reads', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('r1', {
+        size: 'L', allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+        history: [
+          { sprintId: 's1', releaseId: 'rel-1', percentComplete: 25 },
+          { sprintId: 's2', releaseId: 'rel-1', percentComplete: 50 },
+          { sprintId: 's3', releaseId: 'rel-1', percentComplete: 100 },
+        ],
+      })])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
+      sprints: [
+        { id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' },
+        { id: 's2', name: 'Sprint 2', order: 2, endDate: '2026-01-24' },
+        // Undated, so not exported. Its progress is outside the history
+        // Forecaster receives, and must not appear in the milestone either.
+        { id: 's3', name: 'Sprint 3', order: 3, endDate: null },
+      ],
+    });
+    const result = buildForecasterExport(product);
+    expect(result.sprints).toHaveLength(2);
+    // As of s2: 40 × 50% left. (As of s1 it would be 30, latest progress 0, total 40.)
+    expect(sizedBacklogs(product)).toEqual([20]);
+    expect(result.sprints[1]?.backlogAtSprintEnd).toBe(20);
+  });
+
+  it('adds up to the backlog Forecaster reads when every rib is fully allocated', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [
+        makeRib('r1', {
+          size: 'S', allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+          history: [
+            { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 },
+            { sprintId: 's2', releaseId: 'rel-1', percentComplete: 70 },
+          ],
+        }),
+        makeRib('r2', {
+          size: 'L',
+          allocations: [{ releaseId: 'rel-1', percentage: 25 }, { releaseId: 'rel-2', percentage: 75 }],
+          history: [
+            { sprintId: 's1', releaseId: 'rel-1', percentComplete: 10 },
+            { sprintId: 's2', releaseId: 'rel-2', percentComplete: 30 },
+          ],
+        }),
+        makeRib('r3', {
+          size: 'M', allocations: [{ releaseId: 'rel-3', percentage: 100 }],
+          history: [{ sprintId: 's1', releaseId: 'rel-3', percentComplete: 35 }],
+        }),
+      ])])],
+      releases: [
+        { id: 'rel-1', name: 'R1', order: 1 },
+        { id: 'rel-2', name: 'R2', order: 2 },
+        { id: 'rel-3', name: 'R3', order: 3 },
+      ],
+      sprints: [
+        { id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' },
+        { id: 's2', name: 'Sprint 2', order: 2, endDate: '2026-01-24' },
+      ],
+    });
+    const result = buildForecasterExport(product);
+    // R1: 10 + 10 allocated, 7 + 4 done. R2: 30 allocated, 12 done. R3: 20 allocated, 7 done.
+    // Exact here because every figure is whole. Each milestone and the backlog
+    // are rounded to 2 places separately, so with fractional points the sum can
+    // overshoot by up to 0.005 per release. Forecaster should compare with a
+    // tolerance; this export cannot make the rounded parts add up exactly.
+    expect(sizedBacklogs(product)).toEqual([9, 18, 13]);
+    expect(9 + 18 + 13).toBe(result.sprints[1]?.backlogAtSprintEnd);
+  });
+
+  it('uses the latest sprint by order when no sprint has an end date', () => {
+    const product = makeProduct({
+      themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('r1', {
+        size: 'M', allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+        // Recorded out of order: sprint 1 was back-filled after sprint 2.
+        history: [
+          { sprintId: 's2', releaseId: 'rel-1', percentComplete: 60 },
+          { sprintId: 's1', releaseId: 'rel-1', percentComplete: 30 },
+        ],
+      })])])],
+      releases: [{ id: 'rel-1', name: 'R1', order: 1 }],
+      sprints: [
+        { id: 's1', name: 'Sprint 1', order: 1, endDate: null },
+        { id: 's2', name: 'Sprint 2', order: 2, endDate: null },
+      ],
+    });
+    expect(buildForecasterExport(product).sprints).toHaveLength(0);
+    // As of s2: 20 × 40% left. (Last entry by position, s1's 30%, would leave 14.)
+    expect(sizedBacklogs(product)).toEqual([8]);
+  });
+
+  it('declares that milestone backlogSize is remaining work', () => {
+    expect(buildForecasterExport(makeProduct()).milestoneBacklog).toBe('remaining');
+  });
+});
+
 // --- buildForecasterExport: sprint mapping ---
 describe('buildForecasterExport — sprint mapping', () => {
   it('maps sprint numbers as 1-based from sorted order', () => {
@@ -523,11 +680,12 @@ describe('buildForecasterExport — edge cases', () => {
   });
 
   it('rounds values to avoid floating-point noise', () => {
-    // 40 points * 33/100 = 13.2, which should stay clean
+    // 40 points * 33/100 = 13.2 allocated, which is 13.200000000000001 in
+    // floating point. 9 of that 33% done leaves 9.6, unrounded 9.600000000000001.
     const rib = makeRib('r1', {
       size: 'L',
       allocations: [{ releaseId: 'rel-1', percentage: 33 }],
-      history: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 33 }],
+      history: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 9 }],
     });
     const product = makeProduct({
       themes: [makeTheme('t1', [makeBackbone('b1', [rib])])],
@@ -536,12 +694,13 @@ describe('buildForecasterExport — edge cases', () => {
     });
 
     const result = buildForecasterExport(product);
-    // backlogSize = 40 * 33/100 = 13.2
-    expect(result.projects[0]?.milestones[0]?.backlogSize).toBe(13.2);
-    // doneValue = 40 * 33/100 = 13.2
-    expect(result.sprints[0]?.doneValue).toBe(13.2);
-    // Verify no floating-point noise (like 13.200000000000001)
-    expect(String(result.sprints[0]?.doneValue)).toBe('13.2');
+    // backlogSize = 13.2 allocated - 13.2 * 9/33 done = 9.6
+    expect(result.projects[0]?.milestones[0]?.backlogSize).toBe(9.6);
+    expect(String(result.projects[0]?.milestones[0]?.backlogSize)).toBe('9.6');
+    // doneValue = 40 * 9/100 = 3.6
+    expect(result.sprints[0]?.doneValue).toBe(3.6);
+    // Verify no floating-point noise
+    expect(String(result.sprints[0]?.doneValue)).toBe('3.6');
   });
 });
 
@@ -592,14 +751,16 @@ describe('buildForecasterExport — integration', () => {
     expect(proj.unitOfMeasure).toBe('Story Points');
     expect(proj.firstSprintStartDate).toBe('2026-01-11');
 
-    // Milestones (incremental)
-    // MVP: rib1 100% of 10 + rib2 50% of 20 = 10 + 10 = 20
-    // GA: rib2 50% of 20 = 10
+    // Milestones: work REMAINING per release, as of Sprint 3 (the last exported).
+    // MVP: 20 allocated (rib1 100% of 10 + rib2 50% of 20). rib1 is at 100% and
+    //      rib2's rel-1 entry is at 50 of its 50, so all 20 are done → 0.
+    // GA:  10 allocated (rib2 50% of 20). rib2's rel-2 entry is at 50 of 50 → 0.
+    // Both are complete. The 40 left in Sprint 3's backlog is rib3, unallocated.
     expect(proj.milestones).toHaveLength(2);
     expect(proj.milestones[0]?.name).toBe('MVP');
-    expect(proj.milestones[0]?.backlogSize).toBe(20);
+    expect(proj.milestones[0]?.backlogSize).toBe(0);
     expect(proj.milestones[1]?.name).toBe('GA');
-    expect(proj.milestones[1]?.backlogSize).toBe(10);
+    expect(proj.milestones[1]?.backlogSize).toBe(0);
 
     // Total project points = 10 + 20 + 40 = 70
 
