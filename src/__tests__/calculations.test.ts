@@ -16,6 +16,7 @@ import {
   getRibItemPercentCompleteForSprint,
   getRibItemPercentCompleteAsOf,
   getReleasePercentComplete,
+  getReleasePoints,
   getProjectPercentComplete,
   getCoreNonCorePointsForRelease,
   getAllocationTotal,
@@ -698,6 +699,88 @@ describe('getReleasePercentComplete with sprint history', () => {
       sprints,
     });
     expect(getReleasePercentComplete(product, 'rel-1', 'sp-1')).toBe(100);
+  });
+});
+
+// --- getReleasePoints ---
+describe('getReleasePoints', () => {
+  const sprints = [
+    { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: null },
+    { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: null },
+  ];
+  const productWith = (ribs: RibItem[]) => makeProduct({
+    themes: [makeTheme('t1', [makeBackbone('b1', ribs)])],
+    releases: [{ id: 'rel-1', name: 'R1', order: 1 }, { id: 'rel-2', name: 'R2', order: 2 }],
+    sprints,
+  });
+
+  it('returns allocated points and the part done as of a sprint', () => {
+    const product = productWith([
+      makeRib('r1', {
+        size: 'L', // 40 pts
+        allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+        history: [
+          { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 25 },
+          { sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: 75 },
+        ],
+      }),
+      makeRib('r2', { size: 'M', allocations: [{ releaseId: 'rel-1', percentage: 100 }] }), // 20 pts, none done
+    ]);
+    expect(getReleasePoints(product, 'rel-1', 'sp-1')).toEqual({ allocated: 60, completed: 10 });
+    expect(getReleasePoints(product, 'rel-1', 'sp-2')).toEqual({ allocated: 60, completed: 30 });
+  });
+
+  it('counts progress against the allocation and never beyond it', () => {
+    // 80% recorded against a 50% allocation (possible once an allocation is
+    // reduced after progress is logged): that release's half is done, and the
+    // excess must not leak into a completed figure larger than the allocation.
+    const product = productWith([makeRib('r1', {
+      size: 'L', // 40 pts
+      allocations: [{ releaseId: 'rel-1', percentage: 50 }, { releaseId: 'rel-2', percentage: 50 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 80 }],
+    })]);
+    expect(getReleasePoints(product, 'rel-1', 'sp-1')).toEqual({ allocated: 20, completed: 20 });
+    expect(getReleasePoints(product, 'rel-2', 'sp-1')).toEqual({ allocated: 20, completed: 0 });
+  });
+
+  it('uses the latest recorded progress when no sprint is given', () => {
+    const product = productWith([makeRib('r1', {
+      size: 'M', // 20 pts
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [
+        { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 40 },
+        { sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: 80 },
+      ],
+    })]);
+    expect(getReleasePoints(product, 'rel-1')).toEqual({ allocated: 20, completed: 16 });
+    expect(getReleasePoints(product, 'rel-1', null)).toEqual({ allocated: 20, completed: 16 });
+  });
+
+  it('ignores ribs allocated elsewhere, and a 0% allocation adds nothing', () => {
+    const product = productWith([
+      makeRib('r1', {
+        size: 'M',
+        allocations: [{ releaseId: 'rel-2', percentage: 100 }],
+        history: [{ sprintId: 'sp-1', releaseId: 'rel-2', percentComplete: 50 }],
+      }),
+      makeRib('r2', {
+        size: 'S',
+        allocations: [{ releaseId: 'rel-1', percentage: 0 }],
+        history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 50 }],
+      }),
+    ]);
+    expect(getReleasePoints(product, 'rel-1', 'sp-1')).toEqual({ allocated: 0, completed: 0 });
+  });
+
+  it('is what getReleasePercentComplete reports as a percentage', () => {
+    const product = productWith([makeRib('r1', {
+      size: 'L',
+      allocations: [{ releaseId: 'rel-1', percentage: 60 }, { releaseId: 'rel-2', percentage: 40 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 15 }],
+    })]);
+    const { allocated, completed } = getReleasePoints(product, 'rel-1', 'sp-1');
+    expect(completed).toBe(6); // 24 allocated × 15/60
+    expect(getReleasePercentComplete(product, 'rel-1', 'sp-1')).toBe((completed / allocated) * 100);
   });
 });
 
