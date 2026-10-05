@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.53.9 (2026-10-05)
+
+### Legal — new Terms of Service and Privacy Policy, which you will be asked to accept again
+
+The SPERT® Suite **Terms of Service** and **Privacy Policy** have new editions — **version 1.3 of each, effective October 5, 2026** — and the **AI Privacy Notice**, which covers Connect AI, is now **version 2.2**. They are published at the same spertsuite.com addresses Story Map already links to.
+
+- **If you sign in to use cloud storage, Story Map asks you to accept the new Terms and Privacy Policy again.** The acceptance it had recorded was for the April 5, 2026 editions; from now on it records the edition you actually accept. Nothing changes if you use Story Map without signing in.
+- **What the documents now say** — none of it a change to what Story Map collects or does: database backups are kept (daily backups for up to 98 days, point-in-time recovery for up to 7 days); data is stored at rest in the United States; project sharing and invitation emails are described; and Connect AI relay data expires seven days after your last activity, or sooner when you disconnect, while the Read Mode snapshot can be read only by the relay server.
+- **The copies of the Terms and Privacy Policy kept in this repository were out of date.** The ones in `legal/` and in `public/` — the second set is served from Story Map's own site — still held the April 5 editions, three re-issues behind. All four files are now byte-identical to the October 5 editions on spertsuite.com.
+
 ## Version 0.53.8 (2026-10-01)
 
 ### Fixed — Forecaster milestones showed each release's whole size instead of the work left in it
