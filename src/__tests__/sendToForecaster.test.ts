@@ -123,14 +123,22 @@ describe('sendToForecaster — the offer', () => {
   });
 
   it('sends the EXACT text the download writes', () => {
-    const h = harness();
-    void sendToForecaster(makeProduct(), h.deps);
-    h.deliver(openMsg);
-    const offer = req(h.posted[0], 'a posted message').message as { exportText: string };
-    expect(offer.exportText).toBe(serialiseForecasterExport(buildForecasterExport(makeProduct())));
-    // ⚠️ And NOT the fixtures' `serialise`, which appends a newline for the SHA-pinned
-    // comparison. One byte, in exactly the quantity the receiver's ceiling measures.
-    expect(offer.exportText.endsWith('\n')).toBe(false);
+    // ⚠️ The clock is pinned because both builds stamp `exportedAt` from it. Running, a
+    // millisecond tick between the two builds made the texts differ in 48 of 20,000 local
+    // runs, and it failed CI on PR #195.
+    vi.setSystemTime(new Date('2026-03-01T12:00:00.000Z'));
+    try {
+      const h = harness();
+      void sendToForecaster(makeProduct(), h.deps);
+      h.deliver(openMsg);
+      const offer = req(h.posted[0], 'a posted message').message as { exportText: string };
+      expect(offer.exportText).toBe(serialiseForecasterExport(buildForecasterExport(makeProduct())));
+      // ⚠️ And NOT the fixtures' `serialise`, which appends a newline for the SHA-pinned
+      // comparison. One byte, in exactly the quantity the receiver's ceiling measures.
+      expect(offer.exportText.endsWith('\n')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('advertises an ABSOLUTE deadline, so the receiver derives its hold from one number', () => {
