@@ -216,6 +216,28 @@ describe('sendToForecaster — it refuses what the download refuses', () => {
     expect(h.openedUrls).toHaveLength(1);
   });
 
+  it('refuses a sprint with no finish date, naming it, instead of opening anything', async () => {
+    // Without this the builder drops the sprint and the send SUCCEEDS — Forecaster gets a
+    // project with no history and the user is told nothing.
+    const h = harness();
+    const reasons = await sendToForecaster(
+      makeProduct({ sprints: [{ id: 's1', name: 'Sprint 1', endDate: null, order: 1 }] }),
+      h.deps,
+    );
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]).toMatch(/^"Sprint 1" has no finish date/);
+    expect(h.openedUrls).toHaveLength(0);
+  });
+
+  it('CONTROL — the same sprint WITH a finish date does open the window', async () => {
+    const h = harness();
+    void sendToForecaster(
+      makeProduct({ sprints: [{ id: 's1', name: 'Sprint 1', endDate: '2026-01-10', order: 1 }] }),
+      h.deps,
+    );
+    expect(h.openedUrls).toHaveLength(1);
+  });
+
   it('returns a reason rather than throwing when a sprint date is malformed', async () => {
     // A present-but-malformed endDate reaches `addDays` and throws RangeError.
     const h = harness();

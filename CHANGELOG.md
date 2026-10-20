@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 0.53.10 (2026-10-19)
+
+### Fixed — a sprint with no finish date was quietly left out of what Forecaster received
+
+Affects **Send to SPERT Forecaster** and **Export for SPERT Forecaster**, which produce the same data.
+
+SPERT Forecaster places every sprint on its timeline by the sprint's finish date. Story Map left out any sprint that had no finish date, and said nothing about it. That was easy to run into without knowing: a project's first sprint is created with no finish date, and each sprint added after it takes its date from the one before. So if Sprint 1 was never given a date, none of the sprints had one. The project then reached Forecaster with no sprint history, no velocity, no remaining backlog and no start date, and Forecaster could not run a forecast. Its milestones did arrive, but with nothing to forecast against they appeared only in Forecaster's Milestones panel, which starts collapsed.
+
+Giving only Sprint 1 a date afterwards was not a full fix. The send then succeeded, but every later sprint was still undated and still left out, along with the progress recorded in it, and the milestone figures were taken as of Sprint 1.
+
+- **Both buttons now refuse a project that has any sprint without a finish date.** The message names each such sprint and points to the Sprints section in Settings, where the finish date is set. Nothing is sent, and Forecaster is not opened.
+- **A project with no sprints at all can still be sent**, as before. There is no sprint history to lose.
+- **The Download Template example now gives Sprint 1 a finish date**, so a project built from it can go to Forecaster.
+
+Projects whose sprints all have finish dates are sent exactly as before.
+
 ## Version 0.53.9 (2026-10-05)
 
 ### Legal — new Terms of Service and Privacy Policy, which you will be asked to accept again

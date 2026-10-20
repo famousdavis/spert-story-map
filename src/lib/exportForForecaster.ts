@@ -39,6 +39,47 @@ function round2(value: number): number {
 }
 
 /**
+ * Whether a sprint can become a Forecaster sprint record. Forecaster places every sprint
+ * by its finish date, so one without a date has nowhere to go.
+ *
+ * ONE predicate for two decisions — which sprints the builder leaves out, and which ones
+ * `checkSprintFinishDates` refuses the export over — so the check names exactly the sprints
+ * that would otherwise vanish.
+ */
+function hasFinishDate(sprint: Sprint): sprint is Sprint & { endDate: string } {
+  return Boolean(sprint.endDate);
+}
+
+/**
+ * Sprints with no finish date, as a reason to refuse the export.
+ *
+ * Refused rather than skipped because skipping is silent and the loss is not small. The
+ * first sprint is CREATED without a date (`calculateNextSprintEndDate` has no earlier date to
+ * extend) and every later sprint extends the one before it, so a project whose Sprint 1 was
+ * never dated has no dated sprints at all: Forecaster would get no history, no velocity, no
+ * start date, and nothing it can forecast from. Dating only Sprint 1 afterwards is worse
+ * still, because the export then succeeds while dropping every later sprint's progress.
+ *
+ * @returns [] when every sprint has a finish date (including when there are no sprints).
+ */
+export function checkSprintFinishDates(product: Product): string[] {
+  const undated = [...(product.sprints || [])]
+    .sort((a, b) => a.order - b.order)
+    .filter((s) => !hasFinishDate(s))
+    .map((s) => `"${s.name}"`);
+  const last = undated.pop();
+  if (last === undefined) return [];
+
+  const names = undated.length > 0 ? `${undated.join(', ')} and ${last}` : last;
+  const verb = undated.length > 0 ? 'have' : 'has';
+  return [
+    `${names} ${verb} no finish date. Forecaster places every sprint by its finish date, so ` +
+      'an undated sprint would be left out, along with the progress recorded in it. Set the ' +
+      'dates in the Sprints section in Settings, then try again.',
+  ];
+}
+
+/**
  * Build the complete Forecaster ExportData object from a Story Map product.
  * Pure function — no side effects.
  */
@@ -51,13 +92,13 @@ export function buildForecasterExport(product: Product) {
   const sortedReleases = [...(product.releases || [])].sort((a, b) => a.order - b.order);
   const sortedSprints = [...(product.sprints || [])].sort((a, b) => a.order - b.order);
 
-  // Only sprints with an end date become sprint records.
+  // Only sprints with an end date become sprint records. Both entry points
+  // refuse a product that has any other kind (`checkForecasterExport`); the
+  // filter stays because this builder is also called directly.
   // Type predicate, not a bare truthiness filter: every sprint that survives
   // this genuinely has a date, and saying so lets the reads below (startDate,
   // sprintFinishDate) use it without re-asserting.
-  const sprintsWithDates = sortedSprints.filter(
-    (s): s is Sprint & { endDate: string } => Boolean(s.endDate)
-  );
+  const sprintsWithDates = sortedSprints.filter(hasFinishDate);
 
   // --- Milestones from releases ---
   // `backlogSize` is the work REMAINING in the release, because that is what
@@ -192,6 +233,21 @@ export function serialiseForecasterExport(data: ReturnType<typeof buildForecaste
 }
 
 /**
+ * Every reason this export cannot go to Forecaster: what Story Map itself would leave out
+ * (`checkSprintFinishDates`), then what Forecaster would refuse (`checkForecasterCompatibility`).
+ * The download and the crosslink transport both gate on THIS, so neither can be a way around
+ * a check the other enforces.
+ *
+ * @returns [] when the export can go.
+ */
+export function checkForecasterExport(
+  product: Product,
+  data: ReturnType<typeof buildForecasterExport>,
+): string[] {
+  return [...checkSprintFinishDates(product), ...checkForecasterCompatibility(data)];
+}
+
+/**
  * Download the Forecaster export as a JSON file.
  *
  * Blocked rather than warned: a payload over Forecaster's limits is one it is
@@ -204,7 +260,7 @@ export function serialiseForecasterExport(data: ReturnType<typeof buildForecaste
  */
 export function downloadForecasterExport(product: Product): string[] {
   const data = buildForecasterExport(product);
-  const issues = checkForecasterCompatibility(data);
+  const issues = checkForecasterExport(product, data);
   if (issues.length > 0) return issues;
 
   const blob = new Blob([serialiseForecasterExport(data)], { type: 'application/json' });

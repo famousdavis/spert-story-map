@@ -2,8 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { buildForecasterExport, serialiseForecasterExport } from './exportForForecaster';
-import { checkForecasterCompatibility } from './forecasterLimits';
+import { buildForecasterExport, checkForecasterExport, serialiseForecasterExport } from './exportForForecaster';
 import {
   CROSSLINK_PROTOCOL,
   CROSSLINK_TIMEOUT_MS,
@@ -96,7 +95,7 @@ export async function sendToForecaster(
     ];
   }
 
-  const issues = checkForecasterCompatibility(data);
+  const issues = checkForecasterExport(product, data);
   if (issues.length > 0) return issues;
 
   const exchangeId = deps.mintExchangeId();

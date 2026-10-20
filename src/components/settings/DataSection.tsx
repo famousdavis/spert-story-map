@@ -134,6 +134,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
   };
 
   const handleDownloadTemplate = () => {
+    const now = new Date().toISOString();
     const template = {
       id: 'example-id',
       name: 'Example Project',
@@ -141,7 +142,9 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
       schemaVersion: 2,
       sizeMapping: product.sizeMapping,
       releases: [{ id: 'release-1', name: 'Release 1', order: 1, description: '', targetDate: null }],
-      sprints: [{ id: 'sprint-1', name: 'Sprint 1', order: 1, endDate: null }],
+      // Dated, unlike a sprint created in the app: a sprint with no finish date cannot be
+      // sent to SPERT Forecaster, so an example without one teaches the wrong shape.
+      sprints: [{ id: 'sprint-1', name: 'Sprint 1', order: 1, endDate: now.slice(0, 10) }],
       sprintCadenceWeeks: 2,
       themes: [{
         id: 'theme-1',
@@ -160,7 +163,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
             size: 'M',
             category: 'core',
             releaseAllocations: [{ releaseId: 'release-1', percentage: 100, memo: '' }],
-            progressHistory: [{ sprintId: 'sprint-1', releaseId: 'release-1', percentComplete: 50, comment: 'Initial implementation started', updatedAt: new Date().toISOString() }],
+            progressHistory: [{ sprintId: 'sprint-1', releaseId: 'release-1', percentComplete: 50, comment: 'Initial implementation started', updatedAt: now }],
           }],
         }],
       }],

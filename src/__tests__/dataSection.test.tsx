@@ -8,7 +8,9 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DataSection from '../components/settings/DataSection';
+import { checkSprintFinishDates } from '../lib/exportForForecaster';
 import type { Product, StorageDriver } from '../types';
+import { req } from './testHelpers';
 
 let uuidCounter = 0;
 vi.stubGlobal('crypto', {
@@ -136,5 +138,61 @@ describe('DataSection — single product replace', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /replace all data/i })).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('DataSection — Forecaster buttons refuse a sprint with no finish date', () => {
+  const undated = () => makeProduct('p1', 'My Project', {
+    sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: null }],
+  });
+
+  it('Export for SPERT Forecaster shows the sprint in the cannot-export banner', async () => {
+    renderDataSection(undated(), makeDriver());
+    await userEvent.click(screen.getByRole('button', { name: 'Export for SPERT Forecaster' }));
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('This project cannot be exported to SPERT Forecaster yet:');
+    expect(alert).toHaveTextContent('"Sprint 1" has no finish date');
+  });
+
+  it('Send to SPERT Forecaster shows the sprint and never opens Forecaster', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    try {
+      renderDataSection(undated(), makeDriver());
+      await userEvent.click(screen.getByRole('button', { name: 'Send to SPERT Forecaster' }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('The project was not imported:');
+      expect(alert).toHaveTextContent('"Sprint 1" has no finish date');
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
+  });
+});
+
+describe('DataSection — Download Template', () => {
+  it('gives the example sprint a finish date, so the template can go to Forecaster', async () => {
+    // jsdom has no object URLs. Swapped in and put back by hand, not with `vi.stubGlobal`,
+    // whose `unstubAllGlobals` would also undo this file's `crypto` stub.
+    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+    const createObjectURL = vi.fn<(blob: Blob) => string>(() => 'blob:template');
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      renderDataSection(makeProduct('p1', 'My Project'), makeDriver());
+      await userEvent.click(screen.getByRole('button', { name: 'Download Template' }));
+
+      expect(click).toHaveBeenCalledTimes(1);
+      const blob = req(createObjectURL.mock.calls[0]?.[0], 'template blob');
+      const template = JSON.parse(await blob.text()) as Product;
+      expect(template.sprints[0]?.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(checkSprintFinishDates(template)).toEqual([]);
+    } finally {
+      click.mockRestore();
+      URL.createObjectURL = original.create;
+      URL.revokeObjectURL = original.revoke;
+    }
   });
 });
