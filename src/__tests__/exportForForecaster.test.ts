@@ -3,7 +3,14 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { addDays, computeFirstSprintStartDate, buildForecasterExport } from '../lib/exportForForecaster';
+import {
+  addDays,
+  computeFirstSprintStartDate,
+  buildForecasterExport,
+  checkSprintFinishDates,
+  checkForecasterExport,
+  downloadForecasterExport,
+} from '../lib/exportForForecaster';
 import type { Product, Theme, Backbone, RibItem, ReleaseAllocation, ProgressEntry, Size, Category } from '../types';
 import { req } from './testHelpers';
 
@@ -795,5 +802,81 @@ describe('buildForecasterExport — integration', () => {
     expect(result.sprints[2]?.doneValue).toBe(6);
     expect(result.sprints[2]?.backlogAtSprintEnd).toBe(40);
     expect(result.sprints[2]?.sprintStartDate).toBe('2026-02-08');
+  });
+});
+
+// --- Sprints with no finish date ---
+
+describe('checkSprintFinishDates', () => {
+  const sprint = (id: string, order: number, endDate: string | null) =>
+    ({ id, name: `Sprint ${order}`, order, endDate });
+
+  it('returns nothing when every sprint has a finish date', () => {
+    expect(checkSprintFinishDates(makeProduct({
+      sprints: [sprint('s1', 1, '2026-01-10'), sprint('s2', 2, '2026-01-24')],
+    }))).toEqual([]);
+  });
+
+  it('returns nothing when there are no sprints at all', () => {
+    // Releases alone can still go: there is no history to lose.
+    expect(checkSprintFinishDates(makeProduct())).toEqual([]);
+  });
+
+  it('names the one undated sprint, in the singular, and says where to fix it', () => {
+    const issues = checkSprintFinishDates(makeProduct({ sprints: [sprint('s1', 1, null)] }));
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/^"Sprint 1" has no finish date\./);
+    expect(issues[0]).toContain('Sprints section in Settings');
+  });
+
+  it('names every undated sprint in sprint order, and only those', () => {
+    // Listed out of order on purpose: the message follows `order`, not array position.
+    const issues = checkSprintFinishDates(makeProduct({
+      sprints: [sprint('s3', 3, null), sprint('s1', 1, '2026-01-10'), sprint('s4', 4, null), sprint('s2', 2, null)],
+    }));
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/^"Sprint 2", "Sprint 3" and "Sprint 4" have no finish date\./);
+    expect(issues[0]).not.toContain('"Sprint 1"');
+  });
+
+  it('counts an empty-string date as no date, exactly as the builder does', () => {
+    const product = makeProduct({
+      sprints: [sprint('s1', 1, '2026-01-10'), sprint('s2', 2, '')],
+    });
+    // The builder drops it, so the check must name it — one predicate decides both.
+    expect(buildForecasterExport(product).sprints).toHaveLength(1);
+    expect(checkSprintFinishDates(product)[0]).toMatch(/^"Sprint 2" has no finish date/);
+  });
+});
+
+describe('checkForecasterExport', () => {
+  it('reports the undated sprints AND what Forecaster would refuse, together', () => {
+    // A name over Forecaster's 200-character limit is one its validator refuses. Both kinds
+    // of problem in one list, so the user fixes everything in one pass.
+    const product = makeProduct({
+      name: 'N'.repeat(201),
+      sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: null }],
+    });
+    const issues = checkForecasterExport(product, buildForecasterExport(product));
+    expect(issues.length).toBeGreaterThanOrEqual(2);
+    expect(issues[0]).toMatch(/^"Sprint 1" has no finish date/);
+    expect(issues.slice(1).some((i) => !i.includes('finish date'))).toBe(true);
+  });
+
+  it('CONTROL — a product with dated sprints and nothing over the limits passes', () => {
+    const product = makeProduct({ sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' }] });
+    expect(checkForecasterExport(product, buildForecasterExport(product))).toEqual([]);
+  });
+});
+
+describe('downloadForecasterExport — sprints with no finish date', () => {
+  it('refuses, naming the sprint, before it builds a file', () => {
+    // This file runs in `node`, where `document` does not exist: a download that got past
+    // the check would throw a ReferenceError here instead of returning.
+    const issues = downloadForecasterExport(makeProduct({
+      sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: null }],
+    }));
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatch(/^"Sprint 1" has no finish date/);
   });
 });

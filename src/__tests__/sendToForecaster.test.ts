@@ -123,14 +123,22 @@ describe('sendToForecaster — the offer', () => {
   });
 
   it('sends the EXACT text the download writes', () => {
-    const h = harness();
-    void sendToForecaster(makeProduct(), h.deps);
-    h.deliver(openMsg);
-    const offer = req(h.posted[0], 'a posted message').message as { exportText: string };
-    expect(offer.exportText).toBe(serialiseForecasterExport(buildForecasterExport(makeProduct())));
-    // ⚠️ And NOT the fixtures' `serialise`, which appends a newline for the SHA-pinned
-    // comparison. One byte, in exactly the quantity the receiver's ceiling measures.
-    expect(offer.exportText.endsWith('\n')).toBe(false);
+    // ⚠️ The clock is pinned because both builds stamp `exportedAt` from it. Running, a
+    // millisecond tick between the two builds made the texts differ in 48 of 20,000 local
+    // runs, and it failed CI on PR #195.
+    vi.setSystemTime(new Date('2026-03-01T12:00:00.000Z'));
+    try {
+      const h = harness();
+      void sendToForecaster(makeProduct(), h.deps);
+      h.deliver(openMsg);
+      const offer = req(h.posted[0], 'a posted message').message as { exportText: string };
+      expect(offer.exportText).toBe(serialiseForecasterExport(buildForecasterExport(makeProduct())));
+      // ⚠️ And NOT the fixtures' `serialise`, which appends a newline for the SHA-pinned
+      // comparison. One byte, in exactly the quantity the receiver's ceiling measures.
+      expect(offer.exportText.endsWith('\n')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('advertises an ABSOLUTE deadline, so the receiver derives its hold from one number', () => {
@@ -213,6 +221,28 @@ describe('sendToForecaster — it refuses what the download refuses', () => {
     // Without this, the assertion above passes on a sender that refuses everything.
     const h = harness();
     void sendToForecaster(makeProduct(), h.deps);
+    expect(h.openedUrls).toHaveLength(1);
+  });
+
+  it('refuses a sprint with no finish date, naming it, instead of opening anything', async () => {
+    // Without this the builder drops the sprint and the send SUCCEEDS — Forecaster gets a
+    // project with no history and the user is told nothing.
+    const h = harness();
+    const reasons = await sendToForecaster(
+      makeProduct({ sprints: [{ id: 's1', name: 'Sprint 1', endDate: null, order: 1 }] }),
+      h.deps,
+    );
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]).toMatch(/^"Sprint 1" has no finish date/);
+    expect(h.openedUrls).toHaveLength(0);
+  });
+
+  it('CONTROL — the same sprint WITH a finish date does open the window', async () => {
+    const h = harness();
+    void sendToForecaster(
+      makeProduct({ sprints: [{ id: 's1', name: 'Sprint 1', endDate: '2026-01-10', order: 1 }] }),
+      h.deps,
+    );
     expect(h.openedUrls).toHaveLength(1);
   });
 
