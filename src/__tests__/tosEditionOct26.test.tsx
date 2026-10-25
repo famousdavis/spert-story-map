@@ -149,6 +149,6 @@ describe('Terms and Privacy Policy 1.4 (October 26, 2026): who is asked to accep
     expect(hoisted.signOutCleanupMock).not.toHaveBeenCalled();
     expect(auth.current.user?.uid).toBe(user.uid);
     expect(termsWrites()).toHaveLength(1);
-    expect(termsWrites()[0][1]).toMatchObject({ tosVersion: OCTOBER_26, privacyPolicyVersion: OCTOBER_26 });
+    expect(termsWrites()[0]?.[1]).toMatchObject({ tosVersion: OCTOBER_26, privacyPolicyVersion: OCTOBER_26 });
   });
 });
