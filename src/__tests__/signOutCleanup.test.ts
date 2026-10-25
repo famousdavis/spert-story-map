@@ -35,6 +35,7 @@ import {
   registerDriverCleanup,
   clearDriverCleanup,
 } from '../lib/driverCleanupRegistry';
+import { TOS_ACCEPTED_VERSION_KEY, TOS_VERSION } from '../lib/tosConstants';
 
 // Mock localStorage for node environment.
 const store: Record<string, string> = {};
@@ -145,6 +146,18 @@ describe('signOutCleanup', () => {
     expect(localStorage.getItem('spert-theme')).toBe('dark');
     expect(localStorage.getItem('spert_firstRun_seen')).toBe('true');
     expect(localStorage.getItem('spert_map_hint_dismissed')).toBe('1');
+  });
+
+  it('clears the Terms-acceptance flag so the next user is re-prompted (B-10)', async () => {
+    localStorage.setItem(TOS_ACCEPTED_VERSION_KEY, TOS_VERSION);
+    // Control: the signed-in user's acceptance is present before sign-out.
+    expect(localStorage.getItem(TOS_ACCEPTED_VERSION_KEY)).toBe(TOS_VERSION);
+
+    await signOutCleanup();
+
+    // Cleared, so the sign-in gate (useSignInWithTosGate) re-prompts the next
+    // person for the Terms instead of writing an acceptance record for them.
+    expect(localStorage.getItem(TOS_ACCEPTED_VERSION_KEY)).toBeNull();
   });
 
   it('calls switchMode when provided and does not touch spert-storage-mode directly', async () => {

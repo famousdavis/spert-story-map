@@ -6,6 +6,7 @@ import { signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { clearAllLocalProducts, getActiveNamespace } from './storage';
 import { runDriverCleanup } from './driverCleanupRegistry';
+import { clearTosAcceptance } from './tosHelpers';
 import type { StorageMode } from '../types';
 
 // Intentionally duplicated from StorageProvider.tsx. The key lives there
@@ -44,9 +45,14 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
  * Preserved (must NOT be cleared):
  *   - rp_workspace_id (per-browser academic integrity token)
  *   - spert-theme, spert_firstRun_seen, spert_map_hint_dismissed (UI prefs)
- *   - spert_tos_accepted_version (managed separately by tosHelpers)
  *   - rp:local:* keys (anonymous-session data — signed-out user's other
  *     local-mode workspace stays intact)
+ *
+ * Cleared (B-10): spert_tos_accepted_version, via clearTosAcceptance. Keeping
+ * it across sign-out let the next person on a shared browser be treated as
+ * having accepted the Terms they never saw — and have a users/{uid} record
+ * written for them. signOutCleanup runs only on a genuine sign-out, never on a
+ * cold-load page reload, so a returning user's acceptance survives a reload.
  */
 export async function signOutCleanup(
   switchMode?: ((mode: StorageMode) => void) | null,
@@ -63,6 +69,10 @@ export async function signOutCleanup(
   clearAllLocalProducts(ns);
   localStorage.removeItem(`rp:${ns}:products_index`);
   localStorage.removeItem(`rp:${ns}:preferences`);
+
+  // 4b. Reset Terms acceptance (B-10) so the next person to sign in is shown
+  //     the Terms. See the header note for why this is cleared here.
+  clearTosAcceptance();
 
   // 5. Reset persisted storage mode to 'local'.
   if (switchMode) {
