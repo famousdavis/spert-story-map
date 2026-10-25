@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.53.11 (2026-10-25)
+
+### Security
+
+Hardening only — nothing changes in how the app works.
+
+- **The site now asks browsers to always use HTTPS.** It sends a `Strict-Transport-Security` header with `includeSubDomains` and `preload`, matching the other SPERT® Suite apps. Before, it sent only the default max-age without those directives.
+- **The release workflow declares least-privilege permissions.** Its automation can only read the repository.
+
 ## Version 0.53.10 (2026-10-19)
 
 ### Fixed — a sprint with no finish date was quietly left out of what Forecaster received
