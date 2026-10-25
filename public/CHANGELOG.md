@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.53.14 (2026-10-25)
+
+### Legal — new Terms of Service and Privacy Policy, which you will be asked to accept again
+
+The SPERT® Suite **Terms of Service** and **Privacy Policy** have new editions — **version 1.4 of each, effective October 26, 2026** — and the **AI Privacy Notice**, which covers Connect AI, is now **version 2.3**. They are published at the same spertsuite.com addresses Story Map already links to.
+
+- **If you sign in to use cloud storage, Story Map asks you to accept the new Terms and Privacy Policy the next time you sign in.** If you are already signed in, it signs you out first, so that you can accept them. The acceptance it had recorded was for the October 5, 2026 editions; from now on it records the edition you actually accept. Nothing changes if you use Story Map without signing in.
+- **What the new editions change:** they replace a personal contact address with the SPERT® Suite's own addresses (privacy@, security@ and contact@spertsuite.com), name Microsoft as the provider for email to those addresses, and clarify several disclosures.
+- **The copies of the Terms and Privacy Policy kept in this repository** — in `legal/` and in `public/`, the second set served from Story Map's own site — are now byte-identical to the October 26 editions.
+- **Five new tests** run the real sign-in against a stored acceptance: one that names the October 5 editions is signed out to accept again, whether it is cached in this browser or only on record; one that names the October 26 editions is let through, both ways; and accepting over an October 5 record writes the October 26 Terms and Privacy Policy versions. All five fail on the previous version.
+
 ## Version 0.53.13 (2026-10-25)
 
 ### Security
