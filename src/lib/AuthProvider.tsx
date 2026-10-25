@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
 import {
   onAuthStateChanged,
@@ -14,6 +14,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseAvailable } from './firebase';
 import { callClaimPendingInvitations } from './callables';
 import { signOutCleanup } from './signOutCleanup';
+import { endAiSessionForSignOut } from './aiSessionTeardown';
 import {
   isTosAcceptedLocally,
   isTosAcceptedInFirestore,
@@ -79,6 +80,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(isFirebaseAvailable); // No loading if Firebase not configured
+  // B-04: the previous auth state, so onAuthStateChanged can tell a real
+  // signed-in → null transition (sign-out, including from another tab or a
+  // token that cannot refresh) from a cold load where no one was signed in.
+  // Only a transition ends the Connect AI session; a cold null must not, or a
+  // local-mode session would be torn down on every page load.
+  const previousUserRef = useRef<User | null>(null);
 
   useEffect(() => {
     if (!auth) return;
@@ -149,6 +156,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Runs AFTER ToS check succeeds. Stale-ToS/error paths return above.
         // Covers both fresh sign-in and cached-session page load.
         claimPendingInvitationsAndNotify(firebaseUser);
+      }
+
+      // B-04: end any Connect AI session on a signed-in → null transition that
+      // did NOT go through signOutCleanup — another tab signing out, or a token
+      // that cannot refresh. On an explicit sign-out, signOutCleanup already ran
+      // endAiSessionForSignOut and firebaseSignOut then fires this; by now the
+      // session id is gone, so this call does no server work AND, by design,
+      // leaves any failure marker that run parked untouched (it does not clear
+      // it — see aiSessionTeardown). The transition guard skips a cold load for
+      // a never-signed-in (e.g. local-mode) user so its session is not torn down.
+      if (!firebaseUser) {
+        if (previousUserRef.current) void endAiSessionForSignOut();
+        previousUserRef.current = null;
+      } else {
+        previousUserRef.current = firebaseUser;
       }
 
       setUser(firebaseUser);
