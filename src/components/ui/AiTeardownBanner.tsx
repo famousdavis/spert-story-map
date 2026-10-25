@@ -82,9 +82,9 @@ export default function AiTeardownBanner() {
           <p className="text-xs text-amber-800 dark:text-amber-200">
             Signing out could not reach the server to end your Connect AI
             session. Until it does, a paired AI assistant can still read and
-            change your last-open project. We will keep trying; you can also
-            retry now. The session ends on its own within 7 days, or at once if
-            you reconnect with Connect AI and then choose Disconnect.
+            change your last-open project. Story Map keeps trying whenever you
+            are online, and you can retry now with Try again. Otherwise the
+            session ends on its own within 7 days.
           </p>
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">

@@ -160,10 +160,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // B-04: end any Connect AI session on a signed-in → null transition that
       // did NOT go through signOutCleanup — another tab signing out, or a token
-      // that cannot refresh. Explicit sign-out already ran endAiSessionForSignOut
-      // inside signOutCleanup, so by the time its firebaseSignOut fires this,
-      // the keys are gone and this call is a no-op. The transition guard skips a
-      // cold load for a never-signed-in (e.g. local-mode) user.
+      // that cannot refresh. On an explicit sign-out, signOutCleanup already ran
+      // endAiSessionForSignOut and firebaseSignOut then fires this; by now the
+      // session id is gone, so this call does no server work AND, by design,
+      // leaves any failure marker that run parked untouched (it does not clear
+      // it — see aiSessionTeardown). The transition guard skips a cold load for
+      // a never-signed-in (e.g. local-mode) user so its session is not torn down.
       if (!firebaseUser) {
         if (previousUserRef.current) void endAiSessionForSignOut();
         previousUserRef.current = null;

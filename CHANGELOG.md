@@ -5,7 +5,7 @@
 ### Security
 
 - **Signing out now also ends any Connect AI session.** If you had connected an AI assistant with Connect AI, signing out now disconnects it: the assistant loses access to your project right away, and the copy of your story map that was shared with it is deleted. Before, signing out left the AI session running, so a connected assistant could keep reading and changing your last-open project for up to seven days — a real concern on a shared computer. Signing out now does the same thing as choosing Disconnect in the Connect AI panel. This also applies when you are signed out in another browser tab.
-- **If the session can't be ended, Story Map tells you.** If signing out cannot reach the server to end the AI session — for example, because you are offline — Story Map shows a notice instead of failing silently, keeps trying on its own when you are back online, and lets you retry. You can also end the session for certain by reconnecting and then choosing Disconnect; otherwise it ends on its own within seven days.
+- **If the session can't be ended, Story Map tells you.** If signing out cannot reach the server to end the AI session — for example, because you are offline — Story Map shows a notice instead of failing silently, keeps trying on its own whenever you are back online, and lets you retry. Otherwise the session ends on its own within seven days.
 
 ## Version 0.53.12 (2026-10-25)
 

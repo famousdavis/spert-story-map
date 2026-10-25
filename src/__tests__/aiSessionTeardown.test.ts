@@ -60,6 +60,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   // Re-stub localStorage for the next test (unstubAllGlobals clears it).
   vi.stubGlobal('localStorage', {
@@ -129,14 +130,53 @@ describe('endAiSessionForSignOut', () => {
     expect(getPendingAiTeardownSessionId()).toBe(SID);
   });
 
-  it('is a no-op with no stored session (and clears any stale marker)', async () => {
-    localStorage.setItem(AI_TEARDOWN_PENDING_KEY, 'stale');
+  it('is a no-op with no stored session and PRESERVES a parked marker', async () => {
+    // Regression (review 1): the no-session branch must NOT clear the marker.
+    // A failed teardown parks it then clears the session id, and this same
+    // function runs again right after (AuthProvider's auth-change handler; and
+    // another tab shares localStorage). Clearing here would silence the failure.
+    localStorage.setItem(AI_TEARDOWN_PENDING_KEY, 'sid-parked');
 
     const result = await endAiSessionForSignOut();
 
     expect(result).toEqual({ attempted: false, serverOk: true });
     expect(httpsCallableMock).not.toHaveBeenCalled();
-    expect(getPendingAiTeardownSessionId()).toBeNull();
+    expect(getPendingAiTeardownSessionId()).toBe('sid-parked');
+  });
+
+  it('keeps the failure marker on the second call with no session id (double-call)', async () => {
+    // 1) sign-out with a failing server call parks the marker + clears the id.
+    seedSession();
+    callableMock.mockRejectedValue(new Error('offline'));
+    const first = await endAiSessionForSignOut();
+    expect(first.serverOk).toBe(false);
+    expect(getPendingAiTeardownSessionId()).toBe(SID);
+    expect(localStorage.getItem(AI_SESSION_ID_KEY)).toBeNull();
+
+    // 2) the auth-change handler (or another tab) runs it again — no id now.
+    const second = await endAiSessionForSignOut();
+
+    expect(second).toEqual({ attempted: false, serverOk: true });
+    // Marker must SURVIVE so the banner still warns and the retry still fires.
+    expect(getPendingAiTeardownSessionId()).toBe(SID);
+  });
+
+  it('does not hang when the snapshot delete never resolves; parks the marker within the timeout', async () => {
+    // Regression (review 2): navigator.onLine can be true while Firestore is
+    // unreachable (captive portal / dropped VPN / proxy). A deleteDoc write then
+    // never resolves. The whole server teardown is bounded, so sign-out still
+    // completes and the failure is parked for retry.
+    seedSession();
+    vi.useFakeTimers();
+    deleteDocMock.mockReturnValue(new Promise<void>(() => { /* never resolves */ }));
+
+    const p = endAiSessionForSignOut();
+    await vi.advanceTimersByTimeAsync(10_000);
+    const result = await p;
+    vi.useRealTimers();
+
+    expect(result).toEqual({ attempted: true, serverOk: false });
+    expect(getPendingAiTeardownSessionId()).toBe(SID);
   });
 });
 

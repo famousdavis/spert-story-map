@@ -112,24 +112,33 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
  * `session_not_found`.
  */
 async function runServerTeardown(sessionId: string): Promise<boolean> {
-  if (!db || !functionsInstance) return false;
+  // Capture the imports into locals so the non-null narrowing survives into the
+  // async closure below (a bare `db` would widen back to `Firestore | null`).
+  const database = db;
+  const fns = functionsInstance;
+  if (!database || !fns) return false;
   // Offline: fail fast and deterministically rather than waiting on a request
   // that cannot succeed. The marker is set by the caller so it is retried.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
-  // Best-effort early snapshot delete; the Cloud Function deletes it too.
   try {
-    await deleteDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current'));
-  } catch { /* non-fatal — the Cloud Function removes the snapshot as well */ }
-  try {
-    await withTimeout(
-      httpsCallable(functionsInstance, 'teardownAiSession')({ sessionId }),
-      TEARDOWN_TIMEOUT_MS,
-    );
+    // Bound the WHOLE server teardown, not just the callable. A Firestore write
+    // does not resolve while the backend is unreachable, and navigator.onLine
+    // can be true when it still is (captive portal, dropped VPN, corporate
+    // proxy). Left unbounded, the snapshot delete would hang sign-out forever.
+    await withTimeout((async () => {
+      // Best-effort early snapshot delete; the Cloud Function deletes it too,
+      // so a failure here is swallowed — but it stays inside the timeout.
+      try {
+        await deleteDoc(doc(database, SESSIONS_COL, sessionId, 'snapshot', 'current'));
+      } catch { /* non-fatal — the Cloud Function removes the snapshot as well */ }
+      // The authoritative revocation.
+      await httpsCallable(fns, 'teardownAiSession')({ sessionId });
+    })(), TEARDOWN_TIMEOUT_MS);
     return true;
   } catch (err) {
     console.error(
-      '[AI] Sign-out teardown failed; the AI session may stay live until it ' +
-      'TTL-expires in 7 days unless retried:', err,
+      '[AI] Sign-out could not reach the server to end the AI session; it may ' +
+      'stay live until it TTL-expires in 7 days unless retried:', err,
     );
     return false;
   }
@@ -152,15 +161,27 @@ export async function endAiSessionForSignOut(): Promise<AiSignOutTeardownResult>
   clearLocalAiKeys(sessionId);
 
   // Nothing stored, or no Firebase (so no relay session could ever have been
-  // created): the session is fully ended; drop any stale marker.
+  // created): nothing to revoke. MUST leave any parked marker ALONE. A failed
+  // teardown parks the marker and then clears the session id (above), so the
+  // SAME function running again with no session id — AuthProvider's auth-change
+  // handler fires right after firebaseSignOut, and another tab shares
+  // localStorage — would otherwise erase the warning it just set and the
+  // failure would go silent, which is exactly what this change prevents. Only a
+  // successful teardown/retry (below, or retryPendingAiTeardown) or the user's
+  // Dismiss clears the marker.
   if (!sessionId || !db || !functionsInstance) {
-    clearPendingAiTeardown();
     return { attempted: false, serverOk: true };
   }
 
   const serverOk = await runServerTeardown(sessionId);
-  if (serverOk) clearPendingAiTeardown();
-  else setPendingAiTeardown(sessionId);
+  if (serverOk) {
+    // Clear only a marker that belongs to the session we actually ended, so a
+    // successful teardown of one session cannot drop another session's pending
+    // retry.
+    if (getPendingAiTeardownSessionId() === sessionId) clearPendingAiTeardown();
+  } else {
+    setPendingAiTeardown(sessionId);
+  }
   return { attempted: true, serverOk };
 }
 

@@ -46,6 +46,7 @@ vi.mock('../lib/callables', () => ({
 }));
 
 import { signOutCleanup } from '../lib/signOutCleanup';
+import { endAiSessionForSignOut } from '../lib/aiSessionTeardown';
 import { setStorageNamespace } from '../lib/storage';
 import {
   AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_LAST_SEQ_PREFIX, AI_TEARDOWN_PENDING_KEY,
@@ -107,5 +108,21 @@ describe('signOutCleanup ends the Connect AI session (B-04)', () => {
     // teardown can be retried; sign-out still completes.
     expect(localStorage.getItem(AI_TEARDOWN_PENDING_KEY)).toBe(SID);
     expect(firebaseSignOutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the warning marker when the auth-change handler runs after a failed sign-out', async () => {
+    // The whole sequence: a failing teardown inside signOutCleanup parks the
+    // marker; firebaseSignOut then fires onAuthStateChanged(null), whose handler
+    // calls endAiSessionForSignOut() again with no session id. The marker MUST
+    // survive, or the failure the user needs to see goes silent.
+    callableMock.mockRejectedValue(new Error('offline'));
+
+    await signOutCleanup();
+    expect(localStorage.getItem(AI_TEARDOWN_PENDING_KEY)).toBe(SID);
+
+    // Simulate AuthProvider's onAuthStateChanged(null) → second teardown call.
+    await endAiSessionForSignOut();
+
+    expect(localStorage.getItem(AI_TEARDOWN_PENDING_KEY)).toBe(SID);
   });
 });

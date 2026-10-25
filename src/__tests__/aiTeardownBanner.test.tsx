@@ -53,6 +53,13 @@ describe('AiTeardownBanner', () => {
     expect(screen.getByText(/could not reach the server to end your Connect AI session/i)).toBeInTheDocument();
     expect(screen.getByText(/read and change your last-open project/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+    // Accurate guidance (review 3): keeps trying + 7-day fallback...
+    expect(screen.getByText(/keeps trying whenever you are online/i)).toBeInTheDocument();
+    expect(screen.getByText(/ends on its own within 7 days/i)).toBeInTheDocument();
+    // ...and NOT the false "reconnect then Disconnect ends it at once" claim —
+    // reconnecting mints a NEW session id, so Disconnect ends that, not this one.
+    expect(screen.queryByText(/reconnect/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/disconnect/i)).not.toBeInTheDocument();
   });
 
   it('hides once a teardown retry succeeds', async () => {
