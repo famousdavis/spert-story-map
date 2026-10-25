@@ -7,6 +7,7 @@ import { auth } from './firebase';
 import { clearAllLocalProducts, getActiveNamespace } from './storage';
 import { runDriverCleanup } from './driverCleanupRegistry';
 import { clearTosAcceptance } from './tosHelpers';
+import { endAiSessionForSignOut } from './aiSessionTeardown';
 import type { StorageMode } from '../types';
 
 // Intentionally duplicated from StorageProvider.tsx. The key lives there
@@ -53,6 +54,14 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
  * having accepted the Terms they never saw — and have a users/{uid} record
  * written for them. signOutCleanup runs only on a genuine sign-out, never on a
  * cold-load page reload, so a returning user's acceptance survives a reload.
+ *
+ * Ended (B-04): any active Connect AI session, via endAiSessionForSignOut —
+ * a local teardown plus the server teardownAiSession call, so a paired AI
+ * assistant loses access at sign-out instead of keeping read/write to the
+ * last-open project until the relay's 7-day TTL. Done BEFORE firebaseSignOut
+ * (step 6) while the Firestore client is still live. If the server call fails
+ * (e.g. offline) the session id is parked for retry and AiTeardownBanner tells
+ * the user; this does not block the rest of sign-out. See aiSessionTeardown.ts.
  */
 export async function signOutCleanup(
   switchMode?: ((mode: StorageMode) => void) | null,
@@ -73,6 +82,14 @@ export async function signOutCleanup(
   // 4b. Reset Terms acceptance (B-10) so the next person to sign in is shown
   //     the Terms. See the header note for why this is cleared here.
   clearTosAcceptance();
+
+  // 4c. End any Connect AI session (B-04): local teardown + server
+  //     teardownAiSession, so a paired AI loses access immediately rather than
+  //     keeping read/write until the relay's 7-day TTL. Awaited (bounded by an
+  //     internal timeout) so a reachable server is revoked before the page
+  //     moves on; a failure is parked for retry, never thrown, so it cannot
+  //     block firebaseSignOut below.
+  await endAiSessionForSignOut();
 
   // 5. Reset persisted storage mode to 'local'.
   if (switchMode) {
