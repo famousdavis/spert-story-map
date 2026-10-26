@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.53.15 (2026-10-25)
+
+### Security — a security.txt file, so researchers know where to report a vulnerability
+
+- **Story Map now publishes a security.txt file (RFC 9116)**, so a security researcher can find where to report a vulnerability: by email to security@spertsuite.com, or privately through Story Map’s GitHub repository. Nothing about how the app works, looks or stores data changed.
+- A new test checks the file on every release, and fails a month before the file expires, as a reminder to renew it.
+
 ## Version 0.53.14 (2026-10-25)
 
 ### Legal — new Terms of Service and Privacy Policy, which you will be asked to accept again
