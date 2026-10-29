@@ -31,7 +31,8 @@ export default defineConfig({
   test: {
     // Matches vitest.config.ts — this repo's suite runs in `node`, not jsdom.
     environment: 'node',
-    // The 19 of 40 test files that exercise a mutate target.
+    // The test files that exercise a mutate target (19 of 40 at v0.52.0; 21 of 61
+    // at v0.53.16, after schemaVersion.test.ts and calculationsScale.test.ts).
     //
     // ⚠️ DERIVING THIS FROM DIRECT `import` EDGES ALONE IS NOT SUFFICIENT, and the
     // first draft of this list got it wrong. A test can reach a mutate target THROUGH
@@ -61,6 +62,11 @@ export default defineConfig({
       'src/__tests__/aiOps.test.ts',
       'src/__tests__/authName.test.ts',
       'src/__tests__/calculations.test.ts',
+      // W4 (v0.53.16): the equivalence oracle and work bounds for the rewritten
+      // progress, release-total and history-grouping code. Without it the scoped
+      // branch coverage of calculations.ts was 80.72% against 94.57% for the full
+      // suite — the gap the note above says to close.
+      'src/__tests__/calculationsScale.test.ts',
       'src/__tests__/exportForExcel.test.ts',
       'src/__tests__/exportForForecaster.test.ts',
       'src/__tests__/formatDate.test.ts',

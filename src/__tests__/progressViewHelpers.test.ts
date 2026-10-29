@@ -178,3 +178,52 @@ describe('getDelta', () => {
     expect(getDelta(rib, 'r1', sprint, prevSprint, 's2')).toBe(40);
   });
 });
+
+// W4 (v0.53.16) moved the per-release lookups here onto a grouped history
+// (`historyByRelease`). These pin what the grouping must not change — and the
+// whole-rib branches nothing tested before: other releases, other sprints,
+// uncommented and comment-only entries must each be told apart.
+describe('per-release vs whole-rib branches', () => {
+  const sprint = { id: 's2', order: 2, name: 'Sprint 2', endDate: '2026-01-28' };
+  const prevSprint = { id: 's1', order: 1, name: 'Sprint 1', endDate: '2026-01-14' };
+  const rib = makeRib([
+    { releaseId: 'r1', sprintId: 's1', percentComplete: 20, comment: 'a' },
+    { releaseId: 'r2', sprintId: 's1', percentComplete: 10 },
+    { releaseId: 'r2', sprintId: 's1', percentComplete: null, comment: 'note only' },
+    { releaseId: 'r1', sprintId: 's2', percentComplete: 50 },
+    { releaseId: 'r2', sprintId: 's2', percentComplete: 30, comment: 'b' },
+    { releaseId: 'r1', sprintId: 's3', percentComplete: 90, comment: 'later' },
+  ]);
+
+  it('getSprintPct reads one release, or sums every release for the sprint', () => {
+    expect(getSprintPct(rib, 'r1', 's2')).toBe(50);
+    expect(getSprintPct(rib, null, 's2')).toBe(80);
+    expect(getSprintPct(rib, null, 's1')).toBe(30);
+  });
+
+  it('getSprintPct is null when a sprint holds only comment-only entries', () => {
+    const notes = makeRib([{ releaseId: 'r1', sprintId: 's1', percentComplete: null, comment: 'n' }]);
+    expect(getSprintPct(notes, null, 's1')).toBeNull();
+  });
+
+  it('getDelta across every release: this sprint\'s sum minus the previous sprint\'s', () => {
+    expect(getDelta(rib, null, sprint, prevSprint, 's2')).toBe(50);
+    expect(getDelta(rib, 'r2', sprint, prevSprint, 's2')).toBe(20);
+  });
+
+  it('getDelta across every release treats a missing previous sprint as 0', () => {
+    const only = makeRib([
+      { releaseId: 'r1', sprintId: 's2', percentComplete: 40 },
+      { releaseId: 'r2', sprintId: 's2', percentComplete: 15 },
+    ]);
+    expect(getDelta(only, null, sprint, prevSprint, 's2')).toBe(55);
+  });
+
+  it('getCommentHistory keeps only commented entries, per release or for the whole rib', () => {
+    const order = { s1: 1, s2: 2, s3: 3 };
+    expect(getCommentHistory(rib, 'r2', {}, order).map(e => e.comment)).toEqual(['b', 'note only']);
+    expect(getCommentHistory(rib, null, {}, order).map(e => e.comment)).toEqual(['later', 'b', 'a', 'note only']);
+    expect(getCommentHistory(rib, 'r2', {}, order)[0]?.sprintName).toBe('Unknown');
+    expect(getCommentCount(rib, 'r1')).toBe(2);
+  });
+});
