@@ -95,10 +95,19 @@ export function updateComment(updateProduct: UpdateProduct, ribId: string, relea
   });
 }
 
-/** Calculate the next sprint end date based on cadence. */
+/**
+ * Calculate the next sprint end date based on cadence.
+ *
+ * Returns null — the same "no date yet" the first sprint gets — when the
+ * previous date cannot be read. `toISOString` throws on an invalid date, and
+ * this runs inside an `updateProduct` updater, which React evaluates during
+ * render: a stored end date the date input could never have produced made
+ * "Add sprint" take the whole app down.
+ */
 export function calculateNextSprintEndDate(lastEndDate: string | null, cadenceWeeks: number): string | null {
   if (!lastEndDate) return null;
   const d = new Date(lastEndDate + 'T00:00:00');
   d.setDate(d.getDate() + cadenceWeeks * 7);
+  if (Number.isNaN(d.getTime())) return null;
   return d.toISOString().split('T')[0]!;
 }

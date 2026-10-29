@@ -12,6 +12,8 @@ import ThemeToggle from '../ui/ThemeToggle';
 import StorageStatusPill from '../ui/StorageStatusPill';
 import AppSettingsModal from '../settings/AppSettingsModal';
 import FirstRunBanner from '../ui/FirstRunBanner';
+import CloudLoadNotice from '../ui/CloudLoadNotice';
+import ErrorBoundary from '../ui/ErrorBoundary';
 import { Footer } from '../../pages/ChangelogView';
 import { useAiConnectivity } from '../../hooks/useAiConnectivity';
 import { isFirebaseAvailable } from '../../lib/firebase';
@@ -210,9 +212,16 @@ export default function ProductLayout() {
         </div>
       )}
 
-      {/* Content */}
+      <CloudLoadNotice productId={product.id} productName={product.name} />
+
+      {/* Content — its own boundary, so a view that cannot render leaves the
+          header, the tabs and the way back to the project list in place. The
+          app-level boundary's Reload re-renders the same data, which is no way
+          out at all. Cleared on navigation. */}
       <main className={`flex-1 w-full px-6 py-6 ${isCanvasView ? '' : 'max-w-[1600px] mx-auto'}`}>
-        <Outlet context={{ product, updateProduct, undo, redo }} />
+        <ErrorBoundary inline resetKey={location.pathname}>
+          <Outlet context={{ product, updateProduct, undo, redo }} />
+        </ErrorBoundary>
       </main>
 
       {!isCanvasView && <Footer />}

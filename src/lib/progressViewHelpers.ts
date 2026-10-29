@@ -7,6 +7,7 @@ import {
   getRibItemPercentComplete,
   getRibReleaseProgressForSprint,
   getRibReleaseProgress,
+  historyByRelease,
 } from './calculations';
 
 /**
@@ -15,7 +16,7 @@ import {
 export function getCommentCount(rib: ProgressSource, releaseId: string | null): number {
   if (!rib.progressHistory) return 0;
   if (releaseId) {
-    return rib.progressHistory.filter(p => p.releaseId === releaseId && p.comment).length;
+    return (historyByRelease(rib.progressHistory).get(releaseId) ?? []).filter(p => p.comment).length;
   }
   return rib.progressHistory.filter(p => p.comment).length;
 }
@@ -25,8 +26,10 @@ export function getCommentCount(rib: ProgressSource, releaseId: string | null): 
  */
 export function getCommentHistory(rib: ProgressSource, releaseId: string | null, sprintNameMap: Record<string, string>, sprintOrder: Record<string, number>) {
   if (!rib.progressHistory) return [];
+  // Grouped, not filtered: the Progress table asks once per allocation, and a
+  // full-history filter each time was allocations × history (see historyByRelease).
   const entries = releaseId
-    ? rib.progressHistory.filter(p => p.releaseId === releaseId && p.comment)
+    ? (historyByRelease(rib.progressHistory).get(releaseId) ?? []).filter(p => p.comment)
     : rib.progressHistory.filter(p => p.comment);
   return entries
     .map(e => ({

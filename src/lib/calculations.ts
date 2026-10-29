@@ -3,12 +3,68 @@
 // See LICENSE file in the project root for full license text.
 
 // All computed values - pure functions, no side effects
-import type { Product, RibItem, SizeMapping, Sprint, Theme, Backbone, ProgressSource } from '../types';
+import type { Product, RibItem, SizeMapping, Sprint, Theme, Backbone, ProgressSource, ProgressEntry } from '../types';
 import { forEachRib, reduceRibs } from './ribHelpers';
+
+// ⚠️ The two indexes below exist because a project document is not bounded in
+// COUNT — only in bytes (1 MiB) — and a linear lookup inside a per-rib or
+// per-sprint loop turned that into ribs × rows or sprints² × ribs. A cloud
+// document built for it froze the Progress and Insights tabs outright (W4).
+// Both are keyed by array identity and hold the ROWS, not copies of their
+// fields: product state is replaced rather than mutated, so a changed list is a
+// new array, and a field edited in place is still read live.
+
+/** label → size row, first match winning, exactly as `Array#find` did. */
+const sizeIndexCache = new WeakMap<SizeMapping[], Map<string, SizeMapping>>();
+function sizeIndex(sizeMapping: SizeMapping[]): Map<string, SizeMapping> {
+  let index = sizeIndexCache.get(sizeMapping);
+  if (!index) {
+    index = new Map();
+    for (const m of sizeMapping) if (!index.has(m.label)) index.set(m.label, m);
+    sizeIndexCache.set(sizeMapping, index);
+  }
+  return index;
+}
+
+/** id → sprint, last duplicate winning, exactly as the `Record` it replaces did. */
+const sprintIndexCache = new WeakMap<Sprint[], Map<string, Sprint>>();
+function sprintIndex(sprints: Sprint[]): Map<string, Sprint> {
+  let index = sprintIndexCache.get(sprints);
+  if (!index) {
+    index = new Map();
+    for (const s of sprints) index.set(s.id, s);
+    sprintIndexCache.set(sprints, index);
+  }
+  return index;
+}
+
+/**
+ * A rib's progress history by `releaseId`, in history order, keyed by every
+ * value as the strict-equality filters it replaces saw them (legacy entries
+ * group under `undefined`). Views ask per (rib, release) — the Progress table
+ * once per allocation — and each ask used to scan the whole history, so one rib
+ * with thousands of allocations and entries froze the table. Callers must not
+ * mutate the groups.
+ */
+const historyGroupsCache = new WeakMap<ProgressEntry[], Map<unknown, ProgressEntry[]>>();
+export function historyByRelease(history: ProgressEntry[] | undefined): Map<unknown, ProgressEntry[]> {
+  if (!history) return new Map();
+  let groups = historyGroupsCache.get(history);
+  if (!groups) {
+    groups = new Map();
+    for (const p of history) {
+      const group = groups.get(p.releaseId);
+      if (group) group.push(p);
+      else groups.set(p.releaseId, [p]);
+    }
+    historyGroupsCache.set(history, groups);
+  }
+  return groups;
+}
 
 export function getRibItemPoints(ribItem: Pick<RibItem, 'size'>, sizeMapping: SizeMapping[]): number {
   if (!ribItem.size) return 0;
-  const mapping = sizeMapping.find(m => m.label === ribItem.size);
+  const mapping = sizeIndex(sizeMapping).get(ribItem.size);
   return mapping ? mapping.points : 0;
 }
 
@@ -31,10 +87,7 @@ export function getTotalProjectPoints(product: Product): number {
 }
 
 export function getPointsForRelease(product: Product, releaseId: string): number {
-  return reduceRibs(product, (total, rib) => {
-    const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-    return alloc ? total + getRibItemPoints(rib, product.sizeMapping) * (alloc.percentage / 100) : total;
-  }, 0);
+  return releaseTotals(product, null).get(releaseId)?.allocated ?? 0;
 }
 
 export function getCoreNonCorePoints(product: Product) {
@@ -50,9 +103,7 @@ export function getCoreNonCorePoints(product: Product) {
 
 // Get a single release's progress for a specific sprint
 export function getRibReleaseProgressForSprint(ribItem: ProgressSource, releaseId: string, sprintId: string): number | null {
-  const entry = ribItem.progressHistory?.find(
-    p => p.sprintId === sprintId && p.releaseId === releaseId
-  );
+  const entry = historyByRelease(ribItem.progressHistory).get(releaseId)?.find(p => p.sprintId === sprintId);
   return entry?.percentComplete ?? null;
 }
 
@@ -60,16 +111,22 @@ export function getRibReleaseProgressForSprint(ribItem: ProgressSource, releaseI
 export function getRibReleaseProgressAsOf(ribItem: ProgressSource, releaseId: string, sprintId: string, sprints: Sprint[]): number {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
   if (!sprintId || !sprints) return getRibReleaseProgress(ribItem, releaseId);
+  return releaseProgressAsOf(ribItem.progressHistory, releaseId, sprintId, sprints);
+}
 
-  const sprintOrder: Record<string, number> = {};
-  for (const s of sprints) sprintOrder[s.id] = s.order;
-
-  const targetOrder = sprintOrder[sprintId];
-  if (targetOrder === undefined) return getRibReleaseProgress(ribItem, releaseId);
+/**
+ * The walk-back itself, over a history that may already be narrowed to one
+ * release (getRibItemPercentCompleteAsOf groups first). Narrowing changes
+ * nothing: every read below is filtered by `releaseId` anyway.
+ */
+function releaseProgressAsOf(history: ProgressEntry[], releaseId: string, sprintId: string, sprints: Sprint[]): number {
+  const index = sprintIndex(sprints);
+  const targetOrder = index.get(sprintId)?.order;
+  if (targetOrder === undefined) return getRibReleaseProgress({ progressHistory: history }, releaseId);
 
   let best = null;
   let bestOrder = -1;
-  for (const entry of ribItem.progressHistory) {
+  for (const entry of history) {
     if (entry.releaseId !== releaseId) continue;
     // Skip undefined as well as null. validateProduct now normalises absent to
     // null on import, but a product imported before that fix can still hold an
@@ -77,7 +134,7 @@ export function getRibReleaseProgressAsOf(ribItem: ProgressSource, releaseId: st
     // so this function returned undefined (NaN downstream) where its sibling
     // getRibReleaseProgress returned 0. The two now agree.
     if (entry.percentComplete === null || entry.percentComplete === undefined) continue;
-    const order = sprintOrder[entry.sprintId];
+    const order = index.get(entry.sprintId)?.order;
     if (order !== undefined && order <= targetOrder && order > bestOrder) {
       best = entry;
       bestOrder = order;
@@ -92,8 +149,8 @@ export function getRibReleaseProgressAsOf(ribItem: ProgressSource, releaseId: st
 // Get the latest progress for a single release (last entry by array position)
 export function getRibReleaseProgress(ribItem: ProgressSource, releaseId: string): number {
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
-  const entries = ribItem.progressHistory.filter(
-    p => p.releaseId === releaseId && p.percentComplete !== null
+  const entries = (historyByRelease(ribItem.progressHistory).get(releaseId) ?? []).filter(
+    p => p.percentComplete !== null
   );
   const last = entries[entries.length - 1];
   // The filter above keeps only non-null percentComplete, so `?? 0` is the
@@ -131,25 +188,27 @@ export function getRibItemPercentCompleteAsOf(ribItem: ProgressSource, sprintId:
   if (!ribItem.progressHistory || ribItem.progressHistory.length === 0) return 0;
   if (!sprintId || !sprints) return getRibItemPercentComplete(ribItem);
 
-  const releaseIds = [...new Set(ribItem.progressHistory.map(p => p.releaseId).filter(Boolean))];
-
-  if (releaseIds.length === 0) {
-    return _legacyPercentCompleteAsOf(ribItem, sprintId, sprints);
+  // One walk per release group (first-appearance order, as the Set it replaces
+  // had; falsy ids skipped, as its `filter(Boolean)` did) — instead of one walk
+  // of the WHOLE history per release, which was quadratic in a long history.
+  let total = 0;
+  let releases = 0;
+  for (const [releaseId, entries] of historyByRelease(ribItem.progressHistory)) {
+    if (!releaseId) continue;
+    releases++;
+    total += releaseProgressAsOf(entries, releaseId as string, sprintId, sprints);
   }
 
-  let total = 0;
-  for (const releaseId of releaseIds) {
-    total += getRibReleaseProgressAsOf(ribItem, releaseId, sprintId, sprints);
+  if (releases === 0) {
+    return _legacyPercentCompleteAsOf(ribItem, sprintId, sprints);
   }
   return Math.min(100, total);
 }
 
 // Fallback for any un-migrated entries (shouldn't happen after migration, but safe)
 function _legacyPercentCompleteAsOf(ribItem: ProgressSource, sprintId: string, sprints: Sprint[]): number {
-  const sprintOrder: Record<string, number> = {};
-  for (const s of sprints) sprintOrder[s.id] = s.order;
-
-  const targetOrder = sprintOrder[sprintId];
+  const index = sprintIndex(sprints);
+  const targetOrder = index.get(sprintId)?.order;
   if (targetOrder === undefined) return getRibItemPercentComplete(ribItem);
 
   let best = null;
@@ -157,7 +216,7 @@ function _legacyPercentCompleteAsOf(ribItem: ProgressSource, sprintId: string, s
   // Its only caller guards this, but the guard does not survive the call.
   for (const entry of ribItem.progressHistory ?? []) {
     if (entry.percentComplete === null) continue;
-    const order = sprintOrder[entry.sprintId];
+    const order = index.get(entry.sprintId)?.order;
     if (order !== undefined && order <= targetOrder && order > bestOrder) {
       best = entry;
       bestOrder = order;
@@ -186,23 +245,69 @@ function _legacyPercentCompleteAsOf(ribItem: ProgressSource, sprintId: string, s
  * already treated the two identically.
  */
 export function getReleasePoints(product: Product, releaseId: string, sprintId?: string | null): { allocated: number; completed: number } {
-  return reduceRibs(product, (acc, rib) => {
-    const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-    if (!alloc) return acc;
+  const t = releaseTotals(product, sprintId).get(releaseId);
+  return { allocated: t?.allocated ?? 0, completed: t?.completed ?? 0 };
+}
 
+interface ReleaseTotals { allocated: number; completed: number; core: number; nonCore: number }
+
+/**
+ * Every release's totals in ONE pass over the ribs, cached per product object
+ * and sprint. The per-release functions used to be a full pass over every rib
+ * each, and the views call them once per release — releases × ribs, which a
+ * document holding thousands of both turned into a multi-second freeze of
+ * Release Planning and Progress (W4). Each release still receives the same
+ * additions in the same rib order, so every total is bit-identical; and, as the
+ * `Array#find` it replaces did, only a rib's FIRST allocation to a release counts.
+ * Keyed by product identity: product state is replaced on every change.
+ */
+const releaseTotalsCache = new WeakMap<Product, Map<string, Map<string, ReleaseTotals>>>();
+
+function releaseTotals(product: Product, sprintId: string | null | undefined): Map<string, ReleaseTotals> {
+  const key = sprintId ? `s:${sprintId}` : '';
+  let bySprint = releaseTotalsCache.get(product);
+  if (!bySprint) {
+    bySprint = new Map();
+    releaseTotalsCache.set(product, bySprint);
+  }
+  let table = bySprint.get(key);
+  if (!table) {
+    table = buildReleaseTotals(product, sprintId || null);
+    bySprint.set(key, table);
+  }
+  return table;
+}
+
+function buildReleaseTotals(product: Product, sprintId: string | null): Map<string, ReleaseTotals> {
+  const table = new Map<string, ReleaseTotals>();
+  forEachRib(product, rib => {
+    if (rib.releaseAllocations.length === 0) return;
     const ribPoints = getRibItemPoints(rib, product.sizeMapping);
-    const allocatedPoints = ribPoints * (alloc.percentage / 100);
-    acc.allocated += allocatedPoints;
-
-    const releaseProgress = sprintId
-      ? getRibReleaseProgressAsOf(rib, releaseId, sprintId, product.sprints)
-      : getRibReleaseProgress(rib, releaseId);
-    const releasePortionComplete = alloc.percentage > 0
-      ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
-      : 0;
-    acc.completed += allocatedPoints * releasePortionComplete;
-    return acc;
-  }, { allocated: 0, completed: 0 });
+    const groups = historyByRelease(rib.progressHistory);
+    const seen = new Set<string>();
+    for (const alloc of rib.releaseAllocations) {
+      if (seen.has(alloc.releaseId)) continue;
+      seen.add(alloc.releaseId);
+      const progressHistory = groups.get(alloc.releaseId) ?? [];
+      const releaseProgress = sprintId && product.sprints
+        ? releaseProgressAsOf(progressHistory, alloc.releaseId, sprintId, product.sprints)
+        : getRibReleaseProgress({ progressHistory }, alloc.releaseId);
+      const allocatedPoints = ribPoints * (alloc.percentage / 100);
+      const releasePortionComplete = alloc.percentage > 0
+        ? Math.min(releaseProgress, alloc.percentage) / alloc.percentage
+        : 0;
+      let t = table.get(alloc.releaseId);
+      if (!t) {
+        t = { allocated: 0, completed: 0, core: 0, nonCore: 0 };
+        table.set(alloc.releaseId, t);
+      }
+      t.allocated += allocatedPoints;
+      t.completed += allocatedPoints * releasePortionComplete;
+      if (rib.category === 'non-core') t.nonCore += allocatedPoints;
+      else t.core += allocatedPoints;
+    }
+  });
+  return table;
 }
 
 export function getReleasePercentComplete(product: Product, releaseId: string, sprintId?: string | null): number {
@@ -225,14 +330,8 @@ export function getProjectPercentComplete(product: Product, sprintId?: string): 
 }
 
 export function getCoreNonCorePointsForRelease(product: Product, releaseId: string) {
-  return reduceRibs(product, (acc, rib) => {
-    const alloc = rib.releaseAllocations.find(a => a.releaseId === releaseId);
-    if (!alloc) return acc;
-    const pts = getRibItemPoints(rib, product.sizeMapping) * (alloc.percentage / 100);
-    if (rib.category === 'non-core') acc.nonCore += pts;
-    else acc.core += pts;
-    return acc;
-  }, { core: 0, nonCore: 0 });
+  const t = releaseTotals(product, null).get(releaseId);
+  return { core: t?.core ?? 0, nonCore: t?.nonCore ?? 0 };
 }
 
 export function getAllocationTotal(ribItem: RibItem): number {
@@ -279,10 +378,23 @@ export function getBackboneStats(backbone: Backbone, sizeMapping: SizeMapping[])
   return computeItemStats(backbone.ribItems, sizeMapping);
 }
 
+/**
+ * Most sprints an over-time chart plots — the most recent ones. Every point sums
+ * every rib, so a chart is sprints × ribs, and nothing caps either count at the
+ * write site: a document holding thousands of both froze Progress and Insights.
+ * 500 is nearly ten years of weekly sprints (the import validator stops at 200);
+ * a project past it is charted over its latest 500. Data is untouched.
+ */
+export const MAX_CHART_SPRINTS = 500;
+
+function chartSprints(sprints: Sprint[]): Sprint[] {
+  return sprints.length > MAX_CHART_SPRINTS ? sprints.slice(-MAX_CHART_SPRINTS) : sprints;
+}
+
 export function getProgressOverTime(product: Product) {
   if (!product.sprints.length) return [];
 
-  return product.sprints.map(sprint => {
+  return chartSprints(product.sprints).map(sprint => {
     const { totalPoints, completedPoints } = reduceRibs(product, (acc, rib) => {
       const pts = getRibItemPoints(rib, product.sizeMapping);
       acc.totalPoints += pts;
@@ -382,7 +494,7 @@ export function getSprintSummary(product: Product, sprintId: string | null) {
 export function getReleaseProgressOverTime(product: Product, releaseId: string) {
   if (!product.sprints.length) return [];
 
-  return product.sprints.map(sprint => {
+  return chartSprints(product.sprints).map(sprint => {
     const { allocated, completed } = getReleasePoints(product, releaseId, sprint.id);
     return {
       sprintName: sprint.name,

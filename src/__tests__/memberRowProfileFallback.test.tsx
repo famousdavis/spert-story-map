@@ -139,6 +139,22 @@ describe('MemberRow profile resolution', () => {
     expect(reads).not.toContain(`spertsuite_profiles/${MEMBER_UID}`);
   });
 
+  // W4: profiles are owner-written with no content rules, and this row shows
+  // OTHER people's. A non-string displayName rendered as a React child threw.
+  it('ignores a displayName that is not a string, rather than crashing the panel', async () => {
+    docs[`spertstorymap_profiles/${MEMBER_UID}`] = {
+      displayName: { evil: 'HOSTILE-VALUE' },
+      email: 'member@example.com',
+    };
+
+    render(<ProjectSharingPanel productId="p1" />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('member@example.com').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/HOSTILE-VALUE/)).not.toBeInTheDocument();
+  });
+
   it('still falls back to the uid when neither profile exists', async () => {
     render(<ProjectSharingPanel productId="p1" />);
 

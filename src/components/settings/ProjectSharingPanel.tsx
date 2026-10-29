@@ -256,6 +256,17 @@ interface MemberRowProps {
   onRoleChange: (role: string) => void;
 }
 
+/**
+ * Keep only the string fields of a profile document. Profiles are written by
+ * their owner with no content rules, and this row shows OTHER people's: a
+ * `displayName` that is not a string, rendered as a React child, threw and
+ * took the Sharing section down for the project owner.
+ */
+function readProfile(data: Record<string, unknown> | undefined): { displayName?: string; email?: string } {
+  const pick = (v: unknown) => (typeof v === 'string' ? v : undefined);
+  return { displayName: pick(data?.displayName), email: pick(data?.email) };
+}
+
 /** Displays a single member with role and actions. */
 function MemberRow({ uid, role, isOwner, isSelf, onRemove, onRoleChange }: MemberRowProps) {
   const [profile, setProfile] = useState<{ displayName?: string; email?: string } | null>(null);
@@ -270,7 +281,7 @@ function MemberRow({ uid, role, isOwner, isSelf, onRemove, onRoleChange }: Membe
       const appSnap = await getDoc(doc(database, PROFILES_COL, uid));
       if (cancelled) return;
       if (appSnap.exists()) {
-        setProfile(appSnap.data());
+        setProfile(readProfile(appSnap.data()));
         return;
       }
       // Fall back to the suite-wide mirror. A member added through the
@@ -279,7 +290,7 @@ function MemberRow({ uid, role, isOwner, isSelf, onRemove, onRoleChange }: Membe
       // sign into Story Map specifically — the function only writes
       // members.{uid}. Without this fallback the row renders a raw UID.
       const suiteSnap = await getDoc(doc(database, 'spertsuite_profiles', uid));
-      if (!cancelled && suiteSnap.exists()) setProfile(suiteSnap.data());
+      if (!cancelled && suiteSnap.exists()) setProfile(readProfile(suiteSnap.data()));
     })().catch(() => {
       // Leave profile null; the row falls back to the uid, as before.
     });

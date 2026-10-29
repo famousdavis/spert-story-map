@@ -3,9 +3,18 @@
 // See LICENSE file in the project root for full license text.
 
 import { Component } from 'react';
+import { Link } from 'react-router-dom';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
+  /**
+   * Render a compact in-page fallback instead of the full-screen one. Used
+   * around the project view, so the header, the tabs and the way back to the
+   * project list survive a view that cannot render.
+   */
+  inline?: boolean;
+  /** When this changes, a caught error is cleared (e.g. the route path). */
+  resetKey?: unknown;
 }
 
 interface ErrorBoundaryState {
@@ -19,8 +28,26 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     return { error };
   }
 
+  componentDidUpdate(prev: ErrorBoundaryProps) {
+    if (this.state.error && prev.resetKey !== this.props.resetKey) {
+      this.setState({ error: null });
+    }
+  }
+
   render() {
     if (!this.state.error) return this.props.children;
+
+    if (this.props.inline) {
+      return (
+        <div role="alert" className="max-w-md mx-auto text-center py-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">This view could not be displayed</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{this.state.error.message}</p>
+          <Link to="/" className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+            Back to projects
+          </Link>
+        </div>
+      );
+    }
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">

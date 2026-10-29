@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 0.53.16 (2026-10-29)
+
+### Security — projects loaded from the cloud are checked before they are displayed
+
+- **Projects loaded from cloud storage are now checked before Story Map displays them.** If part of a project is in a form Story Map cannot read, that part is left out and the rest of the project opens as normal, where before the project, or the whole project list, could fail to load. When this happens in a project you open, a notice names the project. Nothing Story Map itself saves is affected: only data in a form Story Map could never have written is left out, and it is not kept the next time the project is saved.
+- **The project list handles each project on its own**, so one project that cannot be read no longer leaves the whole list empty.
+- **A project tab that cannot be displayed now shows its own message**, with the header, the other tabs and the link back to your projects still available. Before, the whole app showed an error that reloading did not clear.
+- **The Story Map, Progress, Insights and Release Planning tabs stay responsive on very large projects.** Several calculations slowed down much faster than a project grew in releases, sprints, size rows or progress history. They now take time in proportion to the project's size, and give exactly the same results. Two limits apply only far beyond any real project: on a map with more than 50,000 release-and-backbone cells, the "+ Rib" hover buttons are not shown, and on a project with more than 500 sprints, the progress-over-time charts show the most recent 500.
+- **Adding a sprint after one whose end date cannot be read now leaves the new sprint's date blank** instead of stopping the app.
+- **Sharing settings ignore a collaborator's profile name if it is not plain text**, instead of failing to display.
+- **New tests** pass malformed and very large projects through the real cloud loading code, check that the largest and oddest project Story Map can legitimately save loads with nothing changed, and compare every rewritten calculation with the previous one over hundreds of generated projects. The tests for malformed and very large projects fail on the previous version.
+
 ## Version 0.53.15 (2026-10-25)
 
 ### Security — a security.txt file, so researchers know where to report a vulnerability
