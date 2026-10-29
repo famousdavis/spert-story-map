@@ -17,7 +17,18 @@ import {
   MIN_LANE_HEIGHT,
   ADD_BUTTON_RESERVED,
   COLLAPSED_LANE_HEIGHT,
+  gapButtonFor,
 } from '../components/storymap/useMapLayout';
+import type { MapLayout, MapGapButton } from '../components/storymap/useMapLayout';
+
+/**
+ * Every "+ Rib" button the map can show, in lane-then-column order — what the
+ * layout used to emit as `gapButtons` before W4 made them on-demand.
+ */
+function allGaps(layout: MapLayout): MapGapButton[] {
+  const lanes = [...layout.releaseLanes, null];
+  return lanes.flatMap(lane => layout.columns.flatMap(col => gapButtonFor(layout, lane, col) ?? []));
+}
 import type { Product, Theme, Backbone, RibItem, Release, ReleaseAllocation } from '../types';
 import { req } from './testHelpers';
 
@@ -266,11 +277,11 @@ describe('computeLayout', () => {
 
     const result = computeLayout(product);
     // 1 release × 2 columns + 1 unassigned × 2 columns = 4 gap buttons
-    expect(result.gapButtons).toHaveLength(4);
+    expect(allGaps(result)).toHaveLength(4);
 
     // Longest unassigned column (col 0, 2 ribs) — button sits below the last
     // rib, inside the reserved bottom padding.
-    const longest = result.gapButtons.find(
+    const longest = allGaps(result).find(
       g => g.releaseId === null && g.backboneId === 'b0'
     );
     expect(longest).toBeDefined();
@@ -279,7 +290,7 @@ describe('computeLayout', () => {
     expect(longest!.y).toBe(longestExpectedY);
 
     // Empty release×column in column 0 (no allocations) — button at top of cell.
-    const emptyRel = result.gapButtons.find(
+    const emptyRel = allGaps(result).find(
       g => g.releaseId === 'rel-1' && g.backboneId === 'b0'
     );
     expect(emptyRel).toBeDefined();
@@ -449,7 +460,7 @@ describe('computeLayout — collapsed release lanes', () => {
     // No cells for the collapsed release
     expect(result.cells.some((c: { releaseId: string | null }) => c.releaseId === 'rel-1')).toBe(false);
     // No gap (+ Rib) buttons for the collapsed release
-    expect(result.gapButtons.some((g: { releaseId: string | null }) => g.releaseId === 'rel-1')).toBe(false);
+    expect(allGaps(result).some(g => g.releaseId === 'rel-1')).toBe(false);
   });
 
   it('cardCount is the SUM across columns (not max)', () => {

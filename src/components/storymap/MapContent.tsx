@@ -2,9 +2,9 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import React, { useEffect, useMemo } from 'react';
-import { COL_GAP, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH } from './useMapLayout';
-import type { MapLayout } from './useMapLayout';
+import React, { useEffect, useMemo, useState } from 'react';
+import { COL_GAP, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, GAP_BUTTON_HEIGHT, gapButtonAt } from './useMapLayout';
+import type { MapLayout, MapGapButton } from './useMapLayout';
 import ThemeHeader from './ThemeHeader';
 import BackboneHeader from './BackboneHeader';
 import ReleaseDivider from './ReleaseDivider';
@@ -61,7 +61,14 @@ export default function MapContent({
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
   onToggleCollapse, selectedIds, editingRibId,
 }: MapContentProps) {
-  const { columns, themeSpans, releaseLanes, cells, unassignedLane, gapButtons, totalWidth, totalHeight } = layout;
+  const { columns, themeSpans, releaseLanes, cells, unassignedLane, totalWidth, totalHeight } = layout;
+
+  // The "+ Rib" hover button is drawn only for the slot under the pointer. One
+  // invisible button per lane × column used to sit in the DOM, which a map with
+  // thousands of releases and backbones could not survive (W4). Tied to the
+  // layout it was computed from, so a stale one never shows after a change.
+  const [hover, setHover] = useState<{ layout: MapLayout; gap: MapGapButton } | null>(null);
+  const hoverGap = hover && hover.layout === layout ? hover.gap : null;
 
   // Extra width for the "+ Theme" / "+ Backbone" buttons beyond the right label column
   const addBtnWidth = 100;
@@ -114,11 +121,26 @@ export default function MapContent({
     );
   }
 
+  // Pointer position → logical map coordinates (the canvas scales this element,
+  // so its rendered width over its logical width is the zoom).
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scale = rect.width / mapWidth || 1;
+    const gap = gapButtonAt(layout, (e.clientX - rect.left) / scale, (e.clientY - rect.top) / scale);
+    setHover(prev => {
+      const same = prev && prev.layout === layout && gap && prev.gap.x === gap.x && prev.gap.y === gap.y;
+      if (same) return prev;
+      return gap ? { layout, gap } : null;
+    });
+  };
+
   return (
     <div
       className="relative"
       style={{ width: mapWidth, height: mapHeight, minWidth: mapWidth, minHeight: mapHeight }}
       data-map-bg=""
+      onPointerMove={handlePointerMove}
+      onPointerLeave={() => setHover(null)}
     >
       {/* Theme headers */}
       {themeSpans.map((ts) => (
@@ -239,21 +261,22 @@ export default function MapContent({
         );
       })}
 
-      {/* Hover + Rib buttons in gap zones below last card in each column×lane */}
-      {!dragState?.isDragging && gapButtons?.map(gb => (
+      {/* Hover + Rib button in the gap zone under the pointer (below the last
+          card in its column × lane) */}
+      {!dragState?.isDragging && hoverGap && (
         <div
-          key={`gap-${gb.backboneId}-${gb.releaseId || 'unassigned'}`}
-          className="absolute opacity-0 hover:opacity-100 transition-opacity duration-150"
-          style={{ left: gb.x, top: gb.y, width: gb.width, height: 22 }}
+          key={`gap-${hoverGap.backboneId}-${hoverGap.releaseId || 'unassigned'}`}
+          className="absolute"
+          style={{ left: hoverGap.x, top: hoverGap.y, width: hoverGap.width, height: GAP_BUTTON_HEIGHT }}
         >
           <button
             className="w-full h-full bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-[10px] rounded px-1 transition-colors dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 dark:hover:text-blue-300"
-            onClick={() => gb.releaseId ? onAddRibToRelease?.(gb.themeId, gb.backboneId, gb.releaseId) : onAddRib?.(gb.themeId, gb.backboneId)}
+            onClick={() => hoverGap.releaseId ? onAddRibToRelease?.(hoverGap.themeId, hoverGap.backboneId, hoverGap.releaseId) : onAddRib?.(hoverGap.themeId, hoverGap.backboneId)}
           >
             + Rib
           </button>
         </div>
-      ))}
+      )}
 
       {/* + Theme button (after last theme) */}
       {onAddTheme && (

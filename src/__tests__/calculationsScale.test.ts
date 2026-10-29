@@ -26,7 +26,7 @@
 import { describe, it, expect } from 'vitest';
 import * as C from '../lib/calculations';
 import * as PV from '../lib/progressViewHelpers';
-import { computeLayout, MAX_GAP_BUTTONS } from '../components/storymap/useMapLayout';
+import { computeLayout, gapButtonAt, gapButtonFor, GAP_BUTTON_HEIGHT } from '../components/storymap/useMapLayout';
 import type { Product, RibItem, Sprint, SizeMapping, ProgressEntry, ProgressSource } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -321,16 +321,32 @@ describe('W4 map layout — lanes × columns', () => {
     };
   };
 
-  it('keeps every "+ Rib" button on a realistic map', () => {
-    expect(computeLayout(wide(30, 60), []).gapButtons).toHaveLength((30 + 1) * 60);
+  it('finds every slot\'s "+ Rib" button under the pointer, on a realistic map', () => {
+    const layout = computeLayout(wide(30, 60), []);
+    let found = 0;
+    for (const lane of [...layout.releaseLanes, null]) {
+      for (const col of layout.columns) {
+        const gb = gapButtonFor(layout, lane, col);
+        if (!gb) continue;
+        expect(gapButtonAt(layout, gb.x + gb.width / 2, gb.y + GAP_BUTTON_HEIGHT / 2)).toEqual(gb);
+        found++;
+      }
+    }
+    expect(found).toBe((30 + 1) * 60);
+    // Off the buttons — a lane label, the gap between columns — there is none.
+    expect(gapButtonAt(layout, 10, layout.releaseLanes[0]!.y + 10)).toBeNull();
   });
 
-  it('omits only the hover buttons past MAX_GAP_BUTTONS, keeping lanes and columns', () => {
+  it('builds nothing per lane × column on a huge map, and still finds the button under the pointer', () => {
     const layout = computeLayout(wide(400, 400), []);
-    expect(401 * 400).toBeGreaterThan(MAX_GAP_BUTTONS);
-    expect(layout.gapButtons).toHaveLength(0);
+    expect(Object.keys(layout.ribCounts)).toHaveLength(0);
     expect(layout.releaseLanes).toHaveLength(400);
     expect(layout.columns).toHaveLength(400);
+    const lane = layout.releaseLanes[200]!;
+    const col = layout.columns[300]!;
+    const gb = gapButtonAt(layout, col.x + 20, lane.y + 10);
+    expect(gb?.releaseId).toBe(lane.releaseId);
+    expect(gb?.backboneId).toBe(col.backboneId);
   });
 
   it('sizes the lanes without visiting every release × column', () => {
