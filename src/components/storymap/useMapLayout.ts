@@ -23,8 +23,10 @@ const MIN_LANE_HEIGHT = 72;
 const ADD_BUTTON_RESERVED = 24;
 // Height of a collapsed release lane — just enough for the mirrored label row.
 const COLLAPSED_LANE_HEIGHT = 30;
+// Height of a "+ Rib" hover button (MapContent draws it at this height).
+const GAP_BUTTON_HEIGHT = 22;
 
-export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT, ADD_BUTTON_RESERVED, COLLAPSED_LANE_HEIGHT };
+export { COL_WIDTH, COL_GAP, CELL_HEIGHT, CELL_GAP, CELL_PAD, THEME_HEIGHT, BACKBONE_HEIGHT, LANE_LABEL_WIDTH, RIGHT_LABEL_WIDTH, MIN_LANE_HEIGHT, ADD_BUTTON_RESERVED, COLLAPSED_LANE_HEIGHT, GAP_BUTTON_HEIGHT };
 
 /** One column of the map — a single backbone item. */
 export interface MapColumn {
@@ -90,7 +92,7 @@ export interface MapCell extends MapRibEntry {
   height: number;
 }
 
-/** A hover "+ Rib" zone, one per column x lane. */
+/** A hover "+ Rib" zone — one per column × visible lane, computed on demand (gapButtonFor / gapButtonAt). */
 export interface MapGapButton {
   themeId: string;
   backboneId: string;
@@ -107,9 +109,41 @@ export interface MapLayout {
   releaseLanes: MapReleaseLane[];
   cells: MapCell[];
   unassignedLane: MapUnassignedLane | null;
-  gapButtons: MapGapButton[];
+  /**
+   * Ribs per (release, column), keyed `${releaseId}:${colIdx}` — only the slots
+   * that hold ribs. The "+ Rib" button for any slot is derived from this on
+   * demand: building one per lane × column up front was the only part of the
+   * layout that was inherently lanes × columns, and a document holding
+   * thousands of each froze the Map tab (W4).
+   */
+  ribCounts: Record<string, number>;
+  /** Ribs per column in the unassigned lane, keyed by colIdx (occupied columns only). */
+  unassignedRibCounts: Record<number, number>;
   totalWidth: number;
   totalHeight: number;
+}
+
+/** Per-release tallies kept while bucketing ribs — see computeLayout step 3. */
+interface LaneTally { max: number; total: number; cols: number[] }
+
+function tallyLane(tallies: Map<string, LaneTally>, releaseId: string, colIdx: number, bucketLength: number): void {
+  let t = tallies.get(releaseId);
+  if (!t) {
+    t = { max: 0, total: 0, cols: [] };
+    tallies.set(releaseId, t);
+  }
+  t.total++;
+  if (bucketLength === 1) t.cols.push(colIdx);
+  if (bucketLength > t.max) t.max = bucketLength;
+}
+
+/** The columns holding ribs for one lane, in column order (the order `columns` has). */
+function occupiedColumns(cols: number[] | undefined, colByIdx: Map<number, MapColumn>): MapColumn[] {
+  if (!cols) return [];
+  return [...cols].sort((a, b) => a - b).flatMap(i => {
+    const col = colByIdx.get(i);
+    return col ? [col] : [];
+  });
 }
 
 export default function useMapLayout(product: Product, collapsedReleaseIds: string[] = []) {
@@ -122,7 +156,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   const releases = [...(product.releases || [])].sort((a, b) => a.order - b.order);
 
   if (themes.length === 0) {
-    return { columns: [], themeSpans: [], releaseLanes: [], cells: [], unassignedLane: null, gapButtons: [], totalWidth: 0, totalHeight: 0 };
+    return { columns: [], themeSpans: [], releaseLanes: [], cells: [], unassignedLane: null, ribCounts: {}, unassignedRibCounts: {}, totalWidth: 0, totalHeight: 0 };
   }
 
   // 1. Build columns — one per backbone, grouped by theme
@@ -182,6 +216,10 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   // 3. Gather rib items with context
   const ribsByRelCol: Record<string, MapRibEntry[]> = {}; // key: `${releaseId}:${colIdx}`
   const unassignedByCol: Record<number, MapRibEntry[]> = {}; // key: colIdx
+  // Tallied while bucketing, so steps 4–6 visit only the (lane, column) pairs
+  // that HOLD ribs. They used to visit every release × every column.
+  const laneTallies = new Map<string, LaneTally>();
+  let maxUnassigned = 0;
 
   for (const theme of themes) {
     for (const backbone of theme.backboneItems) {
@@ -203,6 +241,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
           const bucket = unassignedByCol[col.colIdx] ?? [];
           bucket.push({ ...ribData, releaseId: null, allocation: null });
           unassignedByCol[col.colIdx] = bucket;
+          if (bucket.length > maxUnassigned) maxUnassigned = bucket.length;
         } else {
           for (const alloc of rib.releaseAllocations) {
             const key = `${alloc.releaseId}:${col.colIdx}`;
@@ -214,6 +253,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
               isPartial: alloc.percentage < 100,
             });
             ribsByRelCol[key] = bucket;
+            tallyLane(laneTallies, alloc.releaseId, col.colIdx, bucket.length);
           }
         }
       }
@@ -227,14 +267,9 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   let currentY = bodyTop;
 
   for (const release of releases) {
-    let maxRibs = 0;
-    let cardCount = 0; // total ribs in this release across all columns (shown in collapsed header)
-    for (let ci = 0; ci < totalColumns; ci++) {
-      const key = `${release.id}:${ci}`;
-      const count = ribsByRelCol[key]?.length || 0;
-      cardCount += count;
-      if (count > maxRibs) maxRibs = count;
-    }
+    const tally = laneTallies.get(release.id);
+    const maxRibs = tally?.max ?? 0;
+    const cardCount = tally?.total ?? 0; // total ribs in this release across all columns (shown in collapsed header)
     const collapsed = collapsedSet.has(release.id);
     const height = collapsed
       ? COLLAPSED_LANE_HEIGHT
@@ -254,11 +289,6 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   }
 
   // 5. Unassigned lane (always present so + Release button is always visible)
-  let maxUnassigned = 0;
-  for (let ci = 0; ci < totalColumns; ci++) {
-    const count = unassignedByCol[ci]?.length || 0;
-    if (count > maxUnassigned) maxUnassigned = count;
-  }
   const unassignedLane: MapUnassignedLane = {
     y: currentY,
     height: Math.max(
@@ -274,15 +304,26 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   const cells: MapCell[] = [];
   const cardOrder = product.releaseCardOrder || {};
 
-  // Sort ribs within a lane column by releaseCardOrder position
+  // Sort ribs within a lane column by releaseCardOrder position. The position
+  // table is built once per release, not once per column: a release spread
+  // across thousands of columns rebuilt it thousands of times (W4).
+  const posMaps = new Map<string, Record<string, number>>();
+  const positionsFor = (releaseId: string, order: string[]) => {
+    let posMap = posMaps.get(releaseId);
+    if (!posMap) {
+      posMap = {};
+      for (let i = 0; i < order.length; i++) {
+        const id = order[i];
+        if (id !== undefined) posMap[id] = i;
+      }
+      posMaps.set(releaseId, posMap);
+    }
+    return posMap;
+  };
   const sortByCardOrder = (ribs: MapRibEntry[], releaseId: string) => {
     const order = cardOrder[releaseId];
     if (!order || order.length === 0) return ribs;
-    const posMap: Record<string, number> = {};
-    for (let i = 0; i < order.length; i++) {
-      const id = order[i];
-      if (id !== undefined) posMap[id] = i;
-    }
+    const posMap = positionsFor(releaseId, order);
     return [...ribs].sort((a, b) => {
       const pa = posMap[a.id] ?? Infinity;
       const pb = posMap[b.id] ?? Infinity;
@@ -290,9 +331,10 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
     });
   };
 
+  const colByIdx = new Map(columns.map(c => [c.colIdx, c]));
   for (const lane of releaseLanes) {
     if (lane.collapsed) continue; // collapsed lanes render no cells
-    for (const col of columns) {
+    for (const col of occupiedColumns(laneTallies.get(lane.releaseId)?.cols, colByIdx)) {
       const key = `${lane.releaseId}:${col.colIdx}`;
       const ribs = ribsByRelCol[key];
       if (!ribs) continue;
@@ -327,40 +369,12 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
     }
   }
 
-  // 7. Compute gap buttons (hover "+ Rib" zones in every column×lane cell).
-  // Lane heights now reserve ADD_BUTTON_RESERVED below the longest column's rib
-  // stack, so every cell — empty or not, longest column or not — has room for
-  // an affordance. Empty cells get the button at the top (just below the
-  // divider); populated cells get it below the last card.
-  const gapButtons: MapGapButton[] = [];
-
-  for (const lane of releaseLanes) {
-    if (lane.collapsed) continue; // no "+ Rib" affordance in a collapsed lane
-    for (const col of columns) {
-      const key = `${lane.releaseId}:${col.colIdx}`;
-      const ribCount = ribsByRelCol[key]?.length || 0;
-      const buttonY = ribCount === 0
-        ? lane.y + CELL_PAD
-        : lane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
-      gapButtons.push({
-        themeId: col.themeId, backboneId: col.backboneId, releaseId: lane.releaseId,
-        x: col.x + CELL_PAD, y: buttonY, width: COL_WIDTH - CELL_PAD * 2,
-      });
-    }
-  }
-
-  if (unassignedLane) {
-    for (const col of columns) {
-      const ribCount = unassignedByCol[col.colIdx]?.length || 0;
-      const buttonY = ribCount === 0
-        ? unassignedLane.y + CELL_PAD
-        : unassignedLane.y + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
-      gapButtons.push({
-        themeId: col.themeId, backboneId: col.backboneId, releaseId: null,
-        x: col.x + CELL_PAD, y: buttonY, width: COL_WIDTH - CELL_PAD * 2,
-      });
-    }
-  }
+  // 7. Rib counts per slot, from which each "+ Rib" hover button is derived on
+  // demand (gapButtonFor). Only occupied slots appear, so this is linear in ribs.
+  const ribCounts: Record<string, number> = {};
+  for (const [key, ribs] of Object.entries(ribsByRelCol)) ribCounts[key] = ribs.length;
+  const unassignedRibCounts: Record<number, number> = {};
+  for (const [colKey, ribs] of Object.entries(unassignedByCol)) unassignedRibCounts[Number(colKey)] = ribs.length;
 
   return {
     columns,
@@ -368,8 +382,77 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
     releaseLanes,
     cells,
     unassignedLane,
-    gapButtons,
+    ribCounts,
+    unassignedRibCounts,
     totalWidth,
     totalHeight,
   };
+}
+
+/**
+ * The "+ Rib" hover button for one slot: `lane` null is the unassigned lane.
+ * Below the last card when the slot holds ribs, at the top of the cell when it
+ * is empty; none in a collapsed lane.
+ */
+export function gapButtonFor(layout: MapLayout, lane: MapReleaseLane | null, col: MapColumn): MapGapButton | null {
+  if (lane?.collapsed) return null;
+  const top = lane ? lane.y : layout.unassignedLane?.y;
+  if (top === undefined) return null;
+  const ribCount = (lane ? layout.ribCounts[`${lane.releaseId}:${col.colIdx}`] : layout.unassignedRibCounts[col.colIdx]) ?? 0;
+  const y = ribCount === 0
+    ? top + CELL_PAD
+    : top + CELL_PAD + (ribCount - 1) * (CELL_HEIGHT + CELL_GAP) + CELL_HEIGHT + 2;
+  return {
+    themeId: col.themeId, backboneId: col.backboneId, releaseId: lane ? lane.releaseId : null,
+    x: col.x + CELL_PAD, y, width: COL_WIDTH - CELL_PAD * 2,
+  };
+}
+
+/** The column whose box contains logical `x` (columns are uniform and ordered by colIdx). */
+function columnAt(columns: MapColumn[], x: number): MapColumn | null {
+  const target = Math.floor((x - LANE_LABEL_WIDTH) / (COL_WIDTH + COL_GAP));
+  let lo = 0;
+  let hi = columns.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const col = columns[mid];
+    if (!col) return null;
+    if (col.colIdx === target) return col;
+    if (col.colIdx < target) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  return null;
+}
+
+/** The lane containing logical `y`: a release lane, `null` for the unassigned lane, `undefined` for neither. */
+function laneAt(layout: MapLayout, y: number): MapReleaseLane | null | undefined {
+  const lanes = layout.releaseLanes;
+  let lo = 0;
+  let hi = lanes.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const lane = lanes[mid];
+    if (!lane) break;
+    if (y < lane.y) hi = mid - 1;
+    else if (y >= lane.y + lane.height) lo = mid + 1;
+    else return lane;
+  }
+  const u = layout.unassignedLane;
+  return u && y >= u.y && y < u.y + u.height ? null : undefined;
+}
+
+/**
+ * The "+ Rib" button under logical point (x, y), or null. MapContent calls this
+ * on pointer move and draws only that one button — the same box that, drawn
+ * for every slot, was revealed on hover.
+ */
+export function gapButtonAt(layout: MapLayout, x: number, y: number): MapGapButton | null {
+  const col = columnAt(layout.columns, x);
+  if (!col) return null;
+  const lane = laneAt(layout, y);
+  if (lane === undefined) return null;
+  const gb = gapButtonFor(layout, lane, col);
+  if (!gb) return null;
+  const inside = x >= gb.x && x < gb.x + gb.width && y >= gb.y && y < gb.y + GAP_BUTTON_HEIGHT;
+  return inside ? gb : null;
 }

@@ -238,6 +238,14 @@ describe('calculateNextSprintEndDate', () => {
     expect(calculateNextSprintEndDate('2026-02-01', 1)).toBe('2026-02-08');
   });
 
+  // W4: this runs inside an updateProduct updater, which React evaluates during
+  // render — a RangeError from toISOString took the whole app down on "Add sprint".
+  it('returns null, not a RangeError, when the last end date cannot be read', () => {
+    expect(calculateNextSprintEndDate('2026-01-01T09:00', 2)).toBeNull();
+    expect(calculateNextSprintEndDate('not a date', 2)).toBeNull();
+    expect(calculateNextSprintEndDate('2026-01-01', 1e15)).toBeNull();
+  });
+
   it('handles month boundary', () => {
     expect(calculateNextSprintEndDate('2026-01-28', 1)).toBe('2026-02-04');
   });

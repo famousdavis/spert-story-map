@@ -144,8 +144,11 @@ export function migrateToV2(product: any): any {
       if (!Array.isArray(backbone?.ribItems)) continue;
       for (const rib of backbone.ribItems) {
         if (!rib) continue;
-        if (!rib.progressHistory || rib.progressHistory.length === 0) continue;
-        const allocations = rib.releaseAllocations || [];
+        // Same reasoning as the guards above, one level down: a non-list history
+        // or allocation list (or a null entry in either) threw inside the loops
+        // below. Skipping leaves it for the cloud-load shape guard to set aside.
+        if (!Array.isArray(rib.progressHistory) || rib.progressHistory.length === 0) continue;
+        const allocations = Array.isArray(rib.releaseAllocations) ? rib.releaseAllocations : [];
         if (allocations.length === 0) {
           // No allocations — drop progress (nowhere to assign it)
           rib.progressHistory = [];
@@ -155,9 +158,11 @@ export function migrateToV2(product: any): any {
         // Convert each old entry { sprintId, percentComplete } into per-release entries
         const newHistory = [];
         for (const entry of rib.progressHistory) {
+          if (!entry) continue;
           let remaining = entry.percentComplete;
           // Waterfall: fill first allocation up to its %, then next, etc.
           for (const alloc of allocations) {
+            if (!alloc) continue;
             const portion = Math.min(remaining, alloc.percentage);
             if (portion > 0) {
               newHistory.push({

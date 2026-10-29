@@ -171,6 +171,37 @@ describe('migrateToV2 shape guards', () => {
     expect(p.themes[0]!.backboneItems[0]!.ribItems[1]!.progressHistory).toHaveLength(0);
   });
 
+  // W4: one level further down. Each of these threw inside the waterfall loops
+  // (`for…of` over a non-list, `.percentComplete` / `.percentage` of null), and
+  // the cloud list path calls this per document inside `snap.forEach`.
+  it('does not throw on a non-list history or allocation list, and migrates the sibling', () => {
+    const p = {
+      id: 'p', name: 'N', schemaVersion: 1,
+      themes: [{ id: 't', backboneItems: [{ id: 'b', ribItems: [
+        { id: 'r1', releaseAllocations: [{ releaseId: 'A', percentage: 100 }], progressHistory: { evil: 1 } },
+        { id: 'r2', releaseAllocations: 5, progressHistory: [{ sprintId: 's', percentComplete: 10 }] },
+        { id: 'r3', releaseAllocations: [{ releaseId: 'A', percentage: 100 }], progressHistory: [{ sprintId: 's', percentComplete: 10 }] },
+      ] }] }],
+    };
+    expect(() => migrateToV2(p)).not.toThrow();
+    const ribs = p.themes[0]!.backboneItems[0]!.ribItems;
+    expect(ribs[2]!.progressHistory).toEqual([{ sprintId: 's', releaseId: 'A', percentComplete: 10 }]);
+  });
+
+  it('does not throw on a null history entry or a null allocation', () => {
+    const p = {
+      id: 'p', name: 'N', schemaVersion: 1,
+      themes: [{ id: 't', backboneItems: [{ id: 'b', ribItems: [{
+        id: 'r', releaseAllocations: [null, { releaseId: 'A', percentage: 100 }],
+        progressHistory: [null, { sprintId: 's', percentComplete: 30 }],
+      }] }] }],
+    };
+    expect(() => migrateToV2(p)).not.toThrow();
+    expect(p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory).toEqual([
+      { sprintId: 's', releaseId: 'A', percentComplete: 30 },
+    ]);
+  });
+
   it('still performs the real v1→v2 waterfall it exists for', () => {
     const p = {
       id: 'p', name: 'N', schemaVersion: 1,

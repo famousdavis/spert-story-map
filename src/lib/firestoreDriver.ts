@@ -40,6 +40,8 @@ function requireDb(): Firestore {
 import type { PendingInvite } from '../types';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 import { runObserver } from './validatorObserverRegistry';
+import { guardCloudProduct } from './cloudLoadGuard';
+import { reportGuardedLoad } from './cloudLoadNotices';
 import { normalizeUpdatedAt } from './updated-at';
 
 /** Remove Firestore-only fields from product data. */
@@ -231,35 +233,47 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       const snap = await getDocs(q);
       const products: Product[] = [];
       snap.forEach(docSnap => {
-        const data = docSnap.data();
-        // Brief 10 §3d: `data` is an independent pre-migration source — the object
-        // literal below is a fresh shallow spread, so `migrateToV2` mutating the
-        // product cannot reach this read.
-        const rawSchemaVersion = data.schemaVersion;
-        const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
-        // ⚠️ OBSERVE HERE, BEFORE THE _owner/_members RE-ATTACH BELOW — never at the
-        // `return`. PRODUCT_FIELDS (validateProduct.ts:106-114) omits both fields
-        // deliberately (:115-120 calls them authorisation state), so the strip loop
-        // at :529-533 deletes them; observing after the re-attach would report two
-        // spurious `repaired` paths on every single cloud observation.
-        runObserver(product, { rawSchemaVersion });
-        // Normalize AFTER the observer, deliberately: the observer reports what the
-        // stored document actually contains, and normalizing first would hide a
-        // degraded `updatedAt` from it. `normalizeUpdatedAt` returns `undefined` for
-        // any shape with no recoverable instant, which is why `Product.updatedAt` is
-        // optional — the render sites branch on it and print an em dash rather than
-        // substituting today. See `lib/updated-at.ts`.
-        product.updatedAt = normalizeUpdatedAt(product.updatedAt);
-        // Re-attach owner/members from the raw doc — stripFirestoreFields
-        // removed them. Use `?? null` so the field shape is stable for the
-        // UI's strict-equality ownership checks. (Lessons 38, 49.)
-        product._owner = data.owner ?? null;
-        product._members = data.members;
-        // Seed the baseline so the first save after a list-page load doesn't
-        // re-send every entry (and so arrayUnion isn't asked to dedupe the
-        // entire history).
-        resetChangeLogBaseline(product.id, product._changeLog ?? []);
-        products.push(product);
+        // ⚠️ One malformed project must not take the whole list down with it. The
+        // shape guard below makes this unreachable by construction; the catch is
+        // the containment behind it (W4 G7), and it skips only the one project.
+        try {
+          const data = docSnap.data();
+          // Brief 10 §3d: `data` is an independent pre-migration source — the object
+          // literal below is a fresh shallow spread, so `migrateToV2` mutating the
+          // product cannot reach this read.
+          const rawSchemaVersion = data.schemaVersion;
+          const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
+          // ⚠️ OBSERVE HERE, BEFORE THE _owner/_members RE-ATTACH BELOW — never at the
+          // `return`. PRODUCT_FIELDS (validateProduct.ts:106-114) omits both fields
+          // deliberately (:115-120 calls them authorisation state), so the strip loop
+          // at :529-533 deletes them; observing after the re-attach would report two
+          // spurious `repaired` paths on every single cloud observation.
+          runObserver(product, { rawSchemaVersion });
+          // ⚠️ Shape guard AFTER the observer (which must keep reporting what the
+          // stored document contains) and BEFORE the _owner/_members re-attach.
+          // Shape only, never validateProduct — see cloudLoadGuard.ts. No notice
+          // from the list: opening the project runs the guard again and raises it.
+          reportGuardedLoad(product.id, guardCloudProduct(product), false);
+          // Normalize AFTER the observer, deliberately: the observer reports what the
+          // stored document actually contains, and normalizing first would hide a
+          // degraded `updatedAt` from it. `normalizeUpdatedAt` returns `undefined` for
+          // any shape with no recoverable instant, which is why `Product.updatedAt` is
+          // optional — the render sites branch on it and print an em dash rather than
+          // substituting today. See `lib/updated-at.ts`.
+          product.updatedAt = normalizeUpdatedAt(product.updatedAt);
+          // Re-attach owner/members from the raw doc — stripFirestoreFields
+          // removed them. Use `?? null` so the field shape is stable for the
+          // UI's strict-equality ownership checks. (Lessons 38, 49.)
+          product._owner = data.owner ?? null;
+          product._members = data.members;
+          // Seed the baseline so the first save after a list-page load doesn't
+          // re-send every entry (and so arrayUnion isn't asked to dedupe the
+          // entire history).
+          resetChangeLogBaseline(product.id, product._changeLog ?? []);
+          products.push(product);
+        } catch (e) {
+          console.warn('[cloud-load-guard] project skipped:', docSnap.id, e instanceof Error ? e.name : 'Error');
+        }
       });
       return products;
     },
@@ -274,6 +288,8 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       // ⚠️ Observe BEFORE the _owner/_members re-attach below, not at the `return`
       // on the line after it — see the note at loadProductIndex.
       runObserver(product, { rawSchemaVersion });
+      // Shape guard after the observer, before the re-attach — see loadProductIndex.
+      reportGuardedLoad(product.id, guardCloudProduct(product), true);
       // Normalize after the observer — see the note at loadProductIndex.
       product.updatedAt = normalizeUpdatedAt(product.updatedAt);
       // Seed _owner/_members on cold load too — without these the Share UI
@@ -563,20 +579,32 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         (snap) => {
           if (snap.metadata.hasPendingWrites) return;
           if (!snap.exists()) return;
-          const data = snap.data();
-          const rawSchemaVersion = data.schemaVersion;
-          const product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
-          // ⚠️ Observe BEFORE the _owner/_members re-attach — see loadProductIndex.
-          // This site is behind the `hasPendingWrites` gate above, so the observer
-          // only ever sees server-confirmed snapshots.
-          runObserver(product, { rawSchemaVersion });
-          // Normalize after the observer — see the note at loadProductIndex.
-          product.updatedAt = normalizeUpdatedAt(product.updatedAt);
-          product._owner = data.owner ?? null;
-          product._members = (data.members as Record<string, string>) ?? {};
-          // Re-sync the changelog baseline with the server's authoritative
-          // copy so the next save's arrayUnion delta is correct.
-          resetChangeLogBaseline(id, product._changeLog ?? []);
+          // A snapshot that cannot be read is skipped, never thrown into the SDK:
+          // the previous state stays on screen. Unreachable by construction (the
+          // shape guard below); this is the containment behind it.
+          // Typed as migrateToV2's result, as the `const` this replaced was.
+          let product: ReturnType<typeof migrateToV2>;
+          try {
+            const data = snap.data();
+            const rawSchemaVersion = data.schemaVersion;
+            product = migrateToV2(stripFirestoreFields({ id: snap.id, ...data }));
+            // ⚠️ Observe BEFORE the _owner/_members re-attach — see loadProductIndex.
+            // This site is behind the `hasPendingWrites` gate above, so the observer
+            // only ever sees server-confirmed snapshots.
+            runObserver(product, { rawSchemaVersion });
+            // Shape guard after the observer, before the re-attach — see loadProductIndex.
+            reportGuardedLoad(product.id, guardCloudProduct(product), true);
+            // Normalize after the observer — see the note at loadProductIndex.
+            product.updatedAt = normalizeUpdatedAt(product.updatedAt);
+            product._owner = data.owner ?? null;
+            product._members = (data.members as Record<string, string>) ?? {};
+            // Re-sync the changelog baseline with the server's authoritative
+            // copy so the next save's arrayUnion delta is correct.
+            resetChangeLogBaseline(id, product._changeLog ?? []);
+          } catch (e) {
+            console.warn('[cloud-load-guard] snapshot skipped:', id, e instanceof Error ? e.name : 'Error');
+            return;
+          }
           cb(product);
         },
         (error) => {

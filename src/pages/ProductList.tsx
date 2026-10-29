@@ -83,7 +83,17 @@ export default function ProductList() {
     setLoading(true);
     try {
       const allProducts = await driver.loadProductIndex();
-      const detailed = allProducts.filter(Boolean).map(p => enrichProduct(p));
+      // Each project on its own: one that cannot be summarised is left off the
+      // list rather than leaving the whole list empty. The cloud read path's
+      // shape guard makes this unreachable; this is the containment behind it.
+      const detailed = allProducts.filter(Boolean).flatMap(p => {
+        try {
+          return [enrichProduct(p)];
+        } catch (e) {
+          console.warn('[cloud-load-guard] project left off the list:', p.id, e instanceof Error ? e.name : 'Error');
+          return [];
+        }
+      });
       setProducts(detailed);
       if (mode === 'cloud') setCloudDataLoaded(true);
       // In cloud mode, detect local projects that weren't migrated. Explicit
