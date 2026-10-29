@@ -179,43 +179,60 @@ function randomProduct(seed: number): Product {
 describe('W4 calculations — identical results to the original implementations', () => {
   const sprintsToAsk = (p: Product) => [...new Set(p.sprints.map(s => s.id)), 'unknown', null];
 
-  function checkRelease(p: Product, rib: RibItem, rel: string) {
-    expect(C.getRibReleaseProgress(rib, rel)).toBe(O.latest(rib, rel));
-    expect(PV.getCommentCount(rib, rel || 'r0')).toBe(O.commentCount(rib, rel || 'r0'));
+  // Mismatches are collected and asserted once: an `expect` per comparison made
+  // this test slow enough to brush the default timeout on a loaded machine.
+  type Mismatch = [string, unknown, unknown];
+  function same(out: Mismatch[], what: string, got: unknown, want: unknown) {
+    if (!Object.is(got, want)) out.push([what, got, want]);
+  }
+
+  function checkRelease(out: Mismatch[], p: Product, rib: RibItem, rel: string) {
+    same(out, `${p.id} ${rib.id} latest ${rel}`, C.getRibReleaseProgress(rib, rel), O.latest(rib, rel));
+    same(out, `${p.id} ${rib.id} comments ${rel}`, PV.getCommentCount(rib, rel || 'r0'), O.commentCount(rib, rel || 'r0'));
     for (const s of sprintsToAsk(p)) {
       if (!s) continue;
-      expect(C.getRibReleaseProgressForSprint(rib, rel, s)).toBe(O.forSprint(rib, rel, s));
-      expect(C.getRibReleaseProgressAsOf(rib, rel, s, p.sprints)).toBe(O.asOf(rib, rel, s, p.sprints));
+      same(out, `${p.id} ${rib.id} forSprint ${rel} ${s}`, C.getRibReleaseProgressForSprint(rib, rel, s), O.forSprint(rib, rel, s));
+      same(out, `${p.id} ${rib.id} asOf ${rel} ${s}`, C.getRibReleaseProgressAsOf(rib, rel, s, p.sprints), O.asOf(rib, rel, s, p.sprints));
     }
   }
 
   it('per-rib progress, points and comment helpers agree on 300 random projects', () => {
+    const out: Mismatch[] = [];
+    let compared = 0;
     for (let seed = 1; seed <= 300; seed++) {
       const p = randomProduct(seed);
       for (const rib of O.ribs(p)) {
-        expect(C.getRibItemPoints(rib, p.sizeMapping)).toBe(O.points(rib, p.sizeMapping));
-        for (const rel of ['r0', 'r1', 'r2', 'r3', '']) checkRelease(p, rib, rel);
+        compared++;
+        same(out, `${p.id} ${rib.id} points`, C.getRibItemPoints(rib, p.sizeMapping), O.points(rib, p.sizeMapping));
+        for (const rel of ['r0', 'r1', 'r2', 'r3', '']) checkRelease(out, p, rib, rel);
         for (const s of sprintsToAsk(p)) {
-          expect(C.getRibItemPercentCompleteAsOf(rib, s, p.sprints)).toBe(O.itemAsOf(rib, s, p.sprints));
+          same(out, `${p.id} ${rib.id} itemAsOf ${s}`, C.getRibItemPercentCompleteAsOf(rib, s, p.sprints), O.itemAsOf(rib, s, p.sprints));
         }
       }
     }
+    expect(compared).toBeGreaterThan(1000);
+    expect(out).toEqual([]);
   });
 
   it('per-release totals agree, for every release and sprint, on 300 random projects', () => {
+    const out: Mismatch[] = [];
     for (let seed = 1; seed <= 300; seed++) {
       const p = randomProduct(seed);
       for (const rel of ['r0', 'r1', 'r2', 'r3', 'none']) {
-        expect(C.getPointsForRelease(p, rel)).toBe(O.releasePoints(p, rel).allocated);
-        expect(C.getCoreNonCorePointsForRelease(p, rel)).toEqual(O.coreNonCore(p, rel));
+        same(out, `${p.id} points ${rel}`, C.getPointsForRelease(p, rel), O.releasePoints(p, rel).allocated);
+        const cnc = C.getCoreNonCorePointsForRelease(p, rel);
+        const wantCnc = O.coreNonCore(p, rel);
+        same(out, `${p.id} core ${rel}`, cnc.core, wantCnc.core);
+        same(out, `${p.id} nonCore ${rel}`, cnc.nonCore, wantCnc.nonCore);
         for (const s of [...sprintsToAsk(p), undefined]) {
           const got = C.getReleasePoints(p, rel, s);
           const want = O.releasePoints(p, rel, s);
-          expect(got.allocated).toBe(want.allocated);
-          expect(got.completed).toBe(want.completed);
+          same(out, `${p.id} allocated ${rel} ${s}`, got.allocated, want.allocated);
+          same(out, `${p.id} completed ${rel} ${s}`, got.completed, want.completed);
         }
       }
     }
+    expect(out).toEqual([]);
   });
 
   it('the over-time chart agrees point for point while under the span bound', () => {
