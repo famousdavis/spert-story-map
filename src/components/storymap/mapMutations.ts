@@ -2,7 +2,8 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, RibItem, ReleaseAllocation, Theme, Backbone } from '../../types';
+import type { Product, RibItem, Theme, Backbone } from '../../types';
+import { applyRibTransfer } from '../../lib/progressMutations';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
@@ -104,32 +105,6 @@ function getColumnRibIds(themes: Theme[], backboneId: string, releaseId: string 
 // ─── Shared pure helpers ────────────────────────────────────────────
 
 /**
- * Compute new releaseAllocations for a rib being moved between releases.
- * Returns new allocations array, or null if rib should be left unchanged
- * (e.g. duplicate release guard).
- */
-export function transferAllocation(rib: RibItem, fromReleaseId: string | null, toReleaseId: string | null): ReleaseAllocation[] | null {
-  if (toReleaseId === null) {
-    // Moving to unassigned — clear all allocations
-    return [];
-  }
-  if (fromReleaseId === null) {
-    // Moving from unassigned — create a fresh allocation
-    return [{ releaseId: toReleaseId, percentage: 100, memo: '' }];
-  }
-  // Release → release: guard against duplicate
-  if (rib.releaseAllocations.some(a => a.releaseId === toReleaseId)) {
-    return null; // already has target release
-  }
-  const oldAlloc = rib.releaseAllocations.find(a => a.releaseId === fromReleaseId);
-  const pct = oldAlloc ? oldAlloc.percentage : 100;
-  const memo = oldAlloc?.memo || '';
-  return rib.releaseAllocations
-    .filter(a => a.releaseId !== fromReleaseId)
-    .concat({ releaseId: toReleaseId, percentage: pct, memo });
-}
-
-/**
  * Remove a rib from its source backbone/theme and add it to a target.
  * Returns { themes, ribData } or null if the rib wasn't found.
  */
@@ -171,17 +146,13 @@ function moveRibBetweenBackbones(themes: Theme[], ribId: string, fromThemeId: st
   return { themes: result, ribData };
 }
 
-/** Apply transferAllocation to a single rib across all themes. */
+/** Move a single rib between releases, allocations and progress together, across all themes. */
 function applyAllocationTransfer(themes: Theme[], ribId: string, fromReleaseId: string | null, toReleaseId: string | null): Theme[] {
   return themes.map(t => ({
     ...t,
     backboneItems: t.backboneItems.map(b => ({
       ...b,
-      ribItems: b.ribItems.map(r => {
-        if (r.id !== ribId) return r;
-        const newAlloc = transferAllocation(r, fromReleaseId, toReleaseId);
-        return newAlloc !== null ? { ...r, releaseAllocations: newAlloc } : r;
-      }),
+      ribItems: b.ribItems.map(r => (r.id === ribId ? applyRibTransfer(r, fromReleaseId, toReleaseId) : r)),
     })),
   }));
 }

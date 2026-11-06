@@ -4,13 +4,55 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import type { Product, RibItem } from '../types';
-import { transferAllocation } from '../components/storymap/mapMutations';
+import { applyRibTransfer } from '../lib/progressMutations';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
 interface DropTargetInfo {
   col: string;
   beforeRibId?: string;
+}
+
+/**
+ * Drop a card on a Release Planning column. Pure, and the test seam for the
+ * drag below: a move between columns takes the rib's allocation and progress
+ * with it (see `applyRibTransfer`), and `newOrder` becomes the target's card order.
+ */
+export function applyCardDrop(prev: Product, drop: { ribId: string; fromCol: string | null; targetCol: string; newOrder: string[] }): Product {
+  const { ribId, fromCol, targetCol, newOrder } = drop;
+  const sameColumn = fromCol === targetCol;
+  let next = { ...prev };
+
+  if (!sameColumn) {
+    const fromId = fromCol === 'unassigned' ? null : fromCol;
+    const toId = targetCol === 'unassigned' ? null : targetCol;
+    next = {
+      ...next,
+      themes: next.themes.map(t => ({
+        ...t,
+        backboneItems: t.backboneItems.map(b => ({
+          ...b,
+          ribItems: b.ribItems.map(r => (r.id === ribId ? applyRibTransfer(r, fromId, toId) : r)),
+        })),
+      })),
+    };
+  }
+
+  const prevCardOrder = { ...(next.releaseCardOrder || {}) };
+  prevCardOrder[targetCol] = newOrder;
+
+  // `sameColumn` is `fromCol === targetCol`, so reaching here with a null
+  // fromCol would mean targetCol is non-null and different — but the key is
+  // still only usable once it is known to be a string.
+  if (!sameColumn && fromCol !== null) {
+    const srcOrder = prevCardOrder[fromCol] || [];
+    if (srcOrder.includes(ribId)) {
+      prevCardOrder[fromCol] = srcOrder.filter((id: string) => id !== ribId);
+    }
+  }
+
+  next.releaseCardOrder = prevCardOrder;
+  return next;
 }
 
 /**
@@ -82,44 +124,7 @@ export function useReleaseDrag(updateProduct: UpdateProduct, allRibs: RibItem[],
       newOrder = [...withoutDragged, dragRibId];
     }
 
-    updateProduct(prev => {
-      let next = { ...prev };
-
-      if (!sameColumn) {
-        const fromId = dragFromCol === 'unassigned' ? null : dragFromCol;
-        const toId = targetCol === 'unassigned' ? null : targetCol;
-        next = {
-          ...next,
-          themes: next.themes.map(t => ({
-            ...t,
-            backboneItems: t.backboneItems.map(b => ({
-              ...b,
-              ribItems: b.ribItems.map(r => {
-                if (r.id !== dragRibId) return r;
-                const newAlloc = transferAllocation(r, fromId, toId);
-                return newAlloc !== null ? { ...r, releaseAllocations: newAlloc } : r;
-              }),
-            })),
-          })),
-        };
-      }
-
-      const prevCardOrder = { ...(next.releaseCardOrder || {}) };
-      prevCardOrder[targetCol] = newOrder;
-
-      // `sameColumn` is `dragFromCol === targetCol`, so reaching here with a
-      // null dragFromCol would mean targetCol is non-null and different — but
-      // the key is still only usable once it is known to be a string.
-      if (!sameColumn && dragFromCol !== null) {
-        const srcOrder = prevCardOrder[dragFromCol] || [];
-        if (srcOrder.includes(dragRibId)) {
-          prevCardOrder[dragFromCol] = srcOrder.filter((id: string) => id !== dragRibId);
-        }
-      }
-
-      next.releaseCardOrder = prevCardOrder;
-      return next;
-    });
+    updateProduct(prev => applyCardDrop(prev, { ribId: dragRibId, fromCol: dragFromCol, targetCol, newOrder }));
 
     handleDragEnd();
   }, [dragRibId, dragFromCol, allRibs, unassigned, ribsForRelease, updateProduct, handleDragEnd]);
