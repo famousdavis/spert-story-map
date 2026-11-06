@@ -4,7 +4,7 @@
 
 import { useEffect, Fragment } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { getRibItemPoints } from '../../lib/calculations';
+import { getRibItemPoints, round1 } from '../../lib/calculations';
 import ProgressBar from '../ui/ProgressBar';
 import CommentPanel from './CommentPanel';
 import type { RibItem, SizeMapping, Sprint } from '../../types';
@@ -118,8 +118,8 @@ export default function ProgressRow({
         <td className="text-center px-2 py-2">
           {pts ? (
             <span className="text-xs tabular-nums">
-              <span className="text-gray-700 dark:text-gray-300 font-medium">{Math.round(pts * currentPct / 100)}</span>
-              <span className="text-gray-400 dark:text-gray-500">/{rib._allocPct ? Math.round(pts * rib._allocPct / 100) : pts}</span>
+              <span className="text-gray-700 dark:text-gray-300 font-medium">{round1(pts * currentPct / 100)}</span>
+              <span className="text-gray-400 dark:text-gray-500">/{rib._allocPct ? round1(pts * rib._allocPct / 100) : pts}</span>
             </span>
           ) : (
             <span className="text-xs text-gray-500">—</span>
@@ -186,7 +186,7 @@ export default function ProgressRow({
           <td className="text-center px-2 py-2">
             {delta !== null ? (
               <span className={`text-xs font-medium tabular-nums ${delta > 0 ? 'text-green-600 dark:text-green-400' : delta < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
-                {delta > 0 ? '+' : ''}{delta}%
+                {delta > 0 ? '+' : ''}{round1(delta)}%
               </span>
             ) : (
               <span className="text-xs text-gray-300 dark:text-gray-600">—</span>

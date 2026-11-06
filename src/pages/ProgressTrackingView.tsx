@@ -7,6 +7,7 @@ import { useOutletContext } from 'react-router-dom';
 import {
   getAllRibItems, getReleasePercentComplete, getProgressOverTime, getSprintSummary,
 } from '../lib/calculations';
+import { latestSprintId, previousSprint } from '../lib/progressRule';
 import {
   updateProgress as doUpdateProgress,
   removeProgress as doRemoveProgress,
@@ -23,45 +24,16 @@ import SprintSummaryCard from '../components/progress/SprintSummaryCard';
 import BurnUpChart from '../components/progress/BurnUpChart';
 import ProgressRow from '../components/progress/ProgressRow';
 import GroupSummaryHeader from '../components/progress/GroupSummaryHeader';
+import GroupsFooter from '../components/progress/GroupsFooter';
+import { buildProgressGroups } from '../components/progress/progressGroups';
+import type { GroupBy } from '../components/progress/progressGroups';
 import ProgressHeader from '../components/progress/ProgressHeader';
 import type { OutletContextValue, RibItem } from '../types';
-
-type GroupBy = 'release' | 'backbone' | 'theme';
-
-/**
- * A rib as enriched by getAllRibItems (theme/backbone names + ids), plus the
- * per-row fields this view injects. `_releaseId` / `_allocPct` are null for the
- * backbone/theme groupings, which have no single allocation to edit.
- */
-type ProgressRibRow = ReturnType<typeof getAllRibItems>[number] & {
-  _releaseId: string | null;
-  _releaseName?: string;
-  _allocPct: number | null;
-  _editable: boolean;
-};
-
-/**
- * One collapsible group in the progress table.
- *
- * `key` is the Record key the group was filed under and is always present —
- * it drives collapse state and the React key. `releaseId` is set only by the
- * release grouping (the other two have no single release), and `entityId` only
- * by the backbone/theme groupings, so neither alone can type the group key.
- */
-interface ProgressGroup {
-  key: string;
-  label: string;
-  releaseId?: string;
-  entityId?: string;
-  items: ProgressRibRow[];
-}
 
 export default function ProgressTrackingView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
   const { addSprint } = useProductMutations(updateProduct);
-  const [selectedSprint, setSelectedSprint] = useState<string | null>(
-    product.sprints[product.sprints.length - 1]?.id ?? null
-  );
+  const [selectedSprint, setSelectedSprint] = useState<string | null>(latestSprintId(product.sprints));
   const [groupBy, setGroupBy] = useState<GroupBy>('release');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
@@ -111,9 +83,7 @@ export default function ProgressTrackingView() {
   // take null, and the row components now declare null — one convention rather
   // than three, which is what made these two values report at every boundary.
   const sprint = product.sprints.find(s => s.id === selectedSprint) ?? null;
-  const prevSprint = sprint
-    ? product.sprints.find(s => s.order === sprint.order - 1) ?? null
-    : null;
+  const prevSprint = previousSprint(product.sprints, selectedSprint);
   const showTargetCol = groupBy === 'release';
   const totalCols = 5 + (showTargetCol ? 1 : 0) + (prevSprint ? 1 : 0);
 
@@ -158,68 +128,22 @@ export default function ProgressTrackingView() {
     [sprintNameMap, sprintOrder]
   );
   const boundGetSprintPct = useCallback(
-    (rib: RibItem, releaseId: string | null) => getSprintPct(rib, releaseId, selectedSprint),
-    [selectedSprint]
+    (rib: RibItem, releaseId: string | null) => getSprintPct(rib, releaseId, selectedSprint, product.sprints),
+    [selectedSprint, product.sprints]
+  );
+  const boundGetCurrentPct = useCallback(
+    (rib: RibItem, releaseId: string | null) => getCurrentPct(rib, releaseId, selectedSprint, product.sprints),
+    [selectedSprint, product.sprints]
   );
   const boundGetDelta = useCallback(
-    (rib: RibItem, releaseId: string | null) => getDelta(rib, releaseId, sprint, prevSprint, selectedSprint),
-    [sprint, prevSprint, selectedSprint]
+    (rib: RibItem, releaseId: string | null) => getDelta(rib, releaseId, sprint, prevSprint, selectedSprint, product.sprints),
+    [sprint, prevSprint, selectedSprint, product.sprints]
   );
 
-  // Build rows
-  const grouped = useMemo(() => {
-    const groups: Record<string, ProgressGroup> = {};
-
-    if (groupBy === 'release') {
-      for (const rib of assignedRibs) {
-        for (const alloc of rib.releaseAllocations) {
-          const release = product.releases.find(r => r.id === alloc.releaseId);
-          const key = alloc.releaseId;
-          const label = release?.name || 'Unknown Release';
-          const group = groups[key] ?? (groups[key] = { key, label, releaseId: key, items: [] });
-          group.items.push({
-            ...rib,
-            _releaseId: alloc.releaseId,
-            _releaseName: release?.name || '',
-            _allocPct: alloc.percentage,
-            _editable: true,
-          });
-        }
-      }
-      const releaseOrder: Record<string, number> = {};
-      product.releases.forEach(r => { releaseOrder[r.id] = r.order; });
-      const result = Object.values(groups)
-        .sort((a, b) => (releaseOrder[a.releaseId ?? ''] || 0) - (releaseOrder[b.releaseId ?? ''] || 0));
-      for (const g of result) {
-        g.items.sort((a, b) => a.backboneName.localeCompare(b.backboneName) || a.name.localeCompare(b.name));
-      }
-      return result;
-    }
-
-    for (const rib of assignedRibs) {
-      let key: string;
-      let label: string;
-      if (groupBy === 'backbone') {
-        key = rib.backboneId;
-        label = rib.backboneName;
-      } else {
-        key = rib.themeId;
-        label = rib.themeName;
-      }
-      const group = groups[key] ?? (groups[key] = { key, label, entityId: key, items: [] });
-      group.items.push({
-        ...rib,
-        _releaseId: null,
-        _allocPct: null,
-        _editable: false,
-      });
-    }
-    const result = Object.values(groups);
-    for (const g of result) {
-      g.items.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return result;
-  }, [assignedRibs, groupBy, product.releases]);
+  const grouped = useMemo(
+    () => buildProgressGroups(assignedRibs, groupBy, product.releases),
+    [assignedRibs, groupBy, product.releases]
+  );
 
   // Collect all row keys for expand-all
   const allRowKeys = useMemo(() => {
@@ -329,6 +253,7 @@ export default function ProgressTrackingView() {
                   groupBy={groupBy}
                   releaseId={group.releaseId}
                   product={product}
+                  selectedSprint={selectedSprint}
                   collapsed={isCollapsed}
                   onToggle={() => toggleGroup(groupKey)}
                 />
@@ -367,7 +292,7 @@ export default function ProgressTrackingView() {
                             progressDrafts={progressDrafts}
                             setProgressDrafts={setProgressDrafts}
                             getSprintPct={boundGetSprintPct}
-                            getCurrentPct={getCurrentPct}
+                            getCurrentPct={boundGetCurrentPct}
                             getDelta={boundGetDelta}
                             getCommentCount={getCommentCount}
                             getCommentHistory={boundGetCommentHistory}
@@ -384,6 +309,7 @@ export default function ProgressTrackingView() {
               </div>
             );
           })}
+          <GroupsFooter product={product} selectedSprint={selectedSprint} groupBy={groupBy} ribs={allRibs} />
         </div>
       )}
     </div>

@@ -40,6 +40,69 @@ function replaceRow(remove: string, add: string) {
   fireEvent.click(dialog.getByRole('button', { name: `Release ${add}` }));
 }
 
+describe('AllocationModal warns before progress stops counting', () => {
+  const STOPS = (name: string) => `${name} has progress recorded. It will stop counting (see Needs Attention).`;
+
+  const removeRow = (name: string) => {
+    const row = req(within(dialogRoot()).getByText(name).parentElement, 'row');
+    fireEvent.click(within(row).getByText('Remove'));
+  };
+
+  it('names a removed release holding a record, before Save', () => {
+    openDialog(makeRib('r', [on('X', 50), on('Y', 50)], [entry('S1', 'X', 20)]));
+    expect(screen.getAllByText(STOPS('Release X'))).toHaveLength(1);
+    removeRow('Release X');
+    const line = screen.getByText(STOPS('Release X'));
+    expect(line.closest('button')).toBeNull();
+    // The Save list carries it now, not the line beside Unassign All.
+    expect(line.parentElement?.textContent).toContain('Total');
+  });
+
+  it('names a removed release holding only a comment', () => {
+    openDialog(makeRib('r', [on('X', 50), on('Y', 50)], [entry('S1', 'X', null, 'note')]));
+    removeRow('Release X');
+    expect(screen.getByText(STOPS('Release X'))).toBeTruthy();
+  });
+
+  it('warns beside Unassign All whenever the rib has recorded progress, because it commits at once', () => {
+    openDialog(makeRib('r', [on('X')], [entry('S1', 'X', 20)]));
+    const line = screen.getByText(STOPS('Release X'));
+    expect(req(line.parentElement?.parentElement, 'slot').textContent).toContain('Unassign All');
+  });
+
+  it('says nothing for a rib with no recorded progress', () => {
+    openDialog(makeRib('r', [on('X', 50), on('Y', 50)], []));
+    removeRow('Release X');
+    expect(screen.queryByText(/will stop counting/)).toBeNull();
+    expect(screen.queryByText(/will count\./)).toBeNull();
+  });
+
+  it('names a kept release whose records exceed its new percentage', () => {
+    openDialog(makeRib('r', [on('X')], [entry('S1', 'X', 80)]));
+    expect(screen.queryByText(/will count\./)).toBeNull();
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '50' } });
+    expect(screen.getByText('Release X has 80% recorded; only 50% will count.')).toBeTruthy();
+  });
+
+  it('names a move\'s target when the carried records exceed its percentage', () => {
+    openDialog(makeRib('r', [on('X')], [entry('S1', 'X', 80)]));
+    replaceRow('X', 'Y');
+    expect(screen.getByText('Progress moves to Release Y.')).toBeTruthy();
+    expect(screen.queryByText(/will count\./)).toBeNull();
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '50' } });
+    expect(screen.getByText('Release Y has 80% recorded; only 50% will count.')).toBeTruthy();
+  });
+
+  it('does not say a moved release stops counting', () => {
+    openDialog(makeRib('r', [on('X')], [entry('S1', 'X', 80)]));
+    replaceRow('X', 'Y');
+    const saveLine = screen.getAllByText(STOPS('Release X'));
+    // Only the Unassign All line, which is about the rib as stored.
+    expect(saveLine).toHaveLength(1);
+    expect(req(saveLine[0]?.parentElement?.parentElement, 'slot').textContent).toContain('Unassign All');
+  });
+});
+
 describe('AllocationModal says what Save would do', () => {
   it('says progress moves when the rib brings positive records', () => {
     openDialog(makeRib('r', [on('X')], [entry('S1', 'X', 10)]));

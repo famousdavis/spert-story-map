@@ -137,6 +137,8 @@ CONSTRAINTS:
   skips their release change (their backbone CAN still be changed). If a rib has
   locked: true in storymap_get_project, tell the user — its release assignment must be
   changed manually.
+- Moving a rib back to a release can restore progress recorded there, as dragging it in the
+  app does, and the rib then becomes locked.
 - Never set a target date. Do not include targetDate in any create_release call.
 - If a rib's releaseIds has more than one entry (a percentage split set by the user),
   warn the user before calling storymap_unassign_rib or including that rib in a

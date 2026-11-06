@@ -120,8 +120,8 @@ function fixAllocation(a: Obj, hits: Hits): void {
 const keepAllocation = (v: unknown): v is Obj =>
   hasStringKey(v, 'releaseId') && isNumOrString((v as Obj).percentage);
 
-// `releaseId` may be absent on a legacy (pre-v2) entry; `migrateToV2` and the
-// `_legacyPercentCompleteAsOf` fallback both handle that.
+// `releaseId` may be absent on a legacy (pre-v2) entry; `migrateToV2` handles
+// that, and such an entry is inert to the progress rule.
 const keepProgress = (v: unknown): v is Obj =>
   hasStringKey(v, 'sprintId') && (v.releaseId === undefined || typeof v.releaseId === 'string');
 

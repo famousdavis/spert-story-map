@@ -7,15 +7,18 @@ import {
   getCommentCount, getCommentHistory,
   getSprintPct, getCurrentPct, getDelta,
 } from '../lib/progressViewHelpers';
-import type { ProgressEntry } from '../types';
+import type { ProgressEntry, Sprint } from '../types';
 
 // `progressHistory = []` with no annotation inferred never[], so every call
 // below that passed real entries reported against it.
 const makeRib = (progressHistory: ProgressEntry[] = []) => ({
   id: 'rib1',
   progressHistory,
-  releaseAllocations: [{ releaseId: 'r1', percentage: 50 }],
+  releaseAllocations: [{ releaseId: 'r1', percentage: 50 }, { releaseId: 'r2', percentage: 50 }],
 });
+
+/** The sprints the rib fixtures record against: an entry counts only for a sprint the product holds. */
+const SPRINTS: Sprint[] = ['s1', 's2', 's3'].map((id, i) => ({ id, name: id, order: i + 1, endDate: null }));
 
 describe('getCommentCount', () => {
   it('returns 0 when no progressHistory', () => {
@@ -85,7 +88,7 @@ describe('getCommentHistory', () => {
 
 describe('getSprintPct', () => {
   it('returns null when no selected sprint', () => {
-    expect(getSprintPct(makeRib(), 'r1', null)).toBeNull();
+    expect(getSprintPct(makeRib(), 'r1', null, SPRINTS)).toBeNull();
   });
 
   it('returns progress for a specific release+sprint', () => {
@@ -93,7 +96,7 @@ describe('getSprintPct', () => {
       { releaseId: 'r1', sprintId: 's1', percentComplete: 40 },
       { releaseId: 'r1', sprintId: 's2', percentComplete: 60 },
     ]);
-    expect(getSprintPct(rib, 'r1', 's1')).toBe(40);
+    expect(getSprintPct(rib, 'r1', 's1', SPRINTS)).toBe(40);
   });
 
   it('aggregates across releases when releaseId is null', () => {
@@ -101,7 +104,7 @@ describe('getSprintPct', () => {
       { releaseId: 'r1', sprintId: 's1', percentComplete: 30 },
       { releaseId: 'r2', sprintId: 's1', percentComplete: 20 },
     ]);
-    expect(getSprintPct(rib, null, 's1')).toBe(50);
+    expect(getSprintPct(rib, null, 's1', SPRINTS)).toBe(50);
   });
 
   it('caps aggregated value at 100', () => {
@@ -109,14 +112,14 @@ describe('getSprintPct', () => {
       { releaseId: 'r1', sprintId: 's1', percentComplete: 80 },
       { releaseId: 'r2', sprintId: 's1', percentComplete: 80 },
     ]);
-    expect(getSprintPct(rib, null, 's1')).toBe(100);
+    expect(getSprintPct(rib, null, 's1', SPRINTS)).toBe(100);
   });
 
   it('returns null when no matching entries exist', () => {
     const rib = makeRib([
       { releaseId: 'r1', sprintId: 's2', percentComplete: 50 },
     ]);
-    expect(getSprintPct(rib, null, 's1')).toBeNull();
+    expect(getSprintPct(rib, null, 's1', SPRINTS)).toBeNull();
   });
 });
 
@@ -126,21 +129,29 @@ describe('getCurrentPct', () => {
       { releaseId: 'r1', sprintId: 's1', percentComplete: 50 },
       { releaseId: 'r2', sprintId: 's1', percentComplete: 30 },
     ]);
-    rib.releaseAllocations = [
-      { releaseId: 'r1', percentage: 50 },
-      { releaseId: 'r2', percentage: 50 },
-    ];
-    // getCurrentPct with null releaseId calls getRibItemPercentComplete
-    const result = getCurrentPct(rib, null);
-    expect(typeof result).toBe('number');
+    expect(getCurrentPct(rib, null, null, SPRINTS)).toBe(80);
   });
 
-  it('returns release-specific progress when releaseId given', () => {
+  it('counts a release row up to its allocation', () => {
     const rib = makeRib([
       { releaseId: 'r1', sprintId: 's1', percentComplete: 75 },
     ]);
-    const result = getCurrentPct(rib, 'r1');
-    expect(result).toBe(75);
+    expect(getCurrentPct(rib, 'r1', null, SPRINTS)).toBe(50);
+  });
+
+  it('reads the selected sprint, walking back over a skipped one', () => {
+    const rib = makeRib([
+      { releaseId: 'r1', sprintId: 's1', percentComplete: 20 },
+      { releaseId: 'r1', sprintId: 's3', percentComplete: 40 },
+    ]);
+    expect(getCurrentPct(rib, 'r1', 's1', SPRINTS)).toBe(20);
+    expect(getCurrentPct(rib, 'r1', 's2', SPRINTS)).toBe(20);
+    expect(getCurrentPct(rib, 'r1', 's3', SPRINTS)).toBe(40);
+  });
+
+  it('is 0 for a release the rib is not on', () => {
+    const rib = makeRib([{ releaseId: 'r9', sprintId: 's1', percentComplete: 75 }]);
+    expect(getCurrentPct(rib, 'r9', 's1', SPRINTS)).toBe(0);
   });
 });
 
@@ -149,11 +160,11 @@ describe('getDelta', () => {
   const prevSprint = { id: 's1', order: 1, name: 'Sprint 1', endDate: '2026-01-14' };
 
   it('returns null when no sprint', () => {
-    expect(getDelta(makeRib(), 'r1', null, prevSprint, 's2')).toBeNull();
+    expect(getDelta(makeRib(), 'r1', null, prevSprint, 's2', SPRINTS)).toBeNull();
   });
 
   it('returns null when no prevSprint', () => {
-    expect(getDelta(makeRib(), 'r1', sprint, null, 's2')).toBeNull();
+    expect(getDelta(makeRib(), 'r1', sprint, null, 's2', SPRINTS)).toBeNull();
   });
 
   it('computes delta between sprints for a release', () => {
@@ -161,21 +172,32 @@ describe('getDelta', () => {
       { releaseId: 'r1', sprintId: 's1', percentComplete: 20 },
       { releaseId: 'r1', sprintId: 's2', percentComplete: 50 },
     ]);
-    expect(getDelta(rib, 'r1', sprint, prevSprint, 's2')).toBe(30);
+    expect(getDelta(rib, 'r1', sprint, prevSprint, 's2', SPRINTS)).toBe(30);
   });
 
   it('returns null when current sprint has no entry', () => {
     const rib = makeRib([
       { releaseId: 'r1', sprintId: 's1', percentComplete: 20 },
     ]);
-    expect(getDelta(rib, 'r1', sprint, prevSprint, 's2')).toBeNull();
+    expect(getDelta(rib, 'r1', sprint, prevSprint, 's2', SPRINTS)).toBeNull();
   });
 
   it('treats missing previous as 0', () => {
     const rib = makeRib([
       { releaseId: 'r1', sprintId: 's2', percentComplete: 40 },
     ]);
-    expect(getDelta(rib, 'r1', sprint, prevSprint, 's2')).toBe(40);
+    expect(getDelta(rib, 'r1', sprint, prevSprint, 's2', SPRINTS)).toBe(40);
+  });
+
+  it('walks back over a skipped sprint rather than counting it as 0', () => {
+    const rib = makeRib([
+      { releaseId: 'r1', sprintId: 's1', percentComplete: 30 },
+      { releaseId: 'r1', sprintId: 's3', percentComplete: 40 },
+    ]);
+    const s2 = { id: 's2', order: 2, name: 'Sprint 2', endDate: null };
+    const s3 = { id: 's3', order: 3, name: 'Sprint 3', endDate: null };
+    expect(getDelta(rib, 'r1', s3, s2, 's3', SPRINTS)).toBe(10);
+    expect(getDelta(rib, null, s3, s2, 's3', SPRINTS)).toBe(10);
   });
 });
 
@@ -196,19 +218,19 @@ describe('per-release vs whole-rib branches', () => {
   ]);
 
   it('getSprintPct reads one release, or sums every release for the sprint', () => {
-    expect(getSprintPct(rib, 'r1', 's2')).toBe(50);
-    expect(getSprintPct(rib, null, 's2')).toBe(80);
-    expect(getSprintPct(rib, null, 's1')).toBe(30);
+    expect(getSprintPct(rib, 'r1', 's2', SPRINTS)).toBe(50);
+    expect(getSprintPct(rib, null, 's2', SPRINTS)).toBe(80);
+    expect(getSprintPct(rib, null, 's1', SPRINTS)).toBe(30);
   });
 
   it('getSprintPct is null when a sprint holds only comment-only entries', () => {
     const notes = makeRib([{ releaseId: 'r1', sprintId: 's1', percentComplete: null, comment: 'n' }]);
-    expect(getSprintPct(notes, null, 's1')).toBeNull();
+    expect(getSprintPct(notes, null, 's1', SPRINTS)).toBeNull();
   });
 
   it('getDelta across every release: this sprint\'s sum minus the previous sprint\'s', () => {
-    expect(getDelta(rib, null, sprint, prevSprint, 's2')).toBe(50);
-    expect(getDelta(rib, 'r2', sprint, prevSprint, 's2')).toBe(20);
+    expect(getDelta(rib, null, sprint, prevSprint, 's2', SPRINTS)).toBe(50);
+    expect(getDelta(rib, 'r2', sprint, prevSprint, 's2', SPRINTS)).toBe(20);
   });
 
   it('getDelta across every release treats a missing previous sprint as 0', () => {
@@ -216,7 +238,7 @@ describe('per-release vs whole-rib branches', () => {
       { releaseId: 'r1', sprintId: 's2', percentComplete: 40 },
       { releaseId: 'r2', sprintId: 's2', percentComplete: 15 },
     ]);
-    expect(getDelta(only, null, sprint, prevSprint, 's2')).toBe(55);
+    expect(getDelta(only, null, sprint, prevSprint, 's2', SPRINTS)).toBe(55);
   });
 
   it('getCommentHistory keeps only commented entries, per release or for the whole rib', () => {

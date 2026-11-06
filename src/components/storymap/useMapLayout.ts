@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import type { Product, RibItem, ReleaseAllocation } from '../../types';
 import { getRibItemPoints, getAllocationTotal } from '../../lib/calculations';
+import { currentAllocations } from '../../lib/progressRule';
 
 // Layout constants (pixels in logical/unzoomed space)
 const COL_WIDTH = 200;
@@ -243,7 +244,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
           unassignedByCol[col.colIdx] = bucket;
           if (bucket.length > maxUnassigned) maxUnassigned = bucket.length;
         } else {
-          for (const alloc of rib.releaseAllocations) {
+          for (const alloc of currentAllocations(rib)) {
             const key = `${alloc.releaseId}:${col.colIdx}`;
             const bucket = ribsByRelCol[key] ?? [];
             bucket.push({

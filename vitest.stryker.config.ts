@@ -33,7 +33,8 @@ export default defineConfig({
     environment: 'node',
     // The test files that exercise a mutate target (19 of 40 at v0.52.0; 21 of 61
     // at v0.53.16, after schemaVersion.test.ts and calculationsScale.test.ts; 23 of
-    // 65 at v0.53.17, after the two carry tests below).
+    // 65 at v0.53.17, after the two carry tests below; 27 of 70 at v0.53.18, after
+    // the four progress-rule tests below).
     //
     // ⚠️ DERIVING THIS FROM DIRECT `import` EDGES ALONE IS NOT SUFFICIENT, and the
     // first draft of this list got it wrong. A test can reach a mutate target THROUGH
@@ -69,9 +70,7 @@ export default defineConfig({
       // suite — the gap the note above says to close.
       'src/__tests__/calculationsScale.test.ts',
       // Progress integrity (v0.53.17): carry, its properties, and every writer. The
-      // campaign re-records the baseline at the end of its second release, so a
-      // comparison across this change is not valid until then. The two jsdom tests
-      // for the same work stay out: they reach no target these two do not.
+      // jsdom tests for this work stay out: they reach no target these do not.
       'src/__tests__/carryProgress.test.ts',
       'src/__tests__/exportForExcel.test.ts',
       'src/__tests__/exportForForecaster.test.ts',
@@ -80,7 +79,13 @@ export default defineConfig({
       'src/__tests__/migration.test.ts',
       'src/__tests__/moveCarriesProgress.test.ts',
       'src/__tests__/progressMutations.test.ts',
+      // Progress integrity (v0.53.18): the rule, its row builder, its goldens and its
+      // properties. The baseline was re-recorded for this list; see docs/mutation-baseline.md.
+      'src/__tests__/progressProperties.test.ts',
+      'src/__tests__/progressRule.test.ts',
       'src/__tests__/progressViewHelpers.test.ts',
+      'src/__tests__/progressWalkthrough.test.ts',
+      'src/__tests__/reconciliation.test.ts',
       'src/__tests__/ribCardColors.test.ts',
       'src/__tests__/ribHelpers.test.ts',
       'src/__tests__/settingsMutations.test.ts',

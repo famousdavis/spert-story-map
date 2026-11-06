@@ -7,9 +7,10 @@ import { useOutletContext } from 'react-router-dom';
 import {
   getTotalProjectPoints, getCoreNonCorePoints, getProjectPercentComplete,
   getPointsForRelease, getReleasePercentComplete, getCoreNonCorePointsForRelease,
-  getSizingDistribution, getAllRibItems, getProgressOverTime,
-  getAllocationTotal,
+  getSizingDistribution, getAllRibItems, getProgressOverTime, round1,
 } from '../lib/calculations';
+import NeedsAttention from '../components/insights/NeedsAttention';
+import ReleaseBreakdownTable from '../components/insights/ReleaseBreakdownTable';
 import ProgressBar from '../components/ui/ProgressBar';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -30,14 +31,7 @@ export default function InsightsView() {
   const sizingDist = useMemo(() => getSizingDistribution(product), [product]);
   const progressData = useMemo(() => getProgressOverTime(product), [product]);
 
-  const unsizedItems = allRibs.filter(r => !r.size);
-  const unassignedItems = allRibs.filter(r => r.releaseAllocations.length === 0);
-  const partialAllocItems = allRibs.filter(r => {
-    const total = getAllocationTotal(r);
-    return total > 0 && total !== 100;
-  });
-
-  // Release breakdown
+  // Release breakdown: the chart. The table below it reads unrounded figures.
   const releaseData = useMemo(() =>
     product.releases.map(r => {
       const pts = Math.round(getPointsForRelease(product, r.id));
@@ -76,7 +70,7 @@ export default function InsightsView() {
         <StatCard label="Core Points" value={core} accent="text-blue-600 dark:text-blue-400" />
         <StatCard label="Non-core Points" value={nonCore} accent="text-gray-500 dark:text-gray-400" />
         <StatCard label="Rib Items" value={allRibs.length} />
-        <StatCard label="% Complete" value={`${Math.round(projectPct)}%`} accent={projectPct > 50 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'} />
+        <StatCard label="% Complete" value={`${round1(projectPct)}%`} accent={projectPct > 50 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'} />
       </div>
 
       {/* Project progress */}
@@ -161,33 +155,7 @@ export default function InsightsView() {
             </ComposedChart>
           </ResponsiveContainer>
 
-          {/* Release table */}
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                  <th className="text-left py-2 font-medium">Release</th>
-                  <th className="text-right py-2 font-medium">Total Pts</th>
-                  <th className="text-right py-2 font-medium">Core</th>
-                  <th className="text-right py-2 font-medium">Non-core</th>
-                  <th className="text-right py-2 font-medium">% Complete</th>
-                  <th className="text-right py-2 font-medium">Remaining</th>
-                </tr>
-              </thead>
-              <tbody>
-                {releaseData.map((r, i) => (
-                  <tr key={i} className="border-b border-gray-50 dark:border-gray-800">
-                    <td className="py-2 font-medium text-gray-700 dark:text-gray-300">{r.name}</td>
-                    <td className="py-2 text-right tabular-nums">{r.points}</td>
-                    <td className="py-2 text-right text-blue-600 dark:text-blue-400 tabular-nums">{r.core}</td>
-                    <td className="py-2 text-right text-gray-400 dark:text-gray-500 tabular-nums">{r.nonCore}</td>
-                    <td className="py-2 text-right tabular-nums">{r.complete}%</td>
-                    <td className="py-2 text-right tabular-nums">{r.remaining}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ReleaseBreakdownTable product={product} />
         </div>
       )}
 
@@ -209,35 +177,7 @@ export default function InsightsView() {
         </div>
       )}
 
-      {/* Attention items */}
-      {(unsizedItems.length > 0 || unassignedItems.length > 0 || partialAllocItems.length > 0) && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Needs Attention</h3>
-          <div className="space-y-4">
-            {unsizedItems.length > 0 && (
-              <AttentionSection
-                title={`${unsizedItems.length} unsized items`}
-                color="text-amber-600 dark:text-amber-400"
-                items={unsizedItems.map(r => `${r.name} (${r.backboneName})`)}
-              />
-            )}
-            {unassignedItems.length > 0 && (
-              <AttentionSection
-                title={`${unassignedItems.length} unassigned items`}
-                color="text-orange-600 dark:text-orange-400"
-                items={unassignedItems.map(r => `${r.name} (${r.backboneName})`)}
-              />
-            )}
-            {partialAllocItems.length > 0 && (
-              <AttentionSection
-                title={`${partialAllocItems.length} items with incomplete allocations`}
-                color="text-red-600 dark:text-red-400"
-                items={partialAllocItems.map(r => `${r.name} — ${getAllocationTotal(r)}%`)}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      <NeedsAttention product={product} />
     </div>
   );
 }
@@ -247,18 +187,6 @@ function StatCard({ label, value, accent = '' }: { label: string; value: React.R
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</div>
       <div className={`text-xl font-bold tabular-nums ${accent || 'text-gray-900 dark:text-gray-100'}`}>{value}</div>
-    </div>
-  );
-}
-
-function AttentionSection({ title, color, items }: { title: string; color: string; items: string[] }) {
-  return (
-    <div>
-      <h4 className={`text-sm font-medium ${color} mb-1`}>{title}</h4>
-      <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5 ml-4 list-disc">
-        {items.slice(0, 10).map((item, i) => <li key={i}>{item}</li>)}
-        {items.length > 10 && <li className="italic">...and {items.length - 10} more</li>}
-      </ul>
     </div>
   );
 }

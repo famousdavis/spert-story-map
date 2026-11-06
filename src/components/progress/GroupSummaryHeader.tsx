@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { getRibItemPoints, getRibItemPercentComplete, getReleasePercentComplete } from '../../lib/calculations';
+import { getRibItemPoints, getRibItemPercentCompleteAsOf, getReleasePercentComplete, getReleasePoints, round1 } from '../../lib/calculations';
 import ProgressBar from '../ui/ProgressBar';
 import type { RibItem, SizeMapping, Product } from '../../types';
 
@@ -13,23 +13,28 @@ interface GroupSummaryHeaderProps {
   groupBy: 'release' | 'backbone' | 'theme';
   releaseId: string | undefined;
   product: Product;
+  selectedSprint: string | null;
   collapsed: boolean;
   onToggle: () => void;
 }
 
-export default function GroupSummaryHeader({ label, items, sizeMapping, groupBy, releaseId, product, collapsed, onToggle }: GroupSummaryHeaderProps) {
+export default function GroupSummaryHeader({ label, items, sizeMapping, groupBy, releaseId, product, selectedSprint, collapsed, onToggle }: GroupSummaryHeaderProps) {
   const totalItems = items.length;
-  const totalPoints = items.reduce((sum, rib) => sum + getRibItemPoints(rib, sizeMapping), 0);
+  const isRelease = groupBy === 'release' && releaseId !== undefined;
+  // A release holds only its allocated share of a split rib; a backbone or theme holds the whole rib.
+  const totalPoints = isRelease
+    ? round1(getReleasePoints(product, releaseId, selectedSprint).allocated)
+    : items.reduce((sum, rib) => sum + getRibItemPoints(rib, sizeMapping), 0);
 
   let percentComplete;
-  if (groupBy === 'release' && releaseId) {
-    percentComplete = getReleasePercentComplete(product, releaseId);
+  if (isRelease) {
+    percentComplete = getReleasePercentComplete(product, releaseId, selectedSprint);
   } else if (totalPoints === 0) {
     percentComplete = 0;
   } else {
     const completedPoints = items.reduce((sum, rib) => {
       const pts = getRibItemPoints(rib, sizeMapping);
-      return sum + pts * getRibItemPercentComplete(rib) / 100;
+      return sum + pts * getRibItemPercentCompleteAsOf(rib, selectedSprint, product.sprints) / 100;
     }, 0);
     percentComplete = (completedPoints / totalPoints) * 100;
   }

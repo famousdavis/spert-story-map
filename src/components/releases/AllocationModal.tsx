@@ -4,7 +4,10 @@
 
 import { useState } from 'react';
 import { getRibItemPoints } from '../../lib/calculations';
-import { describeAllocationMove } from '../../lib/progressMutations';
+import { describeAllocationMove, describeAllocationWarnings } from '../../lib/progressMutations';
+import type { AllocationWarning } from '../../lib/progressMutations';
+import { currentAllocations } from '../../lib/progressRule';
+import { UNKNOWN_RELEASE_LABEL } from '../../lib/reconciliation';
 import Modal from '../ui/Modal';
 import type { RibItem, Product, ReleaseAllocation, Category } from '../../types';
 
@@ -23,7 +26,7 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
   // number) is restored by the parsePct pass in the Save handler below.
   type DraftAllocation = Omit<ReleaseAllocation, 'percentage'> & { percentage: string | number };
   const [allocations, setAllocations] = useState<DraftAllocation[]>(
-    rib.releaseAllocations.map(a => ({ ...a }))
+    currentAllocations(rib).map(a => ({ ...a }))
   );
 
   const parsePct = (v: string | number) => { const n = parseInt(String(v), 10); return isNaN(n) ? 0 : Math.max(0, Math.min(100, n)); };
@@ -31,8 +34,20 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
   const pts = getRibItemPoints(rib, product.sizeMapping);
 
   // Read from the draft rows, so the line follows what Save would do as it is typed.
-  const moveNotice = describeAllocationMove(rib, allocations.map(a => ({ releaseId: a.releaseId, percentage: parsePct(a.percentage) })));
-  const moveTarget = moveNotice && product.releases.find(r => r.id === moveNotice.toReleaseId)?.name;
+  const draft = allocations.map(a => ({ releaseId: a.releaseId, percentage: parsePct(a.percentage) }));
+  const moveNotice = describeAllocationMove(rib, draft);
+  const releaseName = (releaseId: string) => product.releases.find(r => r.id === releaseId)?.name ?? UNKNOWN_RELEASE_LABEL;
+  const moveTarget = moveNotice && releaseName(moveNotice.toReleaseId);
+  const warnings = describeAllocationWarnings(rib, draft, product.sprints);
+  // Unassign All commits at once, so it gets its own line, beside its button.
+  const unassignWarnings = describeAllocationWarnings(rib, [], product.sprints)
+    .filter(w => !warnings.some(other => other.kind === w.kind && other.releaseId === w.releaseId));
+  const warningText = (w: AllocationWarning) => {
+    const name = releaseName(w.releaseId);
+    return w.kind === 'stops-counting'
+      ? `${name} has progress recorded. It will stop counting (see Needs Attention).`
+      : `${name} has ${w.recorded}% recorded; only ${w.counted}% will count.`;
+  };
 
   const addRelease = (releaseId: string) => {
     if (allocations.some(a => a.releaseId === releaseId)) return;
@@ -151,15 +166,25 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
               : `${moveTarget} has earlier progress, which will count again.`}
           </p>
         )}
+        {warnings.map(w => (
+          <p key={`${w.kind}-${w.releaseId}`} className="text-sm text-amber-600 dark:text-amber-400">{warningText(w)}</p>
+        ))}
 
-        <div className="flex justify-between pt-2">
+        <div className="flex justify-between gap-3 pt-2">
           {allocations.length > 0 ? (
-            <button
-              onClick={() => onSave([])}
-              className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-            >
-              Unassign All
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onSave([])}
+                className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              >
+                Unassign All
+              </button>
+              {unassignWarnings.length > 0 && (
+                <div className="text-xs text-amber-600 dark:text-amber-400">
+                  {unassignWarnings.map(w => <p key={w.releaseId}>{warningText(w)}</p>)}
+                </div>
+              )}
+            </div>
           ) : <div />}
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg">Cancel</button>

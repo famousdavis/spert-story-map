@@ -2,7 +2,8 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, ReleaseAllocation, RibItem, RibContext } from '../types';
+import type { Product, ReleaseAllocation, RibItem, RibContext, Sprint } from '../types';
+import { hasCountingProgress } from './progressRule';
 
 /**
  * Reusable iterators for the product hierarchy (theme → backbone → rib).
@@ -43,14 +44,17 @@ export function reduceRibs<T>(
 }
 
 /**
- * A rib is locked when any progress entry has percentComplete > 0.
- * Locked ribs must not be re-allocated or unassigned by AI ops.
- * Same predicate used by update_rib in aiOps.ts.
+ * A rib is locked when an effective entry above 0 sits on a current allocation,
+ * in any sprint. A record under a release the rib has left locks nothing. The
+ * Sizing board, the AI's guards and the AI snapshot all read this, so there is
+ * one lock.
+ *
+ * Absent `sprints` (a hand-edited product) reads as no sprints, not a throw.
  *
  * @no-throw — safe for use in the drain path.
  */
-export function isRibLocked(rib: Pick<RibItem, 'progressHistory'>): boolean {
-  return (rib.progressHistory ?? []).some(e => (e.percentComplete ?? 0) > 0);
+export function isRibLocked(rib: Pick<RibItem, 'progressHistory' | 'releaseAllocations'>, sprints: Sprint[] | undefined): boolean {
+  return hasCountingProgress(rib, sprints);
 }
 
 /**

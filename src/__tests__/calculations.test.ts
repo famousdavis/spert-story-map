@@ -13,7 +13,6 @@ import {
   getRibReleaseProgressAsOf,
   getRibReleaseProgress,
   getRibItemPercentComplete,
-  getRibItemPercentCompleteForSprint,
   getRibItemPercentCompleteAsOf,
   getReleasePercentComplete,
   getReleasePoints,
@@ -54,6 +53,12 @@ function makeRib(id: string, { size = null, category = 'core', allocations = [],
     order: 1,
   };
 }
+
+/** Sprints the rib fixtures below can record against: an entry counts only for a sprint the product holds. */
+const SP: Sprint[] = [
+  { id: 'sp-1', name: 'Sprint 1', order: 1, endDate: '2026-01-14' },
+  { id: 'sp-2', name: 'Sprint 2', order: 2, endDate: '2026-01-28' },
+];
 
 function makeBackbone(id: string, ribs: RibItem[] = []): Backbone {
   return { id, name: `Backbone ${id}`, ribItems: ribs, order: 1 };
@@ -96,6 +101,29 @@ describe('getRibItemPoints', () => {
 
   it('returns 0 for unknown size', () => {
     expect(getRibItemPoints(makeRib('r1', { size: 'XXXL' }), SIZE_MAPPING)).toBe(0);
+  });
+
+  describe('points stored as text', () => {
+    // `SizeMappingSection` writes the input's text while a size is typed, and that
+    // text can persist (see cloudLoadGuard's `fixSizeRow`).
+    const asStored = (points: unknown) => [{ label: 'M', points }] as unknown as SizeMapping[];
+
+    it('reads text as a number', () => {
+      expect(getRibItemPoints(makeRib('r1', { size: 'M' }), asStored('20'))).toBe(20);
+    });
+
+    it('counts text that is not a number as 0', () => {
+      expect(getRibItemPoints(makeRib('r1', { size: 'M' }), asStored('abc'))).toBe(0);
+      expect(getRibItemPoints(makeRib('r1', { size: 'M' }), asStored(undefined))).toBe(0);
+    });
+
+    it('sums to a number in the project total, not a concatenation', () => {
+      const product = makeProduct({
+        sizeMapping: [{ label: 'M', points: '20' }, { label: 'L', points: '40' }] as unknown as SizeMapping[],
+        themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('r1', { size: 'M' }), makeRib('r2', { size: 'L' })])])],
+      });
+      expect(getTotalProjectPoints(product)).toBe(60);
+    });
   });
 });
 
@@ -186,28 +214,35 @@ describe('getCoreNonCorePoints', () => {
 describe('getRibReleaseProgressForSprint', () => {
   it('returns null if no matching entry', () => {
     const rib = makeRib('r1');
-    expect(getRibReleaseProgressForSprint(rib, 'rel-1', 'sp-1')).toBeNull();
+    expect(getRibReleaseProgressForSprint(rib, 'rel-1', 'sp-1', SP)).toBeNull();
   });
 
   it('returns the percentComplete for matching sprint+release', () => {
     const rib = makeRib('r1', {
       history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 42 }],
     });
-    expect(getRibReleaseProgressForSprint(rib, 'rel-1', 'sp-1')).toBe(42);
+    expect(getRibReleaseProgressForSprint(rib, 'rel-1', 'sp-1', SP)).toBe(42);
   });
 
   it('returns null for different sprint', () => {
     const rib = makeRib('r1', {
       history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 42 }],
     });
-    expect(getRibReleaseProgressForSprint(rib, 'rel-1', 'sp-2')).toBeNull();
+    expect(getRibReleaseProgressForSprint(rib, 'rel-1', 'sp-2', SP)).toBeNull();
+  });
+
+  it('returns null for a sprint the product does not hold', () => {
+    const rib = makeRib('r1', {
+      history: [{ sprintId: 'gone', releaseId: 'rel-1', percentComplete: 42 }],
+    });
+    expect(getRibReleaseProgressForSprint(rib, 'rel-1', 'gone', SP)).toBeNull();
   });
 });
 
 // --- getRibReleaseProgress ---
 describe('getRibReleaseProgress', () => {
   it('returns 0 for no history', () => {
-    expect(getRibReleaseProgress(makeRib('r1'), 'rel-1')).toBe(0);
+    expect(getRibReleaseProgress(makeRib('r1'), 'rel-1', SP)).toBe(0);
   });
 
   it('returns the last non-null entry', () => {
@@ -217,7 +252,17 @@ describe('getRibReleaseProgress', () => {
         { sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: 60 },
       ],
     });
-    expect(getRibReleaseProgress(rib, 'rel-1')).toBe(60);
+    expect(getRibReleaseProgress(rib, 'rel-1', SP)).toBe(60);
+  });
+
+  it('reads the latest sprint, not the last array position', () => {
+    const rib = makeRib('r1', {
+      history: [
+        { sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: 60 },
+        { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 20 },
+      ],
+    });
+    expect(getRibReleaseProgress(rib, 'rel-1', SP)).toBe(60);
   });
 
   it('skips null percentComplete entries', () => {
@@ -227,7 +272,7 @@ describe('getRibReleaseProgress', () => {
         { sprintId: 'sp-2', releaseId: 'rel-1', percentComplete: null, comment: 'note' },
       ],
     });
-    expect(getRibReleaseProgress(rib, 'rel-1')).toBe(30);
+    expect(getRibReleaseProgress(rib, 'rel-1', SP)).toBe(30);
   });
 });
 
@@ -277,7 +322,7 @@ describe('getRibReleaseProgressAsOf', () => {
 
     const asOf = getRibReleaseProgressAsOf(rib, 'rel-1', 'sp-2', sprints);
     expect(asOf).toBe(0);
-    expect(getRibReleaseProgress(rib, 'rel-1')).toBe(asOf);
+    expect(getRibReleaseProgress(rib, 'rel-1', sprints)).toBe(asOf);
     // The real defect was NaN downstream, not the value itself.
     expect(50 + asOf).toBe(50);
   });
@@ -286,47 +331,29 @@ describe('getRibReleaseProgressAsOf', () => {
 // --- getRibItemPercentComplete ---
 describe('getRibItemPercentComplete', () => {
   it('returns 0 for no history', () => {
-    expect(getRibItemPercentComplete(makeRib('r1'))).toBe(0);
+    expect(getRibItemPercentComplete(makeRib('r1'), SP)).toBe(0);
   });
 
-  it('sums per-release entries for the last sprint', () => {
+  it('sums the shares of current allocations at the latest sprint', () => {
     const rib = makeRib('r1', {
+      allocations: [{ releaseId: 'rel-1', percentage: 50 }, { releaseId: 'rel-2', percentage: 50 }],
       history: [
         { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 30 },
         { sprintId: 'sp-1', releaseId: 'rel-2', percentComplete: 20 },
       ],
     });
-    expect(getRibItemPercentComplete(rib)).toBe(50);
+    expect(getRibItemPercentComplete(rib, SP)).toBe(50);
   });
 
   it('caps at 100', () => {
     const rib = makeRib('r1', {
+      allocations: [{ releaseId: 'rel-1', percentage: 80 }, { releaseId: 'rel-2', percentage: 80 }],
       history: [
         { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 80 },
         { sprintId: 'sp-1', releaseId: 'rel-2', percentComplete: 80 },
       ],
     });
-    expect(getRibItemPercentComplete(rib)).toBe(100);
-  });
-});
-
-// --- getRibItemPercentCompleteForSprint ---
-describe('getRibItemPercentCompleteForSprint', () => {
-  it('returns null if no entries for sprint', () => {
-    const rib = makeRib('r1', {
-      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 50 }],
-    });
-    expect(getRibItemPercentCompleteForSprint(rib, 'sp-2')).toBeNull();
-  });
-
-  it('sums all release entries for a sprint', () => {
-    const rib = makeRib('r1', {
-      history: [
-        { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 30 },
-        { sprintId: 'sp-1', releaseId: 'rel-2', percentComplete: 25 },
-      ],
-    });
-    expect(getRibItemPercentCompleteForSprint(rib, 'sp-1')).toBe(55);
+    expect(getRibItemPercentComplete(rib, SP)).toBe(100);
   });
 });
 
@@ -369,6 +396,7 @@ describe('getProjectPercentComplete', () => {
         }),
         makeRib('r2', { size: 'S' }), // 10 pts, 0% complete
       ])])],
+      sprints: SP,
     });
     // r1 is 100% of 10pts = 10pts complete, r2 is 0% = 0pts. Total 10/20 = 50%
     expect(getProjectPercentComplete(product)).toBe(50);
@@ -429,22 +457,39 @@ describe('getSizingDistribution', () => {
 // --- computeItemStats ---
 describe('computeItemStats', () => {
   it('returns zeroed stats for empty list', () => {
-    const stats = computeItemStats([], SIZE_MAPPING);
+    const stats = computeItemStats([], SIZE_MAPPING, SP);
     expect(stats).toEqual({ totalItems: 0, totalPoints: 0, unsized: 0, remainingPoints: 0, percentComplete: 0 });
   });
 
   it('computes stats for mixed items with progress', () => {
     const items = [
-      makeRib('r1', { size: 'S', history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 100 }] }),
+      makeRib('r1', {
+        size: 'S',
+        allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+        history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 100 }],
+      }),
       makeRib('r2', { size: 'M' }), // no progress
       makeRib('r3'), // unsized
     ];
-    const stats = computeItemStats(items, SIZE_MAPPING);
+    const stats = computeItemStats(items, SIZE_MAPPING, SP);
     expect(stats.totalItems).toBe(3);
     expect(stats.totalPoints).toBe(30); // 10 + 20 + 0
     expect(stats.unsized).toBe(1);
     expect(stats.remainingPoints).toBe(20); // 0 + 20 + 0
     expect(stats.percentComplete).toBe(33); // 10/30 = 33%
+  });
+
+  it('rounds once, from the sum, not per rib', () => {
+    // Ten 10-point ribs at 5%: each is 0.5 points, which per-rib rounding took to 1,
+    // so these read 10% done with all 100 points still remaining.
+    const items = Array.from({ length: 10 }, (_, i) => makeRib(`r${i}`, {
+      size: 'S',
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 5 }],
+    }));
+    const stats = computeItemStats(items, SIZE_MAPPING, SP);
+    expect(stats.percentComplete).toBe(5);
+    expect(stats.remainingPoints).toBe(95);
   });
 });
 
@@ -455,7 +500,7 @@ describe('getThemeStats', () => {
       makeRib('r1', { size: 'M' }),
       makeRib('r2'), // unsized
     ])]);
-    const stats = getThemeStats(theme, SIZE_MAPPING);
+    const stats = getThemeStats(theme, SIZE_MAPPING, SP);
     expect(stats.totalItems).toBe(2);
     expect(stats.totalPoints).toBe(20);
     expect(stats.unsized).toBe(1);
@@ -469,11 +514,12 @@ describe('getBackboneStats', () => {
     const backbone = makeBackbone('b1', [
       makeRib('r1', {
         size: 'S',
+        allocations: [{ releaseId: 'rel-1', percentage: 100 }],
         history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 100 }],
       }),
       makeRib('r2', { size: 'S' }),
     ]);
-    const stats = getBackboneStats(backbone, SIZE_MAPPING);
+    const stats = getBackboneStats(backbone, SIZE_MAPPING, SP);
     expect(stats.totalItems).toBe(2);
     expect(stats.totalPoints).toBe(20);
     expect(stats.percentComplete).toBe(50); // 10/20
@@ -605,6 +651,7 @@ describe('getRibItemPercentCompleteAsOf', () => {
 
   it('sums per-release walk-backs', () => {
     const rib = makeRib('r1', {
+      allocations: [{ releaseId: 'rel-1', percentage: 50 }, { releaseId: 'rel-2', percentage: 50 }],
       history: [
         { sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 30 },
         { sprintId: 'sp-1', releaseId: 'rel-2', percentComplete: 20 },
@@ -613,8 +660,9 @@ describe('getRibItemPercentCompleteAsOf', () => {
     expect(getRibItemPercentCompleteAsOf(rib, 'sp-1', sprints)).toBe(50);
   });
 
-  it('falls back gracefully for missing sprintId', () => {
+  it('reads the latest sprint for a missing sprintId', () => {
     const rib = makeRib('r1', {
+      allocations: [{ releaseId: 'rel-1', percentage: 100 }],
       history: [{ sprintId: 'sp-1', releaseId: 'rel-1', percentComplete: 42 }],
     });
     expect(getRibItemPercentCompleteAsOf(rib, null, sprints)).toBe(42);

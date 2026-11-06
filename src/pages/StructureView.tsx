@@ -7,7 +7,7 @@ import { useOutletContext } from 'react-router-dom';
 import InlineEdit from '../components/ui/InlineEdit';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import BackboneSection from '../components/structure/BackboneSection';
-import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, getRibItemPercentComplete } from '../lib/calculations';
+import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, getRibItemPercentComplete, round1 } from '../lib/calculations';
 import { reduceRibs } from '../lib/ribHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { THEME_COLOR_OPTIONS, getThemeColorClasses } from '../lib/themeColors';
@@ -167,13 +167,13 @@ export default function StructureView() {
         ...backbone,
         ribItems: backbone.ribItems.map(rib => {
           const pts = getRibItemPoints(rib, product.sizeMapping);
-          const pctComplete = getRibItemPercentComplete(rib);
+          const pctComplete = getRibItemPercentComplete(rib, product.sprints);
           return {
             ...rib,
             _pts: pts,
             _allocTotal: getAllocationTotal(rib),
             _pctComplete: pctComplete,
-            _remaining: Math.round(pts * (100 - pctComplete) / 100),
+            _remaining: round1(pts * (100 - pctComplete) / 100),
           };
         }),
       })),
@@ -213,7 +213,7 @@ export default function StructureView() {
       ) : (
         <div className="space-y-3">
           {enrichedProduct.themes.map((theme, themeIdx) => {
-            const themeStats = getThemeStats(theme, product.sizeMapping);
+            const themeStats = getThemeStats(theme, product.sizeMapping, product.sprints);
             const isThemeCollapsed = collapsed[theme.id];
             const themeColor = getThemeColorClasses(theme, themeIdx);
 
@@ -288,7 +288,7 @@ export default function StructureView() {
                           onAddRib={addRib}
                           onDeleteRib={handleDeleteRib}
                           onMoveBackbone={moveBackbone}
-                          bbStats={getBackboneStats(backbone, product.sizeMapping)}
+                          bbStats={getBackboneStats(backbone, product.sizeMapping, product.sprints)}
                         />
                       ))
                     )}

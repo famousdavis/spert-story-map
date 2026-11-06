@@ -193,9 +193,9 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
             didUpdate = true;
             // Mirror the Sizing UI lock (CLAUDE.md #26): do not resize a rib
             // with sprint progress. Corrupting doneValue = points × delta-percent
-            // breaks historical Forecaster math. The ?? [] guard handles
-            // hand-edited/imported products where progressHistory may be absent.
-            const locked = isRibLocked(r);
+            // breaks historical Forecaster math. isRibLocked tolerates a
+            // hand-edited or imported rib with no history, allocations or sprints.
+            const locked = isRibLocked(r, prev.sprints);
             return {
               ...r,
               ...(name !== undefined && { name }),

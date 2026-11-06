@@ -4,6 +4,7 @@
 
 import type { Product, RibItem, ColorKey, Size } from '../types';
 import { appendChangeLogEntry } from './storage';
+import { currentAllocations } from './progressRule';
 import { isRibLocked, computeRibSiblingName } from './ribHelpers';
 import { withCarriedProgress } from './progressMutations';
 import { DEFAULT_THEME_COLOR_KEYS } from './themeColors';
@@ -366,8 +367,11 @@ export function addNamedReleaseToProduct(
  * Guards (all return prev ref-equal, never throw):
  *   1. Release does not exist → prev (prevents orphan allocations).
  *   2. Rib not found → prev.
- *   3. Rib is locked → prev.
- *   4. Rib has any existing allocation → prev (additive; protects user splits).
+ *   3. Rib has any existing allocation → prev (additive; protects user splits).
+ *      This also refuses a locked rib: a lock needs a current allocation.
+ *
+ * A rib holding a record for the target release gets it back: the record counts
+ * again and the rib locks. AI moves behave like drags (owner ruling, 2026-11-05).
  *
  * Does NOT update releaseCardOrder (matches updateRibAllocation / addRibToRelease precedent).
  *
@@ -388,8 +392,7 @@ export function allocateRibInProduct(
       ...b,
       ribItems: b.ribItems.map(r => {
         if (r.id !== ribId) return r;
-        if (isRibLocked(r)) return r;                          // Guard 3
-        if ((r.releaseAllocations ?? []).length > 0) return r; // Guard 4
+        if ((r.releaseAllocations ?? []).length > 0) return r; // Guard 3
         didUpdate = true;
         return { ...r, releaseAllocations: [{ releaseId, percentage: 100 }] };
       }),
@@ -433,7 +436,7 @@ export function unassignRibInProduct(
       ...b,
       ribItems: b.ribItems.map(r => {
         if (r.id !== ribId) return r;
-        if (isRibLocked(r)) return r;                           // Guard 2
+        if (isRibLocked(r, prev.sprints)) return r;             // Guard 2
         if ((r.releaseAllocations ?? []).length === 0) return r; // Guard 3
         didUpdate = true;
         return { ...r, releaseAllocations: [] };
@@ -491,7 +494,7 @@ export function sizeRibInProduct(
       ...b,
       ribItems: b.ribItems.map(r => {
         if (r.id !== ribId) return r;
-        if (isRibLocked(r)) return r;                        // Guard 3
+        if (isRibLocked(r, prev.sprints)) return r;          // Guard 3
         if (r.size && labelSet.has(r.size)) return r;        // Guard 4: Form B
         didUpdate = true;
         return { ...r, size: size as Size };
@@ -669,7 +672,7 @@ export function moveRibInProduct(
   // targetBackboneId === sourceBackboneId falls through with backboneChanged=false ⇒ BB-2
 
   // ── Release leg: REL-1 .. REL-5 ──
-  const allocations = movedRib.releaseAllocations ?? [];
+  const allocations = currentAllocations(movedRib);
   const sole = allocations.length === 1 ? allocations[0] : undefined;
   const releaseEligible =
     allocations.length === 0 || (sole !== undefined && sole.percentage === 100); // REL-4
@@ -678,7 +681,7 @@ export function moveRibInProduct(
   const targetReleaseExists =
     !!targetReleaseId && prev.releases.some(r => r.id === targetReleaseId); // REL-2
   const releaseChanged =
-    targetReleaseExists && !isRibLocked(movedRib) &&       // REL-3
+    targetReleaseExists && !isRibLocked(movedRib, prev.sprints) && // REL-3
     releaseEligible && !alreadyAtTarget;
   // targetReleaseId undefined ⇒ targetReleaseExists false ⇒ REL-1 (leg inactive)
 

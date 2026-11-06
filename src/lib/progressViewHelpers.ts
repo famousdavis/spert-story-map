@@ -4,11 +4,9 @@
 
 import type { Sprint, ProgressSource } from '../types';
 import {
-  getRibItemPercentComplete,
-  getRibReleaseProgressForSprint,
-  getRibReleaseProgress,
-  historyByRelease,
-} from './calculations';
+  allocationTo, completion, currentAllocations, effectiveValue, historyByRelease, resolveSprintId, share,
+} from './progressRule';
+import type { RuleRib } from './progressRule';
 
 /**
  * Count non-empty comments for a rib+release (or all releases if releaseId is null).
@@ -50,41 +48,36 @@ export function getCommentHistory(rib: ProgressSource, releaseId: string | null,
 export type CommentHistoryEntry = ReturnType<typeof getCommentHistory>[number];
 
 /**
- * Get the sprint-specific percentage for a rib+release.
- * For non-release grouping (releaseId is null), aggregates across all releases.
+ * The value recorded for exactly this sprint. Blank (null) when there is none.
+ * With no release (the backbone and theme groupings), the sum of the current
+ * allocations' entries.
  */
-export function getSprintPct(rib: ProgressSource, releaseId: string | null, selectedSprint: string | null): number | null {
+export function getSprintPct(rib: RuleRib, releaseId: string | null, selectedSprint: string | null, sprints: Sprint[]): number | null {
   if (!selectedSprint) return null;
-  if (releaseId) {
-    return getRibReleaseProgressForSprint(rib, releaseId, selectedSprint);
-  }
-  const entries = (rib.progressHistory?.filter(p => p.sprintId === selectedSprint) || [])
-    .filter(e => e.percentComplete !== null);
-  return entries.length > 0 ? Math.min(100, entries.reduce((s, e) => s + (e.percentComplete ?? 0), 0)) : null;
+  if (releaseId) return effectiveValue(rib, releaseId, selectedSprint, sprints);
+  const values = currentAllocations(rib)
+    .map(a => effectiveValue(rib, a.releaseId, selectedSprint, sprints))
+    .filter(v => v !== null);
+  return values.length > 0 ? Math.min(100, values.reduce((sum, v) => sum + v, 0)) : null;
 }
 
 /**
- * Get the current cumulative percentage for a rib+release.
+ * What the row counts as of the selected sprint: the allocation's `share`, or the
+ * rib's `completion` with no release.
  */
-export function getCurrentPct(rib: ProgressSource, releaseId: string | null): number {
-  if (releaseId) return getRibReleaseProgress(rib, releaseId);
-  return getRibItemPercentComplete(rib);
+export function getCurrentPct(rib: RuleRib, releaseId: string | null, selectedSprint: string | null, sprints: Sprint[]): number {
+  const asOf = resolveSprintId(sprints, selectedSprint);
+  if (!releaseId) return completion(rib, asOf, sprints);
+  const allocation = allocationTo(rib, releaseId);
+  return allocation ? share(rib, allocation, asOf, sprints) : 0;
 }
 
 /**
- * Get the delta (change) between the current sprint and the previous sprint.
+ * The change in what the row counts since the previous sprint. Blank when the
+ * sprint cell is blank, and with no previous sprint.
  */
-export function getDelta(rib: ProgressSource, releaseId: string | null, sprint: Sprint | null, prevSprint: Sprint | null, selectedSprint: string | null): number | null {
+export function getDelta(rib: RuleRib, releaseId: string | null, sprint: Sprint | null, prevSprint: Sprint | null, selectedSprint: string | null, sprints: Sprint[]): number | null {
   if (!sprint || !prevSprint) return null;
-  const current = getSprintPct(rib, releaseId, selectedSprint);
-  if (current === null) return null;
-  let prev: number | null;
-  if (releaseId) {
-    prev = getRibReleaseProgressForSprint(rib, releaseId, prevSprint.id);
-  } else {
-    const entries = (rib.progressHistory?.filter(p => p.sprintId === prevSprint.id) || [])
-      .filter(e => e.percentComplete !== null);
-    prev = entries.length > 0 ? entries.reduce((s, e) => s + (e.percentComplete ?? 0), 0) : null;
-  }
-  return current - (prev || 0);
+  if (getSprintPct(rib, releaseId, selectedSprint, sprints) === null) return null;
+  return getCurrentPct(rib, releaseId, sprint.id, sprints) - getCurrentPct(rib, releaseId, prevSprint.id, sprints);
 }
