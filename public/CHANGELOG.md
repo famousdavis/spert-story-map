@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.22 (2026-11-06)
+
+### Changed
+
+- **A rib with progress now keeps its size on every tab.** The Structure tab and the Map's detail panel could still change the size of a rib that Sizing and the AI treat as locked, and doing so rewrote finished sprints. Changing a size from M to L moved those sprints' completed points, on screen and in the data sent to Forecaster, with no warning. Both now show the size as locked and name the sprint that locks it, as Sizing does.
+- **This includes a rib with progress and no size yet.** Sizing and the AI already refused one, and the Structure tab and the Map were the only way to size it.
+- ⚠️ **To change the size of a rib with progress**, use Clear progress on the Progress tab, which deletes its records. Or drag it to Unassigned, change the size and drag it back, which keeps its records. Finished sprints then recalculate at the new size, and a rib on several releases comes back on one.
+
 ## Version 0.53.21 (2026-11-06)
 
 ### Fixed

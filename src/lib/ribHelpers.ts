@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product, ReleaseAllocation, RibItem, RibContext, Sprint } from '../types';
-import { hasCountingProgress } from './progressRule';
+import { hasCountingProgress, lockingSprint } from './progressRule';
 
 /**
  * Reusable iterators for the product hierarchy (theme → backbone → rib).
@@ -63,6 +63,16 @@ export function isRibLocked(rib: Pick<RibItem, 'progressHistory' | 'releaseAlloc
  */
 export function sizeLockNote(sprintName: string | null): string {
   return sprintName ? `Size locked: progress recorded in ${sprintName}` : 'Size locked: progress recorded';
+}
+
+/**
+ * A rib's lock note, or null when its size can change: null exactly when
+ * `isRibLocked` is false, because both read the same sprint. The surfaces that
+ * offer a size picker branch on this, so the lock and its explanation arrive together.
+ */
+export function ribSizeLockNote(rib: Pick<RibItem, 'progressHistory' | 'releaseAllocations'>, sprints: Sprint[] | undefined): string | null {
+  const sprint = lockingSprint(rib, sprints);
+  return sprint ? sizeLockNote(sprint.name) : null;
 }
 
 /**

@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useMemo, useId } from 'react';
 import Modal from '../ui/Modal';
+import LockedSize from '../ui/LockedSize';
 import SizePicker from '../ui/SizePicker';
 import CardColorSwatchRow from '../ui/CardColorSwatchRow';
 import { NOTES_MAX } from '../../lib/constants';
@@ -345,13 +346,7 @@ export default function SizingRibModal({
 
         <Field label="Size">
           {locked ? (
-            <span
-              title={sizeLockNote(lockedSprintName)}
-              className="inline-flex items-center text-xs font-medium px-2 py-1 rounded border border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
-            >
-              {size ?? '—'}
-              <span className="ml-1.5 text-[10px] opacity-70">locked</span>
-            </span>
+            <LockedSize size={size} note={sizeLockNote(lockedSprintName)} />
           ) : (
             <SizePicker
               value={size}
