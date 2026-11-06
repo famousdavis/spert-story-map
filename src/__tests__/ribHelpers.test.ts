@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName, transferAllocation } from '../lib/ribHelpers';
+import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName, sizeLockNote, transferAllocation } from '../lib/ribHelpers';
 import type { ProgressEntry, ReleaseAllocation, RibItem, Sprint } from '../types';
 import { req } from './testHelpers';
 
@@ -86,6 +86,16 @@ describe('reduceRibs', () => {
   it('returns initial value for empty product', () => {
     const result = reduceRibs({ themes: [] }, (sum) => sum + 1, 42);
     expect(result).toBe(42);
+  });
+});
+
+describe('sizeLockNote', () => {
+  it('names the sprint', () => {
+    expect(sizeLockNote('Sprint 4')).toBe('Size locked: progress recorded in Sprint 4');
+  });
+
+  it('still reads as a sentence with no sprint to name', () => {
+    expect(sizeLockNote(null)).toBe('Size locked: progress recorded');
   });
 });
 

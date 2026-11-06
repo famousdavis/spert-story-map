@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import type { Product, Category, Size } from '../../types';
 import { forEachRib } from '../../lib/ribHelpers';
 import { getRibItemPoints, getRibItemPercentComplete } from '../../lib/calculations';
+import { lockingSprintId } from '../../lib/progressRule';
 import { isRibLocked } from '../../lib/ribHelpers';
 
 // Layout constants (pixels in logical/unzoomed space)
@@ -74,6 +75,8 @@ export interface SizingRib {
   percentComplete: number;
   /** Progress > 0 — size editing is disabled to protect points x delta math. */
   locked: boolean;
+  /** The sprint `lockingSprintId` names. Null on a rib that is not locked. */
+  lockedSprintName: string | null;
   cardColor?: string;
 }
 
@@ -112,6 +115,7 @@ export interface SizingLayout {
 export function computeSizingLayout(product: Product, filter: SizingFilter = DEFAULT_SIZING_FILTER, targetWidth: number = 0): SizingLayout {
   const sizeMapping = product.sizeMapping || [];
   const sizeLabels = new Set(sizeMapping.map(m => m.label));
+  const sprintNames = new Map((product.sprints ?? []).map(s => [s.id, s.name]));
 
   // 1. Build size columns (positions/widths are set in step 1.5 once we know expansion)
   const sizeColumns = sizeMapping.map((m, i) => ({
@@ -174,6 +178,7 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
       backboneName: backbone.name,
       percentComplete: pctComplete,
       locked,
+      lockedSprintName: sprintNames.get(lockingSprintId(rib, product.sprints) ?? '') ?? null,
       cardColor: rib.cardColor,
     };
 

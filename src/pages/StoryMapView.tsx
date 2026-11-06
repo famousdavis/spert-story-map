@@ -13,6 +13,7 @@ import RibDetailPanel from '../components/storymap/RibDetailPanel';
 import ReleaseDetailPanel from '../components/storymap/ReleaseDetailPanel';
 import DragGhost from '../components/storymap/DragGhost';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { releaseDeleteMessage } from '../lib/settingsMutations';
 import useMapDrag from '../components/storymap/useMapDrag';
 import useMapLayout from '../components/storymap/useMapLayout';
 import type { MapCell } from '../components/storymap/useMapLayout';
@@ -335,7 +336,7 @@ export default function StoryMapView() {
             : deleteTarget?.type === 'backbone'
               ? `Delete "${deleteTarget.name}"? All rib items within it will also be deleted.`
               : deleteTarget?.type === 'release'
-                ? `Delete "${deleteTarget.name}"? Any remaining allocations and progress history for this release will be removed.`
+                ? releaseDeleteMessage(`Delete "${deleteTarget.name}"?`, product, deleteTarget.releaseId ?? '')
                 : `Delete "${deleteTarget?.name}"?`
         }
       />

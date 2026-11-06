@@ -148,7 +148,8 @@ interface ReleaseSeries {
   ranks: number[];
 }
 
-const hasValue = (entry: ProgressEntry) => entry.percentComplete !== null && entry.percentComplete !== undefined;
+/** A typed 0 is a value. Only an absent or null percentage is not. */
+export const hasValue = (entry: ProgressEntry) => entry.percentComplete !== null && entry.percentComplete !== undefined;
 
 function buildSeries(entries: ProgressEntry[], rank: Map<string, number>): ReleaseSeries {
   const effective = new Map<string, ProgressEntry>();
@@ -236,19 +237,73 @@ export function completion(rib: RuleRib, sprintId: string | null, sprints: Sprin
   return Math.min(100, sharesTotal(rib, sprintId, sprints));
 }
 
+/** The sprint rank of a series' last entry above 0, or -1. Bounded by the series, never by the sprint list. */
+function lastPositiveRank({ valued, ranks }: ReleaseSeries): number {
+  for (let i = valued.length - 1; i >= 0; i--) {
+    if ((valued[i]?.percentComplete ?? 0) > 0) return ranks[i] ?? -1;
+  }
+  return -1;
+}
+
+/**
+ * The sprint that locks a rib: the latest, in sprint order, holding an effective
+ * entry above 0 on a current allocation. Null when nothing locks it. A later
+ * record under a release the rib left names nothing.
+ */
+export function lockingSprintId(rib: RuleRib, sprints: Sprint[] | undefined): string | null {
+  const series = seriesByRelease(rib.progressHistory, sprints);
+  const latest = currentAllocations(rib).reduce((best, allocation) => {
+    const found = series.get(allocation.releaseId);
+    return found ? Math.max(best, lastPositiveRank(found)) : best;
+  }, -1);
+  return sprintOrder(sprints).ordered[latest]?.id ?? null;
+}
+
 /**
  * Locked: an effective entry above 0 on a current allocation, in any sprint. So
  * an earlier sprint's progress locks even if the latest reads 0, and a record
- * left under another release locks nothing.
+ * left under another release locks nothing. Read off `lockingSprintId`, so the
+ * lock and the sprint that explains it cannot disagree.
  */
 export function hasCountingProgress(rib: RuleRib, sprints: Sprint[] | undefined): boolean {
-  const series = seriesByRelease(rib.progressHistory, sprints);
-  return currentAllocations(rib).some(a =>
-    series.get(a.releaseId)?.valued.some(entry => (entry.percentComplete ?? 0) > 0) ?? false,
-  );
+  return lockingSprintId(rib, sprints) !== null;
 }
 
 // ─── Stranded records ───────────────────────────────────────────────
+
+/**
+ * The records one row of Needs Attention stands for: the entries on a release,
+ * with a known sprint, that do not count. On a release the rib has left that is
+ * all of them. On a current allocation it is only the entries behind an effective
+ * one. A 0 or a null beside the positive ones is one of the row's records.
+ *
+ * ⚠️ BY IDENTITY, NEVER BY (sprint, release). A row can be a shadowed duplicate
+ * on a current allocation, and its pair is the pair of the entry that counts: a
+ * filter on the pair takes the counting entry with it. The list and both actions
+ * share this one statement so they cannot disagree about what a row is.
+ */
+export function rowRecords(rib: RuleRib, releaseId: string, sprints: Sprint[] | undefined): ProgressEntry[] {
+  const { rank } = sprintOrder(sprints);
+  const onRib = allocationTo(rib, releaseId) !== null;
+  const effective = seriesByRelease(rib.progressHistory, sprints).get(releaseId)?.effective;
+  return (historyByRelease(rib.progressHistory).get(releaseId) ?? []).filter(entry =>
+    rank.has(entry.sprintId) && !(onRib && effective?.get(entry.sprintId) === entry),
+  );
+}
+
+/**
+ * Where "Bring here" would put a row's records, or null when it is not offered.
+ * Offered only when the rib has exactly one current allocation, above 0, on a
+ * release that exists and is not the row's own. A 0% allocation would lock the rib
+ * with nothing counting, a deleted release loses the records on re-import, and a
+ * release combined with itself would add a series to itself.
+ */
+export function bringHereTarget(rib: RuleRib, releaseId: string, releaseIds: Set<string>): ReleaseAllocation | null {
+  const allocations = currentAllocations(rib);
+  const only = allocations.length === 1 ? allocations[0] : undefined;
+  if (!only || only.percentage <= 0 || only.releaseId === releaseId || !releaseIds.has(only.releaseId)) return null;
+  return only;
+}
 
 /** One release's stranded records on one rib. */
 export interface StrandedSeries {
@@ -266,25 +321,16 @@ export interface StrandedSeries {
  * inert too, but there is no release or sprint to show them against.
  */
 export function strandedSeries(rib: RuleRib, releaseIds: Set<string>, sprints: Sprint[] | undefined): StrandedSeries[] {
-  const { ordered, rank } = sprintOrder(sprints);
-  const latest = ordered[ordered.length - 1]?.id ?? null;
-  const series = seriesByRelease(rib.progressHistory, sprints);
+  const { rank } = sprintOrder(sprints);
+  const latest = latestSprintId(sprints);
   const found: StrandedSeries[] = [];
-  for (const [releaseId, entries] of historyByRelease(rib.progressHistory)) {
+  for (const releaseId of historyByRelease(rib.progressHistory).keys()) {
     if (typeof releaseId !== 'string' || !releaseIds.has(releaseId)) continue;
-    const allocated = allocationTo(rib, releaseId) !== null;
-    const effective = series.get(releaseId)?.effective;
-    const stranded = entries.filter(entry => {
-      if ((entry.percentComplete ?? 0) <= 0 || !rank.has(entry.sprintId)) return false;
-      return !(allocated && effective?.get(entry.sprintId) === entry);
-    });
+    const stranded = rowRecords(rib, releaseId, sprints).filter(entry => (entry.percentComplete ?? 0) > 0);
     if (stranded.length === 0) continue;
-    const places = new Set(stranded.map(entry => entry.sprintId));
-    found.push({
-      releaseId,
-      sprintIds: ordered.filter(s => places.has(s.id)).map(s => s.id),
-      wouldCount: progressAsOf(rib, releaseId, latest, sprints),
-    });
+    // Sorted, not filtered from the sprint list: a per-sprint scan here runs once a row.
+    const sprintIds = [...new Set(stranded.map(entry => entry.sprintId))].sort((a, b) => (rank.get(a) ?? 0) - (rank.get(b) ?? 0));
+    found.push({ releaseId, sprintIds, wouldCount: progressAsOf(rib, releaseId, latest, sprints) });
   }
   return found;
 }

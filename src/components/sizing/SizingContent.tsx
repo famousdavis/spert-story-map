@@ -13,6 +13,7 @@ import {
   type RibCardColorKey,
 } from '../../lib/ribCardColors';
 import { isInteractiveChild } from '../../lib/domHelpers';
+import { sizeLockNote } from '../../lib/ribHelpers';
 import { RIB_NAME_TOOLTIP_DELAY } from '../../lib/constants';
 import { COL_WIDTH, CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, HEADER_HEIGHT, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
 import type { SizingLayout, SizingCell } from './useSizingLayout';
@@ -302,7 +303,7 @@ function SizingRibCell({ cell, onDragStart, onRibClick, isDragging, onEdit, onSp
     >
       <div className="flex items-start justify-between gap-1">
         {locked && (
-          <span className="text-sm leading-none text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5 px-0.5 select-none" title={`${cell.percentComplete}% complete`}>
+          <span className="text-sm leading-none text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5 px-0.5 select-none" title={`${cell.percentComplete}% complete. ${sizeLockNote(cell.lockedSprintName)}`}>
             {cell.percentComplete >= 100 ? '✓' : `${cell.percentComplete}%`}
           </span>
         )}

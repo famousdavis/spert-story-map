@@ -1,5 +1,29 @@
 # Changelog
 
+## Version 0.53.19 (2026-11-06)
+
+### Added — act on progress that is not counting
+
+- **Needs Attention gains "Bring here" and "Remove" on each row.** Each confirm says what will happen and how to undo it: undo is on the Map and Sizing tabs, and it reaches back to what you did here.
+- **"Bring here" adds the listed records to the rib's current release.** The confirm says what the rib will read first, and what the release counts if its allocation is smaller. Where a note will not fit beside the note already there, it stays under its old release instead of being cut.
+- **"Remove" takes the listed records off the rib.** Notes stay. It reaches a rib on no release, which has no row on the Progress tab.
+- **A duplicate entry is listed as a duplicate.** It offers Remove only, and the entry that counts is never touched.
+- **Clear progress on a rib**, from its expanded row on the Progress tab. It covers every release and sprint, including records that are not counting. Notes stay, and the rib unlocks.
+- ⚠️ **"Bring here" recalculates past sprints.** A series that ends lower can make a Forecaster export refuse, and a re-send can move forecast dates.
+- ⚠️ **v0.53.18's recovery note was only partly true:** "Bring here" serves a rib on one release. A split rib has no such action. Type the figure on the release it belongs to, then Remove the record.
+
+### Changed
+
+- **Sizing names the sprint that locks a rib**, on the card's badge and in the edit dialog, so a rib reading 0% that an earlier sprint locks explains itself.
+- **The allocation dialog no longer calls a note progress.** A release holding only notes now says so, and that they stay on the rib.
+- **Deleting a sprint now asks when it holds recorded progress or notes.** It used to delete them from every rib at one click.
+- **Deleting a release says when recorded progress and notes go with it**, the same way on Settings, the Map and Release Planning. Settings now asks before deleting a release that holds only records, which used to go without a word.
+
+### Fixed
+
+- **A project file with no progress list on a rib no longer crashes a delete.** Deleting a release or a sprint from such a project blanked the page.
+- **Release Planning's Delete no longer opens on a release whose allocations a filter is hiding.** With Core or Non-core selected, a release holding only ribs of the other kind could be deleted, taking those allocations and their progress with it.
+
 ## Version 0.53.18 (2026-11-05)
 
 ### Changed — every figure now follows one rule

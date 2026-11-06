@@ -8,6 +8,7 @@ import SizePicker from '../ui/SizePicker';
 import CardColorSwatchRow from '../ui/CardColorSwatchRow';
 import { NOTES_MAX } from '../../lib/constants';
 import { isRibCardColorKey, type RibCardColorKey } from '../../lib/ribCardColors';
+import { sizeLockNote } from '../../lib/ribHelpers';
 import type { Product, Category, Size, RibItem, Theme, Backbone } from '../../types';
 
 export type SizingRibModalMode =
@@ -39,6 +40,7 @@ export interface SizingRibModalProps {
   mode: SizingRibModalMode;
   product: Product;
   locked: boolean;     // edit mode only; ignored in create mode
+  lockedSprintName: string | null;  // the sprint that locks it; null when not locked
   onClose: () => void;
   onCreate?: (input: SizingRibModalCreateInput) => void;
   onSave?: (updates: SizingRibModalSaveInput) => void;
@@ -66,6 +68,7 @@ export default function SizingRibModal({
   mode,
   product,
   locked,
+  lockedSprintName,
   onClose,
   onCreate,
   onSave,
@@ -343,7 +346,7 @@ export default function SizingRibModal({
         <Field label="Size">
           {locked ? (
             <span
-              title="Size locked: progress recorded"
+              title={sizeLockNote(lockedSprintName)}
               className="inline-flex items-center text-xs font-medium px-2 py-1 rounded border border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
             >
               {size ?? '—'}

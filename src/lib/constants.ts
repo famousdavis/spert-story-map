@@ -46,6 +46,13 @@ export const NOTES_MAX = 2000;
 export const CARD_COLOR_LABEL_MAX = 40;
 
 /**
+ * Where undo is, for a confirm on a tab with no undo key of its own. The stack
+ * lives in `ProductLayout`, so it survives the tab change this sends the user on;
+ * the keys themselves are only on Map and Sizing.
+ */
+export const UNDO_HINT = 'To undo, open the Map or Sizing tab and press Ctrl+Z (Cmd+Z on a Mac).';
+
+/**
  * Hover delay (ms) before a rib card's full-name tooltip appears, on both the Map
  * and Sizing tabs. Deliberately longer than `useTooltip`'s 200ms default so that
  * sweeping the pointer across cards doesn't flash tooltips — the user must dwell.

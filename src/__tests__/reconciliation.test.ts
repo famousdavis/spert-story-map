@@ -89,8 +89,20 @@ describe('getStrandedRows', () => {
     const product = makeProduct([makeRib('r', [on('R2')], [entry('S1', 'R1', 10), entry('S2', 'R1', 30)])]);
     expect(getStrandedRows(product)).toEqual([{
       ribId: 'r', ribName: 'r', backboneName: 'B', releaseId: 'R1', releaseName: 'Release R1',
-      sprintNames: ['S1', 'S2'], wouldCount: 30,
+      sprintNames: ['S1', 'S2'], wouldCount: 30, duplicate: false, bringHereTo: 'Release R2',
     }]);
+  });
+
+  it('flags a row on a current allocation as a duplicate, with nowhere to bring it', () => {
+    const product = makeProduct([makeRib('r', [on('R1')], [entry('S1', 'R1', 10), entry('S1', 'R1', 30)])]);
+    expect(getStrandedRows(product)).toMatchObject([{ releaseId: 'R1', duplicate: true, bringHereTo: null }]);
+  });
+
+  it('offers no target on a split rib or a parked one', () => {
+    const split = makeProduct([makeRib('r', [on('R1', 50), on('R2', 50)], [entry('S1', 'R3', 10)])]);
+    expect(getStrandedRows(split)).toMatchObject([{ releaseId: 'R3', duplicate: false, bringHereTo: null }]);
+    const parked = makeProduct([makeRib('r', [], [entry('S1', 'R3', 10)])]);
+    expect(getStrandedRows(parked)).toMatchObject([{ releaseId: 'R3', duplicate: false, bringHereTo: null }]);
   });
 
   it('gives one row per (rib, release)', () => {

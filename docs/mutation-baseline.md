@@ -77,6 +77,35 @@ Non-core points this sprint were never asserted (`-` to `+` survived), a dropped
 sign of Over-allocated's non-core column. The tests for those moved `calculations.ts`, `reconciliation.ts`
 and `exportForExcel.ts`, and this table is the second run.
 
+## v0.53.19, the changed targets only
+
+Recorded 2026-11-06 on the release's final test set, with the incremental cache cleared: 5 of the 24
+target files, 983 mutants, 9m 56s for the first pass and a similar time for this one. **This is a
+partial measurement, not a new baseline: the headline above stands.** `stryker.config.mjs` is
+untouched. `vitest.stryker.config.ts` gained one file, `progressActions.test.ts`, and per-target branch
+coverage under the list was re-compared with the full suite and matches for all five files.
+
+| file | v0.53.18 | v0.53.19 | valid | killed | timeout | survived | nocov | compileErr |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `progressMutations.ts` | 94.82% | **96.03%** | 277 | 266 | 0 | 11 | 0 | 212 |
+| `progressRule.ts` | 98.82% | **97.06%** | 102 | 92 | 7 | 2 | 1 | 137 |
+| `reconciliation.ts` | 97.30% | **97.50%** | 40 | 39 | 0 | 1 | 0 | 28 |
+| `ribHelpers.ts` | 87.72% | **88.14%** | 59 | 52 | 0 | 7 | 0 | 30 |
+| `settingsMutations.ts` | 100.00% | **98.44%** | 64 | 63 | 0 | 1 | 0 | 34 |
+| **five files** | | **95.76%** | **542** | **512** | **7** | **22** | **1** | **441** |
+
+**Four of the 23 unkilled mutants sit on lines this release added, and none is a gap.** Three cannot be
+told apart: `rib.progressHistory ?? []` to `["Stryker was here"]` in `ribHasProgress` and in
+`settingsMutations.ts`'s `anyEntry`, because a string has no `percentComplete` or `releaseId` to match,
+and `valued.length + 1` in `lastPositiveRank`, because a read past the end falls to `?? 0`. The fourth,
+`ranks[i] ?? -1` to `+1`, is unreachable: `ranks` and `valued` are built together. That is why
+`progressRule.ts` and `settingsMutations.ts` read lower than v0.53.18 with nothing weaker.
+
+**The first pass of this run scored 94.46%.** Its survivors on new lines were real: the `duplicate` flag
+was asserted only by rendered tests outside the list, `previewBringHere` was never shown to return null
+on a rib with an allocation or to find a rib among several, and the records predicates survived
+`some` to `every` because the fixture held one theme. The tests for those are in this table.
+
 ## Delta, v0.52.0 → v0.52.1
 
 | | v0.52.0 | v0.52.1 | |

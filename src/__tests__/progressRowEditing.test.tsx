@@ -69,6 +69,7 @@ function renderRow(rib: Rib, overrides: Partial<Props> = {}) {
       getDelta: () => null,
       getCommentCount: () => 0,
       getCommentHistory: () => [],
+      onClearProgress: () => {},
       updateProgress,
       removeProgress,
       updateComment: vi.fn(),

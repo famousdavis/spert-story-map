@@ -21,7 +21,7 @@ import type { OutletContextValue } from '../types';
 
 
 export default function InsightsView() {
-  const { product } = useOutletContext<OutletContextValue>();
+  const { product, updateProduct } = useOutletContext<OutletContextValue>();
   const { isDark } = useDarkMode();
 
   const totalPoints = useMemo(() => getTotalProjectPoints(product), [product]);
@@ -177,7 +177,7 @@ export default function InsightsView() {
         </div>
       )}
 
-      <NeedsAttention product={product} />
+      <NeedsAttention product={product} updateProduct={updateProduct} />
     </div>
   );
 }

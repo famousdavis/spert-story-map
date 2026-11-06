@@ -4,8 +4,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  allocationTo, completion, currentAllocations, effectiveEntry, effectiveValue, hasCountingProgress, historyByRelease,
-  latestSprintId, orderedSprints, previousSprint, progressAsOf, resolveSprintId, share, sharesTotal, strandedSeries,
+  allocationTo, bringHereTarget, completion, currentAllocations, effectiveEntry, effectiveValue, hasCountingProgress, historyByRelease,
+  latestSprintId, lockingSprintId, orderedSprints, previousSprint, progressAsOf, resolveSprintId, rowRecords, share, sharesTotal, strandedSeries,
 } from '../lib/progressRule';
 import type { ProgressEntry, ReleaseAllocation, Sprint } from '../types';
 
@@ -204,6 +204,101 @@ describe('hasCountingProgress', () => {
     expect(hasCountingProgress({ releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', null, 'n')] }, SPRINTS)).toBe(false);
     expect(hasCountingProgress({ releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 0)] }, SPRINTS)).toBe(false);
     expect(hasCountingProgress({ releaseAllocations: [on('r2')], progressHistory: [entry('s1', 'r1', 50)] }, SPRINTS)).toBe(false);
+  });
+});
+
+describe('lockingSprintId', () => {
+  it('names nothing on a rib with nothing counting', () => {
+    expect(lockingSprintId({ releaseAllocations: [on('r1')], progressHistory: [] }, SPRINTS)).toBeNull();
+    expect(lockingSprintId({ releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 0), entry('s2', 'r1', null, 'n')] }, SPRINTS)).toBeNull();
+    expect(lockingSprintId({}, SPRINTS)).toBeNull();
+    expect(lockingSprintId({ releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 50)] }, undefined)).toBeNull();
+  });
+
+  it('names the latest sprint above 0, in sprint order, past a 0 and whatever the array order', () => {
+    const rib = { releaseAllocations: [on('r1')], progressHistory: [entry('s3', 'r1', 0), entry('s2', 'r1', 20), entry('s1', 'r1', 10)] };
+    expect(lockingSprintId(rib, SPRINTS)).toBe('s2');
+  });
+
+  it('takes the latest across a split rib, in whichever allocation holds it', () => {
+    const rib = { releaseAllocations: [on('r1', 50), on('r2', 50)], progressHistory: [entry('s3', 'r2', 20), entry('s1', 'r1', 10)] };
+    expect(lockingSprintId(rib, SPRINTS)).toBe('s3');
+    const reversed = { releaseAllocations: [on('r2', 50), on('r1', 50)], progressHistory: [entry('s3', 'r2', 20), entry('s1', 'r1', 10)] };
+    expect(lockingSprintId(reversed, SPRINTS)).toBe('s3');
+  });
+
+  it('ignores a later record on a release the rib left, a shadowed duplicate and an unknown sprint', () => {
+    const left = { releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 10), entry('s3', 'r2', 90)] };
+    expect(lockingSprintId(left, SPRINTS)).toBe('s1');
+    const shadowed = { releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 10), entry('s2', 'r1', 0), entry('s2', 'r1', 40)] };
+    expect(lockingSprintId(shadowed, SPRINTS)).toBe('s1');
+    const unknown = { releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 10), entry('gone', 'r1', 40)] };
+    expect(lockingSprintId(unknown, SPRINTS)).toBe('s1');
+  });
+
+  it('agrees with the lock', () => {
+    const locked = { releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 10), entry('s2', 'r1', 0)] };
+    expect(hasCountingProgress(locked, SPRINTS)).toBe(true);
+    expect(lockingSprintId(locked, SPRINTS)).toBe('s1');
+  });
+});
+
+describe('rowRecords', () => {
+  const ids = (entries: ProgressEntry[]) => entries.map(e => `${e.sprintId}=${e.percentComplete}`);
+
+  it('is every record with a known sprint, on a release the rib has left, a 0 and a null included', () => {
+    const rib = {
+      releaseAllocations: [on('r2')],
+      progressHistory: [entry('s1', 'r1', 30), entry('s2', 'r1', 0), entry('s3', 'r1', null, 'n'), entry('gone', 'r1', 50), entry('s1', 'r2', 5)],
+    };
+    expect(ids(rowRecords(rib, 'r1', SPRINTS))).toEqual(['s1=30', 's2=0', 's3=null']);
+  });
+
+  it('on a current allocation is only what sits behind an effective entry', () => {
+    const rib = { releaseAllocations: [on('r1')], progressHistory: [entry('s1', 'r1', 10), entry('s1', 'r1', 30), entry('s2', 'r1', 40)] };
+    expect(ids(rowRecords(rib, 'r1', SPRINTS))).toEqual(['s1=30']);
+  });
+
+  it('goes by identity: two equal entries for one pair are still one effective and one shadow', () => {
+    const counting = entry('s1', 'r1', 10);
+    const twin = entry('s1', 'r1', 10);
+    const records = rowRecords({ releaseAllocations: [on('r1')], progressHistory: [counting, twin] }, 'r1', SPRINTS);
+    expect(records).toHaveLength(1);
+    expect(records[0]).toBe(twin);
+  });
+
+  it('holds both duplicates on a release the rib has left, because neither counts', () => {
+    const rib = { releaseAllocations: [on('r2')], progressHistory: [entry('s1', 'r1', 10), entry('s1', 'r1', 30)] };
+    expect(ids(rowRecords(rib, 'r1', SPRINTS))).toEqual(['s1=10', 's1=30']);
+  });
+
+  it('is empty on a rib with no history, and for a release it holds nothing on', () => {
+    expect(rowRecords({ releaseAllocations: [on('r1')] }, 'r1', SPRINTS)).toEqual([]);
+    expect(rowRecords({ progressHistory: [entry('s1', 'r1', 10)] }, 'r2', SPRINTS)).toEqual([]);
+  });
+});
+
+describe('bringHereTarget', () => {
+  const releases = new Set(['r1', 'r2', 'r3']);
+
+  it('is the one current allocation', () => {
+    expect(bringHereTarget({ releaseAllocations: [on('r1', 60)] }, 'r2', releases)).toEqual(on('r1', 60));
+  });
+
+  it('counts distinct releases: a repeated row is one allocation', () => {
+    expect(bringHereTarget({ releaseAllocations: [on('r1', 60), on('r1', 40)] }, 'r2', releases)).toEqual(on('r1', 60));
+  });
+
+  it('is not offered to a parked rib or a split rib', () => {
+    expect(bringHereTarget({ releaseAllocations: [] }, 'r2', releases)).toBeNull();
+    expect(bringHereTarget({}, 'r2', releases)).toBeNull();
+    expect(bringHereTarget({ releaseAllocations: [on('r1', 50), on('r3', 50)] }, 'r2', releases)).toBeNull();
+  });
+
+  it('is not offered on a 0% allocation, a deleted release, or a row of the release itself', () => {
+    expect(bringHereTarget({ releaseAllocations: [on('r1', 0)] }, 'r2', releases)).toBeNull();
+    expect(bringHereTarget({ releaseAllocations: [on('gone')] }, 'r2', releases)).toBeNull();
+    expect(bringHereTarget({ releaseAllocations: [on('r1')] }, 'r1', releases)).toBeNull();
   });
 });
 

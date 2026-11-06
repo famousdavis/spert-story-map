@@ -39,11 +39,11 @@ src/
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory
-│   ├── progressRule.ts              # The one rule for what counts: sprint order, effective entries, share, completion, lock, stranded records
+│   ├── progressRule.ts              # The one rule for what counts: sprint order, effective entries, share, completion, lock, a row's records
 │   ├── calculations.ts              # Pure totals over the rule (points, project and release figures, stats)
 │   ├── reconciliation.ts            # Unallocated / Over-allocated / Unknown release / Total rows, and the stranded list
-│   ├── progressMutations.ts         # Progress helpers (update, remove, comment) + carry on move, allocation save
-│   ├── settingsMutations.ts         # Pure cascade deletion (release, sprint) + releaseHasAllocations
+│   ├── progressMutations.ts         # Progress helpers (update, remove, comment) + carry on move, allocation save, Bring here, Remove, Clear progress
+│   ├── settingsMutations.ts         # Pure cascade deletion (release, sprint) + what a delete would take with it
 │   ├── ribHelpers.ts                # forEachRib / reduceRibs / isRibLocked / transferAllocation / computeRibSiblingName
 │   ├── productTransforms.ts         # Pure (prev:Product)=>Product transforms shared by useProductMutations + aiOps
 │   ├── firestoreCollections.ts      # Centralized Firestore collection-name constants (PROJECTS/PROFILES/SETTINGS/SESSIONS)
@@ -249,3 +249,5 @@ receives are identical to the bytes the file would have contained.
 — unlike every other `_blank` in this app.
 
 21. **Progress carries with a moved rib (v0.53.17)** — Progress entries are keyed by release, so a rib that changes release has to take them along. `carryProgress` in `progressMutations.ts` trades the two releases' keys: nothing merges and nothing is dropped, which is why a move changes no rib-level figure and dragging back restores the array. The one exception is a rib with nothing recorded on its source and positive records on its target: history is left alone and those records count again. A real 0 is a record, so it swaps. Every writer changes allocations and history in one `updateProduct`, so undo restores both. `applyRibTransfer` serves the two drag systems; the allocation dialog (`saveRibAllocations`) and the AI's `moveRibInProduct` keep their own allocation writes and carry through `withCarriedProgress`. `detectAllocationMove` is the one statement of what counts as a move: exactly one release out and one in, with a 0% row absent on both sides. A drop (to Unassigned, or a release removed) deletes nothing.
+
+22. **Acting on progress that is not counting (v0.53.19)** — Needs Attention lists records that do not count, and only a user's click changes them. A row's records are stated once, by `rowRecords` in `progressRule.ts`: the entries on a release, with a known sprint, that do not count. The list, "Bring here" and "Remove" all read it, and it compares entries by identity, because a row can be a duplicate behind an effective entry, with the same (sprint, release) as the entry that counts. "Bring here" is the one place two series combine: `min(100, row + current)` for each sprint, offered only by `bringHereTarget`. A comment is never cut: when two will not fit `MAX_MEMO` together, the row's stays under its old release. Every action is one `updateProduct`, and every confirm says where undo is, because only Map and Sizing have undo keys; the stack lives in `ProductLayout`, so it survives the tab change. `lockingSprintId` is the one statement of what locks a rib, and `hasCountingProgress` reads it.

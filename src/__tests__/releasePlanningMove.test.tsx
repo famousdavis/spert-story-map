@@ -58,10 +58,18 @@ describe('AllocationModal warns before progress stops counting', () => {
     expect(line.parentElement?.textContent).toContain('Total');
   });
 
-  it('names a removed release holding only a comment', () => {
+  it('says a removed release holding only a comment has notes, not progress', () => {
     openDialog(makeRib('r', [on('X', 50), on('Y', 50)], [entry('S1', 'X', null, 'note')]));
     removeRow('Release X');
-    expect(screen.getByText(STOPS('Release X'))).toBeTruthy();
+    expect(screen.getByText('Release X has notes, which stay on the rib.')).toBeTruthy();
+    expect(screen.queryByText(STOPS('Release X'))).toBeNull();
+  });
+
+  it('says the same beside Unassign All', () => {
+    openDialog(makeRib('r', [on('X')], [entry('S1', 'X', null, 'note')]));
+    const line = screen.getByText('Release X has notes, which stay on the rib.');
+    expect(req(line.parentElement?.parentElement, 'slot').textContent).toContain('Unassign All');
+    expect(screen.queryByText(STOPS('Release X'))).toBeNull();
   });
 
   it('warns beside Unassign All whenever the rib has recorded progress, because it commits at once', () => {

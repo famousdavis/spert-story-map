@@ -9,15 +9,18 @@ import {
 } from '../lib/calculations';
 import { latestSprintId, previousSprint } from '../lib/progressRule';
 import {
+  clearRibProgress,
   updateProgress as doUpdateProgress,
   removeProgress as doRemoveProgress,
   updateComment as doUpdateComment,
 } from '../lib/progressMutations';
+import { UNDO_HINT } from '../lib/constants';
 import {
   getCommentCount, getCommentHistory,
   getSprintPct, getCurrentPct, getDelta,
 } from '../lib/progressViewHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import ProgressBar from '../components/ui/ProgressBar';
 import CollapsibleSection from '../components/ui/CollapsibleSection';
 import SprintSummaryCard from '../components/progress/SprintSummaryCard';
@@ -41,6 +44,7 @@ export default function ProgressTrackingView() {
   const [showChart, setShowChart] = useState(false);
   const [progressDrafts, setProgressDrafts] = useState<Record<string, string>>({});
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [clearTarget, setClearTarget] = useState<RibItem | null>(null);
   // Track previous sprint/groupBy to reset transient state on change
   const [lastSprint, setLastSprint] = useState(selectedSprint);
   const [lastGroupBy, setLastGroupBy] = useState(groupBy);
@@ -299,6 +303,7 @@ export default function ProgressTrackingView() {
                             updateProgress={updateProgress}
                             removeProgress={removeProgress}
                             updateComment={updateComment}
+                            onClearProgress={setClearTarget}
                             sizeMapping={product.sizeMapping}
                           />
                         ))}
@@ -312,6 +317,17 @@ export default function ProgressTrackingView() {
           <GroupsFooter product={product} selectedSprint={selectedSprint} groupBy={groupBy} ribs={allRibs} />
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!clearTarget}
+        onClose={() => setClearTarget(null)}
+        onConfirm={() => { if (clearTarget) updateProduct(prev => clearRibProgress(prev, clearTarget.id)); }}
+        title="Clear progress"
+        message={clearTarget
+          ? `Clear all progress on "${clearTarget.name}"? This covers every release and every sprint, including records that are not counting. Notes stay, and the rib unlocks. ${UNDO_HINT}`
+          : ''}
+        confirmLabel="Clear progress"
+      />
     </div>
   );
 }

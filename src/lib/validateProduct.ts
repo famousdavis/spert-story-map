@@ -17,7 +17,7 @@ import { normalizeSchemaVersion } from './schemaVersion';
  */
 
 const MAX_STRING = 1000;      // Max length for name/description fields
-const MAX_MEMO = 2000;        // Max length for memo/comment fields
+export const MAX_MEMO = 2000; // Max length for memo/comment fields
 const MAX_LABEL = 80;         // Max length for card-color legend labels
 const MAX_THEMES = 100;
 const MAX_BACKBONES = 200;

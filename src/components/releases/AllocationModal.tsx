@@ -44,9 +44,9 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
     .filter(w => !warnings.some(other => other.kind === w.kind && other.releaseId === w.releaseId));
   const warningText = (w: AllocationWarning) => {
     const name = releaseName(w.releaseId);
-    return w.kind === 'stops-counting'
-      ? `${name} has progress recorded. It will stop counting (see Needs Attention).`
-      : `${name} has ${w.recorded}% recorded; only ${w.counted}% will count.`;
+    if (w.kind === 'stops-counting') return `${name} has progress recorded. It will stop counting (see Needs Attention).`;
+    if (w.kind === 'notes-stay') return `${name} has notes, which stay on the rib.`;
+    return `${name} has ${w.recorded}% recorded; only ${w.counted}% will count.`;
   };
 
   const addRelease = (releaseId: string) => {
