@@ -32,7 +32,8 @@ export default defineConfig({
     // Matches vitest.config.ts — this repo's suite runs in `node`, not jsdom.
     environment: 'node',
     // The test files that exercise a mutate target (19 of 40 at v0.52.0; 21 of 61
-    // at v0.53.16, after schemaVersion.test.ts and calculationsScale.test.ts).
+    // at v0.53.16, after schemaVersion.test.ts and calculationsScale.test.ts; 23 of
+    // 65 at v0.53.17, after the two carry tests below).
     //
     // ⚠️ DERIVING THIS FROM DIRECT `import` EDGES ALONE IS NOT SUFFICIENT, and the
     // first draft of this list got it wrong. A test can reach a mutate target THROUGH
@@ -67,11 +68,17 @@ export default defineConfig({
       // branch coverage of calculations.ts was 80.72% against 94.57% for the full
       // suite — the gap the note above says to close.
       'src/__tests__/calculationsScale.test.ts',
+      // Progress integrity (v0.53.17): carry, its properties, and every writer. The
+      // campaign re-records the baseline at the end of its second release, so a
+      // comparison across this change is not valid until then. The two jsdom tests
+      // for the same work stay out: they reach no target these two do not.
+      'src/__tests__/carryProgress.test.ts',
       'src/__tests__/exportForExcel.test.ts',
       'src/__tests__/exportForForecaster.test.ts',
       'src/__tests__/formatDate.test.ts',
       'src/__tests__/invitationErrors.test.ts',
       'src/__tests__/migration.test.ts',
+      'src/__tests__/moveCarriesProgress.test.ts',
       'src/__tests__/progressMutations.test.ts',
       'src/__tests__/progressViewHelpers.test.ts',
       'src/__tests__/ribCardColors.test.ts',
