@@ -1,5 +1,37 @@
 # Changelog
 
+## Version 0.53.18 (2026-11-05)
+
+### Changed — every figure now follows one rule
+
+Progress, Insights, Release Planning, Structure, Sizing, the project cards, the Excel export and the Forecaster export now all calculate progress the same way, so they can no longer disagree.
+
+- ⚠️ **Progress on a rib that was moved or parked before this version stops counting until the rib returns to that release.** Completed points and the burn-up fall for those ribs and now match the release tables. Nothing is deleted. Insights' Needs Attention lists each one. To recover: if the rib has nothing recorded on its current release, drag it to the listed release and back. A parked rib goes to the listed release. A rib with its own recorded progress needs "Bring here", in the next version.
+- **A split or reduced allocation now counts only up to the allocation**, so a figure can fall with nothing removed.
+- **Editing the plan can change past sprints' figures**, because every sprint is calculated from the current allocations.
+- **Dragging one card of a split rib to Unassigned clears all its releases**, as before, but now its figures fall too.
+- **The Progress header's total and remaining now include unassigned ribs** and match the backlog Forecaster receives.
+- **Done and the group headers follow the selected sprint.** A split rib's group points are its allocated points. Points on each row show one decimal.
+- **The change column (Δ) is different after a skipped sprint**, and on rows where a stray record sat in an earlier sprint.
+- **Figures move for projects with back-filled sprints**, because "latest" now means the last sprint in order, not the last one entered. The Progress tab opens on that sprint too.
+- **Sizing locks a rib with progress in an earlier sprint even if the latest reads 0, and a rib whose only progress is on a release it left unlocks.** The AI's `locked` flag follows the same rule.
+- ⚠️ **A project can now be refused by the Forecaster export where it was accepted before**, if a stray record was hiding a downward revision. When it is, the refusal says to look at Needs Attention. Re-sending rewrites past sprints, so forecast dates can move.
+
+### Added — the totals now add up on screen
+
+- **Insights gains Unallocated and Total rows**, and Over-allocated or Unknown release when they apply, and shows one decimal. The Progress tab gains an Unallocated footer, or Unassigned ribs when grouped by backbone or theme. Excel's Release Summary gains the same rows.
+- **Insights' Needs Attention lists progress that is not counting**: the rib, the release, the sprints, and what would count if the rib returned.
+- **The allocation dialog warns before Save** when removing a release or lowering a percentage would stop progress counting. Unassign All, which saves at once, shows its warning beside the button.
+
+### Fixed
+
+- **Structure's theme and backbone figures are corrected.** They rounded rib by rib and could read double the true figure.
+- **Sizes stored as text no longer corrupt totals.** A size saved part-way through typing could turn a project's total into nonsense, and send it to Forecaster.
+- **A rib allocated with no percentage**, which an imported file can hold, now counts as unallocated instead of spoiling the project's figures.
+- **An AI assistant moving a rib back to a release can restore progress recorded there**, as a drag does. The rib then locks.
+- **A rib whose only progress is on a release it left** can now be moved, unassigned or sized by an AI assistant, as it can by hand.
+- **Saving a value on a rib with duplicate entries for one sprint and release now leaves one entry**, keeping the first comment, so deleting it cannot bring back an old value.
+
 ## Version 0.53.17 (2026-11-05)
 
 ### Fixed — moving a rib now keeps its progress

@@ -39,7 +39,9 @@ src/
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory
-│   ├── calculations.ts              # Pure computation functions (points, progress, stats)
+│   ├── progressRule.ts              # The one rule for what counts: sprint order, effective entries, share, completion, lock, stranded records
+│   ├── calculations.ts              # Pure totals over the rule (points, project and release figures, stats)
+│   ├── reconciliation.ts            # Unallocated / Over-allocated / Unknown release / Total rows, and the stranded list
 │   ├── progressMutations.ts         # Progress helpers (update, remove, comment) + carry on move, allocation save
 │   ├── settingsMutations.ts         # Pure cascade deletion (release, sprint) + releaseHasAllocations
 │   ├── ribHelpers.ts                # forEachRib / reduceRibs / isRibLocked / transferAllocation / computeRibSiblingName
@@ -89,12 +91,17 @@ src/
 │   │   ├── ProjectCard.tsx           # Project list card (inline rename via pencil/double-click, export, duplicate, delete)
 │   │   ├── ShareDialog.tsx           # Cloud-mode project sharing dialog
 │   │   └── ImportPreviewSection.tsx  # Homepage import preview UI: phase rendering + decision rows + result banner
+│   ├── insights/
+│   │   ├── ReleaseBreakdownTable.tsx # Per-release table plus the rows that add it up to the project
+│   │   └── NeedsAttention.tsx        # Unsized, unassigned, incomplete, and progress not counting
 │   ├── progress/
 │   │   ├── ProgressHeader.tsx        # Sprint selector, group-by buttons, expand/collapse toggle
 │   │   ├── SprintSummaryCard.tsx     # Sprint summary stats card
 │   │   ├── BurnUpChart.tsx           # Burn-up progress chart
 │   │   ├── ProgressRow.tsx           # Individual progress table row
 │   │   ├── GroupSummaryHeader.tsx    # Collapsible group header with summary stats
+│   │   ├── GroupsFooter.tsx          # What the groups leave out, so they add up to the header
+│   │   ├── progressGroups.ts         # Builds the table's groups and rows from current allocations
 │   │   └── CommentPanel.tsx          # Assessment note panel for progress rows
 │   ├── structure/                    # Structure view sub-components
 │   │   ├── BackboneSection.tsx       # Backbone header + rib table grid
@@ -190,11 +197,11 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 3. **Atomic state updates** — Cross-column card moves combine allocation changes + card order into a single `updateProduct` call to prevent race conditions between separate state updates.
 
-4. **Per-release progress** — Progress is tracked per-release per-sprint. Each `progressHistory` entry has a `releaseId` and `percentComplete` capped at the allocation percentage. Overall rib % is the sum of per-release entries. Schema migration (v1→v2) uses a waterfall algorithm to distribute old global entries across allocations.
+4. **Per-release progress** — Progress is tracked per-release per-sprint. Each `progressHistory` entry has a `releaseId` and a `percentComplete`, the share of the WHOLE rib done, credited to that release. `progressRule.ts` is the one statement of what counts: only the first entry for a (sprint, release) whose sprint exists, only on a current allocation, up to that allocation; a rib is the sum of its shares, capped at 100. Anything else is an inert record: it stays stored, counts in no total and locks nothing. Inert records above 0 are listed in Insights' Needs Attention. Every figure the app shows adds points over that rule, so two views cannot disagree. Schema migration (v1→v2) uses a waterfall algorithm to distribute old global entries across allocations.
 
 5. **Assessment notes** — Each progress entry can carry an optional `comment` and `updatedAt` timestamp. Notes are entered via expandable rows in the progress table, with full history shown newest-first. Clearing a progress value removes the entry entirely unless it has a comment attached.
 
-6. **Sprint-aware progress** — `getRibItemPercentCompleteAsOf()` walks backward through sprint history to find the most recent progress entry at or before a selected sprint, enabling historical views. Progress regression (negative deltas) is allowed to keep data honest.
+6. **Sprint-aware progress** — `progressAsOf()` takes the effective value at the latest sprint at or before the one asked for, by sprint order, never array position, enabling historical views. Progress regression (negative deltas) is allowed to keep data honest.
 
 7. **Debounced persistence** — Saves are debounced (500ms for products, 100ms for index) to avoid excessive writes during rapid edits, while `saveProductImmediate` is used for critical operations like create/import.
 
@@ -214,9 +221,9 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 15. **Theme colors** — Each theme has an optional `color` field (e.g. `'blue'`, `'teal'`). `themeColors.js` defines 8 color options with Tailwind classes for solid (theme header), light (backbone header), dot, and swatch contexts. `getThemeColorClasses(theme, index)` resolves the color: uses `theme.color` if set, otherwise falls back to index-based cycling. No schema migration needed — themes without a `color` field use the fallback.
 
-16. **Forecaster export** — `exportForForecaster.js` transforms Story Map data into the SPERT Release Forecaster's import format. Releases map to milestones with incremental `backlogSize` — the work REMAINING in each release (allocated points less recorded progress, via `getReleasePoints`, as of the last exported sprint), not cumulative and not the release total. A fully done release is sent as `0`, Forecaster's "completed" value. The payload declares this with `milestoneBacklog: 'remaining'`, because exports before v0.53.8 sent release totals in the same field. Sprint velocity (`doneValue`) is computed via delta-percent math: `Σ(ribPoints × (pctAsOf − pctPrev) / 100)` using `getRibItemPercentCompleteAsOf`. Zero-point releases are skipped. The export is a pure function with no side effects; `downloadForecasterExport` handles the browser download. Both `downloadForecasterExport` and `sendToForecaster` gate on `checkForecasterExport` (v0.53.10): first `checkSprintFinishDates`, which refuses a product with any sprint that has no finish date (the builder would otherwise drop it silently, and a project whose Sprint 1 was never dated has no dated sprints at all), then `checkForecasterCompatibility`. One predicate, `hasFinishDate`, decides both what the builder drops and what the check names.
+16. **Forecaster export** — `exportForForecaster.js` transforms Story Map data into the SPERT Release Forecaster's import format. Releases map to milestones with incremental `backlogSize` — the work REMAINING in each release (allocated points less recorded progress, via `getReleasePoints`, as of the last exported sprint), not cumulative and not the release total. A fully done release is sent as `0`, Forecaster's "completed" value. The payload declares this with `milestoneBacklog: 'remaining'`, because exports before v0.53.8 sent release totals in the same field. Sprint velocity (`doneValue`) is project completed at the sprint less at the sprint before, and `backlogAtSprintEnd` is total points less completed, both from `getProjectTotals`, so the Progress tab's remaining is what Forecaster receives. Zero-point releases are skipped. The export is a pure function with no side effects; `downloadForecasterExport` handles the browser download. Both `downloadForecasterExport` and `sendToForecaster` gate on `checkForecasterExport` (v0.53.10): first `checkSprintFinishDates`, which refuses a product with any sprint that has no finish date (the builder would otherwise drop it silently, and a project whose Sprint 1 was never dated has no dated sprints at all), then `checkForecasterCompatibility`. One predicate, `hasFinishDate`, decides both what the builder drops and what the check names.
 
-16. **Collapsible group summaries** — Progress tab group headers display item count, total points, % done, and a mini progress bar. Groups are collapsible via a `collapsedGroups` Set (reset on groupBy or sprint change). Release groups use `getReleasePercentComplete` (allocation-weighted); backbone/theme groups compute a weighted average from visible group items. Release Planning column headers also show a progress bar via the same `ProgressBar` component.
+16. **Collapsible group summaries** — Progress tab group headers display item count, total points, % done, and a mini progress bar. Groups are collapsible via a `collapsedGroups` Set (reset on groupBy or sprint change). Both follow the selected sprint. Release groups show allocated points and `getReleasePercentComplete`; backbone/theme groups show whole ribs weighted by points. A footer shows what the groups leave out, so they add up to the header. Release Planning column headers also show a progress bar via the same `ProgressBar` component.
 
 17. **ToS & Privacy Policy acceptance (v0.17.0)** — Browsewrap footer links (ToS + Privacy Policy) render on all pages via the shared `Footer` component. A first-run banner (dismissed via `spert_firstRun_seen` localStorage key) informs new visitors that Cloud Storage requires agreement. A clickwrap consent modal (`TosConsentModal`) gates Cloud Storage sign-in — users must check a checkbox and click "Enable Cloud Storage" before Firebase Auth fires. Post-auth, `AuthProvider` writes acceptance to Firestore at `users/{uid}` with version, timestamp, auth provider, and originating app ID. Returning users are verified on app load: if the stored ToS version doesn't match the current version, the user is signed out and must re-accept. `tosHelpers.js` provides pure async functions for localStorage caching and Firestore read/write; `tosConstants.js` centralizes version strings and keys.
 

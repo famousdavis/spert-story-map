@@ -98,6 +98,11 @@ export default {
     // cloud silently zeroed progress history. Exactly the kind of file where a
     // surviving mutant would matter.
     'src/lib/schemaVersion.ts',
+    // Added v0.53.18. The one statement of what progress counts, and the lines that
+    // make release figures add up to the project. Pure rule content, with every
+    // figure in the app downstream of it.
+    'src/lib/progressRule.ts',
+    'src/lib/reconciliation.ts',
   ],
 
   // Run only the tests that cover the mutated files. ⚠️ Omitting this reports every
