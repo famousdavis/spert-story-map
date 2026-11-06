@@ -97,6 +97,29 @@ describe('getRibItemPoints', () => {
   it('returns 0 for unknown size', () => {
     expect(getRibItemPoints(makeRib('r1', { size: 'XXXL' }), SIZE_MAPPING)).toBe(0);
   });
+
+  describe('points stored as text', () => {
+    // `SizeMappingSection` writes the input's text while a size is typed, and that
+    // text can persist (see cloudLoadGuard's `fixSizeRow`).
+    const asStored = (points: unknown) => [{ label: 'M', points }] as unknown as SizeMapping[];
+
+    it('reads text as a number', () => {
+      expect(getRibItemPoints(makeRib('r1', { size: 'M' }), asStored('20'))).toBe(20);
+    });
+
+    it('counts text that is not a number as 0', () => {
+      expect(getRibItemPoints(makeRib('r1', { size: 'M' }), asStored('abc'))).toBe(0);
+      expect(getRibItemPoints(makeRib('r1', { size: 'M' }), asStored(undefined))).toBe(0);
+    });
+
+    it('sums to a number in the project total, not a concatenation', () => {
+      const product = makeProduct({
+        sizeMapping: [{ label: 'M', points: '20' }, { label: 'L', points: '40' }] as unknown as SizeMapping[],
+        themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('r1', { size: 'M' }), makeRib('r2', { size: 'L' })])])],
+      });
+      expect(getTotalProjectPoints(product)).toBe(60);
+    });
+  });
 });
 
 // --- getAllRibItems ---

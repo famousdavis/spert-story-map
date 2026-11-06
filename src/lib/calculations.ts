@@ -62,10 +62,17 @@ export function historyByRelease(history: ProgressEntry[] | undefined): Map<unkn
   return groups;
 }
 
+/**
+ * A rib's points, always as a number. `SizeMappingSection` writes the input's
+ * text while a size is being typed, and that text can persist. Passed through
+ * as text it concatenates: two sizes summed to "04020", and the export sent a
+ * backlog in the thousands with nothing to refuse it.
+ */
 export function getRibItemPoints(ribItem: Pick<RibItem, 'size'>, sizeMapping: SizeMapping[]): number {
   if (!ribItem.size) return 0;
   const mapping = sizeIndex(sizeMapping).get(ribItem.size);
-  return mapping ? mapping.points : 0;
+  const points = Number(mapping?.points);
+  return Number.isFinite(points) ? points : 0;
 }
 
 export function getAllRibItems(product: Product) {
