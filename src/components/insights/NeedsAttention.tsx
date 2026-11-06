@@ -2,11 +2,14 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { getAllRibItems, getAllocationTotal } from '../../lib/calculations';
+import { UNDO_HINT } from '../../lib/constants';
+import { bringRecordsHere, previewBringHere, removeRowRecords } from '../../lib/progressMutations';
 import { getStrandedRows } from '../../lib/reconciliation';
 import type { StrandedRow } from '../../lib/reconciliation';
-import type { Product } from '../../types';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import type { OutletContextValue, Product } from '../../types';
 
 function AttentionSection({ title, color, items }: { title: string; color: string; items: string[] }) {
   return (
@@ -20,27 +23,88 @@ function AttentionSection({ title, color, items }: { title: string; color: strin
   );
 }
 
-const strandedLine = (row: StrandedRow) =>
-  `${row.ribName} (${row.backboneName}): ${row.releaseName}, ${row.sprintNames.join(', ')}. Would count ${row.wouldCount}%.`;
+const strandedLine = (row: StrandedRow) => {
+  const where = `${row.ribName} (${row.backboneName}): ${row.releaseName}, ${row.sprintNames.join(', ')}.`;
+  return row.duplicate ? `${where} A duplicate of an entry that counts.` : `${where} Would count ${row.wouldCount}%.`;
+};
+
+/**
+ * What Bring here will do, in figures read off the writer. It has no other warning:
+ * the reported case reads 11 here, by request, and the user sees that first.
+ */
+function bringHereMessage(product: Product, row: StrandedRow): string {
+  const preview = previewBringHere(product, row.ribId, row.releaseId);
+  const reads = preview ? ` The rib will read ${preview.reads}%.` : '';
+  const counted = preview && preview.counted < preview.reads ? ` ${row.bringHereTo} counts ${preview.counted}%.` : '';
+  return `${row.releaseName}'s progress moves to ${row.bringHereTo}.${reads}${counted} Past sprints are recalculated, so a Forecaster re-send can change. ${UNDO_HINT}`;
+}
+
+function removeMessage(row: StrandedRow): string {
+  const sprints = row.sprintNames.join(', ');
+  return row.duplicate
+    ? `Remove the duplicate on "${row.ribName}" (${row.releaseName}, ${sprints})? The entry that counts stays, and so do notes. ${UNDO_HINT}`
+    : `Remove the progress on "${row.ribName}" recorded for ${row.releaseName} (${sprints})? Notes stay. ${UNDO_HINT}`;
+}
+
+type PendingAction = { kind: 'bring' | 'remove'; row: StrandedRow };
+
+const ACTION_CLASS = 'ml-2 font-medium text-blue-600 dark:text-blue-400 hover:underline';
 
 /**
  * ⚠️ Every stranded row renders. `AttentionSection` stops at ten, which is fine for
  * a nudge, but this list is the only place progress that is not counting can be
- * seen, and the next release puts actions on each row.
+ * seen, and each row carries the only way to act on it.
  */
-function StrandedSection({ rows }: { rows: StrandedRow[] }) {
+function StrandedSection({ rows, product, updateProduct }: {
+  rows: StrandedRow[];
+  product: Product;
+  updateProduct: OutletContextValue['updateProduct'];
+}) {
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const bringing = pending?.kind === 'bring';
+
+  const confirm = () => {
+    if (!pending) return;
+    const { ribId, releaseId } = pending.row;
+    updateProduct(prev => (bringing ? bringRecordsHere(prev, ribId, releaseId) : removeRowRecords(prev, ribId, releaseId)));
+  };
+
   return (
     <div>
       <h4 className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">Progress not counting: {rows.length}</h4>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Recorded on a release the rib is no longer on, so it is in no total.</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Recorded, but in no total: on a release the rib has left, or a duplicate of an entry that counts.</p>
       <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5 ml-4 list-disc">
-        {rows.map(row => <li key={`${row.ribId}-${row.releaseId}`}>{strandedLine(row)}</li>)}
+        {rows.map(row => (
+          <li key={`${row.ribId}-${row.releaseId}`}>
+            {strandedLine(row)}
+            {row.bringHereTo && (
+              <button type="button" className={ACTION_CLASS} aria-label={`Bring here: ${row.ribName}, ${row.releaseName}`} onClick={() => setPending({ kind: 'bring', row })}>
+                Bring here
+              </button>
+            )}
+            <button type="button" className={ACTION_CLASS} aria-label={`Remove: ${row.ribName}, ${row.releaseName}`} onClick={() => setPending({ kind: 'remove', row })}>
+              Remove
+            </button>
+          </li>
+        ))}
       </ul>
+      <ConfirmDialog
+        open={!!pending}
+        onClose={() => setPending(null)}
+        onConfirm={confirm}
+        title={bringing ? 'Bring here' : 'Remove progress'}
+        message={pending ? (bringing ? bringHereMessage(product, pending.row) : removeMessage(pending.row)) : ''}
+        confirmLabel={bringing ? 'Bring here' : 'Remove'}
+        danger={!bringing}
+      />
     </div>
   );
 }
 
-export default function NeedsAttention({ product }: { product: Product }) {
+export default function NeedsAttention({ product, updateProduct }: {
+  product: Product;
+  updateProduct: OutletContextValue['updateProduct'];
+}) {
   const allRibs = useMemo(() => getAllRibItems(product), [product]);
   const stranded = useMemo(() => getStrandedRows(product), [product]);
 
@@ -57,7 +121,7 @@ export default function NeedsAttention({ product }: { product: Product }) {
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Needs Attention</h3>
       <div className="space-y-4">
-        {stranded.length > 0 && <StrandedSection rows={stranded} />}
+        {stranded.length > 0 && <StrandedSection rows={stranded} product={product} updateProduct={updateProduct} />}
         {unsizedItems.length > 0 && (
           <AttentionSection
             title={`${unsizedItems.length} unsized items`}

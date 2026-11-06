@@ -4,7 +4,7 @@
 
 import type { Product } from '../types';
 import { getProjectTotals, getUnknownReleaseTotals } from './calculations';
-import { strandedSeries } from './progressRule';
+import { allocationTo, bringHereTarget, strandedSeries } from './progressRule';
 import { forEachRib } from './ribHelpers';
 
 export const UNKNOWN_RELEASE_LABEL = 'Unknown release';
@@ -79,9 +79,16 @@ export interface StrandedRow {
   sprintNames: string[];
   /** What the rib would read if it were on the release. A series that ends lower reads lower than its records. */
   wouldCount: number;
+  /**
+   * The rib IS on this release: the row is an entry behind one that counts. Then
+   * `wouldCount` describes the entry that counts, so the row must not show it.
+   */
+  duplicate: boolean;
+  /** The release "Bring here" would put these records on, or null when it is not offered. */
+  bringHereTo: string | null;
 }
 
-/** What Insights' Needs Attention lists. Reads only; nothing here repairs a record. */
+/** What Insights' Needs Attention lists. Reads only: the actions live in `progressMutations`. */
 export function getStrandedRows(product: Product): StrandedRow[] {
   const releases = new Map(product.releases.map(r => [r.id, r.name]));
   const sprintNames = new Map((product.sprints ?? []).map(s => [s.id, s.name]));
@@ -89,6 +96,7 @@ export function getStrandedRows(product: Product): StrandedRow[] {
   const rows: StrandedRow[] = [];
   forEachRib(product, (rib, { backbone }) => {
     for (const found of strandedSeries(rib, releaseIds, product.sprints)) {
+      const target = bringHereTarget(rib, found.releaseId, releaseIds);
       rows.push({
         ribId: rib.id,
         ribName: rib.name,
@@ -97,6 +105,8 @@ export function getStrandedRows(product: Product): StrandedRow[] {
         releaseName: releases.get(found.releaseId) ?? UNKNOWN_RELEASE_LABEL,
         sprintNames: found.sprintIds.map(id => sprintNames.get(id) ?? id),
         wouldCount: found.wouldCount,
+        duplicate: allocationTo(rib, found.releaseId) !== null,
+        bringHereTo: target && (releases.get(target.releaseId) ?? UNKNOWN_RELEASE_LABEL),
       });
     }
   });

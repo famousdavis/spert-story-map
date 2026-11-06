@@ -89,7 +89,7 @@ describe('getStrandedRows', () => {
     const product = makeProduct([makeRib('r', [on('R2')], [entry('S1', 'R1', 10), entry('S2', 'R1', 30)])]);
     expect(getStrandedRows(product)).toEqual([{
       ribId: 'r', ribName: 'r', backboneName: 'B', releaseId: 'R1', releaseName: 'Release R1',
-      sprintNames: ['S1', 'S2'], wouldCount: 30,
+      sprintNames: ['S1', 'S2'], wouldCount: 30, duplicate: false, bringHereTo: 'Release R2',
     }]);
   });
 

@@ -4,6 +4,13 @@
 
 ### Added — act on progress that is not counting
 
+- **Needs Attention gains "Bring here" and "Remove" on each row.** Each confirm says what will happen and how to undo it: undo is on the Map and Sizing tabs, and it reaches back to what you did here.
+- **"Bring here" adds the listed records to the rib's current release.** The confirm says what the rib will read first, and what the release counts if its allocation is smaller. Where a note will not fit beside the note already there, it stays under its old release instead of being cut.
+- **"Remove" takes the listed records off the rib.** Notes stay. It reaches a rib on no release, which has no row on the Progress tab.
+- **A duplicate entry is listed as a duplicate.** It offers Remove only, and the entry that counts is never touched.
+- ⚠️ **"Bring here" recalculates past sprints.** A series that ends lower can make a Forecaster export refuse, and a re-send can move forecast dates.
+- ⚠️ **v0.53.18's recovery note was only partly true:** "Bring here" serves a rib on one release. A split rib has no such action. Type the figure on the release it belongs to, then Remove the record.
+
 ### Changed
 
 ### Fixed
