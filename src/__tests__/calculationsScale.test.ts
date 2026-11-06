@@ -13,11 +13,11 @@
  *
  * ⚠️ TWO KINDS OF TEST, AND BOTH ARE NEEDED.
  *   1. EQUIVALENCE — the ORIGINAL implementations are kept below, verbatim in
- *      behaviour, as an oracle, and compared with `toBe` (Object.is) over a few
- *      hundred seeded random projects full of the awkward cases: duplicate ids
- *      and orders, unknown sprints, legacy entries with no releaseId, null and
- *      undefined percentages, duplicate size labels. A faster function that
- *      differs anywhere fails here.
+ *      behaviour, as an oracle. NEVER rewrite them to call new code: they are the
+ *      one check here that is independent of the rule. Since v0.53.18 the app reads
+ *      the progress rule, which deliberately differs from them, so each oracle is
+ *      compared only on the domain where the two must agree (`narrowed`), and the
+ *      differences are asserted separately, on the complement.
  *   2. WORK BOUNDS — counted, not timed: a getter on the field each loop reads
  *      counts how often it is read. The old code read it (count × count) times;
  *      a timing assertion would be flaky, a read count is not.
@@ -176,8 +176,55 @@ function randomProduct(seed: number): Product {
   };
 }
 
-describe('W4 calculations — identical results to the original implementations', () => {
-  const sprintsToAsk = (p: Product) => [...new Set(p.sprints.map(s => s.id)), 'unknown', null];
+/**
+ * The domain where the pre-rule code and the rule must agree: no inert records,
+ * allocations summing to at most 100, histories in sprint order, no absent
+ * `percentComplete` (`O.latest` and `O.item` filter on `!== null` only, so an absent
+ * value reads differently). Sprint ids and orders are distinct and in array order.
+ *
+ * `capped` also holds every value within its allocation, for `O.itemAsOf`, which has
+ * no cap. `single` also leaves one allocation per rib, for `O.item`, which sums one
+ * sprint's entries and so cannot see a walk-back on a second release.
+ */
+function narrowed(source: Product, { capped = false, single = false } = {}): Product {
+  const sprints = [...new Map(source.sprints.map(s => [s.id, s])).values()].map((s, i) => ({ ...s, order: i + 1 }));
+  const rank = new Map(sprints.map((s, i) => [s.id, i]));
+  const narrowRib = (rib: RibItem): RibItem => {
+    const allocations: RibItem['releaseAllocations'] = [];
+    let sum = 0;
+    for (const a of rib.releaseAllocations) {
+      if (allocations.some(x => x.releaseId === a.releaseId) || sum + a.percentage > 100) continue;
+      if (single && allocations.length === 1) continue;
+      allocations.push(a);
+      sum += a.percentage;
+    }
+    const seen = new Set<string>();
+    const history = rib.progressHistory
+      .filter(e => {
+        const key = `${e.sprintId}|${e.releaseId}`;
+        if (!rank.has(e.sprintId) || !allocations.some(a => a.releaseId === e.releaseId) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map(e => {
+        const limit = capped ? allocations.find(a => a.releaseId === e.releaseId)?.percentage ?? 0 : 100;
+        return { ...e, percentComplete: e.percentComplete === undefined || e.percentComplete === null ? null : Math.min(e.percentComplete, limit) };
+      })
+      .sort((a, b) => (rank.get(a.sprintId) ?? 0) - (rank.get(b.sprintId) ?? 0));
+    return { ...rib, releaseAllocations: allocations, progressHistory: history };
+  };
+  return {
+    ...source,
+    sprints,
+    themes: source.themes.map(t => ({
+      ...t,
+      backboneItems: t.backboneItems.map(b => ({ ...b, ribItems: b.ribItems.map(narrowRib) })),
+    })),
+  };
+}
+
+describe('W4 calculations — identical results to the original implementations, where they must agree', () => {
+  const sprintsToAsk = (p: Product) => p.sprints.map(s => s.id);
 
   // Mismatches are collected and asserted once: an `expect` per comparison made
   // this test slow enough to brush the default timeout on a loaded machine.
@@ -185,28 +232,44 @@ describe('W4 calculations — identical results to the original implementations'
   function same(out: Mismatch[], what: string, got: unknown, want: unknown) {
     if (!Object.is(got, want)) out.push([what, got, want]);
   }
+  /** Sums reach the same value in a different order, so they can differ in the last bit. */
+  function close(out: Mismatch[], what: string, got: number, want: number) {
+    if (Math.abs(got - want) > 1e-9) out.push([what, got, want]);
+  }
 
   function checkRelease(out: Mismatch[], p: Product, rib: RibItem, rel: string) {
-    same(out, `${p.id} ${rib.id} latest ${rel}`, C.getRibReleaseProgress(rib, rel), O.latest(rib, rel));
+    same(out, `${p.id} ${rib.id} latest ${rel}`, C.getRibReleaseProgress(rib, rel, p.sprints), O.latest(rib, rel));
     same(out, `${p.id} ${rib.id} comments ${rel}`, PV.getCommentCount(rib, rel || 'r0'), O.commentCount(rib, rel || 'r0'));
     for (const s of sprintsToAsk(p)) {
-      if (!s) continue;
-      same(out, `${p.id} ${rib.id} forSprint ${rel} ${s}`, C.getRibReleaseProgressForSprint(rib, rel, s), O.forSprint(rib, rel, s));
+      same(out, `${p.id} ${rib.id} forSprint ${rel} ${s}`, C.getRibReleaseProgressForSprint(rib, rel, s, p.sprints), O.forSprint(rib, rel, s));
       same(out, `${p.id} ${rib.id} asOf ${rel} ${s}`, C.getRibReleaseProgressAsOf(rib, rel, s, p.sprints), O.asOf(rib, rel, s, p.sprints));
     }
   }
 
-  it('per-rib progress, points and comment helpers agree on 300 random projects', () => {
+  it('per-release progress, points and comment helpers agree on 300 random projects', () => {
     const out: Mismatch[] = [];
     let compared = 0;
     for (let seed = 1; seed <= 300; seed++) {
-      const p = randomProduct(seed);
+      const p = narrowed(randomProduct(seed));
       for (const rib of O.ribs(p)) {
         compared++;
         same(out, `${p.id} ${rib.id} points`, C.getRibItemPoints(rib, p.sizeMapping), O.points(rib, p.sizeMapping));
         for (const rel of ['r0', 'r1', 'r2', 'r3', '']) checkRelease(out, p, rib, rel);
+      }
+    }
+    expect(compared).toBeGreaterThan(1000);
+    expect(out).toEqual([]);
+  });
+
+  it('a rib\'s percentage as of each sprint agrees, with values capped at the allocation', () => {
+    const out: Mismatch[] = [];
+    let compared = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const p = narrowed(randomProduct(seed), { capped: true });
+      for (const rib of O.ribs(p)) {
         for (const s of sprintsToAsk(p)) {
-          same(out, `${p.id} ${rib.id} itemAsOf ${s}`, C.getRibItemPercentCompleteAsOf(rib, s, p.sprints), O.itemAsOf(rib, s, p.sprints));
+          compared++;
+          close(out, `${p.id} ${rib.id} itemAsOf ${s}`, C.getRibItemPercentCompleteAsOf(rib, s, p.sprints), O.itemAsOf(rib, s, p.sprints));
         }
       }
     }
@@ -214,17 +277,31 @@ describe('W4 calculations — identical results to the original implementations'
     expect(out).toEqual([]);
   });
 
+  it('a rib\'s latest percentage agrees on single-allocation ribs', () => {
+    const out: Mismatch[] = [];
+    let compared = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const p = narrowed(randomProduct(seed), { capped: true, single: true });
+      for (const rib of O.ribs(p)) {
+        compared++;
+        same(out, `${p.id} ${rib.id} item`, C.getRibItemPercentComplete(rib, p.sprints), O.item(rib));
+      }
+    }
+    expect(compared).toBeGreaterThan(500);
+    expect(out).toEqual([]);
+  });
+
   it('per-release totals agree, for every release and sprint, on 300 random projects', () => {
     const out: Mismatch[] = [];
     for (let seed = 1; seed <= 300; seed++) {
-      const p = randomProduct(seed);
+      const p = narrowed(randomProduct(seed));
       for (const rel of ['r0', 'r1', 'r2', 'r3', 'none']) {
         same(out, `${p.id} points ${rel}`, C.getPointsForRelease(p, rel), O.releasePoints(p, rel).allocated);
         const cnc = C.getCoreNonCorePointsForRelease(p, rel);
         const wantCnc = O.coreNonCore(p, rel);
         same(out, `${p.id} core ${rel}`, cnc.core, wantCnc.core);
         same(out, `${p.id} nonCore ${rel}`, cnc.nonCore, wantCnc.nonCore);
-        for (const s of [...sprintsToAsk(p), undefined]) {
+        for (const s of [...sprintsToAsk(p), null, undefined]) {
           const got = C.getReleasePoints(p, rel, s);
           const want = O.releasePoints(p, rel, s);
           same(out, `${p.id} allocated ${rel} ${s}`, got.allocated, want.allocated);
@@ -237,7 +314,7 @@ describe('W4 calculations — identical results to the original implementations'
 
   it('the over-time chart agrees point for point while under the span bound', () => {
     for (let seed = 1; seed <= 300; seed++) {
-      const p = randomProduct(seed);
+      const p = narrowed(randomProduct(seed), { capped: true });
       const want = p.sprints.map(s => {
         let total = 0;
         let done = 0;
@@ -285,6 +362,50 @@ const plainRib = (k: number, extra: Partial<RibItem> = {}): RibItem => ({
   progressHistory: [{ sprintId: 's0', releaseId: 'r0', percentComplete: 50 }], ...extra,
 });
 
+describe('where the rule differs from the original implementations', () => {
+  const sprints: Sprint[] = ['s0', 's1', 's2'].map((id, i) => ({ id, name: id, order: i + 1, endDate: null }));
+  const on = (releaseId: string, percentage = 100) => ({ releaseId, percentage });
+  const entry = (sprintId: string, releaseId: string, percentComplete: number | null): ProgressEntry => ({ sprintId, releaseId, percentComplete });
+
+  it('a record under a release the rib has left counted, and now does not', () => {
+    const rib = plainRib(0, { releaseAllocations: [on('r1')], progressHistory: [entry('s0', 'r0', 10), entry('s0', 'r1', 1)] });
+    expect(O.itemAsOf(rib, 's0', sprints)).toBe(11);
+    expect(C.getRibItemPercentCompleteAsOf(rib, 's0', sprints)).toBe(1);
+  });
+
+  it('a value above the allocation counted in full, and now counts up to it', () => {
+    const rib = plainRib(0, { releaseAllocations: [on('r0', 50)], progressHistory: [entry('s0', 'r0', 80)] });
+    expect(O.itemAsOf(rib, 's0', sprints)).toBe(80);
+    expect(C.getRibItemPercentCompleteAsOf(rib, 's0', sprints)).toBe(50);
+  });
+
+  it('"latest" was array position, and is now sprint order', () => {
+    const rib = plainRib(0, { releaseAllocations: [on('r0')], progressHistory: [entry('s1', 'r0', 60), entry('s0', 'r0', 20)] });
+    expect(O.latest(rib, 'r0')).toBe(20);
+    expect(C.getRibReleaseProgress(rib, 'r0', sprints)).toBe(60);
+  });
+
+  it('a split rib\'s "latest" summed one sprint, and now walks back on each release', () => {
+    const rib = plainRib(0, { releaseAllocations: [on('r0', 50), on('r1', 50)], progressHistory: [entry('s0', 'r0', 50), entry('s1', 'r1', 20)] });
+    expect(O.item(rib)).toBe(20);
+    expect(C.getRibItemPercentComplete(rib, sprints)).toBe(70);
+  });
+
+  it('an absent percentage hid the earlier value from "latest", and now does not', () => {
+    const absent = entry('s1', 'r0', 0);
+    delete (absent as Partial<ProgressEntry>).percentComplete;
+    const rib = plainRib(0, { releaseAllocations: [on('r0')], progressHistory: [entry('s0', 'r0', 30), absent] });
+    expect(O.latest(rib, 'r0')).toBe(0);
+    expect(C.getRibReleaseProgress(rib, 'r0', sprints)).toBe(30);
+  });
+
+  it('a sprint the product does not hold fell back to "latest", and now reads 0', () => {
+    const rib = plainRib(0, { releaseAllocations: [on('r0')], progressHistory: [entry('s0', 'r0', 30)] });
+    expect(O.asOf(rib, 'r0', 'unknown', sprints)).toBe(30);
+    expect(C.getRibReleaseProgressAsOf(rib, 'r0', 'unknown', sprints)).toBe(0);
+  });
+});
+
 describe('W4 calculations — work grows with the data, not with its square', () => {
   it('the over-time chart reads each sprint order a bounded number of times per rib', () => {
     const reads = { n: 0 };
@@ -292,6 +413,16 @@ describe('W4 calculations — work grows with the data, not with its square', ()
     const sprints = Array.from({ length: S }, (_, i) => counted({ id: `s${i}`, name: '', order: i, endDate: null }, 'order', reads));
     C.getProgressOverTime(flatProduct(Array.from({ length: N }, (_, k) => plainRib(k)), { sprints }));
     // Before: the sprint-order table was rebuilt on every call — S × N × S reads.
+    expect(reads.n).toBeLessThan(10 * S * N);
+  });
+
+  it('the over-time chart reads each history row a bounded number of times', () => {
+    const reads = { n: 0 };
+    const S = 200, N = 20;
+    const sprints: Sprint[] = Array.from({ length: S }, (_, i) => ({ id: `s${i}`, name: '', order: i, endDate: null }));
+    const history = (): ProgressEntry[] => sprints.map((s, i) => counted({ sprintId: s.id, releaseId: 'r0', percentComplete: Math.min(100, i) } as ProgressEntry, 'percentComplete', reads));
+    C.getProgressOverTime(flatProduct(Array.from({ length: N }, (_, k) => plainRib(k, { progressHistory: history() })), { sprints }));
+    // Before: each of S points walked each rib's whole history — S × N × S reads.
     expect(reads.n).toBeLessThan(10 * S * N);
   });
 
@@ -315,14 +446,50 @@ describe('W4 calculations — work grows with the data, not with its square', ()
     expect(reads.n).toBeLessThan(5 * R);
   });
 
+  it('"no sprint" and the latest sprint are one figure, so one pass', () => {
+    const reads = { n: 0 };
+    const R = 200;
+    const sprints: Sprint[] = [{ id: 's0', name: '', order: 1, endDate: null }];
+    const ribs = Array.from({ length: R }, (_, k) => counted(plainRib(k), 'releaseAllocations', reads));
+    const p = flatProduct(ribs, { sprints });
+    C.getReleasePoints(p, 'r0');
+    const onePass = reads.n;
+    C.getReleasePoints(p, 'r0', 's0');
+    C.getReleasePoints(p, 'r0', null);
+    expect(reads.n).toBe(onePass);
+  });
+
   it('the Progress table reads a rib history once, not once per allocation', () => {
     const reads = { n: 0 };
     const A = 300;
     const history = Array.from({ length: A }, (_, i) => counted({ sprintId: 's0', releaseId: `r${i}`, percentComplete: 1, comment: 'c' } as ProgressEntry, 'releaseId', reads));
     const rib = plainRib(0, { releaseAllocations: history.map((_, i) => ({ releaseId: `r${i}`, percentage: 1 })), progressHistory: history });
-    for (const a of rib.releaseAllocations) { PV.getCommentHistory(rib, a.releaseId, {}, {}); PV.getCommentCount(rib, a.releaseId); PV.getSprintPct(rib, a.releaseId, 's0'); }
+    // Real sprints: with none, the lookup would stop early and this would measure nothing.
+    const sprints: Sprint[] = [{ id: 's0', name: '', order: 1, endDate: null }];
+    for (const a of rib.releaseAllocations) { PV.getCommentHistory(rib, a.releaseId, {}, {}); PV.getCommentCount(rib, a.releaseId); PV.getSprintPct(rib, a.releaseId, 's0', sprints); }
+    expect(PV.getSprintPct(rib, 'r0', 's0', sprints)).toBe(1);
     // A small constant per entry; the old filters read A × A.
     expect(reads.n).toBeLessThanOrEqual(4 * A);
+  });
+
+  it('the Progress table reads a rib\'s allocations once, not once per row', () => {
+    const reads = { n: 0 };
+    const A = 300;
+    const allocations = Array.from({ length: A }, (_, i) => counted({ releaseId: `r${i}`, percentage: 1 }, 'releaseId', reads));
+    const rib = plainRib(0, {
+      releaseAllocations: allocations,
+      progressHistory: Array.from({ length: A }, (_, i) => ({ sprintId: 's1', releaseId: `r${i}`, percentComplete: 1 })),
+    });
+    const sprints: Sprint[] = [{ id: 's0', name: '', order: 1, endDate: null }, { id: 's1', name: '', order: 2, endDate: null }];
+    const [first, second] = sprints;
+    for (let i = 0; i < A; i++) {
+      const id = `r${i}`;
+      expect(PV.getCurrentPct(rib, id, 's1', sprints)).toBe(1);
+      PV.getSprintPct(rib, id, 's1', sprints);
+      PV.getDelta(rib, id, second ?? null, first ?? null, 's1', sprints);
+    }
+    // A small constant per row. Finding the row's allocation by scanning the list reads A × A.
+    expect(reads.n).toBeLessThanOrEqual(6 * A);
   });
 });
 

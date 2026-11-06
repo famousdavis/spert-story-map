@@ -18,16 +18,11 @@ import { applyUpdate, completionSeries, entry, makeProduct, makeRib, projectComp
 import { asRecord } from './testHelpers';
 
 /**
- * Carry through the real writers. The figures come from three places, and each
- * is there for a reason:
+ * Carry through the real writers. Each assertion reads history, which is what the
+ * writer changes, or a hand-computed figure.
  *
- *  - history, which is what the writer changes;
- *  - `getReleasePoints`, Rule 2, which reads current allocations only, so it is
- *    the app figure that can tell carry from no carry at this release;
- *  - `completionSeries`, the §5 oracle in the fixture.
- *
- * ⚠️ Rule 1 cannot tell them apart: it sums every release in the history, moved
- * or not. An assertion on it alone passes with carry reverted.
+ * ⚠️ An uncarried record now stops counting, so a figure can fall to the same
+ * value for two reasons. Assert history as well, or a test can pass without carry.
  */
 
 type Writer = (product: Product, ribId: string, from: string | null, to: string | null) => Product;
@@ -176,17 +171,17 @@ describe('the reported defect, after a real move (§8)', () => {
   it('(a) 10% then 0% in one sprint: every grouping shows 0 and the rib unlocks', () => {
     const rib = typedAfterMove(0);
     expect(rib.progressHistory).toHaveLength(1);
-    expect(getSprintPct(rib, 'R3', 'S1')).toBe(0);
-    expect(getSprintPct(rib, null, 'S1')).toBe(0);
+    expect(getSprintPct(rib, 'R3', 'S1', SPRINTS)).toBe(0);
+    expect(getSprintPct(rib, null, 'S1', SPRINTS)).toBe(0);
     expect(getRibItemPercentCompleteAsOf(rib, 'S1', SPRINTS)).toBe(0);
-    expect(isRibLocked(rib)).toBe(false);
+    expect(isRibLocked(rib, SPRINTS)).toBe(false);
   });
 
   it('(b) 10% then 1% in one sprint: 1%, not 11%', () => {
     const rib = typedAfterMove(1);
     expect(rib.progressHistory).toHaveLength(1);
-    expect(getSprintPct(rib, 'R3', 'S1')).toBe(1);
-    expect(getSprintPct(rib, null, 'S1')).toBe(1);
+    expect(getSprintPct(rib, 'R3', 'S1', SPRINTS)).toBe(1);
+    expect(getSprintPct(rib, null, 'S1', SPRINTS)).toBe(1);
     expect(getRibItemPercentCompleteAsOf(rib, 'S1', SPRINTS)).toBe(1);
   });
 });
@@ -201,7 +196,6 @@ describe('§9, row 2, through moveRib2D', () => {
 
   it('carries a to R3, which is what the release figures can see', () => {
     const next = mapSingle(walkthrough(), 'a', 'R1', 'R3');
-    // These two fail without carry. Every figure below them passes without it.
     expect(ribOf(next, 'a').progressHistory).toEqual([entry('S1', 'R3', 10)]);
     expect(pointsDone(next, 'R3')).toBe(4);
 
@@ -213,7 +207,7 @@ describe('§9, row 2, through moveRib2D', () => {
 });
 
 describe('§7: carry renames keys and nothing else', () => {
-  it('leaves Rule 1 where it was, and raises Rule 2 for the moved rib', () => {
+  it('keeps the project figure, and moves the release figure with the rib', () => {
     const start = makeProduct([makeRib('r', [on('R1')], [entry('S1', 'R1', 10), entry('S2', 'R1', 30)])]);
     const next = mapSingle(start, 'r', 'R1', 'R3');
     expect(getProjectPercentComplete(next, 'S2')).toBe(getProjectPercentComplete(start, 'S2'));

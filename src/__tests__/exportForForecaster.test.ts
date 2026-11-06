@@ -863,6 +863,46 @@ describe('checkForecasterExport', () => {
     expect(issues.slice(1).some((i) => !i.includes('finish date'))).toBe(true);
   });
 
+  describe('the hint beside a negative velocity', () => {
+    const hint = 'Some ribs have progress that is not counting. See Insights, Needs Attention.';
+    const sprints = [
+      { id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' },
+      { id: 's2', name: 'Sprint 2', order: 2, endDate: '2026-01-24' },
+    ];
+    const history = [
+      { sprintId: 's1', releaseId: 'r1', percentComplete: 50 },
+      { sprintId: 's2', releaseId: 'r1', percentComplete: 40 },
+    ];
+    const rib = (id: string, releaseId: string, progressHistory: ProgressEntry[]) => ({
+      id, name: id, description: '', order: 1, size: 'M' as const, category: 'core' as const,
+      releaseAllocations: [{ releaseId, percentage: 100 }], progressHistory,
+    });
+    const withRibs = (ribItems: RibItem[]) => makeProduct({
+      sprints,
+      releases: [{ id: 'r1', name: 'R1', order: 1 }, { id: 'r2', name: 'R2', order: 2 }],
+      themes: [{ id: 't', name: 'T', order: 1, backboneItems: [{ id: 'b', name: 'B', order: 1, ribItems }] }],
+    });
+
+    it('appears when the project holds stranded records', () => {
+      const product = withRibs([rib('fell', 'r1', history), rib('left', 'r2', [{ sprintId: 's1', releaseId: 'r1', percentComplete: 10 }])]);
+      const issues = checkForecasterExport(product, buildForecasterExport(product));
+      expect(issues.some((i) => i.includes('negative velocity'))).toBe(true);
+      expect(issues[issues.length - 1]).toBe(hint);
+    });
+
+    it('does not appear for a negative velocity with nothing stranded', () => {
+      const product = withRibs([rib('fell', 'r1', history)]);
+      const issues = checkForecasterExport(product, buildForecasterExport(product));
+      expect(issues.some((i) => i.includes('negative velocity'))).toBe(true);
+      expect(issues).not.toContain(hint);
+    });
+
+    it('does not appear for stranded records with no negative velocity', () => {
+      const product = withRibs([rib('left', 'r2', [{ sprintId: 's1', releaseId: 'r1', percentComplete: 10 }])]);
+      expect(checkForecasterExport(product, buildForecasterExport(product))).toEqual([]);
+    });
+  });
+
   it('CONTROL — a product with dated sprints and nothing over the limits passes', () => {
     const product = makeProduct({ sprints: [{ id: 's1', name: 'Sprint 1', order: 1, endDate: '2026-01-10' }] });
     expect(checkForecasterExport(product, buildForecasterExport(product))).toEqual([]);

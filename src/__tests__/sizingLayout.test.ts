@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { computeSizingLayout, CELL_HEIGHT, CELL_GAP } from '../components/sizing/useSizingLayout';
+import { computeSizingLayout, CELL_HEIGHT, CELL_GAP, DEFAULT_SIZING_FILTER } from '../components/sizing/useSizingLayout';
 import type { SizingFilter } from '../components/sizing/useSizingLayout';
 import type { Product, Size } from '../types';
 import { req } from './testHelpers';
@@ -27,6 +27,10 @@ interface ThemeInput {
     ribs: RibInput[];
   }>;
 }
+
+/** A rib holding progress is on that release: a record elsewhere neither counts nor locks. */
+const allocatedTo = (r: RibInput) =>
+  [...new Set((r.progressHistory ?? []).map(p => p.releaseId))].map(releaseId => ({ releaseId, percentage: 100 }));
 
 /** Minimal product builder for sizing tests */
 function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, themes = null }: {
@@ -57,7 +61,7 @@ function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, them
             order: 1,
             size: r.size || null,
             category: 'core' as const,
-            releaseAllocations: [],
+            releaseAllocations: allocatedTo(r),
             progressHistory: r.progressHistory || [],
           })),
         })),
@@ -77,7 +81,7 @@ function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, them
             order: 1,
             size: r.size || null,
             category: 'core' as const,
-            releaseAllocations: [],
+            releaseAllocations: allocatedTo(r),
             progressHistory: r.progressHistory || [],
           })),
         }],
@@ -91,7 +95,7 @@ function makeProduct({ ribs = [], sizeMapping = null, sizingCardOrder = {}, them
     updatedAt: '2026-01-01T00:00:00.000Z',
     schemaVersion: 2,
     releases: [],
-    sprints: [],
+    sprints: [{ id: 's1', name: 'S1', order: 1, endDate: null }],
     themes: buildThemes,
     sizeMapping: sizeMapping ?? defaultMapping,
     sizingCardOrder,
@@ -321,6 +325,42 @@ describe('computeSizingLayout filtering', () => {
     const filter: SizingFilter = { themeIds: [], releaseIds: [], hideLocked: false };
     const layout = computeSizingLayout(product, filter);
     expect(layout.cells).toHaveLength(3);
+  });
+
+  describe('the lock', () => {
+    const SPRINTS = [{ id: 's1', name: 'S1', order: 1, endDate: null }, { id: 's2', name: 'S2', order: 2, endDate: null }];
+    const cell = (rib: RibInput, filter = DEFAULT_SIZING_FILTER) => {
+      const product = { ...makeProduct({ ribs: [rib] }), sprints: SPRINTS };
+      return computeSizingLayout(product, filter).cells[0];
+    };
+
+    it('holds for progress in an earlier sprint even if the latest reads 0', () => {
+      const found = cell({ id: 'r', progressHistory: [
+        { sprintId: 's1', releaseId: 'rel1', percentComplete: 10 },
+        { sprintId: 's2', releaseId: 'rel1', percentComplete: 0 },
+      ] });
+      expect(found?.locked).toBe(true);
+      expect(found?.percentComplete).toBe(0);
+    });
+
+    it('releases a rib whose only progress is on a release it left', () => {
+      const product = { ...makeProduct({ ribs: [{ id: 'r' }] }), sprints: SPRINTS };
+      const rib = req(product.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+      rib.releaseAllocations = [{ releaseId: 'rel2', percentage: 100 }];
+      rib.progressHistory = [{ sprintId: 's1', releaseId: 'rel1', percentComplete: 50 }];
+      const found = computeSizingLayout(product, DEFAULT_SIZING_FILTER).cells[0];
+      expect(found?.locked).toBe(false);
+      expect(found?.percentComplete).toBe(0);
+      expect(computeSizingLayout(product, { ...DEFAULT_SIZING_FILTER, hideLocked: true }).cells).toHaveLength(1);
+    });
+
+    it('hideLocked reads the same lock, not the percentage', () => {
+      const earlier = { id: 'r', progressHistory: [
+        { sprintId: 's1', releaseId: 'rel1', percentComplete: 10 },
+        { sprintId: 's2', releaseId: 'rel1', percentComplete: 0 },
+      ] };
+      expect(cell(earlier, { ...DEFAULT_SIZING_FILTER, hideLocked: true })).toBeUndefined();
+    });
   });
 
   it('combined theme + hideLocked filter', () => {

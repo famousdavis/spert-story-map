@@ -4,9 +4,9 @@
 
 // Pure transformation: Story Map product → SPERT Release Forecaster import format
 import type { Product, Sprint } from '../types';
-import { getRibItemPoints, getRibItemPercentCompleteAsOf, getReleasePoints, getTotalProjectPoints } from './calculations';
-import { reduceRibs } from './ribHelpers';
+import { getProjectTotals, getReleasePoints } from './calculations';
 import { checkForecasterCompatibility } from './forecasterLimits';
+import { getStrandedRows } from './reconciliation';
 
 // Hex colors matching THEME_COLOR_OPTIONS Tailwind-600 shades
 const MILESTONE_HEX_COLORS = [
@@ -144,26 +144,15 @@ export function buildForecasterExport(product: Product) {
     ? computeFirstSprintStartDate(firstWithDate.endDate, cadence)
     : null;
 
-  const totalProjectPoints = getTotalProjectPoints(product);
   const sprintRecords = [];
 
   for (const [i, sprint] of sprintsWithDates.entries()) {
     const prevSprint = i > 0 ? sprintsWithDates[i - 1] ?? null : null;
 
-    // Compute per-sprint velocity and cumulative completed points
-    const { doneValue, cumulativeCompleted } = reduceRibs(product, (acc, rib) => {
-      const ribPts = getRibItemPoints(rib, product.sizeMapping);
-      if (ribPts === 0) return acc;
-
-      const pctAsOf = getRibItemPercentCompleteAsOf(rib, sprint.id, sortedSprints);
-      const pctPrev = prevSprint
-        ? getRibItemPercentCompleteAsOf(rib, prevSprint.id, sortedSprints)
-        : 0;
-
-      acc.doneValue += ribPts * (pctAsOf - pctPrev) / 100;
-      acc.cumulativeCompleted += ribPts * pctAsOf / 100;
-      return acc;
-    }, { doneValue: 0, cumulativeCompleted: 0 });
+    // Velocity and backlog from the same figures the Progress tab shows, so its
+    // remaining at this sprint is what Forecaster receives.
+    const { total, completed } = getProjectTotals(product, sprint.id);
+    const completedBefore = prevSprint ? getProjectTotals(product, prevSprint.id).completed : 0;
 
     const startDate = prevSprint
       ? addDays(prevSprint.endDate, 1)
@@ -175,8 +164,8 @@ export function buildForecasterExport(product: Product) {
       sprintNumber: i + 1,
       sprintStartDate: startDate,
       sprintFinishDate: sprint.endDate,
-      doneValue: round2(doneValue),
-      backlogAtSprintEnd: round2(totalProjectPoints - cumulativeCompleted),
+      doneValue: round2(completed - completedBefore),
+      backlogAtSprintEnd: round2(total - completed),
       includedInForecast: true,
       createdAt,
       updatedAt,
@@ -232,11 +221,24 @@ export function serialiseForecasterExport(data: ReturnType<typeof buildForecaste
   return JSON.stringify(data, null, 2);
 }
 
+/** Story Map's own line beside a negative velocity. `forecasterLimits.ts` is a vendored copy, so it cannot say this. */
+export const STRANDED_PROGRESS_HINT = 'Some ribs have progress that is not counting. See Insights, Needs Attention.';
+
+/**
+ * A stray record can hide a downward revision: while it counted, it held the velocity up.
+ * Now it does not count, so a project can be refused here that exported before, and the
+ * refusal alone would send the user looking in the wrong place.
+ */
+function strandedProgressHint(product: Product, data: ReturnType<typeof buildForecasterExport>): string[] {
+  const negative = data.sprints.some(sprint => sprint.doneValue < 0);
+  return negative && getStrandedRows(product).length > 0 ? [STRANDED_PROGRESS_HINT] : [];
+}
+
 /**
  * Every reason this export cannot go to Forecaster: what Story Map itself would leave out
- * (`checkSprintFinishDates`), then what Forecaster would refuse (`checkForecasterCompatibility`).
- * The download and the crosslink transport both gate on THIS, so neither can be a way around
- * a check the other enforces.
+ * (`checkSprintFinishDates`), then what Forecaster would refuse (`checkForecasterCompatibility`),
+ * then the hint that may explain it. The download and the crosslink transport both gate on
+ * THIS, so neither can be a way around a check the other enforces.
  *
  * @returns [] when the export can go.
  */
@@ -244,7 +246,11 @@ export function checkForecasterExport(
   product: Product,
   data: ReturnType<typeof buildForecasterExport>,
 ): string[] {
-  return [...checkSprintFinishDates(product), ...checkForecasterCompatibility(data)];
+  return [
+    ...checkSprintFinishDates(product),
+    ...checkForecasterCompatibility(data),
+    ...strandedProgressHint(product, data),
+  ];
 }
 
 /**

@@ -18,7 +18,7 @@ const BASE_PRODUCT = {
     { id: 'r1', name: 'Release 1', order: 1, targetDate: '2026-06-01', description: '' },
     { id: 'r2', name: 'Release 2', order: 2, targetDate: null, description: '' },
   ],
-  sprints: [],
+  sprints: [{ id: 'sp1', name: 'Sprint 1', order: 1, endDate: null }],
   themes: [
     {
       id: 't1',
@@ -42,7 +42,8 @@ const BASE_PRODUCT = {
                 { releaseId: 'r2', percentage: 25 },
               ],
               progressHistory: [
-                { sprintId: 'sp1', releaseId: 'r1', percentComplete: 100 },
+                { sprintId: 'sp1', releaseId: 'r1', percentComplete: 75 },
+                { sprintId: 'sp1', releaseId: 'r2', percentComplete: 25 },
               ],
             },
             {
@@ -163,7 +164,7 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
   it('7. % Complete cell has green fill when 100%', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
-    // rib1 has progressHistory entry of 100% — row 5, col 7
+    // rib1 has its two releases complete: 75 + 25 — row 5, col 7
     const cell = ws.getRow(5).getCell(7);
     expect(cell.value).toBe(1);
     expect(cell.numFmt).toBe('0%');
@@ -226,6 +227,21 @@ describe('buildExcelWorkbook — Sheet 2 (Release Summary)', () => {
     const row5 = ws.getRow(5);
     expect(row5.getCell(1).value).toBe('Release 2');
     expect(row5.getCell(6).value).toBe('');
+  });
+
+  it('13b. adds the same lines as Insights, so the sheet adds up to the project', async () => {
+    const wb = await getWorkbook();
+    const ws = wb.getWorksheet('Release Summary');
+    const cells = (rowNum: number) => [1, 2, 3, 4, 5].map(c => ws.getRow(rowNum).getCell(c).value);
+    // rib1 (M, 5 pts) fully allocated; rib2 (S, 2 pts, non-core) unassigned; rib3 (L, 8 pts) at 50%.
+    expect(cells(6)).toEqual(['Unallocated', 6, '', 4, 2]);
+    expect(ws.getRow(7).getCell(1).value).toBe('Total');
+    expect(ws.getRow(7).getCell(2).value).toBe(15);
+    expect(ws.getRow(7).getCell(3).value).toBeCloseTo(8.2 / 15);
+    expect(ws.getRow(7).getCell(3).numFmt).toBe('0%');
+    expect(ws.getRow(8).getCell(1).value).toBeNull();
+    const releases = [4, 5].reduce((sum, r) => sum + Number(ws.getRow(r).getCell(2).value), 0);
+    expect(releases + Number(ws.getRow(6).getCell(2).value)).toBeCloseTo(15);
   });
 
   it('14. release with zero allocated points still appears as a row', async () => {

@@ -4,6 +4,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
+import { currentAllocations } from '../../lib/progressRule';
 import { NOTES_MAX } from '../../lib/constants';
 import { useBufferedField } from '../../hooks/useBufferedField';
 import SizePicker from '../ui/SizePicker';
@@ -29,7 +30,7 @@ interface RibDetailPanelProps {
 }
 
 export default function RibDetailPanel({ rib, product, onClose, onRename, onUpdate, autoEdit }: RibDetailPanelProps) {
-  const pctComplete = getRibItemPercentComplete(rib);
+  const pctComplete = getRibItemPercentComplete(rib, product.sprints);
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(rib.name, (name) => onRename?.(rib.themeId, rib.backboneId, rib.id, name));
 
@@ -227,7 +228,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
               <p className="text-sm text-gray-400 dark:text-gray-500 italic">Not assigned to any release</p>
             ) : (
               <div className="space-y-2">
-                {rib.releaseAllocations.map(alloc => (
+                {currentAllocations(rib).map(alloc => (
                   <div key={alloc.releaseId} className="flex items-center justify-between text-sm">
                     <span className="text-gray-700 dark:text-gray-300">{releaseMap[alloc.releaseId] || 'Unknown'}</span>
                     <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">{alloc.percentage}%</span>

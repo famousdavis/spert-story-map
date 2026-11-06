@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product } from '../types';
+import { currentAllocations } from './progressRule';
 import { isRibLocked } from './ribHelpers';
 
 /**
@@ -72,7 +73,8 @@ export interface AiSnapshot {
  * Per-rib fields:
  *   releaseIds — IDs of all releases this rib is allocated to.
  *                Empty = unallocated. More than one = split allocation (AI must not touch).
- *   locked — true when any progress entry has percentComplete > 0.
+ *   locked — true when an effective entry above 0 sits on a current allocation.
+ *            A record under a release the rib has left does not lock it.
  *   partial — true when the rib has exactly one allocation at a percentage
  *             other than 100. Zero allocations → false; splits → false (the
  *             AI reads those from releaseIds.length). Together with locked and
@@ -114,7 +116,7 @@ export function buildAiSnapshot(
         id: b.id,
         name: b.name,
         ribItems: b.ribItems.map(r => {
-          const allocations = r.releaseAllocations ?? [];
+          const allocations = currentAllocations(r);
           const sole = allocations.length === 1 ? allocations[0] : undefined;
           return {
             id: r.id,
@@ -124,7 +126,7 @@ export function buildAiSnapshot(
             ...(includeNotes && { notes: r.notes ?? '' }),   // ← Phase 8: normalize undefined -> ''
             size: (r.size && sizeLabels.has(r.size)) ? r.size : null,  // ← Phase 3
             releaseIds: allocations.map(a => a.releaseId),
-            locked: isRibLocked(r),
+            locked: isRibLocked(r, p.sprints),
             partial: sole !== undefined && sole.percentage !== 100,    // ← Phase 7
           };
         }),

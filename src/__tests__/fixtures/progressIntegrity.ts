@@ -2,17 +2,18 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
+import { moveRib2D } from '../../components/storymap/mapMutations';
+import { getProjectTotals } from '../../lib/calculations';
+import { saveRibAllocations, updateProgress } from '../../lib/progressMutations';
+import { completion as ruleCompletion } from '../../lib/progressRule';
 import type { Product, ProgressEntry, ReleaseAllocation, RibItem, Size, Sprint } from '../../types';
 
 /**
- * Fixtures and a test-local oracle for the progress-integrity tests.
+ * Fixtures for the progress-integrity tests, and short names for the real rule.
  *
- * ⚠️ THE ORACLE IS NOT THE APP'S RULE, AND THAT IS THE POINT. It restates §5 of
- * the campaign brief and imports nothing from `src/lib`. At v0.53.17 the app has
- * no `completion`: Rule 1 still sums every release in the history, so it reads
- * 11 on the 1-plus-stray-10 case before and after any move, and a test reading it
- * could not tell carry from no carry. The next release replaces this oracle with
- * the real function.
+ * ⚠️ `completion`, `completionSeries` and `projectCompleted` below ARE the app's
+ * rule, so a test reading them proves nothing about the rule by itself. The
+ * independent check is the hand-computed figure a test compares them with.
  */
 
 export const SPRINTS: Sprint[] = ['S1', 'S2', 'S3'].map((id, i) => ({
@@ -60,67 +61,60 @@ export function applyUpdate(product: Product, mutate: (update: (updater: (prev: 
   return result;
 }
 
-// ─── §5, restated ───────────────────────────────────────────────────
+// ─── §9's walkthrough, through the real writers ─────────────────────
 
-/** Current allocations: first row per distinct `releaseId`. */
-function currentAllocations(rib: Pick<RibItem, 'releaseAllocations'>): ReleaseAllocation[] {
-  const seen = new Set<string>();
-  return rib.releaseAllocations.filter(a => {
-    if (seen.has(a.releaseId)) return false;
-    seen.add(a.releaseId);
-    return true;
-  });
+const on = (releaseId: string, percentage = 100): ReleaseAllocation => ({ releaseId, percentage });
+
+/** A drag on the map, as `commitRibDrag` makes it. `null` is the Unassigned lane. */
+export function dragRib(product: Product, ribId: string, from: string | null, to: string | null): Product {
+  return applyUpdate(product, update =>
+    moveRib2D(update, ribId, { themeId: 't', backboneId: 'b', releaseId: from }, { themeId: 't', backboneId: 'b', releaseId: to, insertIndex: null }));
 }
 
-/** The effective non-null value at the latest sprint at or before `sprintId`; 0 if none. */
-function progressAsOf(history: ProgressEntry[], releaseId: string, sprintId: string, sprints: Sprint[]): number {
-  const orderOf = (id: string) => sprints.find(s => s.id === id)?.order;
-  const target = orderOf(sprintId);
-  if (target === undefined) throw new Error(`no sprint ${sprintId}`);
-
-  const effective = new Map<string, ProgressEntry>(); // first entry per sprint wins
-  for (const e of history) {
-    if (e.releaseId === releaseId && !effective.has(e.sprintId)) effective.set(e.sprintId, e);
-  }
-
-  let best: number | null = null;
-  let bestOrder = -Infinity;
-  for (const [id, e] of effective) {
-    const order = orderOf(id);
-    if (order === undefined || e.percentComplete === null || e.percentComplete === undefined) continue;
-    if (order <= target && order > bestOrder) {
-      best = e.percentComplete;
-      bestOrder = order;
-    }
-  }
-  return best ?? 0;
+export function typeProgress(product: Product, ribId: string, sprintId: string, releaseId: string, percent: number): Product {
+  return applyUpdate(product, update => updateProgress(update, ribId, releaseId, sprintId, percent));
 }
 
-/** `share(a, s)`: what one allocation counts, capped at the allocation. */
-function share(rib: Pick<RibItem, 'progressHistory'>, alloc: ReleaseAllocation, sprintId: string, sprints: Sprint[]): number {
-  return Math.min(progressAsOf(rib.progressHistory ?? [], alloc.releaseId, sprintId, sprints), alloc.percentage);
+/**
+ * §9's project after `row` of its table. Each row is a real writer, so a test of
+ * the figures is also a test that the writers keep working with the rule.
+ */
+export function walkthrough(row: number): Product {
+  const steps: ((p: Product) => Product)[] = [
+    p => typeProgress(typeProgress(typeProgress(p, 'a', 'S1', 'R1', 10), 'b', 'S1', 'R1', 20), 'c', 'S1', 'R2', 30),
+    p => dragRib(p, 'a', 'R1', 'R3'),
+    p => typeProgress(typeProgress(p, 'a', 'S2', 'R3', 25), 'b', 'S2', 'R2', 10),
+    p => dragRib(p, 'c', 'R2', null),
+    p => dragRib(p, 'c', null, 'R2'),
+    p => saveRibAllocations(p, 'b', [on('R2', 50)]),
+    p => saveRibAllocations(p, 'c', [on('R2'), on('R3', 30)]),
+    p => typeProgress(typeProgress(p, 'c', 'S2', 'R2', 90), 'c', 'S2', 'R3', 30),
+  ];
+  const start: Product = {
+    ...makeProduct([
+      makeRib('a', [on('R1')], []),
+      makeRib('b', [on('R1', 50), on('R2', 50)], []),
+      makeRib('c', [on('R2', 60)], [], 'M'),
+      makeRib('d', [], [], 'M'),
+    ]),
+    sprints: SPRINTS.slice(0, 2),
+  };
+  return steps.slice(0, row).reduce((product, step) => step(product), start);
 }
 
-/** `completion(rib, s)`: the rib's percentage, from current allocations only. */
+// ─── The rule, by the names these tests use ─────────────────────────
+
+/** `completion(rib, s)`. */
 export function completion(rib: Pick<RibItem, 'releaseAllocations' | 'progressHistory'>, sprintId: string, sprints: Sprint[] = SPRINTS): number {
-  return Math.min(100, currentAllocations(rib).reduce((sum, a) => sum + share(rib, a, sprintId, sprints), 0));
+  return ruleCompletion(rib, sprintId, sprints);
 }
 
 /** `completion` at every sprint, so an assertion sees the whole series. */
 export function completionSeries(rib: Pick<RibItem, 'releaseAllocations' | 'progressHistory'>, sprints: Sprint[] = SPRINTS): number[] {
-  return sprints.map(s => completion(rib, s.id, sprints));
+  return sprints.map(s => ruleCompletion(rib, s.id, sprints));
 }
 
-/** Project completed `C(s)`: points × completion, over every rib. Sizes come from `product.sizeMapping`. */
+/** Project completed `C(s)`. */
 export function projectCompleted(product: Product, sprintId: string): number {
-  let total = 0;
-  for (const t of product.themes) {
-    for (const b of t.backboneItems) {
-      for (const rib of b.ribItems) {
-        const points = product.sizeMapping.find(m => m.label === rib.size)?.points ?? 0;
-        total += points * completion(rib, sprintId, product.sprints) / 100;
-      }
-    }
-  }
-  return total;
+  return getProjectTotals(product, sprintId).completed;
 }

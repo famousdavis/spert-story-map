@@ -750,7 +750,9 @@ function makeFreshProduct(): Product {
   return {
     id: 'p1', name: 'Test', description: '',
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-    schemaVersion: 2, sizeMapping: [], releases: [], sprints: [],
+    schemaVersion: 2, sizeMapping: [], releases: [],
+    // Progress below records against s1: a record counts only for a sprint the product holds.
+    sprints: [{ id: 's1', name: 'S1', order: 1, endDate: null }],
     themes: [], _changeLog: [],
   };
 }
@@ -833,11 +835,21 @@ describe('allocateRibInProduct', () => {
   });
 
   it('skips a locked rib — returns prev ref-equal', () => {
-    const p = makeAllocProduct();
+    const p = makeUnassignProduct();
     p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
       { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
     ];
     expect(allocateRibInProduct(p, 'rib-1', 'rel-1')).toBe(p);
+  });
+
+  it('allocates an unassigned rib holding an inert record, which refused it before', () => {
+    const p = makeAllocProduct();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-2', percentComplete: 50, comment: '' },
+    ];
+    const next = allocateRibInProduct(p, 'rib-1', 'rel-1');
+    expect(next).not.toBe(p);
+    expect(next.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations).toEqual([{ releaseId: 'rel-1', percentage: 100 }]);
   });
 
   it('skips an already-allocated rib (additive guard) — returns prev ref-equal', () => {

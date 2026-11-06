@@ -12,6 +12,8 @@ import {
   getReleasePercentComplete,
   getCoreNonCorePointsForRelease,
 } from './calculations';
+import { currentAllocations } from './progressRule';
+import { getReconciliationRows } from './reconciliation';
 
 const THEME_FILL_COLORS: Record<string, string> = {
   blue:    'FFDBEAFE',
@@ -104,13 +106,12 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     }
 
     const points = getRibItemPoints(rib, product.sizeMapping);
-    const pct = getRibItemPercentComplete(rib);
+    const pct = getRibItemPercentComplete(rib, product.sprints);
 
     // Build release(s) string sorted by release order
     let releaseStr = 'Unassigned';
     if (rib.releaseAllocations.length > 0) {
-      releaseStr = rib.releaseAllocations
-        .slice()
+      releaseStr = [...currentAllocations(rib)]
         .sort((a, b) => {
           const oa = releaseMap.get(a.releaseId)?.order ?? 0;
           const ob = releaseMap.get(b.releaseId)?.order ?? 0;
@@ -188,6 +189,20 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
       release.targetDate ?? '',
     ]);
     relRow.getCell(3).numFmt = '0%';
+  }
+
+  // The same lines the Insights table shows, so this sheet adds up to the project too.
+  for (const row of getReconciliationRows(product)) {
+    const line = ws2.addRow([
+      row.label,
+      row.points,
+      row.percentComplete === null ? '' : row.percentComplete / 100,
+      row.core,
+      row.nonCore,
+      '',
+    ]);
+    line.getCell(3).numFmt = '0%';
+    if (row.kind === 'total') line.font = { bold: true };
   }
 
   return workbook;

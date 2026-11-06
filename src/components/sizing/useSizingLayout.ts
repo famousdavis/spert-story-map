@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import type { Product, Category, Size } from '../../types';
 import { forEachRib } from '../../lib/ribHelpers';
 import { getRibItemPoints, getRibItemPercentComplete } from '../../lib/calculations';
+import { isRibLocked } from '../../lib/ribHelpers';
 
 // Layout constants (pixels in logical/unzoomed space)
 export const COL_WIDTH = 200;
@@ -27,7 +28,7 @@ export const CELL_WIDTH = COL_WIDTH - CELL_PAD * 2;
 export interface SizingFilter {
   themeIds: string[];    // [] = all themes shown
   releaseIds: string[];  // [] = all releases shown; non-empty = only ribs allocated to these releases
-  hideLocked: boolean;   // true = exclude percentComplete > 0
+  hideLocked: boolean;   // true = exclude ribs isRibLocked calls locked
 }
 
 export const DEFAULT_SIZING_FILTER: SizingFilter = {
@@ -155,10 +156,11 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
       if (!allocated) return;
     }
 
-    const pctComplete = getRibItemPercentComplete(rib);
+    const pctComplete = getRibItemPercentComplete(rib, product.sprints);
+    const locked = isRibLocked(rib, product.sprints);
 
     // Locked filter
-    if (filter.hideLocked && pctComplete > 0) return;
+    if (filter.hideLocked && locked) return;
 
     const enriched = {
       id: rib.id,
@@ -171,7 +173,7 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
       backboneId: backbone.id,
       backboneName: backbone.name,
       percentComplete: pctComplete,
-      locked: pctComplete > 0,
+      locked,
       cardColor: rib.cardColor,
     };
 

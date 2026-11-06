@@ -13,13 +13,18 @@ import {
   appendRibNoteInProduct,
 } from '../lib/productTransforms';
 import { buildAiSnapshot, selectSnapshotForWrite } from '../lib/aiSnapshot';
+import { getRibItemPercentComplete } from '../lib/calculations';
+import { buildCopyPrompt } from '../components/ConnectAI/copyPrompt';
+import { isRibLocked } from '../lib/ribHelpers';
 import { req, asRecord } from './testHelpers';
 
 function makeProduct(): Product {
   return {
     id: 'p1', name: 'P', description: '',
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-    schemaVersion: 2, sizeMapping: [], releases: [], sprints: [],
+    schemaVersion: 2, sizeMapping: [], releases: [],
+    // Progress below records against s1: a record counts only for a sprint the product holds.
+    sprints: [{ id: 's1', name: 'S1', order: 1, endDate: null }],
     themes: [], _changeLog: [],
   };
 }
@@ -263,7 +268,7 @@ function makeProductWithSizing(): Product {
 /**
  * Two releases + three ribs in varying states for bulk_allocate tests.
  *   r1 — unlocked, unallocated (happy-path)
- *   r2 — locked (skip candidate)
+ *   r2 — locked on rel-2 (skip candidate)
  *   r3 — already allocated to rel-1 (additive-skip candidate)
  */
 function makeProductWithReleasesAndRibs(): Product {
@@ -278,7 +283,9 @@ function makeProductWithReleasesAndRibs(): Product {
   // Lock r2 via recorded progress.
   p = { ...p, themes: p.themes.map(t => ({ ...t, backboneItems: t.backboneItems.map(b => ({
     ...b, ribItems: b.ribItems.map(r => r.id !== 'r2' ? r : {
-      ...r, progressHistory: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 }],
+      ...r,
+      releaseAllocations: [{ releaseId: 'rel-2', percentage: 100 }],
+      progressHistory: [{ sprintId: 's1', releaseId: 'rel-2', percentComplete: 50 }],
     }),
   })) })) };
   // Pre-allocate r3 to rel-1.
@@ -304,7 +311,9 @@ function makeProductWithSizingMultiRib(): Product {
   // Lock r3 via recorded progress.
   return { ...p, themes: p.themes.map(t => ({ ...t, backboneItems: t.backboneItems.map(b => ({
     ...b, ribItems: b.ribItems.map(r => r.id !== 'r3' ? r : {
-      ...r, progressHistory: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 10 }],
+      ...r,
+      releaseAllocations: [{ releaseId: 'rel-1', percentage: 100 }],
+      progressHistory: [{ sprintId: 's1', releaseId: 'rel-1', percentComplete: 10 }],
     }),
   })) })) };
 }
@@ -315,9 +324,8 @@ function makeProductWithSizingMultiRib(): Product {
  *   r2 — allocated + locked   (Guard 2 isolation: should skip)
  *   r3 — unallocated          (Guard 3 isolation: should skip — already unassigned)
  *
- * Build order for r2: allocate FIRST (while unlocked), THEN inject progressHistory.
- * Reason: allocateRibInProduct Guard 3 blocks re-allocation of a locked rib — doing
- * lock-then-allocate silently produces locked+unallocated, which is the wrong state.
+ * Build order for r2: allocate, THEN inject progressHistory. A rib is locked only by
+ * an entry on a current allocation, so the other order leaves an unlocked rib.
  */
 function makeProductForBulkUnassign(): Product {
   let p = makeProduct();
@@ -438,7 +446,8 @@ describe('applyAiOp — update_rib', () => {
     expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBe('M');
   });
   it('silently ignores size on a locked (in-progress) rib', () => {
-    let p = makeProduct();
+    // A real mapping, or the label is dropped as unknown and this passes with no lock at all.
+    let p: Product = { ...makeProduct(), sizeMapping: [{ label: 'L', points: 40 }] };
     p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
     p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
     // Inject a rib with progress directly (tests the lock guard, not the
@@ -446,7 +455,7 @@ describe('applyAiOp — update_rib', () => {
     const ribWithProgress = {
       id: 'r1', name: 'Rib', description: '', order: 1, size: null,
       category: 'core' as const,
-      releaseAllocations: [],
+      releaseAllocations: [{ releaseId: 'rel1', percentage: 100 }],
       progressHistory: [{ sprintId: 's1', releaseId: 'rel1', percentComplete: 50 }],
     };
     p = {
@@ -684,7 +693,7 @@ describe('applyAiOp — allocate_rib', () => {
   });
 
   it('no-op on locked rib', () => {
-    const p = makeProductWithRelease();
+    const p = allocateRibInProduct(makeProductWithRelease(), 'r1', 'rel-1');
     p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
       { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
     ];
@@ -775,6 +784,7 @@ describe('applyAiOp — size_rib', () => {
 
   it('no-op when rib is locked — ref-equal', () => {
     const p = makeProductWithSizing();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [{ releaseId: 'rel1', percentage: 100 }];
     p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
       { sprintId: 's1', releaseId: 'rel1', percentComplete: 50 },
     ];
@@ -1001,12 +1011,20 @@ describe('buildAiSnapshot', () => {
     expect(snap.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseIds).toEqual(['rel-1', 'rel-2']);
   });
 
-  it('per-rib locked is true when any progress entry has percentComplete > 0', () => {
-    const p = makeProductWithRelease();
+  it('per-rib locked is true when an effective entry above 0 sits on a current allocation', () => {
+    const p = allocateRibInProduct(makeProductWithRelease(), 'r1', 'rel-1');
     p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
       { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
     ];
     expect(buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.locked).toBe(true);
+  });
+
+  it('per-rib locked is false when the only progress is on a release the rib has left', () => {
+    const p = makeProductWithRelease();
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
+      { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50, comment: '' },
+    ];
+    expect(buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.locked).toBe(false);
   });
 
   it('result round-trips through JSON without data loss', () => {
@@ -1232,7 +1250,8 @@ describe('applyAiOp — bulk_allocate', () => {
     expect(next).not.toBe(p);
     expect(next.themes[0]?.backboneItems[0]?.ribItems[0]?.releaseAllocations)
       .toEqual([{ releaseId: 'rel-1', percentage: 100 }]); // r1
-    expect(next.themes[0]?.backboneItems[0]?.ribItems[1]?.releaseAllocations).toEqual([]); // r2
+    expect(next.themes[0]?.backboneItems[0]?.ribItems[1]?.releaseAllocations)
+      .toEqual([{ releaseId: 'rel-2', percentage: 100 }]); // r2 unchanged
   });
 
   it('all-skip batch is a ref-equal no-op', () => {
@@ -1626,7 +1645,7 @@ function makeProductForBulkUpdateRibs(): Product {
     themeId: 't1', backboneId: 'b1', ribId: 'r3',
     name: 'Rib3', description: '', notes: '', category: 'core',
   });
-  // Lock r2: any progressHistory entry with percentComplete > 0.
+  // Lock r2: an entry above 0 on a current allocation.
   return {
     ...p,
     themes: p.themes.map(t => ({
@@ -1635,6 +1654,7 @@ function makeProductForBulkUpdateRibs(): Product {
         ...b,
         ribItems: b.ribItems.map(r => r.id !== 'r2' ? r : {
           ...r,
+          releaseAllocations: [{ releaseId: 'rel-1', percentage: 100 }],
           progressHistory: [
             { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 },
           ],
@@ -1944,8 +1964,8 @@ describe('applyDrainOps — Phase 6 (bulk_update_ribs)', () => {
  *   r3 — LOCKED,   single 100% → rel-1          (REL-3; backbone leg still applies)
  *   r4 — unlocked, split 60/40 rel-1/rel-2      (REL-4 split)
  *   r5 — unlocked, single 60% → rel-1           (REL-4 partial)
- * Build order for r3: allocate FIRST (while unlocked), THEN inject progress —
- * allocateRibInProduct Guard 3 blocks allocation on an already-locked rib.
+ * Build order for r3: allocate, THEN inject progress: allocateRibInProduct refuses a
+ * rib that already has an allocation.
  */
 function makeProductForMove(): Product {
   let p = makeProduct();
@@ -2470,11 +2490,106 @@ describe('appendRibNoteInProduct', () => {
 
   it('appends on a locked rib (D5: no lock guard)', () => {
     const p = withRibNotes('First.');
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.releaseAllocations = [{ releaseId: 'rel-1', percentage: 100 }];
     p.themes[0]!.backboneItems[0]!.ribItems[0]!.progressHistory = [
       { sprintId: 's1', releaseId: 'rel-1', percentComplete: 50 },
     ];
     const next = appendRibNoteInProduct(p, 'r1', 'Second.');
     expect(ribNotesOf(next)).toBe('First.\n\nSecond.');
+  });
+});
+
+// ── Progress rule: what an inert record no longer blocks ────────────────────
+describe('applyAiOp — a rib whose only progress is on a release it left', () => {
+  const REL1 = { releaseId: 'rel-1', percentage: 100 };
+  const REL2 = { releaseId: 'rel-2', percentage: 100 };
+
+  /** r1 on `allocations`, holding 30% recorded under rel-2. */
+  function holding(allocations: Product['themes'][number]['backboneItems'][number]['ribItems'][number]['releaseAllocations']): Product {
+    let p = makeProduct();
+    p = addNamedReleaseToProduct(p, 'rel-1', { name: 'R1' });
+    p = addNamedReleaseToProduct(p, 'rel-2', { name: 'R2' });
+    p = { ...p, sizeMapping: [{ label: 'L', points: 40 }] };
+    p = applyAiOp(p, 'create_theme', { themeId: 't1', name: 'T' });
+    p = applyAiOp(p, 'create_backbone', { themeId: 't1', backboneId: 'b1', name: 'B' });
+    p = applyAiOp(p, 'create_rib', { themeId: 't1', backboneId: 'b1', ribId: 'r1', name: 'Rib' });
+    const rib = p.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    rib.releaseAllocations = allocations;
+    rib.progressHistory = [{ sprintId: 's1', releaseId: 'rel-2', percentComplete: 30 }];
+    return p;
+  }
+  const rib = (p: Product) => p.themes[0]!.backboneItems[0]!.ribItems[0]!;
+  const reads = (p: Product) => getRibItemPercentComplete(rib(p), p.sprints);
+
+  it('reads as unlocked in the snapshot, and counts nothing', () => {
+    const p = holding([REL1]);
+    expect(buildAiSnapshot(p).themes[0]!.backboneItems[0]!.ribItems[0]!.locked).toBe(false);
+    expect(reads(p)).toBe(0);
+  });
+
+  it('move_rib to that release: the records count again and the rib locks, as a drag does', () => {
+    const p = holding([REL1]);
+    const next = applyAiOp(p, 'move_rib', { ribId: 'r1', targetReleaseId: 'rel-2' });
+    expect(rib(next).releaseAllocations).toEqual([REL2]);
+    expect(rib(next).progressHistory).toEqual(rib(p).progressHistory);
+    expect(reads(next)).toBe(30);
+    expect(isRibLocked(rib(next), next.sprints)).toBe(true);
+  });
+
+  it('allocate_rib to that release: the same', () => {
+    const next = applyAiOp(holding([]), 'allocate_rib', { ribId: 'r1', releaseId: 'rel-2' });
+    expect(rib(next).releaseAllocations).toEqual([REL2]);
+    expect(reads(next)).toBe(30);
+    expect(isRibLocked(rib(next), next.sprints)).toBe(true);
+  });
+
+  it('allocate_rib elsewhere leaves the records inert', () => {
+    const next = applyAiOp(holding([]), 'allocate_rib', { ribId: 'r1', releaseId: 'rel-1' });
+    expect(rib(next).releaseAllocations).toEqual([REL1]);
+    expect(reads(next)).toBe(0);
+    expect(isRibLocked(rib(next), next.sprints)).toBe(false);
+  });
+
+  it('replaying the move is idempotent: no second change, no second changelog entry', () => {
+    const once = applyAiOp(holding([REL1]), 'move_rib', { ribId: 'r1', targetReleaseId: 'rel-2' });
+    expect(applyAiOp(once, 'move_rib', { ribId: 'r1', targetReleaseId: 'rel-2' })).toBe(once);
+  });
+
+  it('replaying the allocation is idempotent', () => {
+    const once = applyAiOp(holding([]), 'allocate_rib', { ribId: 'r1', releaseId: 'rel-2' });
+    expect(applyAiOp(once, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-2' })).toBe(once);
+  });
+
+  it('replaying through the drain path applies each op once', () => {
+    const op = { seq: 1, op: 'move_rib', payload: { ribId: 'r1', targetReleaseId: 'rel-2' } } as AiOpDoc;
+    const first = applyDrainOps(holding([REL1]), [op]);
+    const second = applyDrainOps(first.product, [op]);
+    expect(reads(first.product)).toBe(30);
+    expect(second.product).toBe(first.product);
+  });
+
+  it('once revived the rib is locked, so the AI cannot move it back or unassign it', () => {
+    const revived = applyAiOp(holding([REL1]), 'move_rib', { ribId: 'r1', targetReleaseId: 'rel-2' });
+    expect(applyAiOp(revived, 'move_rib', { ribId: 'r1', targetReleaseId: 'rel-1' })).toBe(revived);
+    expect(applyAiOp(revived, 'unassign_rib', { ribId: 'r1' })).toBe(revived);
+  });
+
+  it('unassign_rib and size_rib now reach the rib, which the old lock refused', () => {
+    const p = holding([REL1]);
+    expect(rib(applyAiOp(p, 'unassign_rib', { ribId: 'r1' })).releaseAllocations).toEqual([]);
+    expect(rib(applyAiOp(p, 'size_rib', { ribId: 'r1', size: 'L' })).size).toBe('L');
+  });
+
+  it('the Copy Prompt tells the AI, so it can tell the user', () => {
+    expect(buildCopyPrompt('CODE')).toContain('Moving a rib back to a release can restore progress recorded there');
+  });
+
+  it('survives a hand-edited product with no sprints', () => {
+    const p = holding([REL1]);
+    delete (p as Partial<Product>).sprints;
+    expect(() => applyAiOp(p, 'allocate_rib', { ribId: 'r1', releaseId: 'rel-2' })).not.toThrow();
+    expect(() => applyAiOp(p, 'move_rib', { ribId: 'r1', targetReleaseId: 'rel-2' })).not.toThrow();
+    expect(() => buildAiSnapshot(p)).not.toThrow();
   });
 });
 

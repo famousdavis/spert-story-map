@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName, transferAllocation } from '../lib/ribHelpers';
-import type { ProgressEntry, ReleaseAllocation, RibItem } from '../types';
+import type { ProgressEntry, ReleaseAllocation, RibItem, Sprint } from '../types';
 import { req } from './testHelpers';
 
 const product = {
@@ -90,28 +90,43 @@ describe('reduceRibs', () => {
 });
 
 describe('isRibLocked', () => {
+  const sprints: Sprint[] = ['s1', 's2'].map((id, i) => ({ id, name: id, order: i + 1, endDate: null }));
+  const on = (releaseId: string) => [{ releaseId, percentage: 100 }];
+  const entry = (sprintId: string, releaseId: string, percentComplete: number | null) =>
+    ({ sprintId, releaseId, percentComplete }) as ProgressEntry;
+
   it('returns false for an empty progressHistory', () => {
-    expect(isRibLocked({ progressHistory: [] })).toBe(false);
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [] }, sprints)).toBe(false);
   });
   it('returns false when percentComplete is 0', () => {
-    expect(isRibLocked({
-      progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: 0 } as ProgressEntry],
-    })).toBe(false);
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [entry('s1', 'r1', 0)] }, sprints)).toBe(false);
   });
   it('returns false when percentComplete is null', () => {
-    expect(isRibLocked({
-      progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: null } as ProgressEntry],
-    })).toBe(false);
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [entry('s1', 'r1', null)] }, sprints)).toBe(false);
   });
-  it('returns true when any entry has percentComplete > 0', () => {
-    expect(isRibLocked({
-      progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: 50 } as ProgressEntry],
-    })).toBe(true);
+  it('returns true when an effective entry above 0 sits on a current allocation', () => {
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [entry('s1', 'r1', 50)] }, sprints)).toBe(true);
   });
-  it('returns false when progressHistory is absent (hand-edited rib)', () => {
-    // as unknown as ProgressEntry[] — established no-any pattern (aiOps.test.ts:258)
-    const noHistory = { progressHistory: undefined as unknown as ProgressEntry[] };
-    expect(isRibLocked(noHistory)).toBe(false);
+  it('stays locked when a later sprint reads 0', () => {
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [entry('s1', 'r1', 50), entry('s2', 'r1', 0)] }, sprints)).toBe(true);
+  });
+  it('returns false when the only progress is on a release the rib has left', () => {
+    expect(isRibLocked({ releaseAllocations: on('r2'), progressHistory: [entry('s1', 'r1', 50)] }, sprints)).toBe(false);
+  });
+  it('returns false for a parked rib', () => {
+    expect(isRibLocked({ releaseAllocations: [], progressHistory: [entry('s1', 'r1', 50)] }, sprints)).toBe(false);
+  });
+  it('returns false for a sprint the product does not hold', () => {
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [entry('gone', 'r1', 50)] }, sprints)).toBe(false);
+  });
+  it('reads only the first entry for a (sprint, release)', () => {
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [entry('s1', 'r1', 0), entry('s1', 'r1', 50)] }, sprints)).toBe(false);
+  });
+  it('does not throw on a hand-edited rib or product', () => {
+    // as unknown as — established no-any pattern (aiOps.test.ts:258)
+    const bare = { progressHistory: undefined, releaseAllocations: undefined } as unknown as RibItem;
+    expect(isRibLocked(bare, sprints)).toBe(false);
+    expect(isRibLocked({ releaseAllocations: on('r1'), progressHistory: [entry('s1', 'r1', 50)] }, undefined)).toBe(false);
   });
 });
 
