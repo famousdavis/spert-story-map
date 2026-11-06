@@ -19,6 +19,7 @@
 
 ### Fixed
 
+- **A project file with no progress list on a rib no longer crashes a delete.** Deleting a release or a sprint from such a project blanked the page.
 - **Release Planning's Delete no longer opens on a release whose allocations a filter is hiding.** With Core or Non-core selected, a release holding only ribs of the other kind could be deleted, taking those allocations and their progress with it.
 
 ## Version 0.53.18 (2026-11-05)

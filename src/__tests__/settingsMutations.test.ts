@@ -7,7 +7,7 @@ import {
   deleteReleaseFromProduct, deleteSprintFromProduct, RELEASE_RECORDS_LINE, releaseDeleteMessage, releaseHasAllocations, releaseHoldsRecords,
 } from '../lib/settingsMutations';
 import { req } from './testHelpers';
-import type { Product } from '../types';
+import type { Product, RibItem } from '../types';
 
 // Annotated `Product`: the deletion helpers under test take a full Product, and
 // the omitted scalars (descriptions, orders, sizes, dates) play no part in what
@@ -200,5 +200,31 @@ describe('releaseHoldsRecords', () => {
     expect(releaseDeleteMessage('Lead.', withHistory([at(30)]), 'r9')).toBe(`Lead. ${RELEASE_RECORDS_LINE}`);
     expect(releaseDeleteMessage('Lead.', withHistory([]), 'r9')).toBe('Lead.');
     expect(releaseDeleteMessage('', withHistory([at(30)]), 'r9')).toBe(RELEASE_RECORDS_LINE);
+  });
+});
+
+describe('a rib with no progress list', () => {
+  const firstRib = (p: Product) => req(p.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+  const bare = () => {
+    const p = makeProduct();
+    delete (firstRib(p) as Partial<RibItem>).progressHistory;
+    return p;
+  };
+
+  it('does not stop a release being deleted, and gains no key', () => {
+    const p = bare();
+    const releaseId = req(p.releases[0], 'release').id;
+    const next = deleteReleaseFromProduct(p, releaseId);
+    expect(next.releases.map(r => r.id)).not.toContain(releaseId);
+    expect('progressHistory' in firstRib(next)).toBe(false);
+    expect(firstRib(next).releaseAllocations.map(a => a.releaseId)).not.toContain(releaseId);
+  });
+
+  it('does not stop a sprint being deleted, and gains no key', () => {
+    const p = bare();
+    const sprintId = req(p.sprints[0], 'sprint').id;
+    const next = deleteSprintFromProduct(p, sprintId);
+    expect(next.sprints.map(s => s.id)).not.toContain(sprintId);
+    expect('progressHistory' in firstRib(next)).toBe(false);
   });
 });

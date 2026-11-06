@@ -2,8 +2,17 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, ProgressEntry } from '../types';
+import type { Product, ProgressEntry, RibItem } from '../types';
 import { hasValue } from './progressRule';
+
+/**
+ * `rib` with only the records `keep` passes. A rib with no list stays as it is: the
+ * validator keeps the key absent on import, and a throw here lands in an updater
+ * React evaluates during render, which blanks the page.
+ */
+function keepRecords(rib: RibItem, keep: (entry: ProgressEntry) => boolean): RibItem {
+  return rib.progressHistory ? { ...rib, progressHistory: rib.progressHistory.filter(keep) } : rib;
+}
 
 /**
  * Pure functions for release/sprint cascade deletion.
@@ -21,11 +30,10 @@ export function deleteReleaseFromProduct(product: Product, releaseId: string): P
       ...t,
       backboneItems: t.backboneItems.map(b => ({
         ...b,
-        ribItems: b.ribItems.map(r => ({
-          ...r,
-          releaseAllocations: r.releaseAllocations.filter(a => a.releaseId !== releaseId),
-          progressHistory: r.progressHistory.filter(p => p.releaseId !== releaseId),
-        })),
+        ribItems: b.ribItems.map(r => keepRecords(
+          { ...r, releaseAllocations: r.releaseAllocations.filter(a => a.releaseId !== releaseId) },
+          p => p.releaseId !== releaseId,
+        )),
       })),
     })),
     releaseCardOrder: restCardOrder,
@@ -41,10 +49,7 @@ export function deleteSprintFromProduct(product: Product, sprintId: string): Pro
       ...t,
       backboneItems: t.backboneItems.map(b => ({
         ...b,
-        ribItems: b.ribItems.map(r => ({
-          ...r,
-          progressHistory: r.progressHistory.filter(p => p.sprintId !== sprintId),
-        })),
+        ribItems: b.ribItems.map(r => keepRecords(r, p => p.sprintId !== sprintId)),
       })),
     })),
   };
