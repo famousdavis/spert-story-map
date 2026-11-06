@@ -269,8 +269,30 @@ export function validateProduct(data: unknown): Product {
   const releaseIds = new Set();
   const sprintIds = new Set();
 
+  // The three optional lists. Most of the app reads them as lists without a check, so
+  // a value that is not a list is removed, and the file then imports as one that left
+  // the list out: `importProductFromJSON` fills in `[]`, or the default sizes for
+  // `sizeMapping`. Ribs keep their sizes, allocations and history. With no sprints the
+  // history counts for nothing and locks nothing, as in any file with no `sprints`.
+  //
+  // ⚠️ REMOVED, NOT REJECTED, like `cardColorLabels` below. No writer stores anything
+  // else, but the local read path has no shape guard and an export spreads the product
+  // as it stands, so a value that an older import let through is in a file the app
+  // itself wrote. A project with a bad `sprints` or `sizeMapping` is left off the list,
+  // so Export All and re-import is the only way back to it, and an assert here would
+  // refuse that file.
+  //
+  // ⚠️ DELETED, NOT SET TO `[]`. The backfill only sees a falsy value, so a `[]` would
+  // skip the default sizes, and at the label check below it would clear every rib's
+  // size. Deleting adds no key to a file that never had one (see `schemaVersion`). So
+  // `sizeMapping` is the one list import and `guardCloudProduct` differ on: the cloud
+  // guard resets it to `[]`.
+  for (const key of ['releases', 'sprints', 'sizeMapping'] as const) {
+    if (!Array.isArray(d[key])) delete d[key];
+  }
+
   // --- Releases ---
-  const releases = Array.isArray(d.releases) ? d.releases : [];
+  const releases = d.releases ?? [];
   assert(releases.length <= MAX_RELEASES, `Too many releases (max ${MAX_RELEASES})`);
   for (const r of releases) {
     assert(isValidId(r.id), 'Release id must be a valid string');
@@ -285,7 +307,7 @@ export function validateProduct(data: unknown): Product {
   }
 
   // --- Sprints ---
-  const sprints = Array.isArray(d.sprints) ? d.sprints : [];
+  const sprints = d.sprints ?? [];
   assert(sprints.length <= MAX_SPRINTS, `Too many sprints (max ${MAX_SPRINTS})`);
   for (const s of sprints) {
     assert(isValidId(s.id), 'Sprint id must be a valid string');
@@ -299,7 +321,7 @@ export function validateProduct(data: unknown): Product {
   }
 
   // --- Size mapping ---
-  const sizeMapping = Array.isArray(d.sizeMapping) ? d.sizeMapping : null;
+  const sizeMapping = d.sizeMapping;
   if (sizeMapping) {
     assert(sizeMapping.length <= MAX_SIZE_MAPPING, `Too many size mappings (max ${MAX_SIZE_MAPPING})`);
     for (const sm of sizeMapping) {
@@ -542,7 +564,7 @@ export function validateProduct(data: unknown): Product {
   // now shares. An assert here would add nothing to that and would turn a corrupted
   // field into a rejection of the entire file, which for this app's users lands
   // mid-assignment. This matches the file's own convention for an uninterpretable
-  // value — `size` (:364) and `cardColor` (:374-379) are both cleared, not rejected.
+  // value — `size` (:387) and `cardColor` (:397-403) are both cleared, not rejected.
   //
   // ⚠️ ABSENT MUST STAY ABSENT. A pre-schemaVersion product is a genuine v1 and its
   // migration gate reads the missing field; stamping a version on it here would skip

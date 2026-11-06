@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.23 (2026-11-06)
+
+### Fixed
+
+- **A project file with a broken release, sprint or size list now imports and opens.** A list could hold something else, such as an object or a number. The import reported success, but the project then failed to open, or disappeared from the project list altogether. The broken list is now left out, and the file imports as if it never had one: no releases, no sprints, or the default sizes. Ribs keep their sizes, allocations and progress records.
+- **What a repaired project looks like.** With no sprints, recorded progress reads 0% and no longer locks a rib's size. With the default sizes, points can differ from the original: a rib sized M reads 20. With no releases, ribs appear on the Map's Unknown release lane.
+- ⚠️ **A project already saved with such a list is not repaired by this.** Use Export All Projects, then import that file and choose Replace existing. A project that disappeared from the list is included in that export.
+
 ## Version 0.53.22 (2026-11-06)
 
 ### Changed

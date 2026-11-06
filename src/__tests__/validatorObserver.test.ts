@@ -47,7 +47,7 @@ import type { Product } from '../types';
 
 /** Divergent by construction: one dangling allocation and one dangling progress
  *  entry, so `validateProduct` REPAIRS rather than throws (C2's requirement) while
- *  still carrying the release AND sprint C3's dangling case needs (`:398` wraps the
+ *  still carrying the release AND sprint C3's dangling case needs (`:420` wraps the
  *  whole allocation reassignment, so with zero releases it never fires). */
 function danglingFixture(id = 'p-dangling'): Product {
   return {
@@ -138,7 +138,7 @@ describe('C9 — diff spec', () => {
 
   it('3. reports a cycle on product.description without recursing forever', () => {
     // `description` is one of the eight allowlisted top-level fields with zero
-    // asserts, so it survives the :529-533 strip loop. `self` would not: the
+    // asserts, so it survives the :583-587 strip loop. `self` would not: the
     // walker would report `self DELETED` and never reach the cycle.
     const left: Record<string, unknown> = { id: 'p', description: null };
     left.description = left;
@@ -339,7 +339,7 @@ describe('C2 — the clone is mandatory', () => {
 
   it('sabotage direction: validateProduct DOES destroy live state when handed it', async () => {
     // Pins the premise C2's sabotage rests on — the validator mutates in place and
-    // returns the same reference (:260 … :535). If this ever stops being true, the
+    // returns the same reference (:261 … :589). If this ever stops being true, the
     // whole clone mandate is moot and C2 becomes decorative.
     const { validateProduct } = await import('../lib/validateProduct');
     const live = danglingFixture(nextId());
@@ -510,7 +510,7 @@ describe('assertIdentity', () => {
       .toBe('Error: Product themes must be an array');
   });
 
-  it('tolerates a non-assert throw — the TypeError from validateProduct.ts:275', async () => {
+  it('tolerates a non-assert throw — the TypeError from validateProduct.ts:298', async () => {
     const { validateProduct } = await import('../lib/validateProduct');
     let thrown: unknown;
     try {
