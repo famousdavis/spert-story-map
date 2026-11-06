@@ -53,13 +53,13 @@ let observerErrors = 0;
  *
  * ⚠️ Takes the thrown VALUE, not a message, and must not assume assert-shaped
  * input. The inner `catch` receives non-`assert` throws: a `releases: [null]`
- * product reaches `assert(isValidId(r.id), …)` at `validateProduct.ts:275` and
+ * product reaches `assert(isValidId(r.id), …)` at `validateProduct.ts:298` and
  * dereferences `r.id` on `null`, throwing a `TypeError` BEFORE `assert` is called.
  *
- * Three of the validator's assert messages interpolate user data (`:323`, `:403`,
- * `:428`) and all three wrap it in double quotes, so eliding everything between
+ * Three of the validator's assert messages interpolate user data (`:345`, `:425`,
+ * `:450`) and all three wrap it in double quotes, so eliding everything between
  * the first `"` and the last `"` removes the content and keeps the identity.
- * (It also flattens `:371`'s `Rib category must be "core" or "non-core"` to
+ * (It also flattens `:393`'s `Rib category must be "core" or "non-core"` to
  * `Rib category must be ""`. That message carries no user data and the remainder
  * is still unique — expected, not a defect.)
  */
@@ -107,8 +107,8 @@ export interface Measurement {
 /**
  * Taken BEFORE the clone and inside §4's outer `try`, on every observation.
  *
- * `rejected` reports the first failure only, and the changelog assert (`:511`) is
- * late while releases (`:275`) and sprints (`:290`) are early — so a >500 project
+ * `rejected` reports the first failure only, and the changelog assert (`:534`) is
+ * late while releases (`:298`) and sprints (`:313`) are early — so a >500 project
  * with an empty release name would report the name and conceal the headline number
  * if this ran after classification.
  */

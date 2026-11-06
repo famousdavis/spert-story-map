@@ -12,6 +12,11 @@ import { deleteReleaseFromProduct, releaseHoldsRecords } from '../lib/settingsMu
 import { duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { computeLayout } from '../components/storymap/useMapLayout';
+import { getProjectTotals, getProgressOverTime, getRibItemPoints } from '../lib/calculations';
+import { getReconciliationRows, getStrandedRows } from '../lib/reconciliation';
+import { buildForecasterExport } from '../lib/exportForForecaster';
+import { parseImportFile } from '../lib/import-utils';
+import { DEFAULT_SIZE_MAPPING } from '../lib/constants';
 import type { Product } from '../types';
 import { req, asRecord } from './testHelpers';
 
@@ -25,6 +30,19 @@ function minimal(overrides = {}) {
     schemaVersion: 2,
     ...overrides,
   };
+}
+
+const ribOf = (product: Pick<Product, 'themes'>) =>
+  req(product.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+
+/** importProductFromJSON and duplicateProduct stamp a workspace id. */
+function stubLocalStorage() {
+  const store: Record<string, string> = {};
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: unknown) => { store[key] = String(value); },
+    removeItem: (key: string) => { delete store[key]; },
+  });
 }
 
 describe('validateProduct', () => {
@@ -768,9 +786,6 @@ describe('validateProduct: a rib always comes out holding two lists', () => {
     }));
   }
 
-  const ribOf = (product: Pick<Product, 'themes'>) =>
-    req(product.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
-
   const NOT_A_LIST: [string, unknown][] = [
     ['absent', undefined], ['null', null],
     ['an object', {}], ['an object holding a row', { 0: ENTRY }],
@@ -781,15 +796,7 @@ describe('validateProduct: a rib always comes out holding two lists', () => {
   const CASES = (['releaseAllocations', 'progressHistory'] as const).flatMap(field =>
     NOT_A_LIST.map(([label, value]) => [field, label, value] as const));
 
-  beforeEach(() => {
-    // importProductFromJSON and duplicateProduct stamp a workspace id.
-    const store: Record<string, string> = {};
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => store[key] ?? null,
-      setItem: (key: string, value: unknown) => { store[key] = String(value); },
-      removeItem: (key: string) => { delete store[key]; },
-    });
-  });
+  beforeEach(stubLocalStorage);
   afterEach(() => { vi.unstubAllGlobals(); });
 
   it.each(CASES)('%s as %s becomes an empty list and the other list is kept', (field, _label, value) => {
@@ -847,5 +854,155 @@ describe('validateProduct: a rib always comes out holding two lists', () => {
       b.ribItems.map(r => [r.id, r.releaseAllocations, r.progressHistory])));
     expect(lists(sample).flat(2).length).toBeGreaterThan(0);
     expect(lists(importProductFromJSON(JSON.stringify(sample)))).toEqual(lists(sample));
+  });
+});
+
+// --- A product's three optional lists ---
+
+describe('validateProduct: a product holds its three optional lists or leaves them out', () => {
+  const FIELDS = ['releases', 'sprints', 'sizeMapping'] as const;
+  type ListField = (typeof FIELDS)[number];
+
+  const ALLOCATION = { releaseId: 'r1', percentage: 100 };
+  const ENTRY = { sprintId: 's1', releaseId: 'r1', percentComplete: 50 };
+
+  // M is 5 here and 20 in the default rows, so a default standing in for these shows.
+  const LISTS = {
+    releases: [{ id: 'r1', name: 'R1', order: 1 }, { id: 'r2', name: 'R2', order: 2 }],
+    sprints: [{ id: 's1', name: 'S1', order: 1 }],
+    sizeMapping: [{ label: 'M', points: 5 }],
+  };
+
+  /** A parsed file with one list replaced. JSON drops `undefined`, so that value means the key is absent. */
+  function fileWith(field: ListField, value: unknown) {
+    return JSON.parse(JSON.stringify({
+      id: 'p', name: 'P', schemaVersion: 2, ...LISTS,
+      themes: [{ id: 't1', name: 'T', order: 1, backboneItems: [{ id: 'b1', name: 'B', order: 1, ribItems: [{
+        id: 'k1', name: 'Rib', description: '', order: 1, size: 'M', category: 'core', notes: '',
+        releaseAllocations: [ALLOCATION], progressHistory: [ENTRY],
+      }] }] }],
+      [field]: value,
+    }));
+  }
+
+  const imported = (field: ListField, value: unknown) =>
+    importProductFromJSON(JSON.stringify(fileWith(field, value)));
+
+  /** What the import backfill puts in place of a missing list. */
+  const missing = (field: ListField) => field === 'sizeMapping' ? DEFAULT_SIZE_MAPPING : [];
+
+  type Shape = readonly [label: string, value: unknown];
+  const eachField = (shapes: (field: ListField) => Shape[]) =>
+    FIELDS.flatMap(field => shapes(field).map(([label, value]) => [field, label, value] as const));
+
+  // The truthy non-lists: the backfill passes over these, so they are what reached state.
+  const bad = (field: ListField): Shape[] => [
+    ['an object', {}], ['its own rows in an object', { ...LISTS[field] }],
+    ['a string', 'x'], ['a number', 5], ['true', true],
+  ];
+  const BAD = eachField(bad);
+  const FALSY: Shape[] = [['null', null], ['an empty string', ''], ['zero', 0], ['false', false]];
+  const ABSENT: Shape = ['absent', undefined];
+
+  beforeEach(stubLocalStorage);
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it.each(BAD)('%s as %s imports as a file that left it out, and the other two lists stay', (field, _label, value) => {
+    const product = imported(field, value);
+    expect(product[field]).toEqual(missing(field));
+    for (const other of FIELDS.filter(f => f !== field)) expect(product[other]).toEqual(LISTS[other]);
+  });
+
+  // A `[]` here would pass every row above for two of the three lists. The key being gone
+  // is what reaches the sizes default, and absent adding no key is what keeps the
+  // validator observer quiet on a file that never had one.
+  it.each(eachField(field => [ABSENT, ...FALSY, ...bad(field)]))('%s as %s leaves no key in the validated file', (field, _label, value) => {
+    expect(Object.keys(validateProduct(fileWith(field, value)))).not.toContain(field);
+  });
+
+  it.each(eachField(() => [ABSENT, ...FALSY]))('%s as %s still imports as a file that left it out', (field, _label, value) => {
+    expect(imported(field, value)[field]).toEqual(missing(field));
+  });
+
+  // Every reader that threw on one of these. No single reader sees every shape: the
+  // totals never read `releases`, and the map layout passed on `releases: 'x'`.
+  it.each(BAD)('imported with %s as %s, the project can be read', (field, _label, value) => {
+    const product = imported(field, value);
+    expect(() => getProjectTotals(product)).not.toThrow();
+    expect(() => getProgressOverTime(product)).not.toThrow();
+    expect(() => computeLayout(product, [])).not.toThrow();
+    expect(() => isRibLocked(ribOf(product), product.sprints)).not.toThrow();
+    expect(() => duplicateProduct(product)).not.toThrow();
+    expect(() => getReconciliationRows(product)).not.toThrow();
+    expect(() => getStrandedRows(product)).not.toThrow();
+    expect(() => buildForecasterExport(product)).not.toThrow();
+  });
+
+  it.each(BAD)('imported with %s as %s, a delivery of AI ops applies in full', (field, _label, value) => {
+    const ops = [
+      { seq: 1, op: 'append_rib_note', payload: { ribId: 'k1', text: 'first' } },
+      { seq: 2, op: 'size_rib', payload: { ribId: 'k1', size: 'L' } },
+      { seq: 3, op: 'allocate_rib', payload: { ribId: 'k1', releaseId: 'r2' } },
+      { seq: 4, op: 'create_release', payload: { releaseId: 'r3', name: 'R3' } },
+      { seq: 5, op: 'unassign_rib', payload: { ribId: 'k1' } },
+      { seq: 6, op: 'append_rib_note', payload: { ribId: 'k1', text: 'last' } },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(imported(field, value), ops);
+    expect(safeOps).toHaveLength(6);
+    expect(nextSeq).toBe(6);
+  });
+
+  it.each(bad('sprints'))('sprints as %s reads as a file with no sprints: the records stay and lock nothing', (_label, value) => {
+    const product = imported('sprints', value);
+    expect(ribOf(product).progressHistory).toEqual([ENTRY]);
+    expect(ribOf(product).releaseAllocations).toEqual([ALLOCATION]);
+    expect(isRibLocked(ribOf(product), product.sprints)).toBe(false);
+  });
+
+  it.each(bad('releases'))('releases as %s keeps the rib, its records and its lock, on the Unknown lane', (_label, value) => {
+    const product = imported('releases', value);
+    expect(ribOf(product).progressHistory).toEqual([ENTRY]);
+    expect(ribOf(product).releaseAllocations).toEqual([ALLOCATION]);
+    expect(isRibLocked(ribOf(product), product.sprints)).toBe(true);
+    expect(computeLayout(product, []).unknownLane).not.toBeNull();
+  });
+
+  it.each(bad('sizeMapping'))('sizeMapping as %s keeps the size, which the default rows then price', (_label, value) => {
+    const product = imported('sizeMapping', value);
+    expect(ribOf(product).size).toBe('M');
+    expect(getRibItemPoints(ribOf(product), product.sizeMapping)).toBe(20);
+  });
+
+  // Not `sizeMapping`: the cloud guard resets that to `[]`, and import gives the default.
+  it.each(BAD.filter(([field]) => field !== 'sizeMapping'))('%s as %s reads the same as it does from the cloud', (field, _label, value) => {
+    const cloud = fileWith(field, value);
+    guardCloudProduct(cloud);
+    expect(imported(field, value)[field]).toEqual(cloud[field]);
+  });
+
+  it('brings every list back from an Export All file that holds bad ones', () => {
+    const bundle = BAD.map(([field, label, value]) => ({ ...fileWith(field, value), id: `${field}-${label}` }));
+    const result = parseImportFile(JSON.stringify(bundle));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.products).toHaveLength(BAD.length);
+    for (const product of result.products) {
+      for (const field of FIELDS) expect(Array.isArray(product[field])).toBe(true);
+    }
+  });
+
+  it('keeps an empty list as a list: only a missing sizeMapping gets the default', () => {
+    const product = imported('sizeMapping', []);
+    expect(product.sizeMapping).toEqual([]);
+    expect(imported('releases', []).releases).toEqual([]);
+    expect(imported('sprints', []).sprints).toEqual([]);
+  });
+
+  it('leaves the lists of a file the app exported exactly as they were', () => {
+    const sample = createSampleProduct();
+    expect(sample.releases.length).toBeGreaterThan(0);
+    expect(sample.sprints.length).toBeGreaterThan(0);
+    expect(sample.sizeMapping.length).toBeGreaterThan(0);
+    const product = importProductFromJSON(JSON.stringify(sample));
+    for (const field of FIELDS) expect(product[field]).toEqual(sample[field]);
   });
 });
