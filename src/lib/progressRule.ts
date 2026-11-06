@@ -250,13 +250,18 @@ function lastPositiveRank({ valued, ranks }: ReleaseSeries): number {
  * entry above 0 on a current allocation. Null when nothing locks it. A later
  * record under a release the rib left names nothing.
  */
-export function lockingSprintId(rib: RuleRib, sprints: Sprint[] | undefined): string | null {
+export function lockingSprint(rib: RuleRib, sprints: Sprint[] | undefined): Sprint | null {
   const series = seriesByRelease(rib.progressHistory, sprints);
   const latest = currentAllocations(rib).reduce((best, allocation) => {
     const found = series.get(allocation.releaseId);
     return found ? Math.max(best, lastPositiveRank(found)) : best;
   }, -1);
-  return sprintOrder(sprints).ordered[latest]?.id ?? null;
+  return sprintOrder(sprints).ordered[latest] ?? null;
+}
+
+/** The id of `lockingSprint`. */
+export function lockingSprintId(rib: RuleRib, sprints: Sprint[] | undefined): string | null {
+  return lockingSprint(rib, sprints)?.id ?? null;
 }
 
 /**

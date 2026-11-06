@@ -6,8 +6,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
 import { currentAllocations } from '../../lib/progressRule';
 import { UNKNOWN_RELEASE_LABEL } from '../../lib/reconciliation';
+import { ribSizeLockNote } from '../../lib/ribHelpers';
 import { NOTES_MAX } from '../../lib/constants';
 import { useBufferedField } from '../../hooks/useBufferedField';
+import LockedSize from '../ui/LockedSize';
 import SizePicker from '../ui/SizePicker';
 import useInlineEdit from './useInlineEdit';
 import type { RibItem, Product, Category, Size } from '../../types';
@@ -32,6 +34,7 @@ interface RibDetailPanelProps {
 
 export default function RibDetailPanel({ rib, product, onClose, onRename, onUpdate, autoEdit }: RibDetailPanelProps) {
   const pctComplete = getRibItemPercentComplete(rib, product.sprints);
+  const lockNote = ribSizeLockNote(rib, product.sprints);
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(rib.name, (name) => onRename?.(rib.themeId, rib.backboneId, rib.id, name));
 
@@ -201,11 +204,15 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
             </DetailRow>
             <DetailRow label="Size">
               <div className="flex items-center gap-2">
-                <SizePicker
-                  value={rib.size || null}
-                  sizeMapping={product.sizeMapping}
-                  onChange={(size) => onUpdate?.(rib.themeId, rib.backboneId, rib.id, { size })}
-                />
+                {lockNote ? (
+                  <LockedSize size={rib.size} note={lockNote} />
+                ) : (
+                  <SizePicker
+                    value={rib.size || null}
+                    sizeMapping={product.sizeMapping}
+                    onChange={(size) => onUpdate?.(rib.themeId, rib.backboneId, rib.id, { size })}
+                  />
+                )}
                 {rib.points > 0 && <span className="text-sm text-gray-500 dark:text-gray-400">{rib.points} pts</span>}
               </div>
             </DetailRow>

@@ -8,7 +8,7 @@ import InlineEdit from '../components/ui/InlineEdit';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import BackboneSection from '../components/structure/BackboneSection';
 import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, getRibItemPercentComplete, round1 } from '../lib/calculations';
-import { reduceRibs } from '../lib/ribHelpers';
+import { reduceRibs, ribSizeLockNote } from '../lib/ribHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { THEME_COLOR_OPTIONS, getThemeColorClasses } from '../lib/themeColors';
 import type { OutletContextValue, RibItem } from '../types';
@@ -174,6 +174,7 @@ export default function StructureView() {
             _allocTotal: getAllocationTotal(rib),
             _pctComplete: pctComplete,
             _remaining: round1(pts * (100 - pctComplete) / 100),
+            _sizeLockNote: ribSizeLockNote(rib, product.sprints),
           };
         }),
       })),

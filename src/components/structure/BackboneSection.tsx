@@ -24,7 +24,7 @@ interface DragRibState {
 
 /**
  * The backbone this section renders comes from StructureView's enrichedProduct,
- * whose ribs carry the four derived fields RibRow reads. Declaring plain
+ * whose ribs carry the five derived fields RibRow reads. Declaring plain
  * `Backbone` dropped that on the floor at the RibRow boundary.
  */
 type EnrichedBackbone = Omit<Backbone, 'ribItems'> & { ribItems: RibRowRib[] };

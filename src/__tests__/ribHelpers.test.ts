@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName, sizeLockNote, transferAllocation } from '../lib/ribHelpers';
+import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName, ribSizeLockNote, sizeLockNote, transferAllocation } from '../lib/ribHelpers';
 import type { ProgressEntry, ReleaseAllocation, RibItem, Sprint } from '../types';
 import { req } from './testHelpers';
 
@@ -96,6 +96,40 @@ describe('sizeLockNote', () => {
 
   it('still reads as a sentence with no sprint to name', () => {
     expect(sizeLockNote(null)).toBe('Size locked: progress recorded');
+  });
+});
+
+describe('ribSizeLockNote', () => {
+  const sprints: Sprint[] = [
+    { id: 's1', name: 'Sprint 1', order: 1, endDate: null },
+    { id: 's2', name: 'Sprint 2', order: 2, endDate: null },
+  ];
+  const onR1 = [{ releaseId: 'r1', percentage: 100 }];
+  const at = (sprintId: string, releaseId: string, percentComplete: number) => ({ sprintId, releaseId, percentComplete });
+
+  it('names the latest sprint above 0, reading sprint order rather than array position', () => {
+    const rib = { releaseAllocations: onR1, progressHistory: [at('s1', 'r1', 10), at('s2', 'r1', 20)] };
+    expect(ribSizeLockNote(rib, [...sprints].reverse())).toBe('Size locked: progress recorded in Sprint 2');
+  });
+
+  it('is null on a rib whose only record is on a release it left', () => {
+    expect(ribSizeLockNote({ releaseAllocations: onR1, progressHistory: [at('s1', 'r2', 30)] }, sprints)).toBeNull();
+  });
+
+  it('does not throw on a hand-edited rib or product', () => {
+    expect(ribSizeLockNote({ releaseAllocations: onR1, progressHistory: [at('s1', 'r1', 30)] }, undefined)).toBeNull();
+    expect(ribSizeLockNote({} as Pick<RibItem, 'progressHistory' | 'releaseAllocations'>, sprints)).toBeNull();
+  });
+
+  it.each<[string, ReleaseAllocation[], ProgressEntry[]]>([
+    ['locked', onR1, [at('s1', 'r1', 10)]],
+    ['locked by an earlier sprint', onR1, [at('s1', 'r1', 10), at('s2', 'r1', 0)]],
+    ['a typed 0', onR1, [at('s1', 'r1', 0)]],
+    ['no progress', onR1, []],
+    ['parked', [], [at('s1', 'r1', 10)]],
+  ])('agrees with isRibLocked: %s', (_case, releaseAllocations, progressHistory) => {
+    const rib = { releaseAllocations, progressHistory };
+    expect(ribSizeLockNote(rib, sprints) !== null).toBe(isRibLocked(rib, sprints));
   });
 });
 

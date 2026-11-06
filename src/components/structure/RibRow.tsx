@@ -4,6 +4,7 @@
 
 import React from 'react';
 import InlineEdit from '../ui/InlineEdit';
+import LockedSize from '../ui/LockedSize';
 import SizePicker from '../ui/SizePicker';
 import CategoryBadge from '../ui/CategoryBadge';
 import type { RibItem, SizeMapping } from '../../types';
@@ -12,12 +13,14 @@ const GRID_COLS = '24px minmax(120px, 1fr) 48px 44px 80px 56px 56px 56px 36px';
 
 export { GRID_COLS };
 
-/** StructureView's enrichedProduct adds these four before rendering. */
+/** StructureView's enrichedProduct adds these five before rendering. */
 export interface RibRowRib extends RibItem {
   _pts: number;
   _allocTotal: number;
   _pctComplete: number;
   _remaining: number;
+  /** Why the size cannot change. Null when it can. */
+  _sizeLockNote: string | null;
 }
 
 interface RibRowProps {
@@ -74,11 +77,15 @@ export default function RibRow({
 
         {/* Size */}
         <div className="text-center">
-          <SizePicker
-            value={rib.size}
-            sizeMapping={sizeMapping}
-            onChange={size => onRename(themeId, backboneId, rib.id, { size })}
-          />
+          {rib._sizeLockNote ? (
+            <LockedSize size={rib.size} note={rib._sizeLockNote} compact />
+          ) : (
+            <SizePicker
+              value={rib.size}
+              sizeMapping={sizeMapping}
+              onChange={size => onRename(themeId, backboneId, rib.id, { size })}
+            />
+          )}
         </div>
 
         {/* Points */}
