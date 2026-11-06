@@ -52,6 +52,7 @@ export function deleteSprintFromProduct(product: Product, sprintId: string): Pro
 
 /** Every release delete says this when it will take records with it. */
 export const RELEASE_RECORDS_LINE = 'Recorded progress and notes for this release are deleted too.';
+export const SPRINT_RECORDS_LINE = 'Recorded progress and notes for this sprint are deleted too.';
 
 /** A value or a comment. A typed 0 is a value. An empty null entry holds nothing. */
 const holdsRecord = (entry: ProgressEntry) => hasValue(entry) || Boolean(entry.comment);
@@ -76,6 +77,11 @@ export function releaseHoldsRecords(product: Product, releaseId: string): boolea
  */
 export function releaseDeleteMessage(lead: string, product: Product, releaseId: string): string {
   return [lead, releaseHoldsRecords(product, releaseId) ? RELEASE_RECORDS_LINE : ''].filter(Boolean).join(' ');
+}
+
+/** Would deleting this sprint take a record with it? `deleteSprintFromProduct` drops comments too. */
+export function sprintHoldsRecords(product: Product, sprintId: string): boolean {
+  return anyEntry(product, entry => entry.sprintId === sprintId && holdsRecord(entry));
 }
 
 /** Check if any rib items have allocations referencing a release. */

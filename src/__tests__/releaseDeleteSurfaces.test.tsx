@@ -10,7 +10,7 @@ import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import ReleasePlanningView from '../pages/ReleasePlanningView';
 import SettingsView from '../pages/SettingsView';
 import StoryMapView from '../pages/StoryMapView';
-import { RELEASE_RECORDS_LINE } from '../lib/settingsMutations';
+import { RELEASE_RECORDS_LINE, SPRINT_RECORDS_LINE } from '../lib/settingsMutations';
 import type { Product, ProgressEntry } from '../types';
 import { entry, makeProduct, makeRib, ribOf } from './fixtures/progressIntegrity';
 
@@ -107,6 +107,51 @@ describe('Settings', () => {
     mount(SettingsView, makeProduct([makeRib('r', [on('R2')], [entry('S1', 'R2', 30)])]));
     deleteR2();
     expect(dialogText()).toContain(`Deleting it will remove those allocations. ${RELEASE_RECORDS_LINE} Continue?`);
+  });
+});
+
+describe('Settings, deleting a sprint', () => {
+  const sprintIds = () => current.sprints.map(s => s.id);
+  const deleteS1 = () => {
+    const row = screen.getByDisplayValue('S1').closest('.bg-gray-50') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+  };
+
+  it('deletes a sprint holding nothing without asking', () => {
+    mount(SettingsView, holding([entry('S2', 'R1', 30)]));
+    deleteS1();
+    expect(dialog()).toBeNull();
+    expect(sprintIds()).not.toContain('S1');
+  });
+
+  it.each<[string, ProgressEntry[]]>([
+    ['a record that counts', [entry('S1', 'R1', 30)]],
+    ['an inert record', [entry('S1', 'R2', 30)]],
+    ['a typed 0', [entry('S1', 'R1', 0)]],
+    ['only a comment', [entry('S1', 'R1', null, 'a note')]],
+  ])('asks before deleting a sprint holding %s', (_, history) => {
+    mount(SettingsView, holding(history));
+    deleteS1();
+    expect(dialogText()).toContain(`${SPRINT_RECORDS_LINE} Continue?`);
+    expect(sprintIds()).toContain('S1');
+    expect(ribOf(current, 'r').progressHistory).toHaveLength(1);
+    confirm('Delete');
+    expect(sprintIds()).not.toContain('S1');
+    expect(ribOf(current, 'r').progressHistory).toEqual([]);
+  });
+
+  it('Cancel keeps the sprint and its records', () => {
+    mount(SettingsView, holding([entry('S1', 'R1', 30)]));
+    deleteS1();
+    confirm('Cancel');
+    expect(sprintIds()).toContain('S1');
+    expect(ribOf(current, 'r').progressHistory).toHaveLength(1);
+  });
+
+  it('asks for any rib, not only the first', () => {
+    mount(SettingsView, makeProduct([makeRib('a', [on('R1')], []), makeRib('r', [on('R1')], [entry('S1', 'R1', 30)])]));
+    deleteS1();
+    expect(dialogText()).toContain(SPRINT_RECORDS_LINE);
   });
 });
 

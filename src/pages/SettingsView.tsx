@@ -6,6 +6,7 @@ import { useState, useRef, useId, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   deleteReleaseFromProduct, deleteSprintFromProduct, releaseDeleteMessage, releaseHasAllocations, releaseHoldsRecords,
+  SPRINT_RECORDS_LINE, sprintHoldsRecords,
 } from '../lib/settingsMutations';
 import BufferedText from '../components/ui/BufferedText';
 import { useProductMutations } from '../hooks/useProductMutations';
@@ -22,10 +23,8 @@ export default function SettingsView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
   const { addRelease, addSprint } = useProductMutations(updateProduct);
   const { driver } = useStorage();
-  // Only releases route through this dialog today; the shape is explicit so
-  // the confirm handler can read `.id` / `.message` without a widened object.
   const [deleteTarget, setDeleteTarget] = useState<
-    { type: 'release'; id: string; message: string } | null
+    { type: 'release' | 'sprint'; id: string; message: string } | null
   >(null);
   const baseId = useId();
 
@@ -113,7 +112,11 @@ export default function SettingsView() {
   };
 
   const deleteSprint = (id: string) => {
-    updateProduct(prev => deleteSprintFromProduct(prev, id));
+    if (sprintHoldsRecords(product, id)) {
+      setDeleteTarget({ type: 'sprint', id, message: `${SPRINT_RECORDS_LINE} Continue?` });
+    } else {
+      updateProduct(prev => deleteSprintFromProduct(prev, id));
+    }
   };
 
   return (
@@ -247,12 +250,13 @@ export default function SettingsView() {
 
       {driver && <DataSection product={product} driver={driver} updateProduct={updateProduct} />}
 
-      {/* Delete confirm (a release holding allocations or records) */}
+      {/* Delete confirm (a release holding allocations or records, a sprint holding records) */}
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
           if (deleteTarget?.type === 'release') updateProduct(prev => deleteReleaseFromProduct(prev, deleteTarget.id));
+          if (deleteTarget?.type === 'sprint') updateProduct(prev => deleteSprintFromProduct(prev, deleteTarget.id));
         }}
         title="Confirm Delete"
         message={deleteTarget?.message || ''}
