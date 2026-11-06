@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 0.53.17 (2026-11-05)
+
+### Fixed — moving a rib now keeps its progress
+
+- **Moving a rib to another release now keeps its progress:** it follows the rib, comments included, and release figures and the Forecaster milestones count it. If the rib has nothing recorded and the target release holds old progress, the old progress counts again. Otherwise dragging back restores the rib exactly.
+- **This holds everywhere a rib changes release:** dragging on the Story Map, including several selected cards at once, dragging on Release Planning, the allocation dialog, and an AI assistant's move. One undo restores the allocation and the progress together.
+- **The allocation dialog says what Save will do.** When a Save moves a rib from one release to another, it shows "Progress moves to" the new release, or says the new release "has earlier progress, which will count again."
+- **A typed 0 stays 0.** A rib you have set to 0% stays at 0% when it moves, even if the target release holds old progress.
+- **Dragging a rib to Unassigned, or removing a release in the dialog, still deletes nothing.** The progress stays recorded under that release, and returning the rib there brings it back.
+- **Moves made before this version are unchanged.** Nothing is rewritten when a project opens, so progress left behind by an earlier move stays where it is.
+- **New tests** move ribs through each of these paths, with old progress on the target and without, and confirm that nothing recorded is lost.
+
 ## Version 0.53.16 (2026-10-29)
 
 ### Security — projects loaded from the cloud are checked before they are displayed

@@ -40,9 +40,9 @@ src/
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory
 │   ├── calculations.ts              # Pure computation functions (points, progress, stats)
-│   ├── progressMutations.ts         # Shared progress tracking helpers (update, remove, comment)
+│   ├── progressMutations.ts         # Progress helpers (update, remove, comment) + carry on move, allocation save
 │   ├── settingsMutations.ts         # Pure cascade deletion (release, sprint) + releaseHasAllocations
-│   ├── ribHelpers.ts                # forEachRib / reduceRibs / isRibLocked / computeRibSiblingName
+│   ├── ribHelpers.ts                # forEachRib / reduceRibs / isRibLocked / transferAllocation / computeRibSiblingName
 │   ├── productTransforms.ts         # Pure (prev:Product)=>Product transforms shared by useProductMutations + aiOps
 │   ├── firestoreCollections.ts      # Centralized Firestore collection-name constants (PROJECTS/PROFILES/SETTINGS/SESSIONS)
 │   ├── themeColors.ts               # Centralized 8-color palette for themes (solid, light, dot, swatch)
@@ -57,7 +57,7 @@ src/
 │   ├── useProduct.ts                 # Load/save product state with debounced persistence
 │   ├── useProductMutations.ts        # Reusable CRUD hook (pure transforms live in lib/productTransforms.ts)
 │   ├── aiConnectivityUtils.ts        # Pure helpers for useAiConnectivity (seq cursor, consent parse, ops query)
-│   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag)
+│   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag) + pure applyCardDrop
 │   ├── useImportState.ts             # State machine for multi-project import (idle/preview/applying/done/error)
 │   └── useDarkMode.ts                # Theme toggle hook (localStorage + system preference)
 │
@@ -240,3 +240,5 @@ Both paths serialise through the **one** `serialiseForecasterExport`, so the byt
 receives are identical to the bytes the file would have contained.
 `window.opener` is the transport, so the `window.open` deliberately omits `noopener`/`noreferrer`
 — unlike every other `_blank` in this app.
+
+21. **Progress carries with a moved rib (v0.53.17)** — Progress entries are keyed by release, so a rib that changes release has to take them along. `carryProgress` in `progressMutations.ts` trades the two releases' keys: nothing merges and nothing is dropped, which is why a move changes no rib-level figure and dragging back restores the array. The one exception is a rib with nothing recorded on its source and positive records on its target: history is left alone and those records count again. A real 0 is a record, so it swaps. Every writer changes allocations and history in one `updateProduct`, so undo restores both. `applyRibTransfer` serves the two drag systems; the allocation dialog (`saveRibAllocations`) and the AI's `moveRibInProduct` keep their own allocation writes and carry through `withCarriedProgress`. `detectAllocationMove` is the one statement of what counts as a move: exactly one release out and one in, with a 0% row absent on both sides. A drop (to Unassigned, or a release removed) deletes nothing.
