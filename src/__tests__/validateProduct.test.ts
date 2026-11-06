@@ -7,8 +7,9 @@ import { validateProduct } from '../lib/validateProduct';
 import { importProductFromJSON } from '../lib/importExport';
 import { guardCloudProduct } from '../lib/cloudLoadGuard';
 import { isRibLocked } from '../lib/ribHelpers';
-import { computeSafePrefix } from '../lib/aiOps';
+import { applyAiOp, computeSafePrefix } from '../lib/aiOps';
 import { deleteReleaseFromProduct, releaseHoldsRecords } from '../lib/settingsMutations';
+import { cleanCardOrder } from '../lib/productTransforms';
 import { duplicateProduct } from '../lib/storage';
 import { createSampleProduct } from '../lib/sampleData';
 import { computeLayout } from '../components/storymap/useMapLayout';
@@ -1004,5 +1005,204 @@ describe('validateProduct: a product holds its three optional lists or leaves th
     expect(sample.sizeMapping.length).toBeGreaterThan(0);
     const product = importProductFromJSON(JSON.stringify(sample));
     for (const field of FIELDS) expect(product[field]).toEqual(sample[field]);
+  });
+});
+
+// --- The product's other optional fields ---
+
+describe('validateProduct: the optional fields hold their own shape or are cleared', () => {
+  const ENTRY = { t: 1000, op: 'create', entity: 'product' };
+  const CREATED = '2026-01-01T00:00:00.000Z';
+  const UPDATED = '2026-01-02T00:00:00.000Z';
+
+  /** A parsed file. JSON drops `undefined`, so that value means the key is absent. */
+  function file(overrides: Record<string, unknown> = {}) {
+    return JSON.parse(JSON.stringify({
+      id: 'p', name: 'P', schemaVersion: 2,
+      description: 'A project', createdAt: CREATED, updatedAt: UPDATED, _changeLog: [ENTRY],
+      sizeMapping: [{ label: 'M', points: 5 }],
+      releases: [{ id: 'r1', name: 'R1', order: 1 }, { id: 'r2', name: 'R2', order: 2 }],
+      sprints: [{ id: 's1', name: 'S1', order: 1, endDate: '2026-02-01' }],
+      themes: [{ id: 't1', name: 'T', order: 1, backboneItems: [{ id: 'b1', name: 'B', order: 1, ribItems: [{
+        id: 'k1', name: 'Rib', description: '', order: 1, size: 'M', category: 'core', notes: '',
+        releaseAllocations: [{ releaseId: 'r1', percentage: 100 }], progressHistory: [],
+      }] }] }],
+      ...overrides,
+    }));
+  }
+
+  const imported = (overrides: Record<string, unknown>) => importProductFromJSON(JSON.stringify(file(overrides)));
+
+  /** What an export of this project writes: `exportProduct` spreads it as it stands. */
+  const exported = (product: Product) => JSON.stringify({ ...product, _storageRef: 'workspace' });
+
+  /** Local storage serialises, and JSON gives an array's hole back as a null. */
+  const reloaded = (product: Product): Product => JSON.parse(JSON.stringify(product));
+
+  /** The rules `guardCloudProduct` fires on this project: each one raises the notice. */
+  const guardHits = (product: Product) => guardCloudProduct(structuredClone(product));
+
+  beforeEach(stubLocalStorage);
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  describe('_changeLog', () => {
+    const ops = (product: Product) => (product._changeLog ?? []).map(e => e.op);
+    const NON_LISTS = [['a string', 'x'], ['a longer string', 'abc'], ['a number', 5], ['true', true], ['an object', {}], ['a keyed object', { 0: ENTRY }]] as const;
+    const NON_ENTRIES = [['a string', 'x'], ['null', null], ['a number', 5], ['a list', []]] as const;
+
+    it.each(NON_LISTS)('as %s imports as a file with no log', (_label, value) => {
+      expect(ops(imported({ _changeLog: value }))).toEqual(['import']);
+    });
+
+    it.each(NON_LISTS)('as %s gives a file that imports again', (_label, value) => {
+      const again = importProductFromJSON(exported(imported({ _changeLog: value })));
+      expect(ops(again)).toEqual(['import', 'import']);
+    });
+
+    it.each(NON_LISTS)('as %s raises no cloud notice', (_label, value) => {
+      expect(guardHits(imported({ _changeLog: value }))).toEqual([]);
+    });
+
+    // What an older import left in local stores, so it is in a file the app wrote.
+    it.each(NON_ENTRIES)('holding %s beside real entries drops it and keeps them', (_label, value) => {
+      expect(ops(imported({ _changeLog: [value, ENTRY] }))).toEqual(['create', 'import']);
+    });
+
+    it.each([['null', null], ['an empty string', ''], ['zero', 0], ['false', false]])('as %s still imports as a file with no log', (_label, value) => {
+      expect(ops(imported({ _changeLog: value }))).toEqual(['import']);
+    });
+
+    it('still refuses an entry with no timestamp, because an entry is held to its shape', () => {
+      expect(() => imported({ _changeLog: [{ op: 'add' }] })).toThrow('timestamp');
+    });
+  });
+
+  describe('description', () => {
+    const NON_TEXT = [['null', null], ['zero', 0], ['false', false], ['a number', 5], ['true', true], ['an object', {}], ['an empty list', []], ['a list', ['a']]] as const;
+
+    it.each(NON_TEXT)('as %s becomes empty', (_label, value) => {
+      expect(imported({ description: value }).description).toBe('');
+    });
+
+    // Not null: the cloud guard takes that to '' without a notice.
+    it.each(NON_TEXT.slice(1))('as %s raises no cloud notice', (_label, value) => {
+      expect(guardHits(imported({ description: value }))).toEqual([]);
+    });
+
+    it.each(NON_TEXT)('as %s reads the same as it does from the cloud', (_label, value) => {
+      const cloud = file({ description: value });
+      guardCloudProduct(cloud);
+      expect(imported({ description: value }).description).toBe(cloud.description);
+    });
+
+    it.each(['Some text', ''])('%j stays as it is', value => {
+      expect(imported({ description: value }).description).toBe(value);
+    });
+  });
+
+  describe('createdAt and updatedAt', () => {
+    const FIELDS = ['createdAt', 'updatedAt'] as const;
+    const NON_TEXT = [['null', null], ['zero', 0], ['false', false], ['a number', 5], ['true', true], ['an object', {}], ['an empty list', []], ['a list', ['a']]] as const;
+    const EACH = FIELDS.flatMap(field => NON_TEXT.map(([label, value]) => [field, label, value] as const));
+
+    it.each(EACH)('%s as %s is removed', (field, _label, value) => {
+      expect(imported({ [field]: value })).not.toHaveProperty(field);
+    });
+
+    // Not null, zero or false: the export replaces those with the time of the export.
+    it.each(EACH.filter(([, , value]) => value))('%s as %s goes to Forecaster as a date on every record', (field, _label, value) => {
+      const { projects, sprints } = buildForecasterExport(imported({ [field]: value }));
+      expect(typeof projects[0]?.[field]).toBe('string');
+      expect(typeof sprints[0]?.[field]).toBe('string');
+    });
+
+    // Not null: the cloud guard drops that without a notice.
+    it.each(NON_TEXT.slice(1))('createdAt as %s raises no cloud notice', (_label, value) => {
+      expect(guardHits(imported({ createdAt: value }))).toEqual([]);
+    });
+
+    it.each(NON_TEXT)('createdAt as %s reads the same as it does from the cloud', (_label, value) => {
+      const cloud = file({ createdAt: value });
+      guardCloudProduct(cloud);
+      expect(imported({ createdAt: value })).not.toHaveProperty('createdAt');
+      expect(cloud).not.toHaveProperty('createdAt');
+    });
+
+    it('leaves real dates alone', () => {
+      const product = imported({});
+      expect(product.createdAt).toBe(CREATED);
+      expect(product.updatedAt).toBe(UPDATED);
+    });
+
+    it('leaves a date string it cannot read alone: this is a shape check', () => {
+      expect(imported({ createdAt: 'soon' }).createdAt).toBe('soon');
+    });
+  });
+
+  describe('releaseCardOrder and sizingCardOrder', () => {
+    const FIELDS = ['releaseCardOrder', 'sizingCardOrder'] as const;
+    const NON_MAPS = [
+      ['a string', 'x'], ['a number', 5], ['true', true], ['null', null], ['an empty string', ''], ['zero', 0], ['false', false],
+      ['an empty list', []], ['a list of strings', ['x']], ['a list of lists', [['k1']]],
+    ] as const;
+    const EACH = FIELDS.flatMap(field => NON_MAPS.map(([label, value]) => [field, label, value] as const));
+    const KEPT = { r1: ['k1'] };
+
+    // The two shapes that break a reader. The rest throw nowhere: they only raise the notice.
+    const BREAKS = [['a string', 'x'], ['a list of strings', ['x']]] as const;
+
+    it.each(EACH)('%s as %s is removed', (field, _label, value) => {
+      expect(imported({ [field]: value })).not.toHaveProperty(field);
+    });
+
+    it.each(EACH)('%s as %s raises no cloud notice', (field, _label, value) => {
+      expect(guardHits(imported({ [field]: value }))).toEqual([]);
+    });
+
+    // A list only breaks after storage has turned its hole into a null, so every row
+    // reads the project as a reload gives it.
+    it.each(FIELDS.flatMap(field => BREAKS.map(([label, value]) => [field, label, value] as const)))('with %s as %s, ribs can be deleted and the project duplicated', (field, _label, value) => {
+      const product = reloaded(imported({ [field]: value }));
+      expect(() => cleanCardOrder(product[field], new Set(['k1']))).not.toThrow();
+      expect(() => duplicateProduct(product)).not.toThrow();
+    });
+
+    it.each(BREAKS)('with releaseCardOrder as %s, the AI can move and unassign a rib', (_label, value) => {
+      const product = reloaded(imported({ releaseCardOrder: value }));
+      expect(applyAiOp(product, 'move_rib', { ribId: 'k1', targetReleaseId: 'r2' })).not.toBe(product);
+      expect(applyAiOp(product, 'unassign_rib', { ribId: 'k1' })).not.toBe(product);
+    });
+
+    it.each(FIELDS)('%s keeps a map, and only the lists in it', field => {
+      expect(imported({ [field]: KEPT })[field]).toEqual(KEPT);
+      expect(imported({ [field]: { ...KEPT, r2: 'x', r3: 5 } })[field]).toEqual(KEPT);
+    });
+  });
+
+  it('adds no key to a file that left all of these out', () => {
+    const data = file();
+    const fields = ['description', 'createdAt', 'updatedAt', '_changeLog', 'releaseCardOrder', 'sizingCardOrder'];
+    for (const field of fields) delete data[field];
+    const keys = Object.keys(validateProduct(data));
+    for (const field of fields) expect(keys).not.toContain(field);
+  });
+
+  it('brings back an Export All file holding every one of these at once', () => {
+    const bad = { description: {}, createdAt: {}, updatedAt: {}, _changeLog: 'x', releaseCardOrder: 'x', sizingCardOrder: 'x' };
+    const result = parseImportFile(JSON.stringify([{ ...file(bad), id: 'one' }, { ...file(bad), id: 'two' }]));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.products.map(p => p.id)).toEqual(['one', 'two']);
+    for (const product of result.products) expect(guardHits(product)).toEqual([]);
+  });
+
+  it('leaves these fields of a file the app exported exactly as they were', () => {
+    const sample = { ...createSampleProduct(), releaseCardOrder: { r1: ['k1'] }, sizingCardOrder: { M: ['k1'] } };
+    const product = importProductFromJSON(exported(sample));
+    expect(product.description).toBe(sample.description);
+    expect(product.createdAt).toBe(sample.createdAt);
+    expect(product.updatedAt).toBe(sample.updatedAt);
+    expect(product.releaseCardOrder).toEqual(sample.releaseCardOrder);
+    expect(product.sizingCardOrder).toEqual(sample.sizingCardOrder);
+    expect(product._changeLog?.slice(0, -1)).toEqual(sample._changeLog);
   });
 });

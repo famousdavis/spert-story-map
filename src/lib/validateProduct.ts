@@ -50,6 +50,11 @@ function isNum(v: unknown): v is number {
 }
 
 
+/** Return true if value is a plain object: not null, and not a list. */
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 /** Clamp a number to [min, max]. */
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -482,28 +487,28 @@ export function validateProduct(data: unknown): Product {
     stripObject(theme, KNOWN_THEME_FIELDS);
   }
 
-  // --- releaseCardOrder ---
-  if (d.releaseCardOrder && typeof d.releaseCardOrder === 'object') {
-    for (const [key, val] of Object.entries(d.releaseCardOrder)) {
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype'
-          || !Array.isArray(val)) {
-        delete d.releaseCardOrder[key];
+  // --- releaseCardOrder, sizingCardOrder ---
+  // Each maps a column to a list of rib ids. Both are optional, and every reader takes a
+  // missing one as "no saved order", so anything else is removed. A string threw when
+  // deleting or duplicating a rib, and a list came back from storage holding a null,
+  // which threw the same way.
+  //
+  // ⚠️ EVERY NON-MAP GOES, the harmless ones too. `5`, `true` and `null` throw nowhere, but
+  // `guardCloudProduct` removes them on each read of a cloud project and a save leaves
+  // the document alone (a removed key is not in `mergeFields`), so the project raises
+  // its notice on every open until a card is dragged.
+  for (const field of ['releaseCardOrder', 'sizingCardOrder'] as const) {
+    if (!isRecord(d[field])) {
+      delete d[field];
+      continue;
+    }
+    for (const [key, val] of Object.entries(d[field])) {
+      if (PROTO_KEYS.has(key) || !Array.isArray(val)) {
+        delete d[field][key];
         continue;
       }
       // Filter to valid ID strings only
-      d.releaseCardOrder[key] = val.filter(id => isValidId(id));
-    }
-  }
-
-  // --- sizingCardOrder ---
-  if (d.sizingCardOrder && typeof d.sizingCardOrder === 'object') {
-    for (const [key, val] of Object.entries(d.sizingCardOrder)) {
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype'
-          || !Array.isArray(val)) {
-        delete d.sizingCardOrder[key];
-        continue;
-      }
-      d.sizingCardOrder[key] = val.filter(id => isValidId(id));
+      d[field][key] = val.filter(id => isValidId(id));
     }
   }
 
@@ -530,11 +535,20 @@ export function validateProduct(data: unknown): Product {
   }
 
   // --- _changeLog ---
+  // A log that is not a list is removed, so the import starts a new one, as it does for a
+  // file with no log. Anything in the list that is not an entry is dropped. A string used
+  // to be spread into characters, so the app wrote those into its own export and then
+  // refused the file, and they raise the cloud notice on every open, because a save
+  // sends only new entries.
+  //
+  // ⚠️ DROPPED, NOT REJECTED, like the oversized strings below: the log is advisory, an
+  // older export can hold such a value, and `guardCloudProduct` keeps the same entries.
+  // An object is still held to its timestamp.
   if (Array.isArray(d._changeLog)) {
+    d._changeLog = d._changeLog.filter(isRecord);
     assert(d._changeLog.length <= MAX_CHANGELOG,
       `Changelog too long (max ${MAX_CHANGELOG} entries)`);
     for (const entry of d._changeLog) {
-      assert(typeof entry === 'object' && entry !== null, 'Changelog entry must be an object');
       assert(isNum(entry.t) && entry.t > 0 && entry.t < 4102444800,
         'Changelog entry timestamp must be a valid Unix timestamp');
       // Bound string fields so a tampered import can't smuggle large
@@ -547,6 +561,24 @@ export function validateProduct(data: unknown): Product {
       }
       stripObject(entry, KNOWN_CHANGELOG_FIELDS);
     }
+  } else {
+    delete d._changeLog;
+  }
+
+  // --- description, createdAt, updatedAt ---
+  // No writer stores anything but text here, and every other value is cleared, not
+  // rejected, because an export spreads the product as it stands, so an older import's
+  // value is in a file the app itself wrote. `description` becomes '', as it does on
+  // a read. A date is removed, because nothing can honestly stand in for it: the
+  // Forecaster export sent it out on every record. A string is not checked as a date,
+  // and absent stays absent, so a file that never had these gains no key.
+  //
+  // ⚠️ A BAD `updatedAt` LIVES IN MEMORY ONLY. Every save stamps a new one, so it never
+  // reaches a store, but replacing a project from Settings keeps the file's value in
+  // state until a reload, and both exports read state.
+  if (d.description !== undefined && typeof d.description !== 'string') d.description = '';
+  for (const field of ['createdAt', 'updatedAt'] as const) {
+    if (typeof d[field] !== 'string') delete d[field];
   }
 
   // --- sprintCadenceWeeks ---
@@ -564,7 +596,7 @@ export function validateProduct(data: unknown): Product {
   // now shares. An assert here would add nothing to that and would turn a corrupted
   // field into a rejection of the entire file, which for this app's users lands
   // mid-assignment. This matches the file's own convention for an uninterpretable
-  // value — `size` (:387) and `cardColor` (:397-403) are both cleared, not rejected.
+  // value — `size` (:392) and `cardColor` (:402-408) are both cleared, not rejected.
   //
   // ⚠️ ABSENT MUST STAY ABSENT. A pre-schemaVersion product is a genuine v1 and its
   // migration gate reads the missing field; stamping a version on it here would skip

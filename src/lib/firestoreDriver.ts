@@ -244,9 +244,9 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           const rawSchemaVersion = data.schemaVersion;
           const product = migrateToV2(stripFirestoreFields({ id: docSnap.id, ...data }));
           // ⚠️ OBSERVE HERE, BEFORE THE _owner/_members RE-ATTACH BELOW — never at the
-          // `return`. PRODUCT_FIELDS (validateProduct.ts:106-114) omits both fields
-          // deliberately (:115-120 calls them authorisation state), so the strip loop
-          // at :529-533 deletes them; observing after the re-attach would report two
+          // `return`. PRODUCT_FIELDS (validateProduct.ts:112-120) omits both fields
+          // deliberately (:121-125 calls them authorisation state), so the strip loop
+          // at :615-619 deletes them; observing after the re-attach would report two
           // spurious `repaired` paths on every single cloud observation.
           runObserver(product, { rawSchemaVersion });
           // ⚠️ Shape guard AFTER the observer (which must keep reporting what the
