@@ -44,6 +44,12 @@ const allocationsAndHistory = (hook: Awaited<ReturnType<typeof loaded>>) => {
   return { allocations: rib.releaseAllocations, history: rib.progressHistory };
 };
 
+/**
+ * ⚠️ A string, not the objects. Held by reference, the "before" value is rewritten
+ * by the very in-place edit this file exists to catch, and the comparison passes.
+ */
+const snapshot = (hook: Awaited<ReturnType<typeof loaded>>) => JSON.stringify(allocationsAndHistory(hook));
+
 describe('undo after a carried move', () => {
   const to = { themeId: 't', backboneId: 'b', releaseId: 'Y', insertIndex: null };
   const carried = [entry('S1', 'Y', 10, 'kept'), entry('S1', 'X', 5)];
@@ -54,17 +60,18 @@ describe('undo after a carried move', () => {
     ['dialog Save', (update: Parameters<typeof moveRib2D>[0]) => update(prev => saveRibAllocations(prev, 'r', [{ releaseId: 'Y', percentage: 100 }]))],
   ])('%s: one undo restores allocations and progress together, and redo reapplies both', async (_, move) => {
     const hook = await loaded();
-    const before = allocationsAndHistory(hook);
+    const before = snapshot(hook);
 
     act(() => move(hook.result.current.updateProduct));
-    const after = allocationsAndHistory(hook);
-    expect(after.history).toEqual(carried);
-    expect(after.allocations.map(a => a.releaseId)).toEqual(['Y']);
+    const moved = allocationsAndHistory(hook);
+    expect(moved.history).toEqual(carried);
+    expect(moved.allocations.map(a => a.releaseId)).toEqual(['Y']);
+    const after = snapshot(hook);
 
     act(() => hook.result.current.undo());
-    expect(allocationsAndHistory(hook)).toEqual(before);
+    expect(snapshot(hook)).toBe(before);
 
     act(() => hook.result.current.redo());
-    expect(allocationsAndHistory(hook)).toEqual(after);
+    expect(snapshot(hook)).toBe(after);
   });
 });
