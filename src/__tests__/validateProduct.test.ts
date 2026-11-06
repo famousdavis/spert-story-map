@@ -2,9 +2,17 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { validateProduct } from '../lib/validateProduct';
 import { importProductFromJSON } from '../lib/importExport';
+import { guardCloudProduct } from '../lib/cloudLoadGuard';
+import { isRibLocked } from '../lib/ribHelpers';
+import { computeSafePrefix } from '../lib/aiOps';
+import { deleteReleaseFromProduct, releaseHoldsRecords } from '../lib/settingsMutations';
+import { duplicateProduct } from '../lib/storage';
+import { createSampleProduct } from '../lib/sampleData';
+import { computeLayout } from '../components/storymap/useMapLayout';
+import type { Product } from '../types';
 import { req, asRecord } from './testHelpers';
 
 function minimal(overrides = {}) {
@@ -735,5 +743,109 @@ describe('validateProduct', () => {
     } catch (e) {
       expect((e as Error).message).not.toContain(secret);
     }
+  });
+});
+
+// --- A rib's two lists ---
+
+describe('validateProduct: a rib always comes out holding two lists', () => {
+  const ALLOCATION = { releaseId: 'r1', percentage: 100 };
+  const ENTRY = { sprintId: 's1', releaseId: 'r1', percentComplete: 50 };
+
+  type ListField = 'releaseAllocations' | 'progressHistory';
+
+  /** A parsed file with one list replaced. JSON drops `undefined`, so that value means the key is absent. */
+  function fileWith(field: ListField, value: unknown) {
+    return JSON.parse(JSON.stringify({
+      id: 'p', name: 'P', schemaVersion: 2,
+      sizeMapping: [{ label: 'M', points: 5 }],
+      releases: [{ id: 'r1', name: 'R1', order: 1 }, { id: 'r2', name: 'R2', order: 2 }],
+      sprints: [{ id: 's1', name: 'S1', order: 1 }],
+      themes: [{ id: 't1', name: 'T', order: 1, backboneItems: [{ id: 'b1', name: 'B', order: 1, ribItems: [{
+        id: 'k1', name: 'Rib', description: '', order: 1, size: 'M', category: 'core', notes: '',
+        releaseAllocations: [ALLOCATION], progressHistory: [ENTRY], [field]: value,
+      }] }] }],
+    }));
+  }
+
+  const ribOf = (product: Pick<Product, 'themes'>) =>
+    req(product.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+
+  const NOT_A_LIST: [string, unknown][] = [
+    ['absent', undefined], ['null', null],
+    ['an object', {}], ['an object holding a row', { 0: ENTRY }],
+    ['a string', 'x'], ['an empty string', ''],
+    ['a number', 5], ['zero', 0],
+    ['true', true], ['false', false],
+  ];
+  const CASES = (['releaseAllocations', 'progressHistory'] as const).flatMap(field =>
+    NOT_A_LIST.map(([label, value]) => [field, label, value] as const));
+
+  beforeEach(() => {
+    // importProductFromJSON and duplicateProduct stamp a workspace id.
+    const store: Record<string, string> = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, value: unknown) => { store[key] = String(value); },
+      removeItem: (key: string) => { delete store[key]; },
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it.each(CASES)('%s as %s becomes an empty list and the other list is kept', (field, _label, value) => {
+    const rib = ribOf(validateProduct(fileWith(field, value)));
+    expect(rib.releaseAllocations).toEqual(field === 'releaseAllocations' ? [] : [ALLOCATION]);
+    expect(rib.progressHistory).toEqual(field === 'progressHistory' ? [] : [ENTRY]);
+  });
+
+  it.each(CASES)('%s as %s reads the same as it does from the cloud', (field, _label, value) => {
+    const cloud = fileWith(field, value);
+    guardCloudProduct(cloud);
+    const imported = ribOf(validateProduct(fileWith(field, value)));
+    expect(imported.releaseAllocations).toEqual(ribOf(cloud).releaseAllocations);
+    expect(imported.progressHistory).toEqual(ribOf(cloud).progressHistory);
+  });
+
+  // One reader per place the rib's lists threw. No single reader sees every shape:
+  // isRibLocked is safe on a falsy value, and the map layout is safe on a bad history.
+  it.each(CASES)('imported with %s as %s, the rib can be read and acted on', (field, _label, value) => {
+    const product = importProductFromJSON(JSON.stringify(fileWith(field, value)));
+    expect(() => isRibLocked(ribOf(product), product.sprints)).not.toThrow();
+    expect(() => computeLayout(product, [])).not.toThrow();
+    expect(() => deleteReleaseFromProduct(product, 'r2')).not.toThrow();
+    expect(() => releaseHoldsRecords(product, 'r1')).not.toThrow();
+    expect(() => duplicateProduct(product)).not.toThrow();
+  });
+
+  // Only the shapes the lock throws on: a falsy value applied all three ops before
+  // the fix, so including it here would pass either way.
+  it.each(CASES.filter(([, , value]) => value))('imported with %s as %s, a delivery of AI ops applies in full', (field, _label, value) => {
+    const product = importProductFromJSON(JSON.stringify(fileWith(field, value)));
+    const ops = [
+      { seq: 1, op: 'append_rib_note', payload: { ribId: 'k1', text: 'first' } },
+      { seq: 2, op: 'unassign_rib', payload: { ribId: 'k1' } },
+      { seq: 3, op: 'append_rib_note', payload: { ribId: 'k1', text: 'last' } },
+    ];
+    const { safeOps, nextSeq } = computeSafePrefix(product, ops);
+    expect(safeOps).toHaveLength(3);
+    expect(nextSeq).toBe(3);
+  });
+
+  it('a v1 file with no usable allocations migrates as it did, with a real list', () => {
+    const file = fileWith('releaseAllocations', {});
+    delete file.schemaVersion;
+    file.themes[0].backboneItems[0].ribItems[0].progressHistory = [{ sprintId: 's1', percentComplete: 50 }];
+    const product = importProductFromJSON(JSON.stringify(file));
+    expect(product.schemaVersion).toBe(2);
+    expect(ribOf(product).releaseAllocations).toEqual([]);
+    expect(ribOf(product).progressHistory).toEqual([]);
+  });
+
+  it('leaves the lists of a file the app exported exactly as they were', () => {
+    const sample = createSampleProduct();
+    const lists = (product: Pick<Product, 'themes'>) => product.themes.flatMap(t => t.backboneItems.flatMap(b =>
+      b.ribItems.map(r => [r.id, r.releaseAllocations, r.progressHistory])));
+    expect(lists(sample).flat(2).length).toBeGreaterThan(0);
+    expect(lists(importProductFromJSON(JSON.stringify(sample)))).toEqual(lists(sample));
   });
 });
