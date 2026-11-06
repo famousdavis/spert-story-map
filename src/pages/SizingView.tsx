@@ -305,6 +305,7 @@ export default function SizingView() {
           mode={{ kind: 'edit', themeId: editingCell.themeId, backboneId: editingCell.backboneId, ribId: editingCell.id }}
           product={product}
           locked={editingCell.locked}
+          lockedSprintName={editingCell.lockedSprintName}
           onClose={() => setEditingCell(null)}
           onSave={handleEditSave}
         />
@@ -317,6 +318,7 @@ export default function SizingView() {
           mode={{ kind: 'create', presetThemeId: createPresets.presetThemeId, presetBackboneId: createPresets.presetBackboneId }}
           product={product}
           locked={false}
+          lockedSprintName={null}
           onClose={() => setCreatePresets(null)}
           onCreate={handleCreate}
         />

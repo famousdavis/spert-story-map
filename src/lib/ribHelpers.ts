@@ -58,6 +58,14 @@ export function isRibLocked(rib: Pick<RibItem, 'progressHistory' | 'releaseAlloc
 }
 
 /**
+ * Why a rib's size cannot change, naming the sprint: a rib locked by an earlier sprint
+ * can read 0%, and would not explain itself. The card and the edit dialog share this.
+ */
+export function sizeLockNote(sprintName: string | null): string {
+  return sprintName ? `Size locked: progress recorded in ${sprintName}` : 'Size locked: progress recorded';
+}
+
+/**
  * Compute new releaseAllocations for a rib being moved between releases.
  * Returns new allocations array, or null if rib should be left unchanged
  * (e.g. duplicate release guard).
