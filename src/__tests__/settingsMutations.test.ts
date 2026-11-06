@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   deleteReleaseFromProduct, deleteSprintFromProduct, RELEASE_RECORDS_LINE, releaseDeleteMessage, releaseHasAllocations, releaseHoldsRecords,
-  sprintHoldsRecords,
+  SPRINT_RECORDS_LINE, sprintHoldsRecords,
 } from '../lib/settingsMutations';
 import { req } from './testHelpers';
 import type { Product, RibItem } from '../types';
@@ -195,6 +195,25 @@ describe('releaseHoldsRecords', () => {
     expect(releaseHoldsRecords(withHistory([at(null)]), 'r9')).toBe(false);
     expect(releaseHoldsRecords(withHistory([at(30)]), 'r8')).toBe(false);
     expect(releaseHoldsRecords(withHistory(undefined), 'r9')).toBe(false);
+  });
+
+  it('says what the delete takes, in these words', () => {
+    expect(RELEASE_RECORDS_LINE).toBe('Recorded progress and notes for this release are deleted too.');
+    expect(SPRINT_RECORDS_LINE).toBe('Recorded progress and notes for this sprint are deleted too.');
+  });
+
+  it('finds a record in any theme or backbone, not only when all of them hold one', () => {
+    const theme = (id: string, ribItems: RibItem[]) => ({ id, name: id, order: 1, backboneItems: [
+      { id: `${id}-empty`, name: 'E', order: 1, ribItems: [] },
+      { id: `${id}-b`, name: 'B', order: 2, ribItems },
+    ] });
+    const rib = req(makeProduct().themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+    const product = { ...makeProduct(), themes: [
+      theme('none', []),
+      theme('held', [{ ...rib, progressHistory: [at(30)] }]),
+    ] };
+    expect(releaseHoldsRecords(product, 'r9')).toBe(true);
+    expect(sprintHoldsRecords(product, 's1')).toBe(true);
   });
 
   it('sprintHoldsRecords asks the same of a sprint, in any release', () => {

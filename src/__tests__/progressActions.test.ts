@@ -303,6 +303,12 @@ describe('Bring here stamps only what changed', () => {
     expect(ribOf(next, 'r').progressHistory[0]).toBe(before);
   });
 
+  it('leaves alone an entry with no comment key at all', () => {
+    const before: ProgressEntry = { sprintId: 'S1', releaseId: 'R1', percentComplete: 5, updatedAt: OLD };
+    const next = bringRecordsHere(rib([before, entry('S2', 'R2', 30)]), 'r', 'R2');
+    expect(ribOf(next, 'r').progressHistory[0]).toBe(before);
+  });
+
   it('stamps an entry whose value changed', () => {
     const next = bringRecordsHere(rib([{ ...entry('S1', 'R1', 5), updatedAt: OLD }, entry('S1', 'R2', 30)]), 'r', 'R2');
     expect(ribOf(next, 'r').progressHistory[0]?.updatedAt).toBe(NOW);
@@ -353,6 +359,18 @@ describe('previewBringHere is what the writer leaves', () => {
     const p = rib([entry('S1', 'R2', 30)], []);
     expect(previewBringHere(p, 'r', 'R2')).toBeNull();
     expect(previewBringHere(rib([entry('S1', 'R2', 30)]), 'nope', 'R2')).toBeNull();
+  });
+
+  it('is null on a rib with a release and nothing to bring, not a reading of what is there', () => {
+    expect(previewBringHere(rib([entry('S1', 'R1', 30)]), 'r', 'R2')).toBeNull();
+  });
+
+  it('reads the rib it was asked about, among several', () => {
+    const p = makeProduct([
+      makeRib('r', [on('R1')], [entry('S1', 'R1', 5), entry('S1', 'R2', 10)]),
+      makeRib('later', [on('R1')], [entry('S1', 'R1', 90)]),
+    ]);
+    expect(previewBringHere(p, 'r', 'R2')).toEqual({ reads: 15, counted: 15 });
   });
 });
 
