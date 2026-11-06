@@ -4,7 +4,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { getProjectTotals, getReleasePoints, getSprintSummary, getUnknownReleaseTotals } from '../lib/calculations';
-import { getReconciliationRows } from '../lib/reconciliation';
+import { bringRecordsHere, clearRibProgress, removeRowRecords } from '../lib/progressMutations';
+import { bringHereTarget, completion, progressAsOf } from '../lib/progressRule';
+import { getReconciliationRows, getStrandedRows } from '../lib/reconciliation';
+import { isRibLocked } from '../lib/ribHelpers';
 import type { Product, ProgressEntry, ReleaseAllocation, RibItem, Size, Sprint } from '../types';
 
 /**
@@ -167,5 +170,98 @@ describe('inert records', () => {
       }
     }
     expect(compared).toBeGreaterThan(1500);
+  });
+});
+
+describe('the actions', () => {
+  const ribsOf = (p: Product) => p.themes.flatMap(t => t.backboneItems).flatMap(b => b.ribItems);
+  const ribOf = (p: Product, id: string) => ribsOf(p).find(rib => rib.id === id) as RibItem;
+  const notes = (p: Product) => ribsOf(p).flatMap(rib => rib.progressHistory).flatMap(e => (e.comment ? [e.comment] : []));
+
+  /** Every third entry carries a note of its own, so a lost one cannot hide behind a twin. */
+  function withNotes(p: Product): Product {
+    const copy: Product = JSON.parse(JSON.stringify(p));
+    let k = 0;
+    for (const rib of ribsOf(copy)) {
+      rib.progressHistory = rib.progressHistory.map(e => (k++ % 3 === 0 ? { ...e, comment: `note ${k}` } : e));
+    }
+    return copy;
+  }
+
+  const everyAnnotatedProject = (visit: (p: Product) => void) => everyProject(p => visit(withNotes(p)));
+
+  it('Remove on every row changes no figure and no lock, and empties the list', () => {
+    let rows = 0;
+    everyAnnotatedProject(p => {
+      let next = p;
+      for (const row of getStrandedRows(p)) {
+        next = removeRowRecords(next, row.ribId, row.releaseId);
+        rows++;
+      }
+      expect(getStrandedRows(next)).toEqual([]);
+      for (const rib of ribsOf(p)) expect(isRibLocked(ribOf(next, rib.id), p.sprints)).toBe(isRibLocked(rib, p.sprints));
+      for (const s of p.sprints) {
+        expect(getProjectTotals(next, s.id)).toEqual(getProjectTotals(p, s.id));
+        for (const r of RELEASES) expect(getReleasePoints(next, r, s.id)).toEqual(getReleasePoints(p, r, s.id));
+      }
+    });
+    expect(rows).toBeGreaterThan(500);
+  });
+
+  it('Remove loses no note', () => {
+    everyAnnotatedProject(p => {
+      const next = getStrandedRows(p).reduce((product, row) => removeRowRecords(product, row.ribId, row.releaseId), p);
+      expect(notes(next).sort()).toEqual(notes(p).sort());
+    });
+  });
+
+  it('Bring here holds the formula at every sprint, written or not, and the row leaves', () => {
+    let rows = 0;
+    everyAnnotatedProject(p => {
+      const releaseIds = new Set(p.releases.map(r => r.id));
+      for (const row of getStrandedRows(p)) {
+        if (!row.bringHereTo) continue;
+        const before = ribOf(p, row.ribId);
+        const target = bringHereTarget(before, row.releaseId, releaseIds);
+        expect(target).not.toBeNull();
+        const next = bringRecordsHere(p, row.ribId, row.releaseId);
+        const after = ribOf(next, row.ribId);
+        for (const s of p.sprints) {
+          const expected = Math.min(100, progressAsOf(before, row.releaseId, s.id, p.sprints) + progressAsOf(before, target?.releaseId ?? '', s.id, p.sprints));
+          expect(progressAsOf(after, target?.releaseId ?? '', s.id, p.sprints)).toBeCloseTo(expected, 8);
+        }
+        expect(getStrandedRows(next).filter(r => r.ribId === row.ribId && r.releaseId === row.releaseId)).toEqual([]);
+        rows++;
+      }
+    });
+    expect(rows).toBeGreaterThan(100);
+  });
+
+  it('Bring here cuts no note: each one survives whole, on its own or inside a join', () => {
+    everyAnnotatedProject(p => {
+      for (const row of getStrandedRows(p)) {
+        if (!row.bringHereTo) continue;
+        const after = bringRecordsHere(p, row.ribId, row.releaseId);
+        const kept = notes(after).join('|');
+        // Only a shadowed entry's note can go, and only when an earlier one holds its place.
+        const shadowless = new Set(ribOf(p, row.ribId).progressHistory.flatMap(e => {
+          const first = ribOf(p, row.ribId).progressHistory.find(x => x.sprintId === e.sprintId && x.releaseId === e.releaseId && x.comment);
+          return e.comment && first === e ? [e.comment] : [];
+        }));
+        for (const note of shadowless) expect(kept).toContain(note);
+      }
+    });
+  });
+
+  it('Clear progress leaves nothing counting, on any rib, and loses no note', () => {
+    everyAnnotatedProject(p => {
+      const next = ribsOf(p).reduce((product, rib) => clearRibProgress(product, rib.id), p);
+      expect(getProjectTotals(next).completed).toBe(0);
+      for (const rib of ribsOf(next)) {
+        expect(rib.progressHistory.every(e => e.percentComplete === null)).toBe(true);
+        for (const s of p.sprints) expect(completion(rib, s.id, p.sprints)).toBe(0);
+      }
+      expect(notes(next).sort()).toEqual(notes(p).sort());
+    });
   });
 });
