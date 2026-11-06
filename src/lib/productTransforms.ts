@@ -470,7 +470,7 @@ export function unassignRibInProduct(
  *   4. Rib already has a valid size → prev (additive; never overwrites).
  *      Form B: r.size && labelSet.has(r.size). Matches useSizingLayout.ts:118's definition
  *      of "unsized" (falsy OR not-in-mapping). Handles both null and the empty-string value
- *      validateProduct.ts:387 writes for orphan sizes on import.
+ *      validateProduct.ts:392 writes for orphan sizes on import.
  *
  * Does NOT update sizingCardOrder (matches allocateRibInProduct / addRibToRelease precedent).
  * AI-sized ribs render at the end of their size column via the sort-position Infinity fallback.

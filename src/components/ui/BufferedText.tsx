@@ -28,8 +28,8 @@ interface BufferedTextProps {
    * focus, exactly as Escape does.
    *
    * ⚠️ Set this on every field `validateProduct` requires to be non-empty —
-   * today the product, release and sprint names (`validateProduct.ts` :265,
-   * :277, :292). Without it the UI can write a value the importer rejects, so a
+   * today the product, release and sprint names (`validateProduct.ts` :270,
+   * :304, :319). Without it the UI can write a value the importer rejects, so a
    * user can build a project that cannot be exported and read back. Theme,
    * backbone and rib names are deliberately NOT in that set: the validator
    * accepts an empty one, so nothing downstream breaks.

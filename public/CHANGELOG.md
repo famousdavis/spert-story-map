@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.25 (2026-11-06)
+
+### Fixed
+
+- **A project file with a damaged description, date, change log or card order now imports cleanly.** A file could hold something else in those places, such as an object or a number. A damaged change log made the app refuse a file it had exported itself. A damaged card order could stop ribs being deleted and the project being duplicated, and a damaged description showed as `[object Object]` in Settings.
+- **What the import does with them.** A damaged description is left empty, a damaged date is removed, and a damaged card order is removed, so those cards take their default order. A damaged change log starts again, and a log with a few bad entries keeps the real ones. Ribs, sizes, allocations and progress are not touched.
+- ⚠️ **This runs when a file is imported.** A cloud project already saved with one of these can keep showing the notice at the top of the project each time it opens, even after you edit it.
+
 ## Version 0.53.24 (2026-11-06)
 
 ### Fixed
