@@ -13,13 +13,17 @@ interface UnassignedLaneProps {
   lane: LaneData;
   totalWidth: number;
   isDropTarget: boolean;
+  label?: string;
+  /** A line under the left label. */
+  note?: string;
 }
 
 /**
- * Renders the "Unassigned" lane at the bottom of the story map.
+ * Renders a lane that is not a release: "Unassigned" at the bottom of the story
+ * map, and the "Unknown release" lane above it.
  * Mirrored labels on left and right sides. No + Release or delete buttons.
  */
-export default function UnassignedLane({ lane, totalWidth, isDropTarget }: UnassignedLaneProps) {
+export default function UnassignedLane({ lane, totalWidth, isDropTarget, label = 'Unassigned', note }: UnassignedLaneProps) {
   const rightLabelX = totalWidth - RIGHT_LABEL_WIDTH;
 
   return (
@@ -38,12 +42,13 @@ export default function UnassignedLane({ lane, totalWidth, isDropTarget }: Unass
       />
       {/* Left label */}
       <div
-        className="absolute flex items-start pt-2 px-2"
+        className="absolute flex flex-col items-start gap-1 pt-2 px-2"
         style={{ top: lane.y, left: 0, width: LANE_LABEL_WIDTH, height: lane.height }}
       >
         <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-1 rounded">
-          Unassigned
+          {label}
         </span>
+        {note && <span className="text-[10px] leading-tight text-amber-700 dark:text-amber-400">{note}</span>}
       </div>
       {/* Right label */}
       <div
@@ -51,7 +56,7 @@ export default function UnassignedLane({ lane, totalWidth, isDropTarget }: Unass
         style={{ top: lane.y, left: rightLabelX, width: RIGHT_LABEL_WIDTH, height: lane.height }}
       >
         <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-1 rounded">
-          Unassigned
+          {label}
         </span>
       </div>
     </>
