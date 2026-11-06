@@ -47,7 +47,7 @@ import type { Product } from '../types';
 
 /** Divergent by construction: one dangling allocation and one dangling progress
  *  entry, so `validateProduct` REPAIRS rather than throws (C2's requirement) while
- *  still carrying the release AND sprint C3's dangling case needs (`:385` wraps the
+ *  still carrying the release AND sprint C3's dangling case needs (`:398` wraps the
  *  whole allocation reassignment, so with zero releases it never fires). */
 function danglingFixture(id = 'p-dangling'): Product {
   return {

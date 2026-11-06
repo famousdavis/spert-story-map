@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.53.20 (2026-11-06)
+
+### Fixed
+
+- **A project file with a damaged rib no longer breaks the project once imported.** A rib's release list or progress list could be missing, or hold the wrong kind of value, and import let it through. Depending on the value, that crashed the Map or the progress figures, blocked deleting a release or duplicating the project, or stopped a batch of AI edits partway. Either list now imports empty, and the other list stays as it was. The import does not say so. Progress on a rib that loses its release list is kept, does not count, and shows in Needs Attention.
+- ⚠️ **A project already saved with such a rib is not repaired by this.** Export it and import it again to clear it.
+
 ## Version 0.53.19 (2026-11-06)
 
 ### Added — act on progress that is not counting

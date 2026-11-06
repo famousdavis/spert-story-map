@@ -380,69 +380,77 @@ export function validateProduct(data: unknown): Product {
           else delete rib.cardColor;
         }
 
-        // Release allocations
-        if (Array.isArray(rib.releaseAllocations)) {
-          // Strip allocations referencing non-existent releases
-          if (releaseIds.size > 0) {
-            rib.releaseAllocations = rib.releaseAllocations.filter(
-              (alloc: { releaseId: unknown }) => isValidId(alloc.releaseId) && releaseIds.has(alloc.releaseId)
-            );
+        // The rib's two lists. Most of the app reads them as lists without a check, so
+        // anything that is not a list becomes an empty one, absent included. That is
+        // what `guardCloudProduct` does on a cloud read, so these two read the same from
+        // a file and from the cloud. Clearing one list leaves the other alone: history
+        // on a rib with no allocations is kept, and does not count.
+        //
+        // ⚠️ CLEARED, NOT REJECTED, like `size` and `cardColor` above. No writer stores
+        // anything else, but an export spreads the product as it stands, so a value that
+        // an older import let through is in a file the app itself wrote. An assert here
+        // would refuse that whole file, and would refuse a hand-written one that simply
+        // leaves an empty list out.
+        if (!Array.isArray(rib.releaseAllocations)) rib.releaseAllocations = [];
+        if (!Array.isArray(rib.progressHistory)) rib.progressHistory = [];
+
+        // Release allocations: strip those referencing non-existent releases
+        if (releaseIds.size > 0) {
+          rib.releaseAllocations = rib.releaseAllocations.filter(
+            (alloc: { releaseId: unknown }) => isValidId(alloc.releaseId) && releaseIds.has(alloc.releaseId)
+          );
+        }
+        assert(rib.releaseAllocations.length <= MAX_ALLOCATIONS,
+          `Too many allocations on rib "${rib.name || rib.id}"`);
+        for (const alloc of rib.releaseAllocations) {
+          assert(isValidId(alloc.releaseId), 'Allocation releaseId must be a valid string');
+          if (alloc.percentage !== undefined) {
+            assert(isNum(alloc.percentage), 'Allocation percentage must be a number');
+            alloc.percentage = clamp(alloc.percentage, 0, 100);
           }
-          assert(rib.releaseAllocations.length <= MAX_ALLOCATIONS,
-            `Too many allocations on rib "${rib.name || rib.id}"`);
-          for (const alloc of rib.releaseAllocations) {
-            assert(isValidId(alloc.releaseId), 'Allocation releaseId must be a valid string');
-            if (alloc.percentage !== undefined) {
-              assert(isNum(alloc.percentage), 'Allocation percentage must be a number');
-              alloc.percentage = clamp(alloc.percentage, 0, 100);
-            }
-            if (alloc.memo !== undefined) {
-              assert(typeof alloc.memo === 'string' && alloc.memo.length <= MAX_MEMO,
-                'Allocation memo too long');
-            }
-            stripObject(alloc, KNOWN_ALLOCATION_FIELDS);
+          if (alloc.memo !== undefined) {
+            assert(typeof alloc.memo === 'string' && alloc.memo.length <= MAX_MEMO,
+              'Allocation memo too long');
           }
+          stripObject(alloc, KNOWN_ALLOCATION_FIELDS);
         }
 
-        // Progress history
-        if (Array.isArray(rib.progressHistory)) {
-          // Strip entries referencing non-existent sprints or releases
-          rib.progressHistory = rib.progressHistory.filter((p: { sprintId: unknown; releaseId?: unknown }) => {
-            if (!isValidId(p.sprintId)) return false;
-            if (sprintIds.size > 0 && !sprintIds.has(p.sprintId)) return false;
-            if (p.releaseId !== undefined) {
-              if (!isValidId(p.releaseId)) return false;
-              if (releaseIds.size > 0 && !releaseIds.has(p.releaseId)) return false;
-            }
-            return true;
-          });
-          assert(rib.progressHistory.length <= MAX_PROGRESS,
-            `Too many progress entries on rib "${rib.name || rib.id}"`);
-          for (const p of rib.progressHistory) {
-            // `percentComplete` is declared `number | null`, and BOTH values are
-            // written by production code — progressMutations.removeProgress writes
-            // null when clearing the % on an entry that still has a comment, and
-            // updateComment writes null when creating a comment-only entry. The
-            // previous `isNum()` assert was false for null and therefore threw,
-            // rejecting the ENTIRE file: any project holding an assessment note
-            // without a percentage could not be re-imported.
-            //
-            // An absent field is normalised to null so the in-memory shape always
-            // matches the declared contract — callers filter on `!== null`, and an
-            // undefined slipping through is what made getRibReleaseProgress and
-            // getRibReleaseProgressAsOf disagree.
-            if (p.percentComplete === undefined || p.percentComplete === null) {
-              p.percentComplete = null;
-            } else {
-              assert(isNum(p.percentComplete), 'Progress percentComplete must be a number');
-              p.percentComplete = clamp(p.percentComplete, 0, 100);
-            }
-            if (p.comment !== undefined) {
-              assert(typeof p.comment === 'string' && p.comment.length <= MAX_MEMO,
-                'Progress comment too long');
-            }
-            stripObject(p, KNOWN_PROGRESS_FIELDS);
+        // Progress history: strip entries referencing non-existent sprints or releases
+        rib.progressHistory = rib.progressHistory.filter((p: { sprintId: unknown; releaseId?: unknown }) => {
+          if (!isValidId(p.sprintId)) return false;
+          if (sprintIds.size > 0 && !sprintIds.has(p.sprintId)) return false;
+          if (p.releaseId !== undefined) {
+            if (!isValidId(p.releaseId)) return false;
+            if (releaseIds.size > 0 && !releaseIds.has(p.releaseId)) return false;
           }
+          return true;
+        });
+        assert(rib.progressHistory.length <= MAX_PROGRESS,
+          `Too many progress entries on rib "${rib.name || rib.id}"`);
+        for (const p of rib.progressHistory) {
+          // `percentComplete` is declared `number | null`, and BOTH values are
+          // written by production code — progressMutations.removeProgress writes
+          // null when clearing the % on an entry that still has a comment, and
+          // updateComment writes null when creating a comment-only entry. The
+          // previous `isNum()` assert was false for null and therefore threw,
+          // rejecting the ENTIRE file: any project holding an assessment note
+          // without a percentage could not be re-imported.
+          //
+          // An absent field is normalised to null so the in-memory shape always
+          // matches the declared contract — callers filter on `!== null`, and an
+          // undefined slipping through is what made getRibReleaseProgress and
+          // getRibReleaseProgressAsOf disagree.
+          if (p.percentComplete === undefined || p.percentComplete === null) {
+            p.percentComplete = null;
+          } else {
+            assert(isNum(p.percentComplete), 'Progress percentComplete must be a number');
+            p.percentComplete = clamp(p.percentComplete, 0, 100);
+          }
+          if (p.comment !== undefined) {
+            assert(typeof p.comment === 'string' && p.comment.length <= MAX_MEMO,
+              'Progress comment too long');
+          }
+          stripObject(p, KNOWN_PROGRESS_FIELDS);
         }
 
         stripObject(rib, KNOWN_RIB_FIELDS);
