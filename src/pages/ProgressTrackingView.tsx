@@ -24,6 +24,7 @@ import SprintSummaryCard from '../components/progress/SprintSummaryCard';
 import BurnUpChart from '../components/progress/BurnUpChart';
 import ProgressRow from '../components/progress/ProgressRow';
 import GroupSummaryHeader from '../components/progress/GroupSummaryHeader';
+import GroupsFooter from '../components/progress/GroupsFooter';
 import { buildProgressGroups } from '../components/progress/progressGroups';
 import type { GroupBy } from '../components/progress/progressGroups';
 import ProgressHeader from '../components/progress/ProgressHeader';
@@ -308,6 +309,7 @@ export default function ProgressTrackingView() {
               </div>
             );
           })}
+          <GroupsFooter product={product} selectedSprint={selectedSprint} groupBy={groupBy} ribs={allRibs} />
         </div>
       )}
     </div>
