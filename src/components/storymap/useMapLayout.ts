@@ -68,6 +68,13 @@ export interface MapUnassignedLane {
   height: number;
 }
 
+/**
+ * The lane for allocations to a release the project does not hold, which only a
+ * file holding no releases can produce: `validateProduct` removes them from any
+ * other. Null unless a rib has one.
+ */
+export type MapUnknownLane = MapUnassignedLane;
+
 /** A rib plus the theme/backbone context and derived totals the map displays. */
 export interface MapRibData extends RibItem {
   themeName: string;
@@ -78,7 +85,11 @@ export interface MapRibData extends RibItem {
   allocTotal: number;
 }
 
-/** A rib assigned to one lane. `releaseId` is null in the unassigned lane. */
+/**
+ * A rib assigned to one lane. `releaseId` is null in the unassigned lane. In the
+ * unknown lane it is the id the rib holds, which is what lets a drag move that
+ * allocation and carry its progress.
+ */
 export interface MapRibEntry extends MapRibData {
   releaseId: string | null;
   allocation: ReleaseAllocation | null;
@@ -109,6 +120,7 @@ export interface MapLayout {
   themeSpans: MapThemeSpan[];
   releaseLanes: MapReleaseLane[];
   cells: MapCell[];
+  unknownLane: MapUnknownLane | null;
   unassignedLane: MapUnassignedLane | null;
   /**
    * Ribs per (release, column), keyed `${releaseId}:${colIdx}` — only the slots
@@ -138,6 +150,14 @@ function tallyLane(tallies: Map<string, LaneTally>, releaseId: string, colIdx: n
   if (bucketLength > t.max) t.max = bucketLength;
 }
 
+/** Add a rib to a column's bucket and return the column's new height in ribs. */
+function addToColumn(byCol: Record<number, MapRibEntry[]>, colIdx: number, entry: MapRibEntry): number {
+  const bucket = byCol[colIdx] ?? [];
+  bucket.push(entry);
+  byCol[colIdx] = bucket;
+  return bucket.length;
+}
+
 /** The columns holding ribs for one lane, in column order (the order `columns` has). */
 function occupiedColumns(cols: number[] | undefined, colByIdx: Map<number, MapColumn>): MapColumn[] {
   if (!cols) return [];
@@ -157,7 +177,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   const releases = [...(product.releases || [])].sort((a, b) => a.order - b.order);
 
   if (themes.length === 0) {
-    return { columns: [], themeSpans: [], releaseLanes: [], cells: [], unassignedLane: null, ribCounts: {}, unassignedRibCounts: {}, totalWidth: 0, totalHeight: 0 };
+    return { columns: [], themeSpans: [], releaseLanes: [], cells: [], unknownLane: null, unassignedLane: null, ribCounts: {}, unassignedRibCounts: {}, totalWidth: 0, totalHeight: 0 };
   }
 
   // 1. Build columns — one per backbone, grouped by theme
@@ -217,10 +237,15 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
   // 3. Gather rib items with context
   const ribsByRelCol: Record<string, MapRibEntry[]> = {}; // key: `${releaseId}:${colIdx}`
   const unassignedByCol: Record<number, MapRibEntry[]> = {}; // key: colIdx
+  // Allocations to a release the project does not hold. No release lane can draw
+  // them, and the rib is not unassigned: the figures count it as allocated.
+  const unknownByCol: Record<number, MapRibEntry[]> = {}; // key: colIdx
+  const releaseIds = new Set(releases.map(r => r.id));
   // Tallied while bucketing, so steps 4–6 visit only the (lane, column) pairs
   // that HOLD ribs. They used to visit every release × every column.
   const laneTallies = new Map<string, LaneTally>();
   let maxUnassigned = 0;
+  let maxUnknown = 0;
 
   for (const theme of themes) {
     for (const backbone of theme.backboneItems) {
@@ -239,20 +264,24 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
         };
 
         if (rib.releaseAllocations.length === 0) {
-          const bucket = unassignedByCol[col.colIdx] ?? [];
-          bucket.push({ ...ribData, releaseId: null, allocation: null });
-          unassignedByCol[col.colIdx] = bucket;
-          if (bucket.length > maxUnassigned) maxUnassigned = bucket.length;
+          const height = addToColumn(unassignedByCol, col.colIdx, { ...ribData, releaseId: null, allocation: null });
+          if (height > maxUnassigned) maxUnassigned = height;
         } else {
           for (const alloc of currentAllocations(rib)) {
-            const key = `${alloc.releaseId}:${col.colIdx}`;
-            const bucket = ribsByRelCol[key] ?? [];
-            bucket.push({
+            const entry = {
               ...ribData,
               releaseId: alloc.releaseId,
               allocation: alloc,
               isPartial: alloc.percentage < 100,
-            });
+            };
+            if (!releaseIds.has(alloc.releaseId)) {
+              const height = addToColumn(unknownByCol, col.colIdx, entry);
+              if (height > maxUnknown) maxUnknown = height;
+              continue;
+            }
+            const key = `${alloc.releaseId}:${col.colIdx}`;
+            const bucket = ribsByRelCol[key] ?? [];
+            bucket.push(entry);
             ribsByRelCol[key] = bucket;
             tallyLane(laneTallies, alloc.releaseId, col.colIdx, bucket.length);
           }
@@ -289,7 +318,14 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
     currentY += height;
   }
 
-  // 5. Unassigned lane (always present so + Release button is always visible)
+  // 5. Unknown release lane, only when a rib needs it. It reserves no "+ Rib" room:
+  // nothing can be added to a release that is not there.
+  const unknownLane: MapUnknownLane | null = maxUnknown > 0
+    ? { y: currentY, height: maxUnknown * (CELL_HEIGHT + CELL_GAP) + CELL_PAD * 2 }
+    : null;
+  if (unknownLane) currentY += unknownLane.height;
+
+  // Unassigned lane (always present so + Release button is always visible)
   const unassignedLane: MapUnassignedLane = {
     y: currentY,
     height: Math.max(
@@ -303,6 +339,17 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
 
   // 6. Place rib cells with absolute positions
   const cells: MapCell[] = [];
+  const placeColumn = (ribs: MapRibEntry[], col: MapColumn, laneY: number) => {
+    ribs.forEach((rib, i) => {
+      cells.push({
+        ...rib,
+        x: col.x + CELL_PAD,
+        y: laneY + CELL_PAD + i * (CELL_HEIGHT + CELL_GAP),
+        width: COL_WIDTH - CELL_PAD * 2,
+        height: CELL_HEIGHT,
+      });
+    });
+  };
   const cardOrder = product.releaseCardOrder || {};
 
   // Sort ribs within a lane column by releaseCardOrder position. The position
@@ -339,16 +386,15 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
       const key = `${lane.releaseId}:${col.colIdx}`;
       const ribs = ribsByRelCol[key];
       if (!ribs) continue;
-      const sorted = sortByCardOrder(ribs, lane.releaseId);
-      sorted.forEach((rib, i) => {
-        cells.push({
-          ...rib,
-          x: col.x + CELL_PAD,
-          y: lane.y + CELL_PAD + i * (CELL_HEIGHT + CELL_GAP),
-          width: COL_WIDTH - CELL_PAD * 2,
-          height: CELL_HEIGHT,
-        });
-      });
+      placeColumn(sortByCardOrder(ribs, lane.releaseId), col, lane.y);
+    }
+  }
+
+  // Unknown release cells. Rib order: a card here can leave but cannot be reordered.
+  if (unknownLane) {
+    for (const col of columns) {
+      const ribs = unknownByCol[col.colIdx];
+      if (ribs) placeColumn(ribs, col, unknownLane.y);
     }
   }
 
@@ -357,16 +403,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
     for (const col of columns) {
       const ribs = unassignedByCol[col.colIdx];
       if (!ribs) continue;
-      const sorted = sortByCardOrder(ribs, 'unassigned');
-      sorted.forEach((rib, i) => {
-        cells.push({
-          ...rib,
-          x: col.x + CELL_PAD,
-          y: unassignedLane.y + CELL_PAD + i * (CELL_HEIGHT + CELL_GAP),
-          width: COL_WIDTH - CELL_PAD * 2,
-          height: CELL_HEIGHT,
-        });
-      });
+      placeColumn(sortByCardOrder(ribs, 'unassigned'), col, unassignedLane.y);
     }
   }
 
@@ -382,6 +419,7 @@ export function computeLayout(product: Product, collapsedReleaseIds: string[] = 
     themeSpans,
     releaseLanes,
     cells,
+    unknownLane,
     unassignedLane,
     ribCounts,
     unassignedRibCounts,

@@ -613,6 +613,19 @@ describe('W4 map layout — lanes × columns', () => {
     expect(gb?.backboneId).toBe(col.backboneId);
   });
 
+  it('places ribs on unknown releases without visiting the release list per allocation', () => {
+    const reads = { n: 0 };
+    const R = 300;
+    const N = 300;
+    const product = wide(R, 300, reads);
+    const backbone = product.themes[0]!.backboneItems[0]!;
+    backbone.ribItems = Array.from({ length: N }, (_, i) => plainRib(i, { releaseAllocations: [{ releaseId: `gone${i}`, percentage: 100 }] }));
+    const layout = computeLayout(product, []);
+    expect(layout.cells.filter(c => c.releaseId?.startsWith('gone'))).toHaveLength(N);
+    // Finding a lane or a release per allocation reads R × N.
+    expect(reads.n).toBeLessThan(20 * R);
+  });
+
   it('sizes the lanes without visiting every release × column', () => {
     const reads = { n: 0 };
     const R = 300;

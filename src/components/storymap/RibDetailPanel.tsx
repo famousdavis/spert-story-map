@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { getRibItemPercentComplete } from '../../lib/calculations';
 import { currentAllocations } from '../../lib/progressRule';
+import { UNKNOWN_RELEASE_LABEL } from '../../lib/reconciliation';
 import { NOTES_MAX } from '../../lib/constants';
 import { useBufferedField } from '../../hooks/useBufferedField';
 import SizePicker from '../ui/SizePicker';
@@ -230,7 +231,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
               <div className="space-y-2">
                 {currentAllocations(rib).map(alloc => (
                   <div key={alloc.releaseId} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">{releaseMap[alloc.releaseId] || 'Unknown'}</span>
+                    <span className="text-gray-700 dark:text-gray-300">{releaseMap[alloc.releaseId] || UNKNOWN_RELEASE_LABEL}</span>
                     <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">{alloc.percentage}%</span>
                   </div>
                 ))}

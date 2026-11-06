@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 0.53.21 (2026-11-06)
+
+### Fixed
+
+- **A rib allocated to a release the project does not have now has a card on the Map.** It had none: no release lane could draw it, and the Unassigned lane holds only ribs with no allocation. An **Unknown release** lane now appears above Unassigned when one is needed, with the name Progress and Insights already use.
+- **Drag a card from that lane to a release to fix it.** Its allocation and progress move with it. A card cannot be dragged into the lane.
+- ⚠️ **Drop on a release if the rib has progress, not on Unassigned.** Unassigned clears the allocation, as it does for any card, and the progress stays on the rib but counts nowhere. Needs Attention does not list it either, because that list shows only records on a release that exists.
+- **A rib split with a missing release shows a card for each share**, as any split rib does.
+- The rib's detail panel now says "Unknown release" where it said "Unknown".
+- This takes a project file holding no releases at all. A file holding any release has such allocations removed on import.
+
 ## Version 0.53.20 (2026-11-06)
 
 ### Fixed

@@ -13,6 +13,7 @@ import UnassignedLane from './UnassignedLane';
 import DropHighlight from './DropHighlight';
 import InsertionIndicator from './InsertionIndicator';
 import { getThemeColorClasses } from '../../lib/themeColors';
+import { UNKNOWN_RELEASE_LABEL } from '../../lib/reconciliation';
 import { releaseHasAllocations } from '../../lib/settingsMutations';
 import type { Theme, Product } from '../../types';
 import type { RibCardColorKey } from '../../lib/ribCardColors';
@@ -61,7 +62,7 @@ export default function MapContent({
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
   onToggleCollapse, selectedIds, editingRibId,
 }: MapContentProps) {
-  const { columns, themeSpans, releaseLanes, cells, unassignedLane, totalWidth, totalHeight } = layout;
+  const { columns, themeSpans, releaseLanes, cells, unknownLane, unassignedLane, totalWidth, totalHeight } = layout;
 
   // The "+ Rib" hover button is drawn only for the slot under the pointer. One
   // invisible button per lane × column used to sit in the DOM, which a map with
@@ -202,6 +203,17 @@ export default function MapContent({
           onReleaseDragStart={onReleaseDragStart}
         />
       ))}
+
+      {/* Unknown release lane: never a drop target, nothing can be allocated to it */}
+      {unknownLane && (
+        <UnassignedLane
+          lane={unknownLane}
+          totalWidth={totalWidth}
+          isDropTarget={false}
+          label={UNKNOWN_RELEASE_LABEL}
+          note="Allocated to a release this project does not have. Drag to a release to fix."
+        />
+      )}
 
       {/* Unassigned lane */}
       {unassignedLane && (
