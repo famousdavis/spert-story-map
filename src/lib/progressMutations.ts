@@ -262,16 +262,26 @@ export function describeAllocationMove(
 /** Something Save would do to a rib's progress that the dialog should say first. */
 export type AllocationWarning =
   | { kind: 'stops-counting'; releaseId: string }
+  | { kind: 'notes-stay'; releaseId: string }
   | { kind: 'capped'; releaseId: string; recorded: number; counted: number };
 
-const holdsProgress = (entry: ProgressEntry, sprintIds: Set<string>) =>
-  (sprintIds.has(entry.sprintId) && (entry.percentComplete ?? 0) > 0) || Boolean(entry.comment);
+/**
+ * What a release leaving the rib takes out of the figures, if anything. Notes are not
+ * progress: after Clear progress keeps one, "has progress recorded" would be false, and
+ * the list it points at would show nothing.
+ */
+function leavingWarning(history: ProgressEntry[], releaseId: string, sprintIds: Set<string>): AllocationWarning | null {
+  const entries = history.filter(e => e.releaseId === releaseId);
+  if (entries.some(e => sprintIds.has(e.sprintId) && (e.percentComplete ?? 0) > 0)) return { kind: 'stops-counting', releaseId };
+  return entries.some(e => e.comment) ? { kind: 'notes-stay', releaseId } : null;
+}
 
 /**
  * What an allocation change would stop counting. On a detected move nothing stops:
  * the records carry, or the target's count again. Otherwise each release leaving
- * the rib with a record or a comment is named. A release staying on the rib, or a
- * move's target, is named when it holds more than its percentage will count.
+ * the rib with a record is named, or with only comments, as that. A release staying
+ * on the rib, or a move's target, is named when it holds more than its percentage will
+ * count.
  */
 export function describeAllocationWarnings(
   rib: Pick<RibItem, 'releaseAllocations' | 'progressHistory'>,
@@ -289,8 +299,8 @@ export function describeAllocationWarnings(
   const warnings: AllocationWarning[] = [];
   if (!move) {
     for (const releaseId of before) {
-      if (after.has(releaseId)) continue;
-      if (history.some(e => e.releaseId === releaseId && holdsProgress(e, sprintIds))) warnings.push({ kind: 'stops-counting', releaseId });
+      const warning = after.has(releaseId) ? null : leavingWarning(history, releaseId, sprintIds);
+      if (warning) warnings.push(warning);
     }
   }
   for (const row of next) {

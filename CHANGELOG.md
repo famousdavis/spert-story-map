@@ -14,6 +14,7 @@
 
 ### Changed
 
+- **The allocation dialog no longer calls a note progress.** A release holding only notes now says so, and that they stay on the rib.
 - **Deleting a sprint now asks when it holds recorded progress or notes.** It used to delete them from every rib at one click.
 - **Deleting a release says when recorded progress and notes go with it**, the same way on Settings, the Map and Release Planning. Settings now asks before deleting a release that holds only records, which used to go without a word.
 

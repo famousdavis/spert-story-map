@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { updateProgress, removeProgress, updateComment, calculateNextSprintEndDate, describeAllocationWarnings } from '../lib/progressMutations';
+import { updateProgress, removeProgress, updateComment, calculateNextSprintEndDate, clearRibProgress, describeAllocationWarnings } from '../lib/progressMutations';
 import type { Product, ProductUpdater, Theme, Backbone, RibItem, ProgressEntry, ReleaseAllocation, Sprint } from '../types';
 import { req } from './testHelpers';
 
@@ -307,9 +307,31 @@ describe('describeAllocationWarnings', () => {
       .toEqual([{ kind: 'stops-counting', releaseId: 'r1' }]);
   });
 
-  it('names a removed release holding only a comment', () => {
+  it('says a removed release holding only a comment has notes, not progress', () => {
     expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', null, 'note')], [on('r2', 50)]))
+      .toEqual([{ kind: 'notes-stay', releaseId: 'r1' }]);
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', 0, 'note')], [on('r2', 50)]))
+      .toEqual([{ kind: 'notes-stay', releaseId: 'r1' }]);
+    expect(warn([on('r1', 50), on('r2', 50)], [at('gone', 'r1', 50, 'note')], [on('r2', 50)]))
+      .toEqual([{ kind: 'notes-stay', releaseId: 'r1' }]);
+  });
+
+  it('a record beside a comment is still a record', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', null, 'note'), at('s2', 'r1', 20)], [on('r2', 50)]))
       .toEqual([{ kind: 'stops-counting', releaseId: 'r1' }]);
+  });
+
+  it('says nothing about a comment on a release staying on the rib', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', null, 'note')], [on('r1', 50), on('r2', 50)])).toEqual([]);
+  });
+
+  it('after a Clear that keeps a note, Unassign All says notes, not progress', () => {
+    const rib = { ...makeRib('rib-1', [at('s1', 'r1', 30, 'kept')]), releaseAllocations: [on('r1')] };
+    const backbone = { id: 'b', name: 'B', order: 1, ribItems: [rib] };
+    const cleared = clearRibProgress(makeProduct({ themes: [{ id: 't', name: 'T', order: 1, backboneItems: [backbone] }] }), 'rib-1');
+    const after = req(cleared.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+    expect(after.progressHistory.map(e => e.percentComplete)).toEqual([null]);
+    expect(describeAllocationWarnings(after, [], sprints)).toEqual([{ kind: 'notes-stay', releaseId: 'r1' }]);
   });
 
   it('does not name a removed release for a record on another release', () => {
