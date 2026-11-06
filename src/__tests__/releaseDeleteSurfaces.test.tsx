@@ -169,4 +169,32 @@ describe('Release Planning', () => {
     expect(dialogText()).toContain('This release will be permanently removed.');
     expect(dialogText()).not.toContain(RELEASE_RECORDS_LINE);
   });
+
+  describe('a filter hiding a release\'s ribs', () => {
+    const nonCoreOnR2 = () => makeProduct([{ ...makeRib('r', [on('R2')], [entry('S1', 'R2', 30)]), category: 'non-core' }]);
+
+    it('Delete stays shut with every rib showing', () => {
+      mount(ReleasePlanningView, nonCoreOnR2());
+      deleteR2();
+      expect(dialog()).toBeNull();
+    });
+
+    it('Delete stays shut when the filter hides the allocated rib', () => {
+      mount(ReleasePlanningView, nonCoreOnR2());
+      fireEvent.click(screen.getByRole('button', { name: 'Core' }));
+      expect(screen.queryByText('r')).toBeNull();
+      deleteR2();
+      expect(dialog()).toBeNull();
+      expect(releaseIds()).toContain('R2');
+      expect(ribOf(current, 'r').releaseAllocations).toEqual([on('R2')]);
+    });
+
+    it('a release with nothing on it still deletes, whatever the filter', () => {
+      mount(ReleasePlanningView, holding([]));
+      fireEvent.click(screen.getByRole('button', { name: 'Core' }));
+      deleteR2();
+      confirm('Delete');
+      expect(releaseIds()).not.toContain('R2');
+    });
+  });
 });

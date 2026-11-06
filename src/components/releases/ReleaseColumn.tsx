@@ -10,7 +10,7 @@ import ProgressBar from '../ui/ProgressBar';
 import { useTooltip } from '../ui/Tooltip';
 import useInlineEdit from '../storymap/useInlineEdit';
 import { formatDate } from '../../lib/formatDate';
-import { releaseDeleteMessage } from '../../lib/settingsMutations';
+import { releaseDeleteMessage, releaseHasAllocations } from '../../lib/settingsMutations';
 import type { Release, Product } from '../../types';
 import type { EnrichedRib } from '../../lib/calculations';
 
@@ -104,7 +104,9 @@ export default function ReleaseColumn({
     release?.name || '',
     (newName) => { if (release) onRenameRelease?.(release.id, newName); },
   );
-  const hasItems = ribs.length > 0;
+  // The project, not `ribs`: that list follows the category filter, and a filter must
+  // not open Delete on a release that still holds allocations.
+  const hasItems = release ? releaseHasAllocations(product, release.id) : false;
   const {
     triggerRef: deleteTriggerRef,
     onMouseEnter: deleteMouseEnter,
