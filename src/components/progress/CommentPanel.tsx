@@ -5,6 +5,7 @@
 import React, { useId } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { formatDate } from '../../lib/formatDate';
+import { ribHasProgress } from '../../lib/progressMutations';
 import type { RibItem, Sprint } from '../../types';
 import type { CommentHistoryEntry } from '../../lib/progressViewHelpers';
 
@@ -24,6 +25,7 @@ interface CommentPanelProps {
   updateComment: (ribId: string, releaseId: string | null, comment: string) => void;
   getCommentHistory: (rib: RibItem, releaseId: string | null) => CommentHistoryEntry[];
   editable: boolean;
+  onClearProgress: (rib: RibItem) => void;
 }
 
 /**
@@ -33,7 +35,7 @@ interface CommentPanelProps {
 export default function CommentPanel({
   rib, sprint, selectedSprint, rowKey,
   savedComment, commentDrafts, setCommentDrafts,
-  updateComment, getCommentHistory, editable,
+  updateComment, getCommentHistory, editable, onClearProgress,
 }: CommentPanelProps) {
   const draft = commentDrafts[rowKey] ?? savedComment;
   const history = getCommentHistory(rib, rib._releaseId);
@@ -98,6 +100,17 @@ export default function CommentPanel({
       ) : !editable && !savedComment ? (
         <p className="text-xs text-gray-300 dark:text-gray-600 italic">No assessment notes yet.</p>
       ) : null}
+
+      {/* On read-only rows too: Clear covers the whole rib, so it needs no single allocation. */}
+      {ribHasProgress(rib) && (
+        <button
+          type="button"
+          onClick={() => onClearProgress(rib)}
+          className="text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+        >
+          Clear progress
+        </button>
+      )}
     </div>
   );
 }

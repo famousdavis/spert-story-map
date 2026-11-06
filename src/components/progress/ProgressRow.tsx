@@ -55,6 +55,7 @@ interface ProgressRowProps {
   updateProgress: (ribId: string, releaseId: string | null, value: number) => void;
   removeProgress: (ribId: string, releaseId: string | null) => void;
   updateComment: (ribId: string, releaseId: string | null, comment: string) => void;
+  onClearProgress: (rib: RibItem) => void;
   sizeMapping: SizeMapping[];
 }
 
@@ -63,7 +64,7 @@ export default function ProgressRow({
   showTargetCol, totalCols, expandedRows, toggleRow,
   commentDrafts, setCommentDrafts, progressDrafts, setProgressDrafts,
   getSprintPct, getCurrentPct, getDelta, getCommentCount, getCommentHistory,
-  updateProgress, removeProgress, updateComment, sizeMapping,
+  updateProgress, removeProgress, updateComment, onClearProgress, sizeMapping,
 }: ProgressRowProps) {
   const rowKey = `${rib.id}-${rib._releaseId || idx}`;
   const isExpanded = expandedRows.has(rowKey);
@@ -212,6 +213,7 @@ export default function ProgressRow({
               updateComment={updateComment}
               getCommentHistory={getCommentHistory}
               editable={rib._editable}
+              onClearProgress={onClearProgress}
             />
           </td>
         </tr>

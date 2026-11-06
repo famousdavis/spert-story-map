@@ -8,6 +8,7 @@ import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import InsightsView from '../pages/InsightsView';
+import ProgressTrackingView from '../pages/ProgressTrackingView';
 import { UNDO_HINT } from '../lib/constants';
 import { isRibLocked } from '../lib/ribHelpers';
 import type { Product, ProgressEntry, ReleaseAllocation } from '../types';
@@ -206,5 +207,74 @@ describe('Remove is guarded by a confirm', () => {
     fireEvent.click(dialog().getByRole('button', { name: 'Cancel' }));
     expect(writes).toBe(0);
     expect(history()).toEqual([['S1', 'R2', 30]]);
+  });
+});
+
+describe('Clear progress, from the Progress row', () => {
+  function ProgressHost({ initial }: { initial: Product }) {
+    const [product, setProduct] = useState(initial);
+    current = product;
+    const updateProduct = (updater: unknown) => {
+      writes++;
+      setProduct(updater as (prev: Product) => Product);
+    };
+    const context = { product, updateProduct, undo: () => {}, redo: () => {} };
+    return (
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Outlet context={context} />}>
+            <Route path="*" element={<ProgressTrackingView />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  function openRow(entries: ProgressEntry[], allocations: ReleaseAllocation[] = [on('R1')]) {
+    writes = 0;
+    render(<ProgressHost initial={makeProduct([makeRib('r', allocations, entries)])} />);
+    fireEvent.click(document.querySelector('tbody tr td') as HTMLElement);
+  }
+
+  const clearButton = () => screen.queryByRole('button', { name: 'Clear progress' });
+
+  it('is behind a confirm that says it covers everything, that notes stay, and where undo is', () => {
+    openRow([entry('S1', 'R1', 30)]);
+    fireEvent.click(clearButton() as HTMLElement);
+    expect(writes).toBe(0);
+    expect(dialogText()).toContain(
+      `Clear all progress on "r"? This covers every release and every sprint, including records that are not counting. Notes stay, and the rib unlocks. ${UNDO_HINT}`,
+    );
+  });
+
+  it('one confirm is one write: inert records go, a note stays, and the rib unlocks', () => {
+    openRow([entry('S1', 'R1', 30), entry('S1', 'R2', 40, 'note')]);
+    expect(isRibLocked(ribOf(current, 'r'), current.sprints)).toBe(true);
+    fireEvent.click(clearButton() as HTMLElement);
+    fireEvent.click(dialog().getByRole('button', { name: 'Clear progress' }));
+    expect(writes).toBe(1);
+    expect(ribOf(current, 'r').progressHistory).toEqual([expect.objectContaining({ sprintId: 'S1', releaseId: 'R2', percentComplete: null, comment: 'note' })]);
+    expect(isRibLocked(ribOf(current, 'r'), current.sprints)).toBe(false);
+  });
+
+  it('Cancel writes nothing', () => {
+    openRow([entry('S1', 'R1', 30)]);
+    fireEvent.click(clearButton() as HTMLElement);
+    fireEvent.click(dialog().getByRole('button', { name: 'Cancel' }));
+    expect(writes).toBe(0);
+    expect(history()).toEqual([['S1', 'R1', 30]]);
+  });
+
+  it('is on a read-only row too', () => {
+    writes = 0;
+    render(<ProgressHost initial={makeProduct([makeRib('r', [on('R1')], [entry('S1', 'R1', 30)])])} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Backbone' }));
+    fireEvent.click(document.querySelector('tbody tr td') as HTMLElement);
+    expect(clearButton()).toBeTruthy();
+  });
+
+  it('is not offered with nothing to clear', () => {
+    openRow([entry('S1', 'R1', null, 'only a note')]);
+    expect(clearButton()).toBeNull();
   });
 });
