@@ -807,7 +807,7 @@ describe('applyAiOp — size_rib', () => {
   });
 
   it('[EDGE] rib with size "" (post-import orphan clear) is sizeable — Form B treats it as unsized', () => {
-    // validateProduct.ts:225 persists orphan sizes as '' not null.
+    // validateProduct.ts:387 persists orphan sizes as '' not null.
     // Form B: '' is falsy → not "already validly sized" → sizeable.
     // A guard of !== null would skip this rib despite the UI showing it as unsized.
     const p = makeProductWithSizing();
