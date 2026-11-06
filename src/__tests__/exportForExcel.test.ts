@@ -239,6 +239,8 @@ describe('buildExcelWorkbook — Sheet 2 (Release Summary)', () => {
     expect(ws.getRow(7).getCell(2).value).toBe(15);
     expect(ws.getRow(7).getCell(3).value).toBeCloseTo(8.2 / 15);
     expect(ws.getRow(7).getCell(3).numFmt).toBe('0%');
+    expect(ws.getRow(7).font?.bold).toBe(true);
+    expect(ws.getRow(6).font?.bold).toBeFalsy();
     expect(ws.getRow(8).getCell(1).value).toBeNull();
     const releases = [4, 5].reduce((sum, r) => sum + Number(ws.getRow(r).getCell(2).value), 0);
     expect(releases + Number(ws.getRow(6).getCell(2).value)).toBeCloseTo(15);

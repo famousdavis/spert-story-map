@@ -269,6 +269,21 @@ describe('a write keeps one entry per (sprint, release)', () => {
     expect(history.filter(e => e.sprintId === 's1' && e.releaseId === 'r1')).toMatchObject([{ percentComplete: null, comment: 'keep me' }]);
   });
 
+  it('finds the pair wherever it sits in the history', () => {
+    const later: ProgressEntry[] = [
+      { sprintId: 's9', releaseId: 'r9', percentComplete: 70 },
+      { sprintId: 's1', releaseId: 'r1', percentComplete: 10 },
+      { sprintId: 's1', releaseId: 'r1', percentComplete: 30 },
+    ];
+    expect(after(product(later), u => updateProgress(u, 'rib-1', 'r1', 's1', 20)).map(e => e.percentComplete)).toEqual([70, 20]);
+  });
+
+  it('writes to a rib with no history at all', () => {
+    const bare = product([]);
+    delete (req(bare.themes[0]?.backboneItems[0]?.ribItems[0], 'rib') as Partial<RibItem>).progressHistory;
+    expect(after(bare, u => updateProgress(u, 'rib-1', 'r1', 's1', 20))).toHaveLength(1);
+  });
+
   it('leaves a history with no duplicates exactly as it was, bar the write', () => {
     const clean: ProgressEntry[] = [{ sprintId: 's1', releaseId: 'r1', percentComplete: 10 }, { sprintId: 's2', releaseId: 'r1', percentComplete: 40 }];
     expect(after(product(clean), u => updateProgress(u, 'rib-1', 'r1', 's2', 50)).map(e => e.percentComplete)).toEqual([10, 50]);
@@ -295,6 +310,16 @@ describe('describeAllocationWarnings', () => {
   it('names a removed release holding only a comment', () => {
     expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', null, 'note')], [on('r2', 50)]))
       .toEqual([{ kind: 'stops-counting', releaseId: 'r1' }]);
+  });
+
+  it('does not name a removed release for a record on another release', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r2', 20)], [on('r2', 50)])).toEqual([]);
+  });
+
+  it('reads a rib with no history as having nothing to say', () => {
+    const bare = { releaseAllocations: [on('r1')] } as RibItem;
+    expect(describeAllocationWarnings(bare, [], sprints)).toEqual([]);
+    expect(describeAllocationWarnings(bare, [on('r2')], sprints)).toEqual([]);
   });
 
   it('does not name a removed release with a 0, a null, or a record for a sprint that is gone', () => {

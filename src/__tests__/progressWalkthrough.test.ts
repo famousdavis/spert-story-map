@@ -90,6 +90,18 @@ describe('§9: the walkthrough, through the real writers', () => {
     expect(delta('c', 'R2')).toBeNull();
   });
 
+  it('splits points this sprint by category, and has no percentage to divide by for an empty one', () => {
+    const product = walkthrough(3);
+    const nonCoreRib = ribOf(product, 'b');
+    nonCoreRib.category = 'non-core';
+    const summary = req(getSprintSummary({ ...product }, 'S2'), 'summary');
+    // a +6 is core; b +4 is non-core.
+    expect(summary.core.pointsThisSprint).toBe(6);
+    expect(summary.nonCore.pointsThisSprint).toBe(4);
+    const allCore = req(getSprintSummary(walkthrough(3), 'S2'), 'summary');
+    expect(allCore.nonCore).toEqual({ totalPoints: 0, completedPoints: 0, pointsThisSprint: 0, percentComplete: 0 });
+  });
+
   it('row 4: parking c keeps +10, because its earlier points leave S1 too, and c unlocks and is listed', () => {
     const product = walkthrough(4);
     const summary = req(getSprintSummary(product, 'S2'), 'summary');
