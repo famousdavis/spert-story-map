@@ -13,7 +13,8 @@ interface CloudLoadNoticeProps {
 /**
  * Shown when part of a project could not be read and was left out so the project
  * could open, on either read path (see `guardCloudProduct`). Names the project, never the
- * value. The next save writes the project without the part that was left out.
+ * value. The next save removes the part that was left out. The cloud driver raises this
+ * only when that is true: `createdAt` and `_changeLog` stay stored, and raise nothing.
  */
 export default function CloudLoadNotice({ productId, productName }: CloudLoadNoticeProps) {
   const shown = useSyncExternalStore(subscribeGuardedLoads, () => isGuardedLoad(productId));

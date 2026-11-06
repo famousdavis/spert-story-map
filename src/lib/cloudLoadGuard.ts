@@ -28,9 +28,23 @@
  *     wrong type is reset to a neutral value, and the rest of the project loads.
  *
  * It mutates the freshly-read product in place (as `migrateToV2` already does)
- * and returns the ids of the rules that fired. It never writes back: a value set
- * aside here disappears from the document at the next save, which repairs it.
- * That is acceptable ONLY because no app writer can produce a value it rejects.
+ * and returns the ids of the rules that fired. It never writes back. What happens to
+ * a value set aside here at the next save depends on the path, below. Losing it there
+ * is acceptable ONLY because no app writer can produce a value this guard rejects.
+ *
+ *   - LOCAL: the next save repairs everything. It writes the whole product.
+ *   - CLOUD, a value reset here: the next save repairs it. Its key is in `mergeFields`,
+ *     and so is the list around anything set aside inside a list.
+ *   - CLOUD, a top-level key deleted here: the save merges named fields, so leaving a
+ *     key out leaves it stored. Since v0.53.26 the driver names it with `deleteField()`
+ *     at the next save (`guardRead` in `firestoreDriver.ts`).
+ *   - CLOUD, `createdAt` and `_changeLog`: no save repairs these and none may. They stay
+ *     in the document, filtered from every read, and raise no notice there.
+ *
+ * ⚠️ Commit 6d98b85 says "Repair is at the next save, as on the cloud". That is true
+ * on a local read and was FALSE on the cloud: not for `createdAt`, not for `_changeLog`,
+ * not for any deleted key. A commit message cannot be corrected, so it is corrected
+ * here. It is still false for the first two: see `RULES_NO_SAVE_CLEARS`.
  *
  * ⚠️ THE TWO PATHS DO NOT STORE THE SAME VALUE. `sanitizeForFirestore` leaves NaN
  * and Infinity alone, so the cloud keeps a number and this guard passes it.
@@ -203,8 +217,9 @@ export function guardCloudProduct(loaded: object): string[] {
   record(product, 'sizingCardOrder', 'sizingCardOrder', hits, Array.isArray);
   record(product, 'cardColorLabels', 'cardColorLabels', hits, isString);
   // The cloud save appends deltas via arrayUnion, so there this changes only what
-  // is held in memory, never the server. A local save writes the whole product, so
-  // there it goes at the next save, like everything else set aside here.
+  // is held in memory, never the server, and the driver raises no notice for it. A
+  // local save writes the whole product, so there it goes at the next save, like
+  // everything else set aside here.
   if (product._changeLog !== undefined) list(product, '_changeLog', '_changeLog', hits, isObj);
   return [...hits];
 }

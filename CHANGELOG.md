@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.26 (2026-11-06)
+
+### Fixed
+
+- **A cloud project no longer shows the "could not be read" notice every time it opens.** The 0.53.25 entry below warned about this. A project saved with a damaged card order, card color labels or sprint cadence showed the notice on every open, and again after you dismissed it, and editing the project did not stop it. Your next edit now removes the damaged value and the notice stops. This works for editors as well as owners.
+- **A damaged creation date or change log no longer raises the notice on a cloud project.** Neither is shown in the app and no edit changes them, so the notice could never clear. They stay in the saved project as they are, and the real change log entries are kept.
+- ⚠️ **Opening a project changes nothing.** The notice stays until someone who can edit the project makes a change. A viewer cannot clear it. Local projects work as they did.
+
 ## Version 0.53.25 (2026-11-06)
 
 ### Fixed
