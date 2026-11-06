@@ -276,11 +276,11 @@ export function validateProduct(data: unknown): Product {
   // history counts for nothing and locks nothing, as in any file with no `sprints`.
   //
   // ⚠️ REMOVED, NOT REJECTED, like `cardColorLabels` below. No writer stores anything
-  // else, but the local read path has no shape guard and an export spreads the product
-  // as it stands, so a value that an older import let through is in a file the app
-  // itself wrote. A project with a bad `sprints` or `sizeMapping` is left off the list,
-  // so Export All and re-import is the only way back to it, and an assert here would
-  // refuse that file.
+  // else, but an older import let such a value through and an export spreads the
+  // product as it stands, so it is in files the app itself wrote, and an assert here
+  // would refuse them. A project already stored with one is handled at read, with the
+  // same outcome: see `guardStoredProduct` in `storage.ts`. So a local read and a
+  // re-import of it agree.
   //
   // ⚠️ DELETED, NOT SET TO `[]`. The backfill only sees a falsy value, so a `[]` would
   // skip the default sizes, and at the label check below it would clear every rib's

@@ -33,6 +33,7 @@ import { isRibLocked } from '../lib/ribHelpers';
 import { computeLayout } from '../components/storymap/useMapLayout';
 import { dismissGuardedLoad, isGuardedLoad } from '../lib/cloudLoadNotices';
 import { DEFAULT_SIZE_MAPPING } from '../lib/constants';
+import { createSampleProduct } from '../lib/sampleData';
 import ProductList from '../pages/ProductList';
 import type { Product, RibItem } from '../types';
 
@@ -129,7 +130,22 @@ describe('a stored list of the wrong shape', () => {
   });
 });
 
-describe('sizeMapping: a local read gives what re-importing the project gives', () => {
+describe('a local read gives what re-importing the project gives', () => {
+  // `themes` is left out: the validator rejects a file with a bad one.
+  it.each(BAD.filter(([field]) => field !== 'themes'))('%s as %s', (field, _label, value) => {
+    const file = stored({ [field]: value });
+    seed(ID, file);
+    const product = loadProduct(ID)!;
+    const imported = importProductFromJSON(JSON.stringify(file));
+    for (const list of ['releases', 'sprints', 'sizeMapping'] as const) expect(product[list]).toEqual(imported[list]);
+    expect(ribOf(product).size).toBe(ribOf(imported).size);
+    expect(ribOf(product).releaseAllocations).toEqual(ribOf(imported).releaseAllocations);
+    expect(ribOf(product).progressHistory).toEqual(ribOf(imported).progressHistory);
+    expect(getTotalProjectPoints(product)).toBe(getTotalProjectPoints(imported));
+  });
+});
+
+describe('sizeMapping', () => {
   const OWN = [{ label: 'M', points: 20 }];
 
   it.each(SHAPES)('%s has the default rows, so the rib keeps its size and its points', (_label, value) => {
@@ -195,6 +211,14 @@ describe('the notice', () => {
     await driver.loadProduct(ID);
     expect(isGuardedLoad(ID)).toBe(false);
     expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('is not raised by the sample project, written and read the way the app does', async () => {
+    const sample = createSampleProduct();
+    saveProductImmediate(sample);
+    const read = await driver.loadProduct(sample.id);
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(read).toEqual(JSON.parse(localStorage.getItem(`rp:local:product_${sample.id}`)!));
   });
 
   it('goes when an import replaces the project it was about', async () => {
