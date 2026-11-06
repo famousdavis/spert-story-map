@@ -10,6 +10,7 @@ import ProgressBar from '../ui/ProgressBar';
 import { useTooltip } from '../ui/Tooltip';
 import useInlineEdit from '../storymap/useInlineEdit';
 import { formatDate } from '../../lib/formatDate';
+import { releaseDeleteMessage } from '../../lib/settingsMutations';
 import type { Release, Product } from '../../types';
 import type { EnrichedRib } from '../../lib/calculations';
 
@@ -259,7 +260,7 @@ export default function ReleaseColumn({
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
         title={`Delete "${release.name}"?`}
-        message="This release will be permanently removed."
+        message={releaseDeleteMessage('This release will be permanently removed.', product, release.id)}
         confirmLabel="Delete"
         onConfirm={() => { setConfirmDelete(false); onDeleteRelease?.(release.id); }}
         onCancel={() => setConfirmDelete(false)}

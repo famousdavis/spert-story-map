@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **Deleting a release says when recorded progress and notes go with it**, the same way on Settings, the Map and Release Planning. Settings now asks before deleting a release that holds only records, which used to go without a word.
+
 ### Fixed
 
 ## Version 0.53.18 (2026-11-05)

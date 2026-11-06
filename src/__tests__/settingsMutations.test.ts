@@ -3,7 +3,9 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
+import {
+  deleteReleaseFromProduct, deleteSprintFromProduct, RELEASE_RECORDS_LINE, releaseDeleteMessage, releaseHasAllocations, releaseHoldsRecords,
+} from '../lib/settingsMutations';
 import { req } from './testHelpers';
 import type { Product } from '../types';
 
@@ -169,5 +171,34 @@ describe('deleteSprintFromProduct', () => {
     const originalJSON = JSON.stringify(original);
     deleteSprintFromProduct(original, 'sp-1');
     expect(JSON.stringify(original)).toBe(originalJSON);
+  });
+});
+
+describe('releaseHoldsRecords', () => {
+  const withHistory = (progressHistory: unknown): Product => {
+    const p = makeProduct();
+    const [rib] = p.themes[0]?.backboneItems[0]?.ribItems ?? [];
+    req(rib, 'rib').progressHistory = progressHistory as never;
+    return p;
+  };
+  const at = (percentComplete: number | null, comment = '', sprintId = 's1', releaseId = 'r9') => ({ sprintId, releaseId, percentComplete, comment });
+
+  it('sees a value, a typed 0, a comment and an entry for an unknown sprint', () => {
+    expect(releaseHoldsRecords(withHistory([at(30)]), 'r9')).toBe(true);
+    expect(releaseHoldsRecords(withHistory([at(0)]), 'r9')).toBe(true);
+    expect(releaseHoldsRecords(withHistory([at(null, 'note')]), 'r9')).toBe(true);
+    expect(releaseHoldsRecords(withHistory([at(30, '', 'gone')]), 'r9')).toBe(true);
+  });
+
+  it('does not see an empty null entry, another release, or no history', () => {
+    expect(releaseHoldsRecords(withHistory([at(null)]), 'r9')).toBe(false);
+    expect(releaseHoldsRecords(withHistory([at(30)]), 'r8')).toBe(false);
+    expect(releaseHoldsRecords(withHistory(undefined), 'r9')).toBe(false);
+  });
+
+  it('builds a message with the line only when it applies, and an empty lead leaves no gap', () => {
+    expect(releaseDeleteMessage('Lead.', withHistory([at(30)]), 'r9')).toBe(`Lead. ${RELEASE_RECORDS_LINE}`);
+    expect(releaseDeleteMessage('Lead.', withHistory([]), 'r9')).toBe('Lead.');
+    expect(releaseDeleteMessage('', withHistory([at(30)]), 'r9')).toBe(RELEASE_RECORDS_LINE);
   });
 });

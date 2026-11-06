@@ -2,7 +2,8 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product } from '../types';
+import type { Product, ProgressEntry } from '../types';
+import { hasValue } from './progressRule';
 
 /**
  * Pure functions for release/sprint cascade deletion.
@@ -47,6 +48,34 @@ export function deleteSprintFromProduct(product: Product, sprintId: string): Pro
       })),
     })),
   };
+}
+
+/** Every release delete says this when it will take records with it. */
+export const RELEASE_RECORDS_LINE = 'Recorded progress and notes for this release are deleted too.';
+
+/** A value or a comment. A typed 0 is a value. An empty null entry holds nothing. */
+const holdsRecord = (entry: ProgressEntry) => hasValue(entry) || Boolean(entry.comment);
+
+function anyEntry(product: Product, test: (entry: ProgressEntry) => boolean): boolean {
+  return product.themes.some(t => t.backboneItems.some(b => b.ribItems.some(r => (r.progressHistory ?? []).some(test))));
+}
+
+/**
+ * Would deleting this release take a record with it? Any entry with a value or a
+ * comment, in any sprint, because `deleteReleaseFromProduct` drops all of them,
+ * comments included. Not `strandedSeries`, which sees only positive records on known
+ * sprints, and not the lock, which sees only current allocations.
+ */
+export function releaseHoldsRecords(product: Product, releaseId: string): boolean {
+  return anyEntry(product, entry => entry.releaseId === releaseId && holdsRecord(entry));
+}
+
+/**
+ * A release delete's confirm: `lead`, then the shared line when it applies. All three
+ * surfaces build their message here, so the line and its condition cannot drift.
+ */
+export function releaseDeleteMessage(lead: string, product: Product, releaseId: string): string {
+  return [lead, releaseHoldsRecords(product, releaseId) ? RELEASE_RECORDS_LINE : ''].filter(Boolean).join(' ');
 }
 
 /** Check if any rib items have allocations referencing a release. */

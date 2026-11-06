@@ -4,7 +4,9 @@
 
 import { useState, useRef, useId, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { deleteReleaseFromProduct, deleteSprintFromProduct, releaseHasAllocations } from '../lib/settingsMutations';
+import {
+  deleteReleaseFromProduct, deleteSprintFromProduct, releaseDeleteMessage, releaseHasAllocations, releaseHoldsRecords,
+} from '../lib/settingsMutations';
 import BufferedText from '../components/ui/BufferedText';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { useStorage } from '../lib/StorageProvider';
@@ -93,8 +95,10 @@ export default function SettingsView() {
   };
 
   const deleteRelease = (id: string) => {
-    if (releaseHasAllocations(product, id)) {
-      setDeleteTarget({ type: 'release', id, message: 'This release has rib items allocated to it. Deleting it will remove those allocations. Continue?' });
+    const allocated = releaseHasAllocations(product, id);
+    if (allocated || releaseHoldsRecords(product, id)) {
+      const lead = allocated ? 'This release has rib items allocated to it. Deleting it will remove those allocations.' : '';
+      setDeleteTarget({ type: 'release', id, message: `${releaseDeleteMessage(lead, product, id)} Continue?` });
     } else {
       updateProduct(prev => deleteReleaseFromProduct(prev, id));
     }
@@ -243,7 +247,7 @@ export default function SettingsView() {
 
       {driver && <DataSection product={product} driver={driver} updateProduct={updateProduct} />}
 
-      {/* Delete confirm (release with allocations) */}
+      {/* Delete confirm (a release holding allocations or records) */}
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
