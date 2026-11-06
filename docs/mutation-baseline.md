@@ -1,10 +1,81 @@
 # Mutation baseline — `src/lib/**` well-covered subset
 
-**Current: v0.52.1, 73.58%.** Superseding the v0.52.0 first baseline of 71.57%.
+**Current: v0.53.18, 79.53%.** Superseding v0.52.5's 73.80%, v0.52.1's 73.58% and the v0.52.0 first
+baseline of 71.57%.
 
 > ⚠️ **The v0.52.0 figures are kept throughout, not overwritten.** The delta is the finding, and a
 > baseline is the one document where a silently-replaced number destroys the only evidence that a
 > change did anything.
+
+## Per-file — CURRENT (v0.53.18), ranked by survivors
+
+Recorded 2026-11-05 with the incremental cache cleared, on the final commit of the progress-integrity
+release: 24 target files, 27 scoped test files, 83m 36s. **The config changed**, so this is a new
+baseline rather than a comparison: `progressRule.ts` and `reconciliation.ts` joined the targets, and
+four test files joined the scoped list. Per-target branch coverage under that list was re-compared
+with the full suite and matches for every file the release touched; `firestoreUtils.ts` (80 against 90)
+and `validateProduct.ts` (94.82 against 96.55) differ, and neither was touched.
+
+```
+total mutants   3864
+killed          1831     survived   420     timeout        7
+no coverage       53     compile error  1553     runtime error  0     ignored  0
+
+mutation score  79.53%          (covered: 81.40%)
+```
+
+| file | score | valid | killed | timeout | survived | nocov | compileErr |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `validateProduct.ts` | 63.47% | 438 | 278 | 0 | 147 | 13 | 156 |
+| `aiOps.ts` | 79.71% | 350 | 279 | 0 | 66 | 5 | 449 |
+| `exportForExcel.ts` | 50.35% | 143 | 72 | 0 | 58 | 13 | 29 |
+| `productTransforms.ts` | 88.41% | 345 | 305 | 0 | 39 | 1 | 205 |
+| `ribCardColors.ts` | 46.81% | 47 | 22 | 0 | 25 | 0 | 35 |
+| `exportForForecaster.ts` | 73.95% | 119 | 88 | 0 | 18 | 13 | 46 |
+| `calculations.ts` | 93.24% | 148 | 138 | 0 | 10 | 0 | 116 |
+| `progressMutations.ts` | 94.82% | 193 | 183 | 0 | 10 | 0 | 132 |
+| `invitationErrors.ts` | 88.31% | 77 | 68 | 0 | 9 | 0 | 23 |
+| `firestoreUtils.ts` | 61.11% | 18 | 10 | 1 | 7 | 0 | 1 |
+| `formatDate.ts` | 80.00% | 40 | 32 | 0 | 7 | 1 | 22 |
+| `ribHelpers.ts` | 87.72% | 57 | 50 | 0 | 7 | 0 | 29 |
+| `migration.ts` | 62.07% | 29 | 18 | 0 | 6 | 5 | 18 |
+| `aiSnapshot.ts` | 85.71% | 35 | 30 | 0 | 5 | 0 | 33 |
+| `sortByOrder.ts` | 75.00% | 8 | 6 | 0 | 2 | 0 | 8 |
+| `driverCleanupRegistry.ts` | 50.00% | 6 | 3 | 0 | 1 | 2 | 3 |
+| `progressRule.ts` | 98.82% | 85 | 78 | 6 | 1 | 0 | 119 |
+| `reconciliation.ts` | 97.30% | 37 | 36 | 0 | 1 | 0 | 24 |
+| `signOutCleanup.ts` | 87.50% | 8 | 7 | 0 | 1 | 0 | 5 |
+| `auth-name.ts` | 100.00% | 15 | 15 | 0 | 0 | 0 | 2 |
+| `progressViewHelpers.ts` | 100.00% | 24 | 24 | 0 | 0 | 0 | 43 |
+| `schemaVersion.ts` | 100.00% | 14 | 14 | 0 | 0 | 0 | 9 |
+| `settingsMutations.ts` | 100.00% | 40 | 40 | 0 | 0 | 0 | 23 |
+| `themeColors.ts` | 100.00% | 35 | 35 | 0 | 0 | 0 | 23 |
+| **total** | **79.53%** | **2311** | **1831** | **7** | **420** | **53** | **1553** |
+
+### What moved, against the last recorded per-file table (v0.52.5)
+
+| file | v0.52.5 | v0.53.18 |
+|---|---:|---:|
+| `calculations.ts` | 76.14% | **93.24%** |
+| `progressViewHelpers.ts` | 66.10% | **100.00%** |
+| `progressMutations.ts` | 80.43% | **94.82%** |
+| `ribHelpers.ts` | 85.71% | **87.72%** |
+| `exportForForecaster.ts` | 64.38% | **73.95%** |
+| `exportForExcel.ts` | 46.62% | **50.35%** |
+| `progressRule.ts` | new | **98.82%** |
+| `reconciliation.ts` | new | **97.30%** |
+
+⚠️ **The six `progressRule.ts` timeouts are real kills:** they are binary-search mutants that never
+terminate. Its one survivor, `high = length + 1`, is equivalent, because a read past the end falls to
+the `?? Infinity` beside it.
+
+⚠️ **The rule moved out of `calculations.ts`, so its denominator fell** from 264 to 148. Read its score
+with `progressRule.ts` beside it, not against its old self.
+
+**The first full run scored 78.93%.** Reading its survivors on changed lines found real gaps: Core and
+Non-core points this sprint were never asserted (`-` to `+` survived), a dropped 0-point guard, the
+sign of Over-allocated's non-core column. The tests for those moved `calculations.ts`, `reconciliation.ts`
+and `exportForExcel.ts`, and this table is the second run.
 
 ## Delta, v0.52.0 → v0.52.1
 
@@ -162,7 +233,7 @@ tests actually reach, how much is really checked?*
 
 ---
 
-## Per-file — CURRENT (v0.52.5), ranked by survivors
+## Per-file — v0.52.5, kept for comparison
 
 | file | score | valid | killed | timeout | survived | nocov | compileErr |
 |---|---:|---:|---:|---:|---:|---:|---:|
