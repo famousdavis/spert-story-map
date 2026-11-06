@@ -6,6 +6,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { getAllRibItems, getPointsForRelease, getCoreNonCorePointsForRelease, getTotalProjectPoints, getCoreNonCorePoints, getReleasePercentComplete } from '../lib/calculations';
 import { deleteReleaseFromProduct } from '../lib/settingsMutations';
+import { saveRibAllocations } from '../lib/progressMutations';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { useReleaseDrag } from '../hooks/useReleaseDrag';
 import ReleaseColumn from '../components/releases/ReleaseColumn';
@@ -68,18 +69,7 @@ export default function ReleasePlanningView() {
 
   // Update a single rib's allocations
   const updateRibAllocation = useCallback((ribId: string, allocations: ReleaseAllocation[]) => {
-    updateProduct(prev => ({
-      ...prev,
-      themes: prev.themes.map(t => ({
-        ...t,
-        backboneItems: t.backboneItems.map(b => ({
-          ...b,
-          ribItems: b.ribItems.map(r =>
-            r.id === ribId ? { ...r, releaseAllocations: allocations } : r
-          ),
-        })),
-      })),
-    }));
+    updateProduct(prev => saveRibAllocations(prev, ribId, allocations));
   }, [updateProduct]);
 
   const updateRibCategory = useCallback((ribId: string, category: Category) => {

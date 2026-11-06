@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { getRibItemPoints } from '../../lib/calculations';
+import { describeAllocationMove } from '../../lib/progressMutations';
 import Modal from '../ui/Modal';
 import type { RibItem, Product, ReleaseAllocation, Category } from '../../types';
 
@@ -28,6 +29,10 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
   const parsePct = (v: string | number) => { const n = parseInt(String(v), 10); return isNaN(n) ? 0 : Math.max(0, Math.min(100, n)); };
   const total = allocations.reduce((s, a) => s + parsePct(a.percentage), 0);
   const pts = getRibItemPoints(rib, product.sizeMapping);
+
+  // Read from the draft rows, so the line follows what Save would do as it is typed.
+  const moveNotice = describeAllocationMove(rib, allocations.map(a => ({ releaseId: a.releaseId, percentage: parsePct(a.percentage) })));
+  const moveTarget = moveNotice && product.releases.find(r => r.id === moveNotice.toReleaseId)?.name;
 
   const addRelease = (releaseId: string) => {
     if (allocations.some(a => a.releaseId === releaseId)) return;
@@ -138,6 +143,14 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
           <span>Total: {total}%</span>
           {total !== 100 && total > 0 && <span className="text-xs font-normal">(should be 100%)</span>}
         </div>
+
+        {moveNotice && moveTarget && (
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {moveNotice.effect === 'carries'
+              ? `Progress moves to ${moveTarget}.`
+              : `${moveTarget} has earlier progress, which will count again.`}
+          </p>
+        )}
 
         <div className="flex justify-between pt-2">
           {allocations.length > 0 ? (

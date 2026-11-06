@@ -5,6 +5,7 @@
 import type { Product, RibItem, ColorKey, Size } from '../types';
 import { appendChangeLogEntry } from './storage';
 import { isRibLocked, computeRibSiblingName } from './ribHelpers';
+import { withCarriedProgress } from './progressMutations';
 import { DEFAULT_THEME_COLOR_KEYS } from './themeColors';
 import { NOTES_MAX } from './constants';   // = 2000
 
@@ -611,6 +612,11 @@ export function appendRibNoteInProduct(
  * "allocate from unassigned". The replace intentionally drops any existing
  * allocation memo (matches allocateRibInProduct's write shape).
  *
+ * The release leg carries the rib's records with it (`withCarriedProgress`).
+ * REL-3 has already refused any positive record, so what moves is zero, null or
+ * comment-only, and REL-5 keeps a replay idempotent. From unassigned there is no
+ * source release, so nothing carries.
+ *
  * Positioning is append-only: the moved rib lands at the end of the target
  * backbone with order = ribItems.length + 1; no renumbering elsewhere.
  *
@@ -712,7 +718,11 @@ export function moveRibInProduct(
       backboneItems: t.backboneItems.map(b => ({
         ...b,
         ribItems: b.ribItems.map(r =>
-          r.id !== ribId ? r : { ...r, releaseAllocations: [{ releaseId: targetReleaseId, percentage: 100 }] }
+          r.id !== ribId ? r : withCarriedProgress(
+            { ...r, releaseAllocations: [{ releaseId: targetReleaseId, percentage: 100 }] },
+            sole?.releaseId ?? null,
+            targetReleaseId,
+          )
         ),
       })),
     }));

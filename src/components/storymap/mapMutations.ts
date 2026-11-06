@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product, RibItem, Theme, Backbone } from '../../types';
-import { transferAllocation } from '../../lib/ribHelpers';
+import { applyRibTransfer } from '../../lib/progressMutations';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
@@ -146,17 +146,13 @@ function moveRibBetweenBackbones(themes: Theme[], ribId: string, fromThemeId: st
   return { themes: result, ribData };
 }
 
-/** Apply transferAllocation to a single rib across all themes. */
+/** Move a single rib between releases, allocations and progress together, across all themes. */
 function applyAllocationTransfer(themes: Theme[], ribId: string, fromReleaseId: string | null, toReleaseId: string | null): Theme[] {
   return themes.map(t => ({
     ...t,
     backboneItems: t.backboneItems.map(b => ({
       ...b,
-      ribItems: b.ribItems.map(r => {
-        if (r.id !== ribId) return r;
-        const newAlloc = transferAllocation(r, fromReleaseId, toReleaseId);
-        return newAlloc !== null ? { ...r, releaseAllocations: newAlloc } : r;
-      }),
+      ribItems: b.ribItems.map(r => (r.id === ribId ? applyRibTransfer(r, fromReleaseId, toReleaseId) : r)),
     })),
   }));
 }
