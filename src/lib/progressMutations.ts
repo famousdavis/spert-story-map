@@ -3,8 +3,11 @@
 // See LICENSE file in the project root for full license text.
 
 import type { Product, ProgressEntry, ReleaseAllocation, RibItem, Sprint } from '../types';
-import { latestSprintId, progressAsOf } from './progressRule';
-import { transferAllocation } from './ribHelpers';
+import {
+  bringHereTarget, currentAllocations, hasValue, historyByRelease, latestSprintId, orderedSprints, progressAsOf, rowRecords, share,
+} from './progressRule';
+import { reduceRibs, transferAllocation } from './ribHelpers';
+import { MAX_MEMO } from './validateProduct';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
@@ -319,4 +322,176 @@ export function saveRibAllocations(prev: Product, ribId: string, allocations: Re
       })),
     })),
   };
+}
+
+// ─── Acting on records that do not count ────────────────────────────
+
+/**
+ * `prev` with one rib changed. `prev` itself when the rib is not found or comes
+ * back the same, so an action on a row that has since gone writes nothing.
+ */
+function withRib(prev: Product, ribId: string, change: (rib: RibItem) => RibItem): Product {
+  let changed = false;
+  const themes = prev.themes.map(t => ({
+    ...t,
+    backboneItems: t.backboneItems.map(b => ({
+      ...b,
+      ribItems: b.ribItems.map(r => {
+        if (r.id !== ribId) return r;
+        const next = change(r);
+        if (next !== r) changed = true;
+        return next;
+      }),
+    })),
+  }));
+  return changed ? { ...prev, themes } : prev;
+}
+
+const isPositive = (entry: ProgressEntry) => (entry.percentComplete ?? 0) > 0;
+
+/** Pattern #6: a comment keeps its entry and loses the percentage. With no comment, the entry goes. */
+function clearedEntry(entry: ProgressEntry, now: string): ProgressEntry[] {
+  if (!entry.comment) return [];
+  return hasValue(entry) ? [{ ...entry, percentComplete: null, updatedAt: now }] : [entry];
+}
+
+function bySprint(entries: ProgressEntry[]): Map<string, ProgressEntry[]> {
+  const groups = new Map<string, ProgressEntry[]>();
+  for (const entry of entries) {
+    const group = groups.get(entry.sprintId);
+    if (group) group.push(entry);
+    else groups.set(entry.sprintId, [entry]);
+  }
+  return groups;
+}
+
+/** Bring here's two releases and everything each step reads. */
+interface Combining { rib: RibItem; fromId: string; toId: string; sprints: Sprint[]; now: string }
+
+/**
+ * The first entry wins on each side, as `collapseDuplicates` does. A sprint where
+ * neither side holds a value stays null: its comments move, and no figure changes.
+ */
+function combinedValue({ rib, fromId, toId, sprints }: Combining, sprintId: string, here: ProgressEntry[], row: ProgressEntry[]): number | null {
+  const valued = [here[0], row[0]].some(entry => entry && hasValue(entry));
+  if (!valued) return null;
+  return Math.min(100, progressAsOf(rib, fromId, sprintId, sprints) + progressAsOf(rib, toId, sprintId, sprints));
+}
+
+/**
+ * The entry a sprint ends with on the target. An entry that keeps its value and
+ * comment is returned as it is, because `updatedAt` is printed beside each note and
+ * a date should not move for an entry nothing happened to.
+ */
+function combinedEntry(c: Combining, sprintId: string, here: ProgressEntry[], row: ProgressEntry[], comment: string): ProgressEntry {
+  const [first] = here;
+  const percentComplete = combinedValue(c, sprintId, here, row);
+  if (first && (first.percentComplete ?? null) === percentComplete && (first.comment ?? '') === comment) return first;
+  return { ...first, sprintId, releaseId: c.toId, percentComplete, comment, updatedAt: c.now };
+}
+
+/**
+ * The two comments together when they fit. ⚠️ NOTHING CUTS A COMMENT: when the join
+ * would pass `MAX_MEMO`, the current comment is kept whole and null is returned, so
+ * the caller leaves the row's comment where it is. The cap is real, because the
+ * validator refuses a whole file over one long comment, and a comment can already
+ * be over it, because nothing caps one as it is typed.
+ */
+function joinedComment(current: string, row: string): string | null {
+  const joined = `${current}\n\n${row}`;
+  return joined.length <= MAX_MEMO ? joined : null;
+}
+
+/** `rib`'s history with `records` combined into the target. Entries for an unknown sprint are never reached. */
+function combineSeries(c: Combining, records: ProgressEntry[]): ProgressEntry[] {
+  const history = c.rib.progressHistory;
+  const target = bySprint(historyByRelease(history).get(c.toId) ?? []);
+  const source = bySprint(records);
+  const consumed = new Set<ProgressEntry>();
+  const combined: ProgressEntry[] = [];
+  const stayBehind: ProgressEntry[] = [];
+  for (const sprintId of new Set(orderedSprints(c.sprints).map(s => s.id))) {
+    const here = target.get(sprintId) ?? [];
+    const row = source.get(sprintId) ?? [];
+    if (here.length === 0 && row.length === 0) continue;
+    for (const entry of [...here, ...row]) consumed.add(entry);
+    const current = here.find(e => e.comment)?.comment;
+    const note = row.find(e => e.comment);
+    const joined = current && note?.comment ? joinedComment(current, note.comment) : undefined;
+    if (joined === null && note) stayBehind.push(...clearedEntry(note, c.now));
+    combined.push(combinedEntry(c, sprintId, here, row, joined ?? current ?? note?.comment ?? ''));
+  }
+  return [...history.filter(entry => !consumed.has(entry)), ...stayBehind, ...combined];
+}
+
+/**
+ * "Bring here": the row's records combined into the rib's one current release, the
+ * one place two series combine, because the user asked. For each sprint with a value
+ * on either side the value is `min(100, row's walk-back + current's walk-back)`, one
+ * entry per (sprint, release), so a later sprint on one side keeps the other's total.
+ *
+ * Never a bare re-key, which could collide with or be shadowed by an entry already
+ * there. Everything is decided from `prev`, not from the row the user saw: a cloud
+ * echo can land between the click and this running.
+ */
+export function bringRecordsHere(prev: Product, ribId: string, releaseId: string): Product {
+  return withRib(prev, ribId, rib => {
+    const target = bringHereTarget(rib, releaseId, new Set(prev.releases.map(r => r.id)));
+    const records = rowRecords(rib, releaseId, prev.sprints);
+    if (!target || !records.some(isPositive)) return rib;
+    const now = new Date().toISOString();
+    const c = { rib, fromId: releaseId, toId: target.releaseId, sprints: prev.sprints, now };
+    return { ...rib, progressHistory: combineSeries(c, records) };
+  });
+}
+
+/**
+ * What "Bring here" would leave at the latest sprint, read off the writer's own
+ * result so that the confirm cannot restate the formula differently. `reads` is what
+ * the rib records and `counted` what its release counts, lower when the allocation
+ * is. Null when the action would do nothing.
+ */
+export function previewBringHere(product: Product, ribId: string, releaseId: string): { reads: number; counted: number } | null {
+  const next = bringRecordsHere(product, ribId, releaseId);
+  if (next === product) return null;
+  const rib = reduceRibs<RibItem | null>(next, (found, r) => (r.id === ribId ? r : found), null);
+  const allocation = rib && currentAllocations(rib)[0];
+  if (!rib || !allocation) return null;
+  const latest = latestSprintId(next.sprints);
+  return { reads: progressAsOf(rib, allocation.releaseId, latest, next.sprints), counted: share(rib, allocation, latest, next.sprints) };
+}
+
+/**
+ * "Remove": the row's records follow pattern #6. It reaches a parked rib, which has
+ * no Progress row. An effective entry on a current allocation is never touched, and
+ * that is `rowRecords`' job: reusing `removeProgress` here finds the FIRST entry for
+ * the pair, which is the one that counts.
+ */
+export function removeRowRecords(prev: Product, ribId: string, releaseId: string): Product {
+  return withRib(prev, ribId, rib => {
+    const records = rowRecords(rib, releaseId, prev.sprints);
+    if (!records.some(isPositive)) return rib;
+    const going = new Set(records);
+    const now = new Date().toISOString();
+    return { ...rib, progressHistory: rib.progressHistory.flatMap(e => (going.has(e) ? clearedEntry(e, now) : [e])) };
+  });
+}
+
+/** Is there anything for Clear progress to clear? A note on its own is not progress. */
+export function ribHasProgress(rib: Pick<RibItem, 'progressHistory'>): boolean {
+  return (rib.progressHistory ?? []).some(hasValue);
+}
+
+/**
+ * Clear progress: every entry the rib holds, on every sprint and release, by pattern
+ * #6. Inert records go too, including the ones no row lists: a legacy entry with no
+ * release, an unknown sprint. Comments stay, and the rib unlocks.
+ */
+export function clearRibProgress(product: Product, ribId: string): Product {
+  return withRib(product, ribId, rib => {
+    const history = rib.progressHistory ?? [];
+    if (!history.some(e => hasValue(e) || !e.comment)) return rib;
+    const now = new Date().toISOString();
+    return { ...rib, progressHistory: history.flatMap(e => clearedEntry(e, now)) };
+  });
 }

@@ -9,7 +9,8 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { moveRib2D, moveRibs2D } from '../components/storymap/mapMutations';
 import { useProduct } from '../hooks/useProduct';
-import { saveRibAllocations } from '../lib/progressMutations';
+import { bringRecordsHere, clearRibProgress, removeRowRecords, saveRibAllocations } from '../lib/progressMutations';
+import type { Product } from '../types';
 import { entry, makeProduct, makeRib, ribOf } from './fixtures/progressIntegrity';
 import { req } from './testHelpers';
 
@@ -67,6 +68,31 @@ describe('undo after a carried move', () => {
     expect(moved.history).toEqual(carried);
     expect(moved.allocations.map(a => a.releaseId)).toEqual(['Y']);
     const after = snapshot(hook);
+
+    act(() => hook.result.current.undo());
+    expect(snapshot(hook)).toBe(before);
+
+    act(() => hook.result.current.redo());
+    expect(snapshot(hook)).toBe(after);
+  });
+});
+
+describe('undo after an action on recorded progress', () => {
+  const update = (hook: Awaited<ReturnType<typeof loaded>>, action: (prev: Product) => Product) =>
+    act(() => hook.result.current.updateProduct(action));
+
+  it.each<[string, (prev: Product) => Product, unknown[]]>([
+    ['Bring here', prev => bringRecordsHere(prev, 'r', 'Y'), [['S1', 'X', 15, 'kept']]],
+    ['Remove', prev => removeRowRecords(prev, 'r', 'Y'), [['S1', 'X', 10, 'kept']]],
+    ['Clear progress', prev => clearRibProgress(prev, 'r'), [['S1', 'X', null, 'kept']]],
+  ])('%s: one undo restores the records, and redo reapplies them', async (_, action, written) => {
+    const hook = await loaded();
+    const before = snapshot(hook);
+
+    update(hook, action);
+    expect(allocationsAndHistory(hook).history.map(e => [e.sprintId, e.releaseId, e.percentComplete, e.comment])).toEqual(written);
+    const after = snapshot(hook);
+    expect(after).not.toBe(before);
 
     act(() => hook.result.current.undo());
     expect(snapshot(hook)).toBe(before);

@@ -78,6 +78,7 @@ export default defineConfig({
       'src/__tests__/invitationErrors.test.ts',
       'src/__tests__/migration.test.ts',
       'src/__tests__/moveCarriesProgress.test.ts',
+      'src/__tests__/progressActions.test.ts',
       'src/__tests__/progressMutations.test.ts',
       // Progress integrity (v0.53.18): the rule, its row builder, its goldens and its
       // properties. The baseline was re-recorded for this list; see docs/mutation-baseline.md.
