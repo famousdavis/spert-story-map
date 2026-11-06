@@ -3,15 +3,15 @@
 // See LICENSE file in the project root for full license text.
 
 // @vitest-environment jsdom
-import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { screen, cleanup, fireEvent, within } from '@testing-library/react';
 import InsightsView from '../pages/InsightsView';
 import ProgressTrackingView from '../pages/ProgressTrackingView';
 import { UNDO_HINT } from '../lib/constants';
 import { isRibLocked } from '../lib/ribHelpers';
-import type { Product, ProgressEntry, ReleaseAllocation } from '../types';
+import type { ProgressEntry, ReleaseAllocation } from '../types';
+import { mountHosted } from './fixtures/productHost';
+import type { HostedProduct } from './fixtures/productHost';
 import { entry, makeProduct, makeRib, ribOf } from './fixtures/progressIntegrity';
 
 /**
@@ -30,38 +30,17 @@ beforeAll(() => {
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
 });
 
-let current: Product;
-let writes = 0;
-
-function Host({ initial }: { initial: Product }) {
-  const [product, setProduct] = useState(initial);
-  current = product;
-  const updateProduct = (updater: unknown) => {
-    writes++;
-    setProduct(updater as (prev: Product) => Product);
-  };
-  const context = { product, updateProduct, undo: () => {}, redo: () => {} };
-  return (
-    <MemoryRouter>
-      <Routes>
-        <Route element={<Outlet context={context} />}>
-          <Route path="*" element={<InsightsView />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
-  );
-}
+let hosted: HostedProduct;
 
 function mount(history: ProgressEntry[], allocations: ReleaseAllocation[] = [on('R1')]) {
-  writes = 0;
-  render(<Host initial={makeProduct([makeRib('r', allocations, history)])} />);
+  hosted = mountHosted(InsightsView, makeProduct([makeRib('r', allocations, history)]));
 }
 
 const bringButtons = () => screen.queryAllByRole('button', { name: /^Bring here: / });
 const removeButtons = () => screen.queryAllByRole('button', { name: /^Remove: / });
 const dialog = () => within(screen.getByRole('button', { name: 'Cancel' }).closest('.fixed') as HTMLElement);
 const dialogText = () => (screen.getByRole('button', { name: 'Cancel' }).closest('.fixed') as HTMLElement).textContent ?? '';
-const history = () => ribOf(current, 'r').progressHistory.map(e => [e.sprintId, e.releaseId, e.percentComplete]);
+const history = () => ribOf(hosted.product, 'r').progressHistory.map(e => [e.sprintId, e.releaseId, e.percentComplete]);
 const text = () => document.body.textContent ?? '';
 
 describe('which rows offer Bring here', () => {
@@ -84,9 +63,8 @@ describe('which rows offer Bring here', () => {
   });
 
   it('shows the actions on every row, past ten', () => {
-    writes = 0;
     const ribs = Array.from({ length: 14 }, (_, i) => makeRib(`rib${i}`, [on('R2')], [entry('S1', 'R1', 10)]));
-    render(<Host initial={makeProduct(ribs)} />);
+    hosted = mountHosted(InsightsView, makeProduct(ribs));
     expect(bringButtons()).toHaveLength(14);
     expect(removeButtons()).toHaveLength(14);
   });
@@ -118,7 +96,7 @@ describe('a duplicate row', () => {
     expect(dialogText()).toContain('The entry that counts stays');
     fireEvent.click(dialog().getByRole('button', { name: 'Remove' }));
     expect(history()).toEqual([['S1', 'R1', 10]]);
-    expect(isRibLocked(ribOf(current, 'r'), current.sprints)).toBe(true);
+    expect(isRibLocked(ribOf(hosted.product, 'r'), hosted.product.sprints)).toBe(true);
     expect(screen.queryByText('Needs Attention')).toBeNull();
   });
 });
@@ -129,7 +107,7 @@ describe('Bring here is guarded by a confirm that states the result', () => {
   it('writes nothing until it is confirmed', () => {
     mount(REPORTED, [on('R3')]);
     fireEvent.click(bringButtons()[0] as HTMLElement);
-    expect(writes).toBe(0);
+    expect(hosted.writes).toBe(0);
     expect(history()).toEqual([['S1', 'R3', 1], ['S1', 'R2', 10]]);
   });
 
@@ -163,7 +141,7 @@ describe('Bring here is guarded by a confirm that states the result', () => {
     mount(REPORTED, [on('R3')]);
     fireEvent.click(bringButtons()[0] as HTMLElement);
     fireEvent.click(dialog().getByRole('button', { name: 'Bring here' }));
-    expect(writes).toBe(1);
+    expect(hosted.writes).toBe(1);
     expect(history()).toEqual([['S1', 'R3', 11]]);
     expect(screen.queryByText('Needs Attention')).toBeNull();
   });
@@ -172,7 +150,7 @@ describe('Bring here is guarded by a confirm that states the result', () => {
     mount(REPORTED, [on('R3')]);
     fireEvent.click(bringButtons()[0] as HTMLElement);
     fireEvent.click(dialog().getByRole('button', { name: 'Cancel' }));
-    expect(writes).toBe(0);
+    expect(hosted.writes).toBe(0);
     expect(history()).toEqual([['S1', 'R3', 1], ['S1', 'R2', 10]]);
     expect(bringButtons()).toHaveLength(1);
   });
@@ -182,7 +160,7 @@ describe('Remove is guarded by a confirm', () => {
   it('writes nothing until it is confirmed, and says notes stay and where undo is', () => {
     mount([entry('S1', 'R2', 30)]);
     fireEvent.click(removeButtons()[0] as HTMLElement);
-    expect(writes).toBe(0);
+    expect(hosted.writes).toBe(0);
     expect(dialogText()).toContain(`Remove the progress on "r" recorded for Release R2 (S1)? Notes stay. ${UNDO_HINT}`);
   });
 
@@ -196,7 +174,7 @@ describe('Remove is guarded by a confirm', () => {
     mount([entry('S1', 'R2', 30)], []);
     fireEvent.click(removeButtons()[0] as HTMLElement);
     fireEvent.click(dialog().getByRole('button', { name: 'Remove' }));
-    expect(writes).toBe(1);
+    expect(hosted.writes).toBe(1);
     expect(history()).toEqual([]);
     expect(text()).not.toContain('Progress not counting');
   });
@@ -205,34 +183,14 @@ describe('Remove is guarded by a confirm', () => {
     mount([entry('S1', 'R2', 30)]);
     fireEvent.click(removeButtons()[0] as HTMLElement);
     fireEvent.click(dialog().getByRole('button', { name: 'Cancel' }));
-    expect(writes).toBe(0);
+    expect(hosted.writes).toBe(0);
     expect(history()).toEqual([['S1', 'R2', 30]]);
   });
 });
 
 describe('Clear progress, from the Progress row', () => {
-  function ProgressHost({ initial }: { initial: Product }) {
-    const [product, setProduct] = useState(initial);
-    current = product;
-    const updateProduct = (updater: unknown) => {
-      writes++;
-      setProduct(updater as (prev: Product) => Product);
-    };
-    const context = { product, updateProduct, undo: () => {}, redo: () => {} };
-    return (
-      <MemoryRouter>
-        <Routes>
-          <Route element={<Outlet context={context} />}>
-            <Route path="*" element={<ProgressTrackingView />} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    );
-  }
-
   function openRow(entries: ProgressEntry[], allocations: ReleaseAllocation[] = [on('R1')]) {
-    writes = 0;
-    render(<ProgressHost initial={makeProduct([makeRib('r', allocations, entries)])} />);
+    hosted = mountHosted(ProgressTrackingView, makeProduct([makeRib('r', allocations, entries)]));
     fireEvent.click(document.querySelector('tbody tr td') as HTMLElement);
   }
 
@@ -241,7 +199,7 @@ describe('Clear progress, from the Progress row', () => {
   it('is behind a confirm that says it covers everything, that notes stay, and where undo is', () => {
     openRow([entry('S1', 'R1', 30)]);
     fireEvent.click(clearButton() as HTMLElement);
-    expect(writes).toBe(0);
+    expect(hosted.writes).toBe(0);
     expect(dialogText()).toContain(
       `Clear all progress on "r"? This covers every release and every sprint, including records that are not counting. Notes stay, and the rib unlocks. ${UNDO_HINT}`,
     );
@@ -249,25 +207,24 @@ describe('Clear progress, from the Progress row', () => {
 
   it('one confirm is one write: inert records go, a note stays, and the rib unlocks', () => {
     openRow([entry('S1', 'R1', 30), entry('S1', 'R2', 40, 'note')]);
-    expect(isRibLocked(ribOf(current, 'r'), current.sprints)).toBe(true);
+    expect(isRibLocked(ribOf(hosted.product, 'r'), hosted.product.sprints)).toBe(true);
     fireEvent.click(clearButton() as HTMLElement);
     fireEvent.click(dialog().getByRole('button', { name: 'Clear progress' }));
-    expect(writes).toBe(1);
-    expect(ribOf(current, 'r').progressHistory).toEqual([expect.objectContaining({ sprintId: 'S1', releaseId: 'R2', percentComplete: null, comment: 'note' })]);
-    expect(isRibLocked(ribOf(current, 'r'), current.sprints)).toBe(false);
+    expect(hosted.writes).toBe(1);
+    expect(ribOf(hosted.product, 'r').progressHistory).toEqual([expect.objectContaining({ sprintId: 'S1', releaseId: 'R2', percentComplete: null, comment: 'note' })]);
+    expect(isRibLocked(ribOf(hosted.product, 'r'), hosted.product.sprints)).toBe(false);
   });
 
   it('Cancel writes nothing', () => {
     openRow([entry('S1', 'R1', 30)]);
     fireEvent.click(clearButton() as HTMLElement);
     fireEvent.click(dialog().getByRole('button', { name: 'Cancel' }));
-    expect(writes).toBe(0);
+    expect(hosted.writes).toBe(0);
     expect(history()).toEqual([['S1', 'R1', 30]]);
   });
 
   it('is on a read-only row too', () => {
-    writes = 0;
-    render(<ProgressHost initial={makeProduct([makeRib('r', [on('R1')], [entry('S1', 'R1', 30)])])} />);
+    hosted = mountHosted(ProgressTrackingView, makeProduct([makeRib('r', [on('R1')], [entry('S1', 'R1', 30)])]));
     fireEvent.click(screen.getByRole('button', { name: 'Backbone' }));
     fireEvent.click(document.querySelector('tbody tr td') as HTMLElement);
     expect(clearButton()).toBeTruthy();

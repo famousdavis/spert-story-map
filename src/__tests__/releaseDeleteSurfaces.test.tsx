@@ -3,15 +3,15 @@
 // See LICENSE file in the project root for full license text.
 
 // @vitest-environment jsdom
-import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { screen, cleanup, fireEvent, within } from '@testing-library/react';
 import ReleasePlanningView from '../pages/ReleasePlanningView';
 import SettingsView from '../pages/SettingsView';
 import StoryMapView from '../pages/StoryMapView';
 import { RELEASE_RECORDS_LINE, SPRINT_RECORDS_LINE } from '../lib/settingsMutations';
 import type { Product, ProgressEntry } from '../types';
+import { mountHosted } from './fixtures/productHost';
+import type { HostedProduct } from './fixtures/productHost';
 import { entry, makeProduct, makeRib, ribOf } from './fixtures/progressIntegrity';
 
 /**
@@ -30,34 +30,13 @@ beforeAll(() => {
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
 });
 
-let current: Product;
-
-function Host({ View, initial }: { View: () => React.ReactElement; initial: Product }) {
-  const [product, setProduct] = useState(initial);
-  current = product;
-  const context = {
-    product,
-    updateProduct: (updater: unknown) => setProduct(updater as (prev: Product) => Product),
-    undo: () => {},
-    redo: () => {},
-  };
-  return (
-    <MemoryRouter>
-      <Routes>
-        <Route element={<Outlet context={context} />}>
-          <Route path="*" element={<View />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
-  );
-}
-
-const mount = (View: () => React.ReactElement, product: Product) => render(<Host View={View} initial={product} />);
+let hosted: HostedProduct;
+const mount = (View: () => React.ReactElement, product: Product) => { hosted = mountHosted(View, product); };
 const on = (releaseId: string, percentage = 100) => ({ releaseId, percentage });
 
 /** One rib on R1, holding `history`. R2 is the release under test unless a test says otherwise. */
 const holding = (history: ProgressEntry[]) => makeProduct([makeRib('r', [on('R1')], history)]);
-const releaseIds = () => current.releases.map(r => r.id);
+const releaseIds = () => hosted.product.releases.map(r => r.id);
 const dialog = () => (screen.queryByRole('button', { name: 'Cancel' })?.closest('.fixed') ?? null) as HTMLElement | null;
 const dialogText = () => dialog()?.textContent ?? '';
 const confirm = (label: string) => fireEvent.click(within(dialog() as HTMLElement).getByRole('button', { name: label }));
@@ -87,7 +66,7 @@ describe('Settings', () => {
     expect(releaseIds()).toContain('R2');
     confirm('Delete');
     expect(releaseIds()).not.toContain('R2');
-    expect(ribOf(current, 'r').progressHistory).toEqual([]);
+    expect(ribOf(hosted.product, 'r').progressHistory).toEqual([]);
   });
 
   it('does not ask for an empty null entry, which holds nothing', () => {
@@ -111,7 +90,7 @@ describe('Settings', () => {
 });
 
 describe('Settings, deleting a sprint', () => {
-  const sprintIds = () => current.sprints.map(s => s.id);
+  const sprintIds = () => hosted.product.sprints.map(s => s.id);
   const deleteS1 = () => {
     const row = screen.getByDisplayValue('S1').closest('.bg-gray-50') as HTMLElement;
     fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
@@ -134,10 +113,10 @@ describe('Settings, deleting a sprint', () => {
     deleteS1();
     expect(dialogText()).toContain(`${SPRINT_RECORDS_LINE} Continue?`);
     expect(sprintIds()).toContain('S1');
-    expect(ribOf(current, 'r').progressHistory).toHaveLength(1);
+    expect(ribOf(hosted.product, 'r').progressHistory).toHaveLength(1);
     confirm('Delete');
     expect(sprintIds()).not.toContain('S1');
-    expect(ribOf(current, 'r').progressHistory).toEqual([]);
+    expect(ribOf(hosted.product, 'r').progressHistory).toEqual([]);
   });
 
   it('Cancel keeps the sprint and its records', () => {
@@ -145,7 +124,7 @@ describe('Settings, deleting a sprint', () => {
     deleteS1();
     confirm('Cancel');
     expect(sprintIds()).toContain('S1');
-    expect(ribOf(current, 'r').progressHistory).toHaveLength(1);
+    expect(ribOf(hosted.product, 'r').progressHistory).toHaveLength(1);
   });
 
   it('asks for any rib, not only the first', () => {
@@ -176,7 +155,7 @@ describe('Map', () => {
     expect(releaseIds()).toContain('R2');
     confirm('Delete');
     expect(releaseIds()).not.toContain('R2');
-    expect(ribOf(current, 'r').progressHistory).toEqual([]);
+    expect(ribOf(hosted.product, 'r').progressHistory).toEqual([]);
   });
 
   it('has lost its unconditional wording: a release holding nothing has no line', async () => {
@@ -231,7 +210,7 @@ describe('Release Planning', () => {
       deleteR2();
       expect(dialog()).toBeNull();
       expect(releaseIds()).toContain('R2');
-      expect(ribOf(current, 'r').releaseAllocations).toEqual([on('R2')]);
+      expect(ribOf(hosted.product, 'r').releaseAllocations).toEqual([on('R2')]);
     });
 
     it('a release with nothing on it still deletes, whatever the filter', () => {
