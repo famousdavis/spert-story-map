@@ -26,6 +26,7 @@
 import { describe, it, expect } from 'vitest';
 import * as C from '../lib/calculations';
 import * as PV from '../lib/progressViewHelpers';
+import { lockingSprintId, rowRecords, strandedSeries } from '../lib/progressRule';
 import { computeLayout, gapButtonAt, gapButtonFor, GAP_BUTTON_HEIGHT } from '../components/storymap/useMapLayout';
 import type { Product, RibItem, Sprint, SizeMapping, ProgressEntry, ProgressSource } from '../types';
 
@@ -490,6 +491,57 @@ describe('W4 calculations — work grows with the data, not with its square', ()
     }
     // A small constant per row. Finding the row's allocation by scanning the list reads A × A.
     expect(reads.n).toBeLessThanOrEqual(6 * A);
+  });
+
+  // A real sprint list, so a lookup cannot stop early, and each rib holds one row:
+  // the shape where a per-sprint scan inside the per-rib loop costs ribs × sprints.
+  const manySprints = (reads: { n: number }, count: number): Sprint[] =>
+    Array.from({ length: count }, (_, i) => counted({ id: `s${i}`, name: '', order: i + 1, endDate: null } as Sprint, 'id', reads));
+
+  it('Needs Attention reads the sprint list once, not once per stranded row', () => {
+    const reads = { n: 0 };
+    const R = 300;
+    const S = 300;
+    const sprints = manySprints(reads, S);
+    const ribs = Array.from({ length: R }, (_, k) => plainRib(k, {
+      releaseAllocations: [{ releaseId: 'r0', percentage: 100 }],
+      progressHistory: [{ sprintId: 's1', releaseId: 'r1', percentComplete: 30 }],
+    }));
+    const found = ribs.map(rib => strandedSeries(rib, new Set(['r0', 'r1']), sprints));
+    expect(found.every(rows => rows.length === 1)).toBe(true);
+    // One pass to rank the sprints. Filtering the list per row reads R × S.
+    expect(reads.n).toBeLessThanOrEqual(2 * S);
+  });
+
+  it('the locking sprint reads the sprint list once, not once per rib', () => {
+    const reads = { n: 0 };
+    const R = 300;
+    const S = 300;
+    const sprints = manySprints(reads, S);
+    const ribs = Array.from({ length: R }, (_, k) => plainRib(k, { progressHistory: [{ sprintId: 's7', releaseId: 'r0', percentComplete: 30 }] }));
+    expect(ribs.every(rib => lockingSprintId(rib, sprints) === 's7')).toBe(true);
+    expect(reads.n).toBeLessThanOrEqual(2 * S);
+  });
+
+  it('the locking sprint reads a rib\'s history in one pass, however many allocations it has', () => {
+    const reads = { n: 0 };
+    const A = 300;
+    const sprints: Sprint[] = [{ id: 's0', name: '', order: 1, endDate: null }];
+    const history = Array.from({ length: A }, (_, i) => counted({ sprintId: 's0', releaseId: `r${i}`, percentComplete: 0 } as ProgressEntry, 'percentComplete', reads));
+    const rib = plainRib(0, { releaseAllocations: history.map((_, i) => ({ releaseId: `r${i}`, percentage: 1 })), progressHistory: history });
+    expect(lockingSprintId(rib, sprints)).toBeNull();
+    expect(reads.n).toBeLessThanOrEqual(4 * A);
+  });
+
+  it('a row\'s records read the sprint list once, not once per release', () => {
+    const reads = { n: 0 };
+    const R = 300;
+    const S = 300;
+    const sprints = manySprints(reads, S);
+    const history = Array.from({ length: R }, (_, i) => ({ sprintId: 's1', releaseId: `r${i}`, percentComplete: 1 }));
+    const rib = plainRib(0, { releaseAllocations: [], progressHistory: history });
+    for (let i = 0; i < R; i++) expect(rowRecords(rib, `r${i}`, sprints)).toHaveLength(1);
+    expect(reads.n).toBeLessThanOrEqual(2 * S);
   });
 });
 

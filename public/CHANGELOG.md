@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.19 (2026-11-06)
+
+### Added — act on progress that is not counting
+
+### Changed
+
+### Fixed
+
 ## Version 0.53.18 (2026-11-05)
 
 ### Changed — every figure now follows one rule
