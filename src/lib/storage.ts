@@ -6,6 +6,8 @@ import type { Product, ChangeLogEntry, UserSettings } from '../types';
 import { STORAGE_KEYS, SCHEMA_VERSION, DEFAULT_SIZE_MAPPING, CHANGELOG_MAX_ENTRIES } from './constants';
 import { runObserver } from './validatorObserverRegistry';
 import { needsV2Migration } from './schemaVersion';
+import { guardCloudProduct } from './cloudLoadGuard';
+import { reportGuardedLoad } from './cloudLoadNotices';
 
 // ── localStorage namespace ──────────────────────────────────────────
 //
@@ -146,7 +148,7 @@ export function migrateToV2(product: any): any {
         if (!rib) continue;
         // Same reasoning as the guards above, one level down: a non-list history
         // or allocation list (or a null entry in either) threw inside the loops
-        // below. Skipping leaves it for the cloud-load shape guard to set aside.
+        // below. Skipping leaves it for the read paths' shape guard to set aside.
         if (!Array.isArray(rib.progressHistory) || rib.progressHistory.length === 0) continue;
         const allocations = Array.isArray(rib.releaseAllocations) ? rib.releaseAllocations : [];
         if (allocations.length === 0) {
@@ -184,13 +186,43 @@ export function migrateToV2(product: any): any {
   return product;
 }
 
+/**
+ * The cloud read's shape guard (see `cloudLoadGuard.ts`), plus what a stored value
+ * needs and a cloud document already has. Same rule as the cloud: it NEVER WRITES
+ * BACK. The list reads every project on every visit, so a write here would discard
+ * a value before anyone had acted or been told. What is set aside stays stored until
+ * the next save. A repeat read costs nothing: the guard gives the same answer.
+ */
+function guardStoredProduct(stored: unknown, id: string, notify: boolean): Product | null {
+  // The cloud seam builds this object; here it is whatever JSON.parse found. The
+  // guard throws on a primitive, and `loadProductIndex` has no per-project `try`,
+  // so one such key would empty the whole list. Treated as unparseable JSON is.
+  if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return null;
+  const product = stored as Product;
+  // The cloud takes this from `snap.id`. Without it the project lists with a card
+  // that opens nothing and cannot be deleted.
+  if (typeof product.id !== 'string') product.id = id;
+  // Read ahead of the guard, which turns a non-list into [].
+  const hasSizeList = Array.isArray(product.sizeMapping);
+  reportGuardedLoad(id, guardCloudProduct(product), notify);
+  // ⚠️ Default rows, not the guard's []. It is what an import gives a project with no
+  // list, so the ribs keep their points. With [] they read 0, and an export of it
+  // clears every rib's size at import. A real [] is a user's own and is left alone.
+  if (!hasSizeList) product.sizeMapping = [...DEFAULT_SIZE_MAPPING];
+  return product;
+}
+
 // Products
-export function loadProduct(id: string, ns?: string): Product | null {
+/**
+ * `notify: false` is for a read that does not open the project (the list, the upload
+ * at sign-in). No notice: opening it runs the guard again.
+ */
+export function loadProduct(id: string, ns?: string, notify = true): Product | null {
   const namespace = ns ?? activeNamespace;
   const key = productKeyFor(id, namespace);
   // Boundary cast: immediatelyLoad returns `unknown` because localStorage JSON
   // is untrusted. This is the same validation boundary validateProduct sits on
-  // for imports — the migration below is what normalises an older shape.
+  // for imports — the migration and the shape guard below are what normalise it.
   let product = immediatelyLoad(key) as Product | null;
   // Brief 10 §3d: capture BEFORE the gate below. `migrateToV2` mutates `product`
   // IN PLACE, so a capture taken at the `return` would already read the
@@ -209,7 +241,10 @@ export function loadProduct(id: string, ns?: string): Product | null {
   // registered the observer at bootstrap (§3a); `null` is routine here and the
   // observer guards it (§3b.2).
   runObserver(product, { rawSchemaVersion });
-  return product;
+  // ⚠️ Shape guard LAST. After the observer, which must keep reporting what is
+  // stored, and after the migration's save above, which must not persist what the
+  // guard sets aside.
+  return guardStoredProduct(product, id, notify);
 }
 
 export function saveProduct(product: Product): Product {

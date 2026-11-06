@@ -71,7 +71,7 @@ describe('createLocalStorageDriver', () => {
     const result = await driver.loadProductIndex();
     expect(storage.loadProductIndex).toHaveBeenCalledOnce();
     // Loads each product via loadProduct (uniform with cloud driver)
-    expect(storage.loadProduct).toHaveBeenCalledWith('p1');
+    expect(storage.loadProduct).toHaveBeenCalledWith('p1', undefined, false);
     expect(result).toEqual([{ id: 'p1', name: 'Loaded Product' }]);
   });
 

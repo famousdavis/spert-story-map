@@ -425,6 +425,23 @@ describe('C1 — cannot alter output', () => {
     expect(returned).toEqual(before);
   });
 
+  it('the shape guard runs after the local seam, so the observer still reports what is stored (seam)', () => {
+    const id = nextId();
+    const { schemaVersion: _omitted, ...v1 } = pristineFixture('Bad shape') as Product & Record<string, unknown>;
+    localStorage.setItem(`rp:local:product_${id}`, JSON.stringify({ ...v1, id, sprints: {} }));
+    // A snapshot taken INSIDE the call. The guard mutates in place, so a reference
+    // held and read afterwards shows [] whichever order the two ran in.
+    const seen: unknown[] = [];
+    registerObserver((p, ctx) => {
+      seen.push(structuredClone({ sprints: p?.sprints, version: p?.schemaVersion, raw: ctx.rawSchemaVersion }));
+    });
+
+    const loaded = loadProduct(id);
+
+    expect(seen).toEqual([{ sprints: {}, version: 2, raw: undefined }]);
+    expect(loaded?.sprints).toEqual([]);
+  });
+
   it('the local seam returns byte-identical data with the observer registered (seam)', () => {
     const p = danglingFixture(nextId());
     saveProductImmediate(p);

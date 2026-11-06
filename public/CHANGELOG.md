@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.24 (2026-11-06)
+
+### Fixed
+
+- **A project already saved with a broken release, sprint or size list now opens and stays on the project list.** It no longer needs exporting and importing again, which is what the 0.53.23 entry below asks for. A notice at the top of the project says part of it could not be read. Cloud projects already had this protection.
+- **It opens the way a re-import would leave it.** A broken release or sprint list opens empty, and a broken size list opens with the default sizes. Ribs keep their sizes, allocations and history. With no sprints, recorded progress reads 0% and no longer locks a rib's size. With the default sizes, points can differ from the original: a rib sized M reads 20. With no releases, ribs appear on the Map's Unknown release lane.
+- ⚠️ **Your next edit saves the project that way.** Until then the saved copy stays as it was, so opening a project changes nothing. The part that could not be read is not kept after that edit.
+
 ## Version 0.53.23 (2026-11-06)
 
 ### Fixed

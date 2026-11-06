@@ -62,7 +62,7 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
   let skipped = 0;
 
   for (const entry of index) {
-    const product = loadProduct(entry.id, 'local');
+    const product = loadProduct(entry.id, 'local', false);
     if (!product) {
       skipped++;
       continue;

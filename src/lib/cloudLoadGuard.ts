@@ -3,14 +3,16 @@
 // See LICENSE file in the project root for full license text.
 
 /**
- * Shape guard for project documents read from the cloud.
+ * Shape guard for project documents read from the cloud or from localStorage.
+ * (`storage.ts` adds the few things a stored value needs: see `guardStoredProduct`.)
  *
  * A project document reaches this app from Firestore with no content checks:
  * the rules allowlist field NAMES only, and `validateProduct` runs on the import
- * path alone. A value of the wrong shape — an object where a name belongs, a
- * number where a list belongs — throws the first time a view touches it, and
- * because the app's only top-level error boundary re-renders the same data on
- * Reload, one such document on the project list locked the whole app.
+ * path alone. localStorage has no checks either. A value of the wrong shape — an
+ * object where a name belongs, a number where a list belongs — throws the first
+ * time a view touches it, and because the app's only top-level error boundary
+ * re-renders the same data on Reload, one such document on the project list
+ * locked the whole app.
  *
  * ⚠️ THIS IS NOT `validateProduct`, AND MUST NEVER BECOME IT. The validator
  * rejects a whole file on its first violation and is STRICTER than what the app
@@ -29,6 +31,13 @@
  * and returns the ids of the rules that fired. It never writes back: a value set
  * aside here disappears from the document at the next save, which repairs it.
  * That is acceptable ONLY because no app writer can produce a value it rejects.
+ *
+ * ⚠️ THE TWO PATHS DO NOT STORE THE SAME VALUE. `sanitizeForFirestore` leaves NaN
+ * and Infinity alone, so the cloud keeps a number and this guard passes it.
+ * `JSON.stringify` writes `null`, so the same value reads back here as `null`. No
+ * writer stores either in `percentage` or `points`. One did in `sprintCadenceWeeks`:
+ * before v0.6.0 clearing the Settings input stored NaN, and a local store outlives
+ * the code that wrote it. Check a new rule against both, and against old writers.
  */
 
 type Obj = Record<string, unknown>;
@@ -64,11 +73,15 @@ function textOrNull(o: Obj, key: string, rule: string, hits: Hits): void {
   hits.add(rule);
 }
 
-/** An optional field that is dropped when it has the wrong type. */
+/**
+ * An optional field that is dropped when it has the wrong type. A `null` carries
+ * no value, so dropping it loses nothing and is not reported as set aside.
+ */
 function dropUnless(o: Obj, key: string, ok: (v: unknown) => boolean, rule: string, hits: Hits): void {
-  if (o[key] === undefined || ok(o[key])) return;
+  const v = o[key];
+  if (v === undefined || ok(v)) return;
   delete o[key];
-  hits.add(rule);
+  if (v !== null) hits.add(rule);
 }
 
 /**
@@ -189,8 +202,9 @@ export function guardCloudProduct(loaded: object): string[] {
   record(product, 'releaseCardOrder', 'releaseCardOrder', hits, Array.isArray);
   record(product, 'sizingCardOrder', 'sizingCardOrder', hits, Array.isArray);
   record(product, 'cardColorLabels', 'cardColorLabels', hits, isString);
-  // `_changeLog` is never written back whole (the save path appends deltas via
-  // arrayUnion), so this changes only what is held in memory, never the server.
+  // The cloud save appends deltas via arrayUnion, so there this changes only what
+  // is held in memory, never the server. A local save writes the whole product, so
+  // there it goes at the next save, like everything else set aside here.
   if (product._changeLog !== undefined) list(product, '_changeLog', '_changeLog', hits, isObj);
   return [...hits];
 }
