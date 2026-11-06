@@ -29,6 +29,7 @@ import {
   cancelPendingSaves as _cancelPendingSaves,
   onSaveError as _onSaveError,
 } from './storage';
+import { dismissGuardedLoad } from './cloudLoadNotices';
 
 // Re-export Firestore driver from dedicated module
 export { createFirestoreDriver } from './firestoreDriver';
@@ -47,7 +48,7 @@ export function createLocalStorageDriver(): StorageDriver {
     loadProductIndex() {
       const index = _loadProductIndex();
       const products = index
-        .map(entry => _loadProduct(entry.id))
+        .map(entry => _loadProduct(entry.id, undefined, false))
         .filter(Boolean) as Product[];
       return Promise.resolve(products);
     },
@@ -100,6 +101,8 @@ export function createLocalStorageDriver(): StorageDriver {
         _originRef: existing?._originRef ?? product._originRef,
       };
       _saveProductImmediateOrThrow(merged);
+      // Whatever the notice was about has just been replaced.
+      dismissGuardedLoad(product.id);
     },
 
     deleteProduct(id: string) {

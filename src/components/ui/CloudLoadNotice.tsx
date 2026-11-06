@@ -11,8 +11,8 @@ interface CloudLoadNoticeProps {
 }
 
 /**
- * Shown when part of a cloud project could not be read and was left out so the
- * project could open (see `guardCloudProduct`). Names the project, never the
+ * Shown when part of a project could not be read and was left out so the project
+ * could open, on either read path (see `guardCloudProduct`). Names the project, never the
  * value. The next save writes the project without the part that was left out.
  */
 export default function CloudLoadNotice({ productId, productName }: CloudLoadNoticeProps) {

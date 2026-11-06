@@ -70,6 +70,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import { migrateLocalToCloud } from '../lib/migration';
+import { isGuardedLoad } from '../lib/cloudLoadNotices';
 import { setDoc } from 'firebase/firestore';
 import type { ChangeLogEntry, Product } from '../types';
 
@@ -135,6 +136,19 @@ describe('migrateLocalToCloud', () => {
     const call = findSetDocCall('proj-1');
     expect(call.owner).toBe('user-1');
     expect(call.members).toEqual({ 'user-1': 'owner' });
+  });
+
+  it('uploads what the local read guard leaves, so one bad project does not stop the rest', async () => {
+    const bad = { ...createLocalProduct('proj-1', 'Bad'), sprints: {}, _changeLog: {} };
+    seedLocalStorage([bad, createLocalProduct('proj-2', 'Good')]);
+
+    const result = await migrateLocalToCloud('user-1');
+
+    expect(result.uploaded).toBe(2);
+    expect(findSetDocCall('proj-1').sprints).toEqual([]);
+    // "Local data is left in place as a backup": the upload wrote nothing back.
+    expect(JSON.parse(localStorage.getItem('rp:local:product_proj-1')!).sprints).toEqual({});
+    expect(isGuardedLoad('proj-1')).toBe(false);
   });
 
   it('skips products that already exist in cloud with user as member', async () => {

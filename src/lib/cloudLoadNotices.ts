@@ -25,7 +25,7 @@ function emit(): void {
  */
 export function reportGuardedLoad(productId: string, rules: string[], notify: boolean): void {
   if (rules.length === 0) return;
-  console.warn(`[cloud-load-guard] project ${productId}: ${rules.join(', ')}`);
+  console.warn(`[load-guard] project ${productId}: ${rules.join(', ')}`);
   if (!notify || flagged.has(productId)) return;
   flagged.add(productId);
   emit();

@@ -3,7 +3,8 @@
 // See LICENSE file in the project root for full license text.
 
 /**
- * `guardCloudProduct` — the shape guard on the cloud read path.
+ * `guardCloudProduct` — the shape guard on both read paths. What the local seam
+ * adds to it is in `localLoadGuard.test.tsx`.
  *
  * ⚠️ THE MUST-PASS FIXTURE IS THE HALF THAT MATTERS. A guard that sets aside a
  * value an app writer can produce turns into data loss at the next save, for a
@@ -90,6 +91,33 @@ describe('guardCloudProduct — must-pass: everything an app writer can produce'
     const before = structuredClone(doc);
     expect(guardCloudProduct(doc)).toEqual([]);
     expect(doc).toEqual(before);
+  });
+
+  // localStorage stores through JSON, not sanitizeForFirestore: same writers, but an
+  // `undefined` key, a list hole and a NaN each land differently. See the guard's header.
+  it('fires no rule and changes nothing on the same project read back through JSON', () => {
+    const doc = JSON.parse(JSON.stringify(legitimateProject())) as Doc;
+    const before = structuredClone(doc);
+    expect(guardCloudProduct(doc)).toEqual([]);
+    expect(doc).toEqual(before);
+  });
+
+  it('drops a null optional field silently — a local store can hold a null cadence, and null carries no value', () => {
+    const doc = small();
+    doc.createdAt = null;
+    doc.sprintCadenceWeeks = null;
+    rib1(doc).cardColor = null;
+    expect(guardCloudProduct(doc)).toEqual([]);
+    expect('createdAt' in doc).toBe(false);
+    expect('sprintCadenceWeeks' in doc).toBe(false);
+    expect('cardColor' in rib1(doc)).toBe(false);
+  });
+
+  it('still reports a wrong-typed optional field — only null is silent', () => {
+    const doc = small();
+    doc.sprintCadenceWeeks = 'two';
+    expect(guardCloudProduct(doc)).toEqual(['product.sprintCadenceWeeks']);
+    expect('sprintCadenceWeeks' in doc).toBe(false);
   });
 
   it('turns a null text field into "" silently — null carries no text, so nothing is lost', () => {
