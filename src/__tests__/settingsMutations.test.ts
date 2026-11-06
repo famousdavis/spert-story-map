@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   deleteReleaseFromProduct, deleteSprintFromProduct, RELEASE_RECORDS_LINE, releaseDeleteMessage, releaseHasAllocations, releaseHoldsRecords,
+  sprintHoldsRecords,
 } from '../lib/settingsMutations';
 import { req } from './testHelpers';
 import type { Product, RibItem } from '../types';
@@ -194,6 +195,15 @@ describe('releaseHoldsRecords', () => {
     expect(releaseHoldsRecords(withHistory([at(null)]), 'r9')).toBe(false);
     expect(releaseHoldsRecords(withHistory([at(30)]), 'r8')).toBe(false);
     expect(releaseHoldsRecords(withHistory(undefined), 'r9')).toBe(false);
+  });
+
+  it('sprintHoldsRecords asks the same of a sprint, in any release', () => {
+    expect(sprintHoldsRecords(withHistory([at(30)]), 's1')).toBe(true);
+    expect(sprintHoldsRecords(withHistory([at(0, '', 's1', 'gone')]), 's1')).toBe(true);
+    expect(sprintHoldsRecords(withHistory([at(null, 'note')]), 's1')).toBe(true);
+    expect(sprintHoldsRecords(withHistory([at(null)]), 's1')).toBe(false);
+    expect(sprintHoldsRecords(withHistory([at(30)]), 's2')).toBe(false);
+    expect(sprintHoldsRecords(withHistory(undefined), 's1')).toBe(false);
   });
 
   it('builds a message with the line only when it applies, and an empty lead leaves no gap', () => {

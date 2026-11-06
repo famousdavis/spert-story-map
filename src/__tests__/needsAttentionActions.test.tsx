@@ -93,7 +93,7 @@ describe('a duplicate row', () => {
   it('Remove\'s confirm says the entry that counts stays, and it does', () => {
     mount([entry('S1', 'R1', 10), entry('S1', 'R1', 30)]);
     fireEvent.click(removeButtons()[0] as HTMLElement);
-    expect(dialogText()).toContain('The entry that counts stays');
+    expect(dialogText()).toContain(`Remove the duplicate on "r" (Release R1, S1)? The entry that counts stays, and so do notes. ${UNDO_HINT}`);
     fireEvent.click(dialog().getByRole('button', { name: 'Remove' }));
     expect(history()).toEqual([['S1', 'R1', 10]]);
     expect(isRibLocked(ribOf(hosted.product, 'r'), hosted.product.sprints)).toBe(true);

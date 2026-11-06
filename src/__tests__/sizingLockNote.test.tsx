@@ -7,7 +7,6 @@ import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { computeSizingLayout } from '../components/sizing/useSizingLayout';
-import { sizeLockNote } from '../lib/ribHelpers';
 import SizingView from '../pages/SizingView';
 import type { ProgressEntry, ReleaseAllocation } from '../types';
 import { entry, makeProduct, makeRib } from './fixtures/progressIntegrity';
@@ -52,16 +51,6 @@ describe('the cell carries the locking sprint', () => {
 
   it('ignores a later record on a release the rib left', () => {
     expect(cellFor([entry('S1', 'R1', 10), entry('S3', 'R2', 90)])?.lockedSprintName).toBe('S1');
-  });
-});
-
-describe('sizeLockNote', () => {
-  it('names the sprint', () => {
-    expect(sizeLockNote('Sprint 4')).toBe('Size locked: progress recorded in Sprint 4');
-  });
-
-  it('still reads as a sentence with no sprint to name', () => {
-    expect(sizeLockNote(null)).toBe('Size locked: progress recorded');
   });
 });
 
