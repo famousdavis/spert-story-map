@@ -2,7 +2,8 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product, ProgressEntry, ReleaseAllocation, RibItem } from '../types';
+import type { Product, ProgressEntry, ReleaseAllocation, RibItem, Sprint } from '../types';
+import { latestSprintId, progressAsOf } from './progressRule';
 import { transferAllocation } from './ribHelpers';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
@@ -12,6 +13,21 @@ type UpdateProduct = (updater: (prev: Product) => Product) => void;
  * These wrap the triple-nested theme→backbone→rib traversal
  * into testable, reusable functions.
  */
+
+/**
+ * A copy of `history` holding one entry for (sprint, release). Only the first
+ * entry for a pair counts, so a write that left the others behind would let a
+ * delete resurface a shadowed one. The first non-empty comment stays.
+ */
+function collapseDuplicates(history: ProgressEntry[], sprintId: string, releaseId: string): ProgressEntry[] {
+  const isPair = (p: ProgressEntry) => p.sprintId === sprintId && p.releaseId === releaseId;
+  const pair = history.filter(isPair);
+  const first = pair[0];
+  if (!first || pair.length < 2) return [...history];
+  const comment = pair.find(p => p.comment)?.comment;
+  const kept = comment === undefined ? first : { ...first, comment };
+  return history.filter(p => !isPair(p) || p === first).map(p => p === first ? kept : p);
+}
 
 /**
  * Find and update a specific rib's progressHistory in a single updateProduct call.
@@ -35,7 +51,7 @@ function updateRibProgress(
         ...b,
         ribItems: b.ribItems.map(r => {
           if (r.id !== ribId) return r;
-          const history = [...(r.progressHistory || [])];
+          const history = collapseDuplicates(r.progressHistory || [], sprintId, releaseId);
           const existingIdx = history.findIndex(
             p => p.sprintId === sprintId && p.releaseId === releaseId
           );
@@ -238,6 +254,48 @@ export function describeAllocationMove(
   if (targetRecordsCountAgain(history, move.from, move.to)) return { toReleaseId: move.to, effect: 'counts-again' };
   if (hasPositiveEntry(history, move.from)) return { toReleaseId: move.to, effect: 'carries' };
   return null;
+}
+
+/** Something Save would do to a rib's progress that the dialog should say first. */
+export type AllocationWarning =
+  | { kind: 'stops-counting'; releaseId: string }
+  | { kind: 'capped'; releaseId: string; recorded: number; counted: number };
+
+const holdsProgress = (entry: ProgressEntry, sprintIds: Set<string>) =>
+  (sprintIds.has(entry.sprintId) && (entry.percentComplete ?? 0) > 0) || Boolean(entry.comment);
+
+/**
+ * What an allocation change would stop counting. On a detected move nothing stops:
+ * the records carry, or the target's count again. Otherwise each release leaving
+ * the rib with a record or a comment is named. A release staying on the rib, or a
+ * move's target, is named when it holds more than its percentage will count.
+ */
+export function describeAllocationWarnings(
+  rib: Pick<RibItem, 'releaseAllocations' | 'progressHistory'>,
+  next: AllocationRow[],
+  sprints: Sprint[],
+): AllocationWarning[] {
+  const history = rib.progressHistory ?? [];
+  const move = detectAllocationMove(rib.releaseAllocations, next);
+  const carried = move ? carryProgress(history, move.from, move.to) : history;
+  const before = allocatedReleaseIds(rib.releaseAllocations);
+  const after = allocatedReleaseIds(next);
+  const sprintIds = new Set(sprints.map(s => s.id));
+  const latest = latestSprintId(sprints);
+
+  const warnings: AllocationWarning[] = [];
+  if (!move) {
+    for (const releaseId of before) {
+      if (after.has(releaseId)) continue;
+      if (history.some(e => e.releaseId === releaseId && holdsProgress(e, sprintIds))) warnings.push({ kind: 'stops-counting', releaseId });
+    }
+  }
+  for (const row of next) {
+    if (row.percentage <= 0 || !(before.has(row.releaseId) || row.releaseId === move?.to)) continue;
+    const recorded = progressAsOf({ progressHistory: carried }, row.releaseId, latest, sprints);
+    if (recorded > row.percentage) warnings.push({ kind: 'capped', releaseId: row.releaseId, recorded, counted: row.percentage });
+  }
+  return warnings;
 }
 
 /**

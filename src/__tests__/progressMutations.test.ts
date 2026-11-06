@@ -3,8 +3,8 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { updateProgress, removeProgress, updateComment, calculateNextSprintEndDate } from '../lib/progressMutations';
-import type { Product, ProductUpdater, Theme, Backbone, RibItem, ProgressEntry } from '../types';
+import { updateProgress, removeProgress, updateComment, calculateNextSprintEndDate, describeAllocationWarnings } from '../lib/progressMutations';
+import type { Product, ProductUpdater, Theme, Backbone, RibItem, ProgressEntry, ReleaseAllocation, Sprint } from '../types';
 import { req } from './testHelpers';
 
 function makeProduct({ themes = [] }: { themes?: Theme[] } = {}): Product {
@@ -229,6 +229,116 @@ describe('updateComment', () => {
 });
 
 // --- calculateNextSprintEndDate ---
+describe('a write keeps one entry per (sprint, release)', () => {
+  const dup = (first: Partial<ProgressEntry>, shadowed: Partial<ProgressEntry>): ProgressEntry[] => [
+    { sprintId: 's1', releaseId: 'r1', percentComplete: 10, ...first },
+    { sprintId: 's2', releaseId: 'r1', percentComplete: 40 },
+    { sprintId: 's1', releaseId: 'r1', percentComplete: 30, ...shadowed },
+    { sprintId: 's1', releaseId: 'r2', percentComplete: 5 },
+  ];
+  const product = (history: ProgressEntry[]) => makeProduct({
+    themes: [makeTheme('t1', [makeBackbone('b1', [makeRib('rib-1', history)])])],
+  });
+  const after = (p: Product, write: (update: (updater: ProductUpdater) => void) => void) =>
+    captureProgressUpdate(write, p).themes[0]?.backboneItems[0]?.ribItems[0]?.progressHistory ?? [];
+
+  it('updateProgress collapses the pair and leaves other pairs alone', () => {
+    const history = after(product(dup({}, {})), u => updateProgress(u, 'rib-1', 'r1', 's1', 20));
+    expect(history.map(e => [e.sprintId, e.releaseId, e.percentComplete])).toEqual([['s1', 'r1', 20], ['s2', 'r1', 40], ['s1', 'r2', 5]]);
+  });
+
+  it('removeProgress on a first entry cannot resurface a shadowed one', () => {
+    const history = after(product(dup({}, {})), u => removeProgress(u, 'rib-1', 'r1', 's1'));
+    expect(history.filter(e => e.sprintId === 's1' && e.releaseId === 'r1')).toEqual([]);
+  });
+
+  it('updateComment collapses too', () => {
+    const history = after(product(dup({}, {})), u => updateComment(u, 'rib-1', 'r1', 's1', 'new'));
+    expect(history.filter(e => e.sprintId === 's1' && e.releaseId === 'r1')).toMatchObject([{ percentComplete: 10, comment: 'new' }]);
+  });
+
+  it('keeps the first non-empty comment, wherever it sat', () => {
+    const history = after(product(dup({ comment: '' }, { comment: 'only here' })), u => updateProgress(u, 'rib-1', 'r1', 's1', 20));
+    expect(history[0]).toMatchObject({ percentComplete: 20, comment: 'only here' });
+    const first = after(product(dup({ comment: 'first' }, { comment: 'second' })), u => updateProgress(u, 'rib-1', 'r1', 's1', 20));
+    expect(first[0]).toMatchObject({ comment: 'first' });
+  });
+
+  it('a kept comment means a removal nulls the value rather than deleting it', () => {
+    const history = after(product(dup({ comment: '' }, { comment: 'keep me' })), u => removeProgress(u, 'rib-1', 'r1', 's1'));
+    expect(history.filter(e => e.sprintId === 's1' && e.releaseId === 'r1')).toMatchObject([{ percentComplete: null, comment: 'keep me' }]);
+  });
+
+  it('leaves a history with no duplicates exactly as it was, bar the write', () => {
+    const clean: ProgressEntry[] = [{ sprintId: 's1', releaseId: 'r1', percentComplete: 10 }, { sprintId: 's2', releaseId: 'r1', percentComplete: 40 }];
+    expect(after(product(clean), u => updateProgress(u, 'rib-1', 'r1', 's2', 50)).map(e => e.percentComplete)).toEqual([10, 50]);
+  });
+});
+
+describe('describeAllocationWarnings', () => {
+  const sprints: Sprint[] = ['s1', 's2'].map((id, i) => ({ id, name: id, order: i + 1, endDate: null }));
+  const on = (releaseId: string, percentage = 100): ReleaseAllocation => ({ releaseId, percentage });
+  const at = (sprintId: string, releaseId: string, percentComplete: number | null, comment = ''): ProgressEntry => ({ sprintId, releaseId, percentComplete, comment });
+  const warn = (allocations: ReleaseAllocation[], history: ProgressEntry[], next: ReleaseAllocation[]) =>
+    describeAllocationWarnings({ releaseAllocations: allocations, progressHistory: history }, next, sprints);
+
+  it('says nothing when nothing changes for progress', () => {
+    expect(warn([on('r1')], [at('s1', 'r1', 50)], [on('r1')])).toEqual([]);
+    expect(warn([on('r1')], [], [])).toEqual([]);
+  });
+
+  it('names a removed release holding a record', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', 20)], [on('r2', 50)]))
+      .toEqual([{ kind: 'stops-counting', releaseId: 'r1' }]);
+  });
+
+  it('names a removed release holding only a comment', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', null, 'note')], [on('r2', 50)]))
+      .toEqual([{ kind: 'stops-counting', releaseId: 'r1' }]);
+  });
+
+  it('does not name a removed release with a 0, a null, or a record for a sprint that is gone', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', 0), at('s2', 'r1', null), at('gone', 'r1', 50)], [on('r2', 50)])).toEqual([]);
+  });
+
+  it('names each release Unassign All would drop', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', 20), at('s1', 'r2', 10)], []))
+      .toEqual([{ kind: 'stops-counting', releaseId: 'r1' }, { kind: 'stops-counting', releaseId: 'r2' }]);
+  });
+
+  it('treats a row typed down to 0 as removed', () => {
+    expect(warn([on('r1', 50), on('r2', 50)], [at('s1', 'r1', 20)], [on('r1', 0), on('r2', 50)]))
+      .toEqual([{ kind: 'stops-counting', releaseId: 'r1' }]);
+  });
+
+  it('says nothing about the source of a move: the records carry', () => {
+    expect(warn([on('r1')], [at('s1', 'r1', 20)], [on('r2')])).toEqual([]);
+  });
+
+  it('names a kept release whose records exceed its new percentage', () => {
+    expect(warn([on('r1')], [at('s1', 'r1', 80)], [on('r1', 50)]))
+      .toEqual([{ kind: 'capped', releaseId: 'r1', recorded: 80, counted: 50 }]);
+  });
+
+  it('does not name a kept release at or below its percentage', () => {
+    expect(warn([on('r1')], [at('s1', 'r1', 50)], [on('r1', 50)])).toEqual([]);
+  });
+
+  it('names a move\'s target when the carried records exceed its percentage', () => {
+    expect(warn([on('r1')], [at('s1', 'r1', 80)], [on('r2', 50)]))
+      .toEqual([{ kind: 'capped', releaseId: 'r2', recorded: 80, counted: 50 }]);
+  });
+
+  it('names a move\'s target when its own old records count again above the percentage', () => {
+    expect(warn([on('r1')], [at('s1', 'r2', 80)], [on('r2', 50)]))
+      .toEqual([{ kind: 'capped', releaseId: 'r2', recorded: 80, counted: 50 }]);
+  });
+
+  it('does not name a release merely added, which keeps no record of the rib', () => {
+    expect(warn([on('r1', 50)], [at('s1', 'r2', 80)], [on('r1', 50), on('r2', 30)])).toEqual([]);
+  });
+});
+
 describe('calculateNextSprintEndDate', () => {
   it('adds cadence weeks to the last end date', () => {
     expect(calculateNextSprintEndDate('2026-01-01', 2)).toBe('2026-01-15');

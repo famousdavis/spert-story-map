@@ -8,6 +8,7 @@ import { computeLayout } from '../components/storymap/useMapLayout';
 import { buildAiSnapshot } from '../lib/aiSnapshot';
 import { getProgressOverTime, getProjectPercentComplete, getProjectTotals, getReleasePercentComplete, getReleasePoints, getSprintSummary, getThemeStats } from '../lib/calculations';
 import { buildForecasterExport, checkForecasterExport } from '../lib/exportForForecaster';
+import { updateProgress } from '../lib/progressMutations';
 import { getCurrentPct, getDelta, getSprintPct } from '../lib/progressViewHelpers';
 import { getStrandedRows } from '../lib/reconciliation';
 import { isRibLocked } from '../lib/ribHelpers';
@@ -410,5 +411,19 @@ describe('a duplicate allocation row, in the readers beyond the figures', () => 
 
   it('the AI snapshot reports one release, which is what the move guard reads', () => {
     expect(buildAiSnapshot(p).themes[0]?.backboneItems[0]?.ribItems[0]?.releaseIds).toEqual(['R1']);
+  });
+});
+
+describe('editing a progress record', () => {
+  const dup = () => makeProduct([makeRib('r', [on('R1')], [
+    entry('S1', 'R1', 10), entry('S1', 'R1', 30, 'shadowed note'), entry('S2', 'R1', 40),
+  ])]);
+
+  it('a write keeps one entry for the pair, so a delete cannot resurface a shadowed one', () => {
+    const p = applyUpdate(dup(), update => updateProgress(update, 'r', 'R1', 'S1', 20));
+    const history = ribOf(p, 'r').progressHistory;
+    expect(history.filter(e => e.sprintId === 'S1')).toHaveLength(1);
+    expect(history.find(e => e.sprintId === 'S1')?.percentComplete).toBe(20);
+    expect(history.find(e => e.sprintId === 'S2')?.percentComplete).toBe(40);
   });
 });
