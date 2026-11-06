@@ -3,8 +3,9 @@
 // See LICENSE file in the project root for full license text.
 
 import { describe, it, expect } from 'vitest';
-import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName } from '../lib/ribHelpers';
-import type { ProgressEntry } from '../types';
+import { forEachRib, reduceRibs, isRibLocked, computeRibSiblingName, transferAllocation } from '../lib/ribHelpers';
+import type { ProgressEntry, ReleaseAllocation, RibItem } from '../types';
+import { req } from './testHelpers';
 
 const product = {
   themes: [
@@ -153,5 +154,50 @@ describe('computeRibSiblingName', () => {
   it('handles a prefix containing regex metacharacters', () => {
     expect(computeRibSiblingName([{ name: 'Cost ($)' }], 'Cost ($)', true))
       .toEqual({ originalName: 'Cost ($)', newName: 'Cost ($) (1)' });
+  });
+});
+
+function makeRib(id: string, allocations: ReleaseAllocation[] = []): RibItem {
+  return { id, name: `Rib ${id}`, description: '', releaseAllocations: allocations, size: null, category: 'core', order: 1, progressHistory: [] };
+}
+
+// Moved here from mapMutations.test.ts with the function (v0.53.17): this file is
+// inside the Stryker scope and that one is not, so the tests have to follow it.
+describe('transferAllocation', () => {
+  it('clears allocations when moving to unassigned', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 100, memo: 'note' }]);
+    expect(transferAllocation(rib, 'rel-A', null)).toEqual([]);
+  });
+
+  it('creates fresh allocation when moving from unassigned', () => {
+    const rib = makeRib('r1');
+    expect(transferAllocation(rib, null, 'rel-B')).toEqual([
+      { releaseId: 'rel-B', percentage: 100, memo: '' },
+    ]);
+  });
+
+  it('swaps allocation from one release to another', () => {
+    const rib = makeRib('r1', [{ releaseId: 'rel-A', percentage: 60, memo: 'keep' }]);
+    const result = req(transferAllocation(rib, 'rel-A', 'rel-B'), 'result');
+    expect(result).toEqual([{ releaseId: 'rel-B', percentage: 60, memo: 'keep' }]);
+  });
+
+  it('returns null when rib already has the target release (duplicate guard)', () => {
+    const rib = makeRib('r1', [
+      { releaseId: 'rel-A', percentage: 50, memo: '' },
+      { releaseId: 'rel-B', percentage: 50, memo: '' },
+    ]);
+    expect(transferAllocation(rib, 'rel-A', 'rel-B')).toBeNull();
+  });
+
+  it('preserves other allocations during release-to-release transfer', () => {
+    const rib = makeRib('r1', [
+      { releaseId: 'rel-A', percentage: 40, memo: '' },
+      { releaseId: 'rel-C', percentage: 60, memo: 'other' },
+    ]);
+    const result = req(transferAllocation(rib, 'rel-A', 'rel-B'), 'result');
+    expect(result).toHaveLength(2);
+    expect(result.find(a => a.releaseId === 'rel-C')).toEqual({ releaseId: 'rel-C', percentage: 60, memo: 'other' });
+    expect(result.find(a => a.releaseId === 'rel-B')).toEqual({ releaseId: 'rel-B', percentage: 40, memo: '' });
   });
 });

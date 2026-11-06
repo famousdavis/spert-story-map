@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import type { Product, RibItem } from '../types';
-import { transferAllocation } from '../components/storymap/mapMutations';
+import { transferAllocation } from '../lib/ribHelpers';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
 
