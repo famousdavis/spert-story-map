@@ -39,7 +39,9 @@
  *     key out leaves it stored. Since v0.53.26 the driver names it with `deleteField()`
  *     at the next save (`guardRead` in `firestoreDriver.ts`).
  *   - CLOUD, `createdAt` and `_changeLog`: no save repairs these and none may. They stay
- *     in the document, filtered from every read, and raise no notice there.
+ *     in the document, filtered from every read, and raise no notice there. Replacing
+ *     the project writes the whole document, so a bad `createdAt` goes then, and only
+ *     then (`replaceProduct` in `firestoreDriver.ts`).
  *
  * ⚠️ Commit 6d98b85 says "Repair is at the next save, as on the cloud". That is true
  * on a local read and was FALSE on the cloud: not for `createdAt`, not for `_changeLog`,

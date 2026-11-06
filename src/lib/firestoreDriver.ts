@@ -87,10 +87,14 @@ const NEVER_SAVED = new Set(['owner', 'members', 'createdAt', '_originRef', '_ch
  * them, the log keeps its real entries, and the one reader of `createdAt` takes
  * `|| now`.
  *
- * ⚠️ THEY STAY IN THE DOCUMENT, ON PURPOSE. Never repair these with a write. No write may
- * be able to truncate the log. And `replaceProduct` throws when neither the document
- * nor the file holds a `createdAt`, so deleting a bad one would break exporting a
- * project and importing it back over itself (measured on the emulator).
+ * ⚠️ NO SAVE REPAIRS THESE, ON PURPOSE. No write may be able to truncate the log. And
+ * `createdAt` is provenance: a save runs because someone edited something else and has
+ * nothing to put in its place, so a date it removed would go with nobody having asked.
+ * Replacing a project is different. The user has asked for the whole document to be
+ * rewritten, and the file may hold a good date, so a bad one goes there and only there
+ * (see `replaceProduct`). Up to v0.53.26 this comment also said a save must not delete
+ * it because `replaceProduct` threw with no date on either side. It no longer throws.
+ * That was never the only reason, and the rule stands.
  */
 const RULES_NO_SAVE_CLEARS = new Set(['product.createdAt', '_changeLog']);
 
@@ -447,7 +451,9 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      *
      * Preserved from existing doc:
      *   owner, members — collaborator permissions (Firestore-only)
-     *   createdAt      — original creation timestamp
+     *   createdAt      — original creation timestamp, when stored as a string. Any
+     *                    other stored value gives way to the file's date, or goes if
+     *                    the file has none. No date on either side leaves no key.
      *   _originRef     — workspace provenance fingerprint (academic integrity)
      *   _owner,        — alias junk persisted by pre-v0.53.7 cloud Duplicate.
      *   _members         Carried forward ONLY when already stored, never
@@ -474,7 +480,20 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           ...data,
           owner: existing.owner ?? uid,
           members: existing.members ?? { [uid]: 'owner' },
-          createdAt: existing.createdAt ?? data.createdAt,
+          // ⚠️ A STORED STRING WINS, AND NOTHING ELSE STORED DOES. `...data` already holds
+          // the file's date or no key at all, because validateProduct removes anything
+          // but a string and both callers take their product from it. So any other
+          // stored value gives way to the file's date, or goes if the file has none:
+          // the shape guard has hidden it from every read, and the local replace does
+          // the same. An omitted key is a removal, which the rules allow here because
+          // `createdAt` is allowlisted (owner and editor, measured on the emulator).
+          // Never `??`: with no date on either side it is `undefined`, and the write
+          // throws, which is what stopped a project being imported back over itself.
+          // A date is never made up.
+          ...(typeof existing.createdAt === 'string' ? { createdAt: existing.createdAt } : {}),
+          // This `??` is safe only because importProductFromJSON gives every file a
+          // `_originRef`, and both callers take their product from it. A caller that
+          // skipped it, with none stored either, would throw.
           _originRef: (existing._originRef as string | undefined) ?? data._originRef,
           // ⚠️ CARRY FORWARD — do NOT strip, and do NOT copy the `??` idiom above.
           //

@@ -99,10 +99,14 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
       const merged: Product = { ...importConfirm, id: product.id };
       await driver.replaceProduct(merged);
 
-      // Preserve createdAt and _originRef from the current product in the
-      // in-memory state. Without this, useProduct's 500ms debounced saveProduct
-      // would write the imported file's values back, overwriting what
-      // replaceProduct just preserved.
+      // Keep createdAt and _originRef in memory as replaceProduct just stored them:
+      // the current product's if it holds one, otherwise the file's. Without this,
+      // useProduct's debounced saveProduct would undo what replaceProduct stored.
+      // ⚠️ `??`, never a bare `product.createdAt`. The shape guard removes a bad date
+      // from memory and an older project may have no _originRef, and a local save
+      // writes the whole product, so a bare undefined erases the file's value from
+      // the store one save later. `??`, not `||`: a stored '' stays, as it does in
+      // replaceProduct.
       //
       // owner/members are absent from the in-memory product because
       // validateProduct strips any key not in KNOWN_PRODUCT_FIELDS during
@@ -111,8 +115,8 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
       // merge:true preserves Firestore's existing values.
       updateProduct({
         ...merged,
-        createdAt: product.createdAt,
-        _originRef: product._originRef,
+        createdAt: product.createdAt ?? merged.createdAt,
+        _originRef: product._originRef ?? merged._originRef,
       });
 
       setImportConfirm(null);

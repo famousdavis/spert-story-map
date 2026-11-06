@@ -9,6 +9,7 @@ import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DataSection from '../components/settings/DataSection';
 import { checkSprintFinishDates } from '../lib/exportForForecaster';
+import { createLocalStorageDriver } from '../lib/storageDriver';
 import type { Product, StorageDriver } from '../types';
 import { req } from './testHelpers';
 
@@ -118,6 +119,69 @@ describe('DataSection — single product replace', () => {
     expect(updatedWith).toBeDefined();
     expect(updatedWith!.createdAt).toBe('2024-01-01T00:00:00.000Z');
     expect(updatedWith!._originRef).toBe('workspace-abc');
+  });
+
+  describe('and the save that follows it, on the real local driver', () => {
+    // `updateProduct` is the one stand-in: useProduct hands the next product straight to
+    // driver.saveProduct. A local save writes the whole product, so whatever memory holds
+    // here is what the store holds afterwards. A mocked driver cannot show that.
+    const ID = 'p-local';
+    const KEY = `rp:local:product_${ID}`;
+    const FILE_DATE = '2020-02-02T00:00:00.000Z';
+    const STORED_DATE = '2026-03-03T00:00:00.000Z';
+
+    const storedNow = () => JSON.parse(localStorage.getItem(KEY)!) as Record<string, unknown>;
+
+    function plant(fields: Record<string, unknown>): void {
+      const { createdAt: _c, _originRef: _o, ...base } = makeProduct(ID, 'Stored');
+      localStorage.setItem(KEY, JSON.stringify({ ...base, ...fields }));
+    }
+
+    /** Opens the project, replaces it from a file, and lands the save that follows. */
+    async function replaceFromFile(file: Record<string, unknown>): Promise<void> {
+      const driver = createLocalStorageDriver();
+      const product = (await driver.loadProduct(ID))!;
+      render(<DataSection product={product} driver={driver} updateProduct={next => { void driver.saveProduct(next as Product); }} />);
+
+      const { createdAt: _c, _originRef: _o, ...base } = makeProduct(ID, 'From the file');
+      await pickFile(JSON.stringify({ ...base, ...file }));
+      await userEvent.click(await screen.findByRole('button', { name: /replace all data/i }));
+      await waitFor(() => expect(storedNow().name).toBe('From the file'));
+      driver.flushPendingSaves();
+    }
+
+    beforeEach(() => { localStorage.clear(); });
+
+    it.each<[string, Record<string, unknown>]>([
+      ['a damaged date', { createdAt: 5, _originRef: 'workspace-stored' }],
+      ['no date', { _originRef: 'workspace-stored' }],
+    ])("keeps the file's date over a project with %s", async (_label, stored) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      plant(stored);
+      await replaceFromFile({ createdAt: FILE_DATE, _originRef: 'workspace-file' });
+      expect(storedNow().createdAt).toBe(FILE_DATE);
+      expect(storedNow()._originRef, 'control — the stored one still wins').toBe('workspace-stored');
+    });
+
+    it("keeps the file's _originRef over a project that has none", async () => {
+      plant({ createdAt: STORED_DATE });
+      await replaceFromFile({ createdAt: FILE_DATE, _originRef: 'workspace-file' });
+      expect(storedNow()._originRef).toBe('workspace-file');
+      expect(storedNow().createdAt, 'control — the stored one still wins').toBe(STORED_DATE);
+    });
+
+    it("leaves a stored '' as it is, as replaceProduct does", async () => {
+      plant({ createdAt: '', _originRef: 'workspace-stored' });
+      await replaceFromFile({ createdAt: FILE_DATE, _originRef: 'workspace-file' });
+      expect(storedNow().createdAt).toBe('');
+    });
+
+    it('leaves no date when neither the project nor the file has one', async () => {
+      plant({ _originRef: 'workspace-stored' });
+      await replaceFromFile({ _originRef: 'workspace-file' });
+      expect('createdAt' in storedNow()).toBe(false);
+      expect(storedNow().name, 'control — the replace landed').toBe('From the file');
+    });
   });
 
   it('shows error and closes dialog when replaceProduct throws', async () => {

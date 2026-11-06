@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.27 (2026-11-06)
+
+### Fixed
+
+- **A cloud project with no creation date can be replaced from a file again.** Importing a file with no creation date over a cloud project that also had none failed with an error. Exporting such a project and importing it straight back did the same. It now works, and the project stays without a date, because the app never makes one up.
+- **Replacing a cloud project now clears a damaged creation date.** A readable date on the project is still kept. A damaged one gives way to the file's date, or is removed if the file has none. This works for editors as well as owners. Editing a project still leaves the date alone, as the 0.53.26 entry below says.
+- **Replacing a local project from Settings no longer loses the file's creation date.** If the project had no readable date, the file's date was saved and then erased by the save that followed moments later. An older project's workspace reconciliation token was lost the same way. Both are now kept. A date already lost this way comes back if you import the file again.
+
 ## Version 0.53.26 (2026-11-06)
 
 ### Fixed
