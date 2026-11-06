@@ -206,6 +206,22 @@ describe('the notice', () => {
     expect(isGuardedLoad(ID)).toBe(true);
   });
 
+  // The cloud raises nothing for these two, because no cloud save touches them. A local
+  // save writes the whole product, so here the notice is true and it clears.
+  it.each<[string, Doc, keyof Doc]>([
+    ['createdAt', { createdAt: { bad: 1 } }, 'createdAt'],
+    ['_changeLog', { _changeLog: ['x', { t: 1, op: 'create' }] }, '_changeLog'],
+  ])('is raised for a bad %s, and the next save clears it', async (_label, overrides, key) => {
+    seed(ID, stored(overrides));
+    saveProductImmediate((await driver.loadProduct(ID))!);
+    expect(isGuardedLoad(ID)).toBe(true);
+    expect(storedNow()[key]).not.toEqual(overrides[key]);
+
+    dismissGuardedLoad(ID);
+    await driver.loadProduct(ID);
+    expect(isGuardedLoad(ID)).toBe(false);
+  });
+
   it('is not raised by a clean project', async () => {
     seed(ID, stored());
     await driver.loadProduct(ID);

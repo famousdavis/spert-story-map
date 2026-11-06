@@ -72,6 +72,28 @@ function entrySig(entry: ChangeLogEntry): string {
   ].join('|');
 }
 
+/**
+ * Keys no routine save writes. `owner` and `members` belong to create and replace,
+ * `createdAt` and `_originRef` are provenance, and `_changeLog` only ever grows,
+ * through the arrayUnion in doSaveProduct.
+ */
+const NEVER_SAVED = new Set(['owner', 'members', 'createdAt', '_originRef', '_changeLog']);
+
+/**
+ * The shape-guard rules on those keys, which raise no notice from a cloud read. The
+ * notice says a change will drop what was left out. No save touches these two, so that
+ * is false here and the notice could never clear: at v0.53.25 it came back on every
+ * open, and after every dismiss. Saying nothing loses nothing: every read filters
+ * them, the log keeps its real entries, and the one reader of `createdAt` takes
+ * `|| now`.
+ *
+ * ⚠️ THEY STAY IN THE DOCUMENT, ON PURPOSE. Never repair these with a write. No write may
+ * be able to truncate the log. And `replaceProduct` throws when neither the document
+ * nor the file holds a `createdAt`, so deleting a bad one would break exporting a
+ * project and importing it back over itself (measured on the emulator).
+ */
+const RULES_NO_SAVE_CLEARS = new Set(['product.createdAt', '_changeLog']);
+
 export function createFirestoreDriver(uid: string): StorageDriver {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- subscribers may receive heterogeneous error shapes
   const saveErrorSubs = new Set<(error: any) => void>();
@@ -109,6 +131,25 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     changeLogBaseline.set(productId, new Set(log.map(entrySig)));
   }
 
+  // Per-product keys the shape guard removed on the last read. `mergeFields` can name
+  // only what the payload holds, so a save that leaves a key out leaves it in the
+  // document for good. doSaveProduct names these with deleteField(), which the rules
+  // allow an editor as well as the owner, because all of them are allowlisted.
+  // ⚠️ Only ever set from a read. Never derive it from "absent in memory": that is what
+  // an older project looks like, and it would delete a card order another editor
+  // had just stored.
+  const repairsDue = new Map<string, string[]>();
+
+  /** The shape guard at all three read seams. Mutates `product`; see `cloudLoadGuard.ts`. */
+  function guardRead(product: Product, notify: boolean): void {
+    const keys = Object.keys(product);
+    const rules = guardCloudProduct(product);
+    const removed = keys.filter(k => !(k in product) && !NEVER_SAVED.has(k));
+    if (removed.length > 0) repairsDue.set(product.id, removed);
+    else repairsDue.delete(product.id);
+    reportGuardedLoad(product.id, rules, notify && rules.some(r => !RULES_NO_SAVE_CLEARS.has(r)));
+  }
+
   function handleWriteError(e: unknown): void {
     console.error('Firestore write error:', e instanceof Error ? e.message : 'Unknown error');
     for (const cb of saveErrorSubs) {
@@ -134,6 +175,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
    * the changelog entry isn't sent. The baseline isn't advanced for failed
    * writes, so the entry is retried on the next save (the user makes any
    * other change). Acceptable for a best-effort audit trail.
+   *
+   * A key the shape guard removed on the last read goes as deleteField() in the same
+   * setDoc, so what the notice calls left out really goes at this save. A key
+   * rewritten since that read, such as by the first card drag, is saved instead.
    *
    * Side-write fields stripped: id (URL-encoded into the doc ref),
    * _owner/_members (Firestore-only, set by createProduct/replaceProduct
@@ -168,19 +213,23 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       delete restNoAliases._members;
 
       const sanitized = sanitizeForFirestore(restNoAliases);
+      const repairs = (repairsDue.get(product.id) ?? []).filter(k => !(k in sanitized));
       // mergeFields whitelist — every key from sanitized except canonical
       // owner/members (which never appear here anyway because they were
       // destructured out), plus updatedAt. _changeLog is intentionally
       // excluded; the updateDoc(arrayUnion) call below appends only the
       // new entries so the server's history is monotonic.
       const mergeFields = [
-        ...Object.keys(sanitized).filter(k =>
-          k !== 'owner' && k !== 'members' && k !== 'createdAt' &&
-          k !== '_originRef' && k !== '_changeLog',
-        ),
+        ...Object.keys(sanitized).filter(k => !NEVER_SAVED.has(k)),
+        ...repairs,
         'updatedAt',
       ];
-      await setDoc(ref, { ...sanitized, updatedAt: new Date().toISOString() }, { mergeFields });
+      await setDoc(ref, {
+        ...sanitized,
+        ...Object.fromEntries(repairs.map(k => [k, deleteField()])),
+        updatedAt: new Date().toISOString(),
+      }, { mergeFields });
+      repairsDue.delete(product.id);
 
       // Changelog delta — push only entries new to the server.
       const newEntries = getNewChangeLogEntries(product.id, product._changeLog ?? []);
@@ -253,7 +302,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
           // stored document contains) and BEFORE the _owner/_members re-attach.
           // Shape only, never validateProduct — see cloudLoadGuard.ts. No notice
           // from the list: opening the project runs the guard again and raises it.
-          reportGuardedLoad(product.id, guardCloudProduct(product), false);
+          guardRead(product, false);
           // Normalize AFTER the observer, deliberately: the observer reports what the
           // stored document actually contains, and normalizing first would hide a
           // degraded `updatedAt` from it. `normalizeUpdatedAt` returns `undefined` for
@@ -289,7 +338,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       // on the line after it — see the note at loadProductIndex.
       runObserver(product, { rawSchemaVersion });
       // Shape guard after the observer, before the re-attach — see loadProductIndex.
-      reportGuardedLoad(product.id, guardCloudProduct(product), true);
+      guardRead(product, true);
       // Normalize after the observer — see the note at loadProductIndex.
       product.updatedAt = normalizeUpdatedAt(product.updatedAt);
       // Seed _owner/_members on cold load too — without these the Share UI
@@ -455,6 +504,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       // matches product._changeLog (replaceProduct overwrote the array),
       // so future saves should send only post-replace deltas.
       resetChangeLogBaseline(product.id, product._changeLog ?? []);
+      repairsDue.delete(product.id);
     },
 
     async deleteProduct(id: string) {
@@ -593,7 +643,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
             // only ever sees server-confirmed snapshots.
             runObserver(product, { rawSchemaVersion });
             // Shape guard after the observer, before the re-attach — see loadProductIndex.
-            reportGuardedLoad(product.id, guardCloudProduct(product), true);
+            guardRead(product, true);
             // Normalize after the observer — see the note at loadProductIndex.
             product.updatedAt = normalizeUpdatedAt(product.updatedAt);
             product._owner = data.owner ?? null;

@@ -494,9 +494,9 @@ export function validateProduct(data: unknown): Product {
   // which threw the same way.
   //
   // ⚠️ EVERY NON-MAP GOES, the harmless ones too. `5`, `true` and `null` throw nowhere, but
-  // `guardCloudProduct` removes them on each read of a cloud project and a save leaves
-  // the document alone (a removed key is not in `mergeFields`), so the project raises
-  // its notice on every open until a card is dragged.
+  // `guardCloudProduct` removes them on each read of a cloud project, so the file would
+  // bring in a value that raises the notice on every open until the next save removes
+  // it (the driver names a removed key with `deleteField()`).
   for (const field of ['releaseCardOrder', 'sizingCardOrder'] as const) {
     if (!isRecord(d[field])) {
       delete d[field];
@@ -538,8 +538,8 @@ export function validateProduct(data: unknown): Product {
   // A log that is not a list is removed, so the import starts a new one, as it does for a
   // file with no log. Anything in the list that is not an entry is dropped. A string used
   // to be spread into characters, so the app wrote those into its own export and then
-  // refused the file, and they raise the cloud notice on every open, because a save
-  // sends only new entries.
+  // refused the file. On the cloud they would stay in the document for good, because a
+  // save sends only new entries, filtered from every read.
   //
   // ⚠️ DROPPED, NOT REJECTED, like the oversized strings below: the log is advisory, an
   // older export can hold such a value, and `guardCloudProduct` keeps the same entries.
