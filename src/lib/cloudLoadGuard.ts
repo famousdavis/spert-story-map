@@ -26,6 +26,7 @@
  *     percentages, legacy `cardColor` keys) — see the bounds table in the PR;
  *   - never throws: an item of the wrong shape is set aside, a field of the
  *     wrong type is reset to a neutral value, and the rest of the project loads.
+ *     The size list is the one exception: see `guardCloudProduct`.
  *
  * It mutates the freshly-read product in place (as `migrateToV2` already does)
  * and returns the ids of the rules that fired. It never writes back. What happens to
@@ -55,6 +56,8 @@
  * before v0.6.0 clearing the Settings input stored NaN, and a local store outlives
  * the code that wrote it. Check a new rule against both, and against old writers.
  */
+
+import { DEFAULT_SIZE_MAPPING } from './constants';
 
 type Obj = Record<string, unknown>;
 type Hits = Set<string>;
@@ -211,7 +214,16 @@ export function guardCloudProduct(loaded: object): string[] {
   text(product, 'description', 'product.description', hits);
   dropUnless(product, 'createdAt', isString, 'product.createdAt', hits);
   dropUnless(product, 'sprintCadenceWeeks', isNumber, 'product.sprintCadenceWeeks', hits);
+  // ⚠️ THE DEFAULT ROWS, NOT `[]`, FOR A LIST THAT IS MISSING OR IS NOT A LIST. An import
+  // gives the same, so a read from either store and a re-import agree, and the ribs keep
+  // their points. With `[]` every rib reads 0, and an export of it clears every rib's
+  // size at import. Missing raises nothing, like any other list here: the key has never
+  // meant "no sizes", because removing the last row leaves a real `[]`. That is a user's
+  // own (`removeSize` has no minimum), and it stays. Copied row by row: rows are edited
+  // in place, here and after, and these would otherwise be the constant's.
+  const hasSizeList = Array.isArray(product.sizeMapping);
   list(product, 'sizeMapping', 'sizeMapping', hits, (v): v is Obj => hasStringKey(v, 'label'), fixSizeRow);
+  if (!hasSizeList) product.sizeMapping = DEFAULT_SIZE_MAPPING.map(row => ({ ...row }));
   list(product, 'releases', 'releases', hits, keepById, fixRelease);
   list(product, 'sprints', 'sprints', hits, keepById, fixSprint);
   list(product, 'themes', 'themes', hits, keepById, fixTheme);

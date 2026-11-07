@@ -34,7 +34,7 @@ src/
 │   ├── validatorObserver.ts          # Flag-gated observer: runs validateProduct against a CLONE at the read seams, reports only
 │   ├── validatorObserverDiff.ts      # Own-key structural diff (live vs. validated clone) used by the observer
 │   ├── validatorObserverRegistry.ts  # Synchronous no-op-unless-registered slot the read seams call
-│   ├── cloudLoadGuard.ts             # Shape check on projects read from the cloud: sets aside what cannot be read, never rejects a project
+│   ├── cloudLoadGuard.ts             # Shape check on projects read from either store: sets aside what cannot be read, gives a missing or unreadable size list the default rows, never rejects a project
 │   ├── cloudLoadNotices.ts           # Which open projects had data set aside (read by CloudLoadNotice)
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)

@@ -974,8 +974,7 @@ describe('validateProduct: a product holds its three optional lists or leaves th
     expect(getRibItemPoints(ribOf(product), product.sizeMapping)).toBe(20);
   });
 
-  // Not `sizeMapping`: the cloud guard resets that to `[]`, and import gives the default.
-  it.each(BAD.filter(([field]) => field !== 'sizeMapping'))('%s as %s reads the same as it does from the cloud', (field, _label, value) => {
+  it.each(BAD)('%s as %s reads the same as it does from the cloud', (field, _label, value) => {
     const cloud = fileWith(field, value);
     guardCloudProduct(cloud);
     expect(imported(field, value)[field]).toEqual(cloud[field]);

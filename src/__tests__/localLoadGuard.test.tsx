@@ -156,6 +156,13 @@ describe('sizeMapping', () => {
     expect(getTotalProjectPoints(product)).toBe(20);
   });
 
+  it('gives rows of its own, so nothing done to one reaches the default', () => {
+    seed(ID, stored({ sizeMapping: 5 }));
+    const { sizeMapping } = loadProduct(ID)!;
+    expect(sizeMapping).not.toBe(DEFAULT_SIZE_MAPPING);
+    sizeMapping.forEach((row, i) => expect(row).not.toBe(DEFAULT_SIZE_MAPPING[i]));
+  });
+
   it('survives an export and an import', () => {
     seed(ID, stored({ sizeMapping: 5 }));
     const again = importProductFromJSON(JSON.stringify(loadProduct(ID)));

@@ -20,6 +20,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { guardCloudProduct } from '../lib/cloudLoadGuard';
+import { DEFAULT_SIZE_MAPPING } from '../lib/constants';
 import { getAllRibItems, getTotalProjectPoints, getProjectPercentComplete, getProgressOverTime } from '../lib/calculations';
 import { computeLayout } from '../components/storymap/useMapLayout';
 import type { Product } from '../types';
@@ -129,15 +130,49 @@ describe('guardCloudProduct — must-pass: everything an app writer can produce'
     expect(rib1(doc).name).toBe('');
   });
 
-  it('fills a missing list silently — every writer sets these, and [] loses nothing', () => {
+  it('fills a missing list silently — every writer sets these, and nothing is lost', () => {
     const doc: Doc = { id: 'p', name: 'Old', themes: [{ id: 't', name: 'T', order: 1, backboneItems: [{ id: 'b', name: 'B', order: 1, ribItems: [{ id: 'r', name: 'R' }] }] }] };
     expect(guardCloudProduct(doc)).toEqual([]);
     expect(doc.releases).toEqual([]);
     expect(doc.sprints).toEqual([]);
-    expect(doc.sizeMapping).toEqual([]);
+    expect(doc.sizeMapping).toEqual(DEFAULT_SIZE_MAPPING);
     const rib = (((doc.themes as Doc[])[0]!.backboneItems as Doc[])[0]!.ribItems as Doc[])[0]!;
     expect(rib.releaseAllocations).toEqual([]);
     expect(rib.progressHistory).toEqual([]);
+  });
+});
+
+describe('guardCloudProduct: the size list', () => {
+  it.each<[string, unknown]>([['a number', 5], ['a string', 'x'], ['true', true], ['an object', {}], ['null', null]])(
+    '%s becomes the default rows, and is reported', (_label, value) => {
+      const doc: Doc = { ...small(), sizeMapping: value };
+      expect(guardCloudProduct(doc)).toEqual(['sizeMapping']);
+      expect(doc.sizeMapping).toEqual(DEFAULT_SIZE_MAPPING);
+    });
+
+  it('leaves a list alone, empty or not: an empty one is a user\'s own, and is not a missing one', () => {
+    const empty: Doc = { ...small(), sizeMapping: [] };
+    expect(guardCloudProduct(empty)).toEqual([]);
+    expect(empty.sizeMapping).toEqual([]);
+  });
+
+  it('never hands out the constant or its rows, because the guard edits rows in place', () => {
+    const doc: Doc = { ...small(), sizeMapping: 5 };
+    guardCloudProduct(doc);
+    expect(doc.sizeMapping).not.toBe(DEFAULT_SIZE_MAPPING);
+    (doc.sizeMapping as Doc[]).forEach((row, i) => expect(row).not.toBe(DEFAULT_SIZE_MAPPING[i]));
+  });
+
+  it('gives the same rows on every read, however many have run', () => {
+    const rows = structuredClone(DEFAULT_SIZE_MAPPING);
+    for (let i = 0; i < 3; i++) {
+      const doc: Doc = { ...small(), sizeMapping: 5 };
+      guardCloudProduct(doc);
+      guardCloudProduct(doc);
+      (doc.sizeMapping as Doc[])[0]!.points = HOSTILE;
+      guardCloudProduct(doc);
+      expect(DEFAULT_SIZE_MAPPING).toEqual(rows);
+    }
   });
 });
 
