@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.53.29 (2026-11-06)
+
+### Fixed
+
+- **The `Saved` time in the project header now moves when you save a cloud project.** It stayed on the last time it had heard about, either the one stored when you opened the project or a colleague's save, and kept getting older on screen while you worked. Your changes were being saved throughout. Only the line was wrong, and it had been wrong since 0.52.8.
+- **It moves once the save has reached the cloud, not before.** While you are offline, or if a save is refused, the time stays where it was. A save held up offline shows the time you made it once it goes through, which is what a colleague and a reload will see. Local projects are unchanged.
+
 ## Version 0.53.28 (2026-11-06)
 
 ### Fixed

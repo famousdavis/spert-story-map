@@ -120,6 +120,17 @@ export function useProduct(productId: string | undefined) {
     return () => { unsub?.(); };
   }, [productId, driver, mode, storageReady]);
 
+  // A client's own save never reaches the listener above, so it is reported apart.
+  // ⚠️ Only the time, never the product: replacing the product on your own save loses
+  // an edit made while that save was on its way. See the note at `onProductChange`.
+  useEffect(() => {
+    if (!storageReady || !driver || !productId || mode !== 'cloud') return;
+    return driver.onProductSaved((savedId, updatedAt) => {
+      if (savedId !== productId) return;
+      setState(prev => ({ ...prev, lastSaved: parseDate(updatedAt) }));
+    });
+  }, [productId, driver, mode, storageReady]);
+
   // Stable updater that only touches product
   const setProduct = useCallback((updater: ProductUpdater) => {
     setState(prev => {
@@ -139,9 +150,9 @@ export function useProduct(productId: string | undefined) {
   //
   // lastSaved is mode-aware:
   //   - local: set optimistically (write is synchronous and very reliable)
-  //   - cloud: do NOT set — the Firestore echo via onProductChange updates
-  //     lastSaved from the server timestamp. Setting here would produce a
-  //     "Saved 0s ago" flash that gets overwritten 100-500ms later.
+  //   - cloud: do NOT set here, where nothing has been written yet and a write
+  //     may yet be refused or wait offline. `onProductSaved` above sets it from
+  //     the stored `updatedAt` when the write lands.
   //
   // Both `driver` and `mode` must be in the deps — a stale mode capture
   // would keep showing the optimistic local time after a swap to cloud.
