@@ -135,6 +135,11 @@ export function createLocalStorageDriver(): StorageDriver {
       return _onSaveError(cb);
     },
 
+    /** No-op for local mode — `useProduct` sets the time itself, as it schedules the save. */
+    onProductSaved(_cb: (productId: string, updatedAt: string) => void) {
+      return () => {};
+    },
+
     /**
      * No-op for local mode — no remote changes to subscribe to. The
      * optional onError is accepted (and ignored) to keep the signature

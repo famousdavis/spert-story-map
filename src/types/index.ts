@@ -275,6 +275,13 @@ export interface StorageDriver {
   // `unknown`, not `Error`: the source is a catch block, which can receive any
   // thrown value. Both subscribers ignore the argument and only flip a banner.
   onSaveError(callback: (error: unknown) => void): () => void;
+  /**
+   * Subscribe to a client's own saves, as each one lands. `onProductChange` does
+   * not report them. `updatedAt` is the value the write stored. A refused write and
+   * one still waiting to go, such as offline, do not report. No-op for the local
+   * driver. Returns an unsubscribe function — call on effect cleanup.
+   */
+  onProductSaved(callback: (productId: string, updatedAt: string) => void): () => void;
   flushPendingSaves(): void;
   cancelPendingSaves(): void;
   /**

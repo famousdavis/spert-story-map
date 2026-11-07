@@ -101,6 +101,7 @@ const RULES_NO_SAVE_CLEARS = new Set(['product.createdAt', '_changeLog']);
 export function createFirestoreDriver(uid: string): StorageDriver {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- subscribers may receive heterogeneous error shapes
   const saveErrorSubs = new Set<(error: any) => void>();
+  const productSavedSubs = new Set<(productId: string, updatedAt: string) => void>();
   let productTimer: ReturnType<typeof setTimeout> | null = null;
   let productPending: Product | null = null;
   let prefsTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,6 +159,12 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     console.error('Firestore write error:', e instanceof Error ? e.message : 'Unknown error');
     for (const cb of saveErrorSubs) {
       try { cb(e); } catch (err) { console.error('onSaveError subscriber threw:', err); }
+    }
+  }
+
+  function reportProductSaved(productId: string, updatedAt: string): void {
+    for (const cb of productSavedSubs) {
+      try { cb(productId, updatedAt); } catch (err) { console.error('onProductSaved subscriber threw:', err); }
     }
   }
 
@@ -228,12 +235,16 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         ...repairs,
         'updatedAt',
       ];
+      const updatedAt = new Date().toISOString();
       await setDoc(ref, {
         ...sanitized,
         ...Object.fromEntries(repairs.map(k => [k, deleteField()])),
-        updatedAt: new Date().toISOString(),
+        updatedAt,
       }, { mergeFields });
       repairsDue.delete(product.id);
+      // Here, and not after the changelog write below: the project has saved, and
+      // `updatedAt` is now what a colleague and a reload will read.
+      reportProductSaved(product.id, updatedAt);
 
       // Changelog delta — push only entries new to the server.
       const newEntries = getNewChangeLogEntries(product.id, product._changeLog ?? []);
@@ -637,15 +648,35 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     },
 
     /**
+     * Subscribe to a client's own landed saves. `onProductChange` never reports
+     * them: see the note there. Same shape as `onSaveError`, and the same rule for
+     * the caller: unsubscribe on effect cleanup.
+     */
+    onProductSaved(cb: (productId: string, updatedAt: string) => void) {
+      productSavedSubs.add(cb);
+      return () => { productSavedSubs.delete(cb); };
+    },
+
+    /**
      * Subscribe to real-time changes for a product.
-     * Uses hasPendingWrites for echo prevention.
+     *
+     * ⚠️ A CLIENT NEVER HEARS ITS OWN SAVE HERE, AND THAT IS WHAT KEEPS ITS EDITS. The
+     * local write fires with `hasPendingWrites`, which is skipped below, and the ack is
+     * a metadata-only change, which `onSnapshot` does not deliver. A transaction is not
+     * a local write, so a replace does arrive. Until v0.52.7 a save did too, by accident:
+     * `updatedAt` was a `serverTimestamp()`, so the ack changed the data.
+     * Never turn on `includeMetadataChanges`, and never put a server timestamp in a save:
+     * either makes every own save a wholesale replacement of the product. An edit made
+     * before the ack then goes from memory, and the next save takes it out of the
+     * document (real SDK, emulator: 20 of 20 rounds each way, 0 of 20 as it stands).
+     * `onProductSaved` is how the app hears its own save.
      *
      * stripFirestoreFields removes `owner`/`members` from the parsed product;
      * we re-attach BOTH `_owner` AND `_members` from the raw doc so per-project
      * listener echoes don't blank the field set by the initial loadProductIndex.
      * Without `_members`, the Sharing UI's "is this user the owner / an editor
-     * / a viewer" check fails on the first echo, hiding affordances 1-3s after
-     * any save. (H1-B fix; Lesson 49 third strip site.)
+     * / a viewer" check fails on the first snapshot, hiding affordances.
+     * (H1-B fix; Lesson 49 third strip site.)
      */
     onProductChange(
       id: string,
