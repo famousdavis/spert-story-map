@@ -27,6 +27,7 @@ const MAX_SPRINTS = 200;
 const MAX_ALLOCATIONS = 100;
 const MAX_PROGRESS = 10000;
 const MAX_SIZE_MAPPING = 20;
+const MAX_SIZE_LABEL = 20;    // Max length for a size row's label
 const MAX_CHANGELOG = 500;
 
 /** Throw if condition is false. */
@@ -288,9 +289,9 @@ export function validateProduct(data: unknown): Product {
   // of it agree.
   //
   // ⚠️ DELETED, NOT SET TO `[]`. The backfill only sees a falsy value, so a `[]` would
-  // skip the default sizes, and at the label check below it would clear every rib's
-  // size. Deleting adds no key to a file that never had one (see `schemaVersion`). A read
-  // has no backfill behind it, so `guardCloudProduct` puts the default sizes in itself.
+  // skip the default sizes and every rib would count 0. Deleting adds no key to a file
+  // that never had one (see `schemaVersion`). A read has no backfill behind it, so
+  // `guardCloudProduct` puts the default sizes in itself.
   for (const key of ['releases', 'sprints', 'sizeMapping'] as const) {
     if (!Array.isArray(d[key])) delete d[key];
   }
@@ -329,7 +330,8 @@ export function validateProduct(data: unknown): Product {
   if (sizeMapping) {
     assert(sizeMapping.length <= MAX_SIZE_MAPPING, `Too many size mappings (max ${MAX_SIZE_MAPPING})`);
     for (const sm of sizeMapping) {
-      assert(isValidString(sm.label, 20), 'Size mapping label must be a string (max 20 chars)');
+      assert(isValidString(sm.label, MAX_SIZE_LABEL),
+        `Size mapping label must be a string (max ${MAX_SIZE_LABEL} chars)`);
       assert(isNum(sm.points) && sm.points >= 0, 'Size mapping points must be a non-negative number');
       stripObject(sm, KNOWN_SIZEMAPPING_FIELDS);
     }
@@ -384,12 +386,22 @@ export function validateProduct(data: unknown): Product {
             'Rib item notes too long (max 2000 chars)');
         }
 
-        // Size validation
-        if (rib.size && validSizeLabels) {
-          if (!validSizeLabels.has(rib.size)) {
-            // Don't reject — just clear invalid size (non-destructive)
-            rib.size = '';
-          }
+        // Size validation. Don't reject: clear a size the list does not hold.
+        //
+        // ⚠️ AN EMPTY LIST HAS NO LABELS TO CHECK AGAINST, so a label a size row could
+        // hold stays. It is what the rib holds after its user removes the last row, and a
+        // read keeps it, so a project reads the same before and after a round trip. Until
+        // a row has that label again it counts 0 and sits with the unsized ribs, like one
+        // left behind by a renamed row, and then it counts again with no other step. A
+        // cleared size has to be set again rib by rib. A rib with progress is locked, so
+        // that means dragging it to Unassigned and back, and a split rib returns on one
+        // release.
+        //
+        // ⚠️ `[]` MUST STAY AN EMPTY SET HERE. `null` means no list at all and skips this
+        // check, so treating `[]` as `null` would keep `size: 5` and a label of any length.
+        if (rib.size && validSizeLabels && !validSizeLabels.has(rib.size)) {
+          const keepsLabel = validSizeLabels.size === 0 && isValidString(rib.size, MAX_SIZE_LABEL);
+          if (!keepsLabel) rib.size = '';
         }
 
         // Category
@@ -595,7 +607,7 @@ export function validateProduct(data: unknown): Product {
   // now shares. An assert here would add nothing to that and would turn a corrupted
   // field into a rejection of the entire file, which for this app's users lands
   // mid-assignment. This matches the file's own convention for an uninterpretable
-  // value — `size` (:392) and `cardColor` (:402-408) are both cleared, not rejected.
+  // value — `size` and `cardColor` are both cleared, not rejected.
   //
   // ⚠️ ABSENT MUST STAY ABSENT. A pre-schemaVersion product is a genuine v1 and its
   // migration gate reads the missing field; stamping a version on it here would skip
