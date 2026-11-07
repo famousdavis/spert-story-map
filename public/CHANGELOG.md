@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.30 (2026-11-07)
+
+### Fixed
+
+- **Importing a project with an empty size list no longer clears every rib's size.** If you removed every row from T-Shirt Size Mapping and exported the project, importing that file left all its ribs with no size. Each rib now keeps its size. It counts 0 points and shows as unsized on the Sizing tab until the list has that size again, and then it counts as it did before. The project already behaved this way before the export, so the file and the project now agree.
+- **A rib with progress gains the most.** Its size is locked, so to set a cleared size again you had to drag the rib to Unassigned, size it and drag it back, and a rib split across releases came back on just one of them. A kept size needs none of that.
+- ⚠️ **Sizes cleared by an earlier import do not come back on their own.** If you still have the original file, importing it again brings them back. A file whose list has rows still clears any size that is not in the list, as before.
+
 ## Version 0.53.29 (2026-11-06)
 
 ### Fixed

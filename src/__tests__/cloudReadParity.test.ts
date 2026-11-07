@@ -274,7 +274,10 @@ describe('the cloud, a local read and an import give one answer', () => {
     const local = (await createLocalStorageDriver().loadProduct(ID))!;
     const imported = importProductFromJSON(asFile(goodDoc({ sizeMapping: [] })));
 
-    for (const product of [cloud, local, imported]) expect(product.sizeMapping).toEqual([]);
+    for (const product of [cloud, local, imported]) {
+      expect(product.sizeMapping).toEqual([]);
+      expect(product.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBe('M');
+    }
   });
 });
 

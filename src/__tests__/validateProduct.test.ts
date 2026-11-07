@@ -325,6 +325,80 @@ describe('validateProduct', () => {
     expect(result.themes[0]?.backboneItems[0]?.ribItems[0]?.size).toBe('');
   });
 
+  describe('a rib size, by the size list it is read against', () => {
+    const NO_LIST = Symbol('no size list');
+    const NO_SIZE = Symbol('no size');
+    const LONGEST_LABEL = 'x'.repeat(20);
+
+    const fileWith = (sizeMapping: unknown, size: unknown) => minimal({
+      ...(sizeMapping === NO_LIST ? {} : { sizeMapping }),
+      themes: [{
+        id: 't1', backboneItems: [{
+          id: 'b1', ribItems: [{
+            id: 'r1', ...(size === NO_SIZE ? {} : { size }), releaseAllocations: [], progressHistory: [],
+          }],
+        }],
+      }],
+    });
+    const sizeAfter = (sizeMapping: unknown, size: unknown) =>
+      ribOf(validateProduct(fileWith(sizeMapping, size))).size;
+
+    it.each(['M', 'Custom', LONGEST_LABEL])('keeps %s against an empty list', (label) => {
+      expect(sizeAfter([], label)).toBe(label);
+    });
+
+    it.each([
+      ['a number', 5],
+      ['true', true],
+      ['an object', {}],
+      ['a list', ['M']],
+      ['a label no row could hold', `${LONGEST_LABEL}x`],
+    ])('clears %s against an empty list', (_label, size) => {
+      expect(sizeAfter([], size)).toBe('');
+    });
+
+    it('leaves a rib with no size as it was against an empty list', () => {
+      expect(sizeAfter([], '')).toBe('');
+      expect(sizeAfter([], null)).toBeNull();
+      expect(asRecord(ribOf(validateProduct(fileWith([], NO_SIZE))))).not.toHaveProperty('size');
+    });
+
+    it('keeps a label in the list, and clears everything else, however long the list', () => {
+      const oneRow = [{ label: 'S', points: 5 }];
+      const twoRows = [...oneRow, { label: 'L', points: 13 }];
+      expect(sizeAfter(oneRow, 'S')).toBe('S');
+      for (const rows of [oneRow, twoRows]) {
+        expect(sizeAfter(rows, 'M')).toBe('');
+        expect(sizeAfter(rows, LONGEST_LABEL)).toBe('');
+        expect(sizeAfter(rows, 5)).toBe('');
+      }
+    });
+
+    it.each(['M', 'Custom'])('keeps %s with no list, whose rows the import fills in', (label) => {
+      stubLocalStorage();
+      const imported = importProductFromJSON(JSON.stringify(fileWith(NO_LIST, label)));
+
+      expect(ribOf(imported).size).toBe(label);
+      expect(imported.sizeMapping).toEqual(DEFAULT_SIZE_MAPPING);
+      vi.unstubAllGlobals();
+    });
+
+    // ⚠️ TODAY'S BEHAVIOUR, NOT A WISH. With no list nothing is checked, so a value that
+    // is not a label gets through, and a read then sets it aside with the notice.
+    it('checks nothing with no list, so a wrong-typed size stays', () => {
+      expect(sizeAfter(NO_LIST, 5)).toBe(5);
+    });
+
+    it('keeps a size when the list is not a list, which the import treats as none', () => {
+      stubLocalStorage();
+      const imported = importProductFromJSON(JSON.stringify(fileWith(5, 'Custom')));
+
+      expect(ribOf(imported).size).toBe('Custom');
+      expect(imported.sizeMapping).toEqual(DEFAULT_SIZE_MAPPING);
+      vi.unstubAllGlobals();
+    });
+  });
+
   // --- Unknown field stripping ---
   it('strips unknown top-level fields', () => {
     const data = minimal({ _malicious: 'payload', injected: true });
