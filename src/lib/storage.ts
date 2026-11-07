@@ -202,13 +202,7 @@ function guardStoredProduct(stored: unknown, id: string, notify: boolean): Produ
   // The cloud takes this from `snap.id`. Without it the project lists with a card
   // that opens nothing and cannot be deleted.
   if (typeof product.id !== 'string') product.id = id;
-  // Read ahead of the guard, which turns a non-list into [].
-  const hasSizeList = Array.isArray(product.sizeMapping);
   reportGuardedLoad(id, guardCloudProduct(product), notify);
-  // ⚠️ Default rows, not the guard's []. It is what an import gives a project with no
-  // list, so the ribs keep their points. With [] they read 0, and an export of it
-  // clears every rib's size at import. A real [] is a user's own and is left alone.
-  if (!hasSizeList) product.sizeMapping = [...DEFAULT_SIZE_MAPPING];
   return product;
 }
 

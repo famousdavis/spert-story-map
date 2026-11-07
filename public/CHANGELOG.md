@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.53.28 (2026-11-06)
+
+### Fixed
+
+- **A cloud project whose size list could not be read keeps its points.** If a cloud project's sizes were saved as something other than a list, or were not saved at all, the project showed no sizes and every rib counted 0 points. It now shows the default sizes, so a rib sized M, for example, counts as M again. Local projects and imported files already worked this way, so all three now agree. Your next edit saves the default sizes to the project.
+- ⚠️ **Sizes you set yourself and that could not be read do not come back.** A rib with a custom size that is not one of the defaults counts 0 until you size it again. A size list you emptied yourself stays empty.
+- **Replacing a cloud project from a file now clears the "could not be read" notice.** The notice stayed on the replaced project until you dismissed it or reloaded the page. It now goes as soon as the replace has saved. If the replace fails, the project is unchanged and the notice stays. Local projects already worked this way.
+- ⚠️ **One case remains.** If someone else's change to the project arrives at the same moment as the replace, the notice can stay until you dismiss it or reload. Nothing is wrong with the project when that happens.
+
 ## Version 0.53.27 (2026-11-06)
 
 ### Fixed

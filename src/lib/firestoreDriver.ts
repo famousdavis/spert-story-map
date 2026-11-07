@@ -41,7 +41,7 @@ import type { PendingInvite } from '../types';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 import { runObserver } from './validatorObserverRegistry';
 import { guardCloudProduct } from './cloudLoadGuard';
-import { reportGuardedLoad } from './cloudLoadNotices';
+import { dismissGuardedLoad, reportGuardedLoad } from './cloudLoadNotices';
 import { normalizeUpdatedAt } from './updated-at';
 
 /** Remove Firestore-only fields from product data. */
@@ -460,6 +460,9 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      *                    introduced. The unmerged tx.set makes an omission a
      *                    removal, and `allow update`'s hasOnly() denies that.
      *
+     * Clears the could-not-be-read notice once the transaction has committed, and
+     * leaves it if the transaction fails.
+     *
      * Errors propagate to applyImport's per-write try/catch and surface in the
      * import done banner (outcome.errors). NOT routed through handleWriteError.
      */
@@ -524,6 +527,13 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       // so future saves should send only post-replace deltas.
       resetChangeLogBaseline(product.id, product._changeLog ?? []);
       repairsDue.delete(product.id);
+      // Whatever the notice was about has just been replaced. Here, after the commit, and
+      // never in the transaction: its callback has finished before a refused write fails.
+      // ⚠️ Nothing orders this against the listener. If another client wrote to a damaged
+      // document just before the commit, that snapshot can land after this line and raise
+      // the notice again, and the clean snapshot behind it clears nothing. It then stays
+      // until Dismiss or reload, which is what every replace did before this line.
+      dismissGuardedLoad(product.id);
     },
 
     async deleteProduct(id: string) {

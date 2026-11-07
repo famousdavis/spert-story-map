@@ -284,14 +284,13 @@ export function validateProduct(data: unknown): Product {
   // else, but an older import let such a value through and an export spreads the
   // product as it stands, so it is in files the app itself wrote, and an assert here
   // would refuse them. A project already stored with one is handled at read, with the
-  // same outcome: see `guardStoredProduct` in `storage.ts`. So a local read and a
-  // re-import of it agree.
+  // same outcome: see `guardCloudProduct`. So a read from either store and a re-import
+  // of it agree.
   //
   // ⚠️ DELETED, NOT SET TO `[]`. The backfill only sees a falsy value, so a `[]` would
   // skip the default sizes, and at the label check below it would clear every rib's
-  // size. Deleting adds no key to a file that never had one (see `schemaVersion`). So
-  // `sizeMapping` is the one list import and `guardCloudProduct` differ on: the cloud
-  // guard resets it to `[]`.
+  // size. Deleting adds no key to a file that never had one (see `schemaVersion`). A read
+  // has no backfill behind it, so `guardCloudProduct` puts the default sizes in itself.
   for (const key of ['releases', 'sprints', 'sizeMapping'] as const) {
     if (!Array.isArray(d[key])) delete d[key];
   }
