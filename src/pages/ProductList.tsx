@@ -22,6 +22,8 @@ import AppSettingsModal from '../components/settings/AppSettingsModal';
 import FirstRunBanner from '../components/ui/FirstRunBanner';
 import CreateProjectModal from '../components/product/CreateProjectModal';
 import ProjectCard from '../components/product/ProjectCard';
+import ToolbarIcon from '../components/product/ToolbarIcon';
+import { TOOLBAR_ICON_PATHS } from '../components/product/toolbarIconPaths';
 import ShareDialog from '../components/product/ShareDialog';
 import { Footer } from './ChangelogView';
 import type { Product } from '../types';
@@ -366,34 +368,45 @@ export default function ProductList() {
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-3 mb-8">
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            + New Project
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
-            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Import Project
-          </button>
-          <button
-            onClick={() => driver && exportAllProductsBundled(driver, driver.getWorkspaceId())}
-            disabled={products.length === 0}
-            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Export All Projects
-          </button>
-          <button
-            onClick={handleLoadSample}
-            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            Load Sample Project
-          </button>
+        {/* Heading row + toolbar. Order is fixed across the SPERT Suite:
+            Export All · Import · Load Sample · New Project (primary, far right).
+            Every button always renders; gates disable, never hide. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Projects</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => driver && exportAllProductsBundled(driver, driver.getWorkspaceId())}
+              disabled={products.length === 0}
+              aria-label="Export all projects as JSON"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ToolbarIcon d={TOOLBAR_ICON_PATHS.export} />
+              Export All
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
+              aria-label="Import projects from JSON"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ToolbarIcon d={TOOLBAR_ICON_PATHS.import} />
+              Import
+            </button>
+            <button
+              onClick={handleLoadSample}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <ToolbarIcon d={TOOLBAR_ICON_PATHS.sample} />
+              Load Sample
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <ToolbarIcon d={TOOLBAR_ICON_PATHS.plus} />
+              New Project
+            </button>
+          </div>
         </div>
 
         <ImportPreviewSection

@@ -75,7 +75,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
 
       if (result.products.length > 1) {
         setImportError(
-          'This file contains multiple projects. To import a bundled file, use the "Import Project" button on the project list homepage.',
+          'This file contains multiple projects. To import a bundled file, use the "Import" button on the project list homepage.',
         );
         return;
       }
