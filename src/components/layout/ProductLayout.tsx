@@ -11,7 +11,7 @@ import { useDarkMode } from '../../hooks/useDarkMode';
 import ThemeToggle from '../ui/ThemeToggle';
 import StorageStatusPill from '../ui/StorageStatusPill';
 import AppSettingsModal from '../settings/AppSettingsModal';
-import FirstRunBanner from '../ui/FirstRunBanner';
+import AppNotices from '../ui/AppNotices';
 import CloudLoadNotice from '../ui/CloudLoadNotice';
 import ErrorBoundary from '../ui/ErrorBoundary';
 import { Footer } from '../../pages/ChangelogView';
@@ -197,7 +197,7 @@ export default function ProductLayout() {
         </div>
       </header>
 
-      <FirstRunBanner />
+      <AppNotices className="max-w-[1600px] mx-auto w-full px-6 mt-4" />
 
       {/* Save error banner — mode-aware copy. Cloud failures are usually
           transient network issues, not quota exhaustion; the localStorage

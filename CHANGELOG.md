@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 0.53.32 (2026-11-08)
+
+### Changed
+
+- **The local-storage caution now shows on every page, not only on the project list.** It appears just below the page header, under the terms notice, while your projects are stored only in this browser. It also shows on project pages, About and Changelog.
+- **"Got it" on the caution now lasts until you reload the page.** Before, it came back each time you returned to the project list. Moving between the project list, a project and other pages no longer brings it back. It comes back when you reload the page. To turn it off for good, switch off "Warn me on startup when using local storage" in App Settings.
+- **Turning that setting off now hides a caution that is already showing.** Before, the caution stayed until you left the page.
+- **On the project list, the caution now sits above the Projects heading and its buttons,** with the terms notice and the other notices about the whole app. Notices about the list itself, such as a running import, stay below the buttons.
+- **The terms notice now also shows on About and Changelog,** until you dismiss it, as on the other pages. Its wording and its "Got it" are unchanged.
+- **Both notices now look the same:** a rounded card with larger text and an outlined "Got it", blue for the terms notice and amber for the caution. The SPERT® Suite apps are moving to this same look and placement.
+- On the Story Map and Sizing tabs, a notice pushes the bottom of the canvas below the window until you click "Got it". The terms notice already did this on a first visit.
+
+### Fixed
+
+- **The "Warn me on startup when using local storage" switch in App Settings now has a name for screen readers.** It was announced only as a switch, with no label. It now reads its label and its description.
+
 ## Version 0.53.31 (2026-11-08)
 
 ### Changed
