@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.53.31 (2026-11-08)
+
+### Changed
+
+- **The project list has a `Projects` heading, with its buttons beside it.** The buttons now read **Export All**, **Import**, **Load Sample** and **New Project**, in that order from left to right, each with an icon. New Project is the blue button on the far right. The SPERT® Suite apps are moving to this same order, wording and set of icons, so the project list looks alike in each of them.
+- **What each button does is unchanged, and so is when it is available.** Export All is still unavailable while you have no projects, but it now stays in its place. Import is still unavailable while cloud projects load and while an import is being applied.
+- This replaces the earlier labels "+ New Project", "Import Project" (0.11.2), "Export All Projects" and "Load Sample Project", and the order that put Export All between Import and Load Sample (0.23.3).
+- The message in Settings → Data for a file holding several projects now names the **Import** button on the project list.
+
 ## Version 0.53.30 (2026-11-07)
 
 ### Fixed
