@@ -105,7 +105,7 @@ export default function ProductLayout() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <p className="text-gray-500 dark:text-gray-400 mb-4">Project not found</p>
-          <a href="/" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium">Back to projects</a>
+          <Link to="/" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium">Back to projects</Link>
         </div>
       </div>
     );
@@ -130,9 +130,13 @@ export default function ProductLayout() {
                   className="h-7 w-7 rounded-lg ring-1 ring-white/20"
                 />
               </Link>
-              <a href="/" className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm">
+              <Link
+                to="/"
+                onClick={() => window.scrollTo(0, 0)}
+                className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm"
+              >
                 ← Projects
-              </a>
+              </Link>
               <div className="h-5 w-px bg-gray-200 dark:bg-gray-700" />
               <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate max-w-xs">
                 {product.name}
