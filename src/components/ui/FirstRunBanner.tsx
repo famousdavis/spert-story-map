@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { FIRST_RUN_SEEN_KEY, TOS_URL, PRIVACY_POLICY_URL } from '../../lib/tosConstants';
 
-export default function FirstRunBanner() {
+export default function FirstRunBanner({ className = '' }: { className?: string }) {
   const [visible, setVisible] = useState(
     () => localStorage.getItem(FIRST_RUN_SEEN_KEY) !== 'true'
   );
@@ -18,9 +18,9 @@ export default function FirstRunBanner() {
   };
 
   return (
-    <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700/50 px-4 py-3 mb-6">
-      <div className="max-w-4xl mx-auto flex items-start justify-between gap-3">
-        <p className="text-xs text-blue-800 dark:text-blue-200">
+    <div className={className}>
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
           SPERT® Suite web apps are free to use. No account is required to use them.
           By accessing or using this app, you agree to our{' '}
           <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-300">Terms of Service</a>
@@ -31,7 +31,7 @@ export default function FirstRunBanner() {
         </p>
         <button
           onClick={dismiss}
-          className="text-xs text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 rounded px-2.5 py-1 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors flex-shrink-0"
+          className="text-sm text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 rounded px-2.5 py-1 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors flex-shrink-0"
         >
           Got it
         </button>

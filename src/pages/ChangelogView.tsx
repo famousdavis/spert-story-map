@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
 import { TOS_URL, PRIVACY_POLICY_URL, LICENSE_URL } from '../lib/tosConstants';
 import { AI_PRIVACY_URL } from '../lib/aiConstants';
+import AppNotices from '../components/ui/AppNotices';
 
 export default function ChangelogView() {
   const [content, setContent] = useState('');
@@ -25,6 +26,7 @@ export default function ChangelogView() {
         <div className="mb-8">
           <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Products</Link>
         </div>
+        <AppNotices className="mb-6" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Changelog</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
           Version history for SPERT® Story Map. Current version: <strong>v{APP_VERSION}</strong>

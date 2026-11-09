@@ -25,6 +25,7 @@ vi.mock('../lib/AuthProvider', () => ({ useAuth: () => ({ user: null }) }));
 import { createLocalStorageDriver } from '../lib/storageDriver';
 import { createSampleProduct } from '../lib/sampleData';
 import ProductList from '../pages/ProductList';
+import { resetLocalCaution } from '../lib/localCaution';
 
 const GANTT_ICON_PATHS = {
   export: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
@@ -61,6 +62,7 @@ const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUM
 
 beforeEach(() => {
   localStorage.clear();
+  resetLocalCaution();
   storage.value = { driver, mode: 'local', storageReady: true };
   // jsdom has no matchMedia, and `useDarkMode` reads it.
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
@@ -124,15 +126,17 @@ describe('project list toolbar', () => {
     expect(buttons.map(b => b.disabled)).toEqual([false, false, false, false]);
   });
 
-  it('sits above the import area, the local-data warning and the list', async () => {
+  it('sits below the app-wide notices and above the import area and the list', async () => {
     const p = seedProject();
     render(<MemoryRouter><ProductList /></MemoryRouter>);
     await screen.findByText(p.name);
     const heading = screen.getByRole('heading', { level: 2, name: 'Projects' });
+    const terms = screen.getByText(/SPERT® Suite web apps are free to use/);
+    const caution = await screen.findByText(/Your data exists only in this browser/);
     const fileInput = document.querySelector('input[type="file"]')!;
-    const warning = await screen.findByText(/Your data exists only in this browser/);
+    expect(follows(terms, heading)).toBe(true);
+    expect(follows(caution, heading)).toBe(true);
     expect(follows(heading, fileInput)).toBe(true);
-    expect(follows(heading, warning)).toBe(true);
     expect(follows(heading, screen.getByText(p.name))).toBe(true);
   });
 

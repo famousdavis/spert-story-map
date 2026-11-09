@@ -19,7 +19,7 @@ import ThemeToggle from '../components/ui/ThemeToggle';
 import StorageStatusPill from '../components/ui/StorageStatusPill';
 import { useDarkMode } from '../hooks/useDarkMode';
 import AppSettingsModal from '../components/settings/AppSettingsModal';
-import FirstRunBanner from '../components/ui/FirstRunBanner';
+import AppNotices from '../components/ui/AppNotices';
 import CreateProjectModal from '../components/product/CreateProjectModal';
 import ProjectCard from '../components/product/ProjectCard';
 import ToolbarIcon from '../components/product/ToolbarIcon';
@@ -46,7 +46,6 @@ export default function ProductList() {
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<EnrichedProduct | null>(null);
   const [cloudDataLoaded, setCloudDataLoaded] = useState(false);
-  const [showWarning, setShowWarning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
   const [shareTarget, setShareTarget] = useState<{ id: string; name: string } | null>(null);
@@ -185,11 +184,8 @@ export default function ProductList() {
     if (!driver) return;
     driver.loadPreferences().then(prefs => {
       if (prefs?.projectOrder) setProjectOrder(prefs.projectOrder);
-      if (mode === 'local' && !prefs?.suppressLocalStorageWarning) {
-        setShowWarning(true);
-      }
     });
-  }, [driver, mode]);
+  }, [driver]);
 
   // Drag-to-reorder handlers
   const handleProjectDragStart = (e: React.DragEvent, id: string) => {
@@ -332,7 +328,7 @@ export default function ProductList() {
           </div>
         </div>
 
-        <FirstRunBanner />
+        <AppNotices className="mb-4" />
 
         {/* Access-denied banner — one-shot, shown after useProduct redirects
             here because Firestore returned permission-denied (owner revoked
@@ -419,22 +415,6 @@ export default function ProductList() {
           onConfirm={handleConfirmImport}
           onCancel={cancelImport}
         />
-
-        {/* Data warning */}
-        {showWarning && mode === 'local' && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg px-4 py-3 mb-6 flex items-start justify-between gap-3">
-            <p className="text-xs text-amber-800 dark:text-amber-200">
-              <strong>Your data exists only in this browser</strong> and can be lost
-              without warning. Export at the end of every session to protect your work.
-            </p>
-            <button
-              onClick={() => setShowWarning(false)}
-              className="text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 flex-shrink-0"
-            >
-              Got it
-            </button>
-          </div>
-        )}
 
         {/* Cloud orphan warning */}
         {localOrphanCount > 0 && (

@@ -7,6 +7,7 @@ import Modal from '../ui/Modal';
 import { Section, Field } from '../ui/Section';
 import StorageSection from './StorageSection';
 import { useStorage } from '../../lib/StorageProvider';
+import { setLocalCautionSuppressed } from '../../lib/localCaution';
 import type { UserSettings } from '../../types';
 
 interface AppSettingsModalProps {
@@ -69,17 +70,25 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
       <Section title="Notifications">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <p id={`${baseId}-warn-label`} className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Warn me on startup when using local storage
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <p id={`${baseId}-warn-desc`} className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               Shows a caution banner each time the app opens while your data is stored locally in this browser.
             </p>
           </div>
           <button
             role="switch"
             aria-checked={!prefs?.suppressLocalStorageWarning}
-            onClick={() => updatePref('suppressLocalStorageWarning', !prefs?.suppressLocalStorageWarning)}
+            aria-labelledby={`${baseId}-warn-label`}
+            aria-describedby={`${baseId}-warn-desc`}
+            onClick={() => {
+              const suppressed = !prefs?.suppressLocalStorageWarning;
+              updatePref('suppressLocalStorageWarning', suppressed);
+              // The caution follows at once; the saved preferences catch up after
+              // their debounce.
+              setLocalCautionSuppressed(suppressed, driver);
+            }}
             className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
               !prefs?.suppressLocalStorageWarning
                 ? 'bg-blue-600'

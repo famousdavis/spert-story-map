@@ -5,6 +5,7 @@
 import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
 import { Footer } from './ChangelogView';
+import AppNotices from '../components/ui/AppNotices';
 
 const R = () => <sup className="text-[0.45em] text-gray-400 font-normal tracking-wide align-super">®</sup>;
 
@@ -15,6 +16,7 @@ export default function AboutView() {
         <div className="mb-8">
           <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Projects</Link>
         </div>
+        <AppNotices className="mb-6" />
 
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-8">About This App</h1>
 
