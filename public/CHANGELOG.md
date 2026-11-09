@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.53.33 (2026-11-09)
+
+### Fixed
+
+- **"← Projects" on a project page no longer reloads the app.** It now opens the project list straight away, the same way the logo beside it does, and a local-storage caution you dismissed stays dismissed. "Back to projects" on the "Project not found" screen works the same way.
+
 ## Version 0.53.32 (2026-11-08)
 
 ### Changed
