@@ -6,10 +6,9 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Product } from '../../types';
 import { CELL_HEIGHT, CELL_GAP, CELL_PAD, CELL_WIDTH, LETTER_STRIP_HEIGHT, NUMBER_GUTTER_WIDTH } from './useSizingLayout';
 import type { SizingLayout } from './useSizingLayout';
+import { DRAG_THRESHOLD } from '../storymap/useMapDrag';
 
 type UpdateProduct = (updater: (prev: Product) => Product) => void;
-
-const DRAG_THRESHOLD = 8;
 
 /**
  * Pointer-event drag hook for the sizing board.

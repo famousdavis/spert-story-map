@@ -68,9 +68,14 @@ function legitimateProject(): Doc {
   const themes = Array.from({ length: 25 }, (_, t) => ({
     id: crypto.randomUUID(), name: `Theme ${t}`, order: t + 1,
     ...(t % 2 ? { color: 'teal' } : {}),
+    // v0.54.0. A theme description is absent (every older theme), '' (a cleared
+    // editor), or past the 2000 the editor and Connect AI enforce: import has no
+    // length assert, so a file can carry one in. The guard checks type, never length.
+    ...(t % 3 === 0 ? {} : { description: t % 3 === 1 ? '' : 'D'.repeat(3000) }),
     backboneItems: Array.from({ length: 10 }, (_, b) => ({
       id: crypto.randomUUID(), name: `Backbone ${b}`, order: b + 1,
-      ...(b % 2 ? { description: 'd' } : {}),
+      // Absent, '' (addBackbone writes it), short, and past 2000 (import keeps it).
+      ...(b === 0 ? {} : { description: b === 1 ? '' : b === 2 ? 'e'.repeat(3000) : 'd' }),
       ribItems: ribs.slice((t * 10 + b) * 20, (t * 10 + b + 1) * 20),
     })),
   }));
@@ -112,6 +117,16 @@ describe('guardCloudProduct — must-pass: everything an app writer can produce'
     expect('createdAt' in doc).toBe(false);
     expect('sprintCadenceWeeks' in doc).toBe(false);
     expect('cardColor' in rib1(doc)).toBe(false);
+  });
+
+  it('turns a null theme description into "" silently, and leaves an absent one absent (v0.54.0)', () => {
+    const doc = small();
+    const [t1] = doc.themes as Doc[];
+    (doc.themes as Doc[]).push({ id: 't2', name: 'No description', order: 2, backboneItems: [] });
+    t1!.description = null;
+    expect(guardCloudProduct(doc)).toEqual([]);
+    expect(t1!.description).toBe('');
+    expect('description' in (doc.themes as Doc[])[1]!).toBe(false);
   });
 
   it('still reports a wrong-typed optional field — only null is silent', () => {
@@ -206,6 +221,7 @@ const cases: Array<[string, (d: Doc) => void, string, (d: Doc) => void]> = [
   ['a theme is null', d => { (d.themes as unknown[]).push(null); }, 'themes', d => expect((d.themes as Doc[]).map(t => t.id)).toEqual(['t1'])],
   ['a theme id is a number', d => { (d.themes as unknown[]).push({ id: 9, name: 'x', backboneItems: [] }); }, 'themes', d => expect(d.themes).toHaveLength(1)],
   ['theme color is an object', d => { (d.themes as Doc[])[0]!.color = HOSTILE; }, 'theme.color', d => expect('color' in (d.themes as Doc[])[0]!).toBe(false)],
+  ['theme description is an object', d => { (d.themes as Doc[])[0]!.description = HOSTILE; }, 'theme.description', d => expect((d.themes as Doc[])[0]!.description).toBe('')],
   ['backboneItems is a string', d => { (d.themes as Doc[])[0]!.backboneItems = 'x'; }, 'theme.backboneItems', d => expect((d.themes as Doc[])[0]!.backboneItems).toEqual([])],
   ['ribItems holds a non-object', d => { ribs(d).push(42 as unknown as Doc); }, 'backbone.ribItems', d => expect(ribs(d)).toHaveLength(2)],
   ['rib name is an object', d => { rib1(d).name = HOSTILE; }, 'rib.name', d => expect(rib1(d).name).toBe('')],

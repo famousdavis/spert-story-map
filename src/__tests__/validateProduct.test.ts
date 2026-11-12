@@ -1173,6 +1173,64 @@ describe('validateProduct: the optional fields hold their own shape or are clear
     });
   });
 
+  // v0.54.0. Theme descriptions are new; a backbone's was kept by import and never
+  // checked. Both now follow the product description above: text stays, anything
+  // else becomes '', absent stays absent, and there is no length check.
+  describe('theme and backbone description', () => {
+    const NON_TEXT = [['null', null], ['zero', 0], ['false', false], ['a number', 5], ['true', true], ['an object', {}], ['an empty list', []], ['a list', ['a']]] as const;
+    const HOLDERS = ['theme', 'backbone'] as const;
+    type Holder = (typeof HOLDERS)[number];
+    const EACH = HOLDERS.flatMap(holder => NON_TEXT.map(([label, value]) => [holder, label, value] as const));
+    const ABSENT = Symbol('absent');
+
+    /** The file, its one theme or backbone holding `value` (or no key at all). */
+    function fileWith(holder: Holder, value: unknown) {
+      const f = file();
+      const target = holder === 'theme' ? f.themes[0] : f.themes[0].backboneItems[0];
+      if (value !== ABSENT) target.description = value;
+      return f;
+    }
+    const holderOf = (holder: Holder, product: Pick<Product, 'themes'>): { description?: unknown } => {
+      const theme = req(product.themes[0], 'theme');
+      return holder === 'theme' ? theme : req(theme.backboneItems[0], 'backbone');
+    };
+    const importedWith = (holder: Holder, value: unknown) =>
+      holderOf(holder, importProductFromJSON(JSON.stringify(fileWith(holder, value))));
+
+    it.each(HOLDERS)('a %s description survives an export and a re-import', holder => {
+      const once = importProductFromJSON(JSON.stringify(fileWith(holder, 'Why this exists')));
+      const again = importProductFromJSON(exported(once));
+      expect(holderOf(holder, again).description).toBe('Why this exists');
+    });
+
+    it.each(EACH)('a %s description as %s becomes empty', (holder, _label, value) => {
+      expect(importedWith(holder, value).description).toBe('');
+    });
+
+    // Not null: the cloud guard takes that to '' without a notice.
+    it.each(EACH.filter(([, label]) => label !== 'null'))('a %s description as %s raises no cloud notice after import', (holder, _label, value) => {
+      const product = importProductFromJSON(JSON.stringify(fileWith(holder, value)));
+      expect(guardHits(product)).toEqual([]);
+    });
+
+    it.each(EACH)('a %s description as %s reads the same as it does from the cloud', (holder, _label, value) => {
+      const cloud = fileWith(holder, value);
+      guardCloudProduct(cloud);
+      expect(importedWith(holder, value).description).toBe(holderOf(holder, cloud).description);
+    });
+
+    it.each(HOLDERS)('an absent %s description stays absent', holder => {
+      expect('description' in importedWith(holder, ABSENT)).toBe(false);
+    });
+
+    // The app's own export can carry one this long: backbone import never checked
+    // the field, and the 2000 limit is enforced where the text is written.
+    it.each(HOLDERS)('a 3000-character %s description imports unchanged', holder => {
+      const long = 'x'.repeat(3000);
+      expect(importedWith(holder, long).description).toBe(long);
+    });
+  });
+
   describe('createdAt and updatedAt', () => {
     const FIELDS = ['createdAt', 'updatedAt'] as const;
     const NON_TEXT = [['null', null], ['zero', 0], ['false', false], ['a number', 5], ['true', true], ['an object', {}], ['an empty list', []], ['a list', ['a']]] as const;

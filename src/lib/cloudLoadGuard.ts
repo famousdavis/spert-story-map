@@ -186,6 +186,9 @@ function fixBackbone(b: Obj, hits: Hits): void {
 
 function fixTheme(t: Obj, hits: Hits): void {
   text(t, 'name', 'theme.name', hits, '');
+  // v0.54.0. Absent stays absent, with no notice: no writer before 0.54.0 stored
+  // one, so every older theme has none, and absent reads as ''.
+  text(t, 'description', 'theme.description', hits);
   dropUnless(t, 'color', isString, 'theme.color', hits);
   list(t, 'backboneItems', 'theme.backboneItems', hits, keepById, fixBackbone);
 }

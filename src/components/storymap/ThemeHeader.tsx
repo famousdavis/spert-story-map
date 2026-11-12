@@ -4,11 +4,16 @@
 
 import React from 'react';
 import useInlineEdit from './useInlineEdit';
+import HeaderName from './HeaderName';
+import type { HeaderNameHandlers } from './HeaderName';
 import { DEFAULT_THEME_COLOR } from '../../lib/themeColors';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
-interface ThemeHeaderProps {
+interface ThemeHeaderProps extends HeaderNameHandlers {
   themeSpan: { themeId: string; themeName: string; x: number; width: number };
+  description: string;
+  /** This theme's panel is open. */
+  isSelected: boolean;
   colorClasses: { solid: string; light: string; dot: string; swatch: string } | undefined;
   onRename: (themeId: string, name: string) => void;
   onDelete?: (themeId: string) => void;
@@ -19,7 +24,7 @@ interface ThemeHeaderProps {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelete, onAddBackbone, isDropTarget, isDragging, onDragStart }: ThemeHeaderProps) {
+export default function ThemeHeader({ themeSpan, description, isSelected, colorClasses, onRename, onDelete, onAddBackbone, isDropTarget, isDragging, onDragStart, onNameClick, onNameDoubleClick }: ThemeHeaderProps) {
   const color = colorClasses?.solid || DEFAULT_THEME_COLOR.solid;
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(themeSpan.themeName, (name) => onRename(themeSpan.themeId, name));
@@ -34,7 +39,9 @@ export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelet
     <div
       className={`absolute ${color} rounded-md flex items-center gap-0.5 px-1 transition-shadow ${
         isDragging ? 'opacity-50 ring-2 ring-white/60' : ''
-      } ${isDropTarget ? 'ring-2 ring-white/60 shadow-lg' : ''}`}
+      } ${isDropTarget ? 'ring-2 ring-white/60 shadow-lg' : ''} ${
+        isSelected ? 'ring-2 ring-offset-2 ring-blue-500 ring-offset-gray-100 dark:ring-blue-400 dark:ring-offset-gray-800' : ''
+      }`}
       style={{
         left: themeSpan.x,
         top: 0,
@@ -52,27 +59,35 @@ export default function ThemeHeader({ themeSpan, colorClasses, onRename, onDelet
       >
         ⠿
       </span>
-      {editing ? (
-        <input
-          ref={inputRef}
-          name="themeName"
-          type="text"
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={handleKeyDown}
-          onClick={e => e.stopPropagation()}
-          className="bg-white/20 text-white placeholder-white/60 text-sm font-semibold rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-white/40 w-full border-0"
-        />
-      ) : (
-        <span
-          className="text-sm font-semibold text-white truncate cursor-pointer hover:bg-white/10 rounded px-1 py-0.5 transition-colors"
-          onDoubleClick={startEditing}
-          title="Double-click to rename"
-        >
-          {themeSpan.themeName}
-        </span>
-      )}
+      <HeaderName
+        target={{ kind: 'theme', id: themeSpan.themeId }}
+        description={description}
+        editing={editing}
+        startEditing={startEditing}
+        onNameClick={onNameClick}
+        onNameDoubleClick={onNameDoubleClick}
+        className="text-white"
+      >
+        {editing ? (
+          <input
+            ref={inputRef}
+            name="themeName"
+            type="text"
+            autoComplete="off"
+            aria-label="Theme name"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            onClick={e => e.stopPropagation()}
+            className="bg-white/20 text-white placeholder-white/60 text-sm font-semibold rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-white/40 w-full border-0"
+          />
+        ) : (
+          <span className="text-sm font-semibold text-white truncate hover:bg-white/10 rounded px-1 py-0.5 transition-colors">
+            {themeSpan.themeName}
+          </span>
+        )}
+      </HeaderName>
       {onAddBackbone && (
         <button
           className="text-[10px] leading-none text-white/40 hover:text-white/90 flex-shrink-0 ml-auto whitespace-nowrap transition-opacity"

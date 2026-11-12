@@ -31,6 +31,16 @@ import { isRibLocked } from './ribHelpers';
  *   - top-level notesIncluded (boolean) — always present in v0.49.0+; positive
  *     marker so a snapshot's absence of notes is never load-bearing (D10)
  *   - selectSnapshotForWrite: bounded variant selection (full/lean/skip, D8)
+ *
+ * Phase 9 additions (v0.54.0, theme and backbone descriptions):
+ *   - themes and backboneItems: include description (string; absent → '') —
+ *     omitted when themeBackboneDescriptionsIncluded is false
+ *   - top-level themeBackboneDescriptionsIncluded (boolean) — always present in
+ *     v0.54.0+, a positive marker like notesIncluded
+ *   - selectSnapshotForWrite: a third rung (no notes AND no theme/backbone
+ *     descriptions) between lean and skip. Descriptions make the first rung
+ *     larger, so a map near the limit can now reach the second rung and lose
+ *     notes from the snapshot.
  */
 export interface AiSnapshot {
   id: string;
@@ -43,14 +53,25 @@ export interface AiSnapshot {
    * assumption about notes. Never infer "included" from absence.
    */
   notesIncluded: boolean;
+  /**
+   * ← Phase 9 (v0.54.0). ALWAYS emitted by v0.54.0+. true -> every theme and
+   * backbone carries an authoritative `description` string. false -> descriptions
+   * exist but were left out for size (the third rung): no theme or backbone has a
+   * `description` field, and the tab is NOT stale. ABSENT ENTIRELY -> written by a
+   * pre-0.54.0 bundle, which cannot apply a theme description or
+   * bulk_update_backbones. Never infer "included" from absence.
+   */
+  themeBackboneDescriptionsIncluded: boolean;
   sizeMapping: Array<{ label: string; points: number }>;  // ← Phase 3
   releases: Array<{ id: string; name: string; order: number }>;
   themes: Array<{
     id: string;
     name: string;
+    description?: string;            // ← Phase 9 (present iff themeBackboneDescriptionsIncluded)
     backboneItems: Array<{
       id: string;
       name: string;
+      description?: string;          // ← Phase 9 (present iff themeBackboneDescriptionsIncluded)
       ribItems: Array<{
         id: string;
         name: string;
@@ -87,13 +108,18 @@ export interface AiSnapshot {
  *     marker so a snapshot's absence of notes is never load-bearing (D10)
  *   - selectSnapshotForWrite: bounded variant selection (full/lean/skip, D8)
  *
+ * Phase 9 additions (v0.54.0): `includeThemeBackboneDescriptions` (default true)
+ * adds each theme's and backbone's description, absent normalized to '', and sets
+ * themeBackboneDescriptionsIncluded. Rib descriptions are always included.
+ *
  * @pure — no side effects; testable without Firebase or React.
  */
 export function buildAiSnapshot(
   p: Product,
-  opts?: { includeNotes?: boolean },
+  opts?: { includeNotes?: boolean; includeThemeBackboneDescriptions?: boolean },
 ): AiSnapshot {
   const includeNotes = opts?.includeNotes ?? true;
+  const includeDescriptions = opts?.includeThemeBackboneDescriptions ?? true;
   // Valid-label set used for per-rib size normalization below.
   const sizeLabels = new Set((p.sizeMapping ?? []).map(m => m.label));
   return {
@@ -101,6 +127,7 @@ export function buildAiSnapshot(
     name: p.name,
     description: p.description,
     notesIncluded: includeNotes,                                     // ← Phase 8 (always present)
+    themeBackboneDescriptionsIncluded: includeDescriptions,          // ← Phase 9 (always present)
     sizeMapping: (p.sizeMapping ?? [])                               // ← Phase 3
       .slice()
       .sort((a, b) => a.points - b.points)
@@ -112,9 +139,11 @@ export function buildAiSnapshot(
     themes: p.themes.map(t => ({
       id: t.id,
       name: t.name,
+      ...(includeDescriptions && { description: t.description ?? '' }), // ← Phase 9: undefined -> ''
       backboneItems: t.backboneItems.map(b => ({
         id: b.id,
         name: b.name,
+        ...(includeDescriptions && { description: b.description ?? '' }), // ← Phase 9: undefined -> ''
         ribItems: b.ribItems.map(r => {
           const allocations = currentAllocations(r);
           const sole = allocations.length === 1 ? allocations[0] : undefined;
@@ -136,10 +165,15 @@ export function buildAiSnapshot(
 }
 
 /**
- * Choose the largest snapshot variant that fits `limit` bytes (D8). Full (with
- * notes) if it fits; else lean (no notes, notesIncluded:false); else null
- * (caller skips the write). `limit` is a parameter so unit tests force each rung
- * with tiny limits instead of multi-hundred-KB fixtures.
+ * Choose the largest snapshot variant that fits `limit` bytes (D8). Three rungs,
+ * then skip:
+ *   1. full — notes and theme/backbone descriptions; both markers true.
+ *   2. lean — no notes (notesIncluded:false); descriptions kept (marker true).
+ *   3. leaner (Phase 9, v0.54.0) — no notes and no theme/backbone descriptions;
+ *      both markers false. Rib descriptions stay in every rung.
+ * else null (caller skips the write and the prior snapshot stays). `degraded` is
+ * true for rungs 2 and 3 and for null. `limit` is a parameter so unit tests force
+ * each rung with tiny limits instead of multi-hundred-KB fixtures.
  * @pure
  */
 export function selectSnapshotForWrite(
@@ -152,5 +186,7 @@ export function selectSnapshotForWrite(
   if (byteLen(full) <= limit) return { snapshot: full, degraded: false };
   const lean = buildAiSnapshot(p, { includeNotes: false });
   if (byteLen(lean) <= limit) return { snapshot: lean, degraded: true };
+  const leaner = buildAiSnapshot(p, { includeNotes: false, includeThemeBackboneDescriptions: false });
+  if (byteLen(leaner) <= limit) return { snapshot: leaner, degraded: true };
   return { snapshot: null, degraded: true };
 }

@@ -5,11 +5,16 @@
 import React from 'react';
 import { THEME_HEIGHT, BACKBONE_HEIGHT } from './useMapLayout';
 import useInlineEdit from './useInlineEdit';
+import HeaderName from './HeaderName';
+import type { HeaderNameHandlers } from './HeaderName';
 import { DEFAULT_THEME_COLOR } from '../../lib/themeColors';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- layout/drag objects passed from parent have complex computed shapes */
-interface BackboneHeaderProps {
+interface BackboneHeaderProps extends HeaderNameHandlers {
   column: { backboneId: string; backboneName: string; themeId: string; x: number; width: number };
+  description: string;
+  /** This backbone's panel is open. */
+  isSelected: boolean;
   colorClasses: { solid: string; light: string; dot: string; swatch: string } | undefined;
   onRename: (themeId: string, backboneId: string, name: string) => void;
   onDelete?: (themeId: string, backboneId: string) => void;
@@ -19,7 +24,7 @@ interface BackboneHeaderProps {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export default function BackboneHeader({ column, colorClasses, onRename, onDelete, isDropTarget, isDragging, onDragStart }: BackboneHeaderProps) {
+export default function BackboneHeader({ column, description, isSelected, colorClasses, onRename, onDelete, isDropTarget, isDragging, onDragStart, onNameClick, onNameDoubleClick }: BackboneHeaderProps) {
   const color = colorClasses?.light || DEFAULT_THEME_COLOR.light;
   const { editing, draft, setDraft, inputRef, startEditing, commit, handleKeyDown } =
     useInlineEdit(column.backboneName, (name) => onRename(column.themeId, column.backboneId, name));
@@ -34,7 +39,7 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
     <div
       className={`group absolute ${color} rounded flex items-center gap-0.5 px-1 transition-shadow ${
         isDragging ? 'opacity-50 ring-2 ring-blue-400' : ''
-      } ${isDropTarget ? 'ring-2 ring-blue-400 shadow-md' : ''}`}
+      } ${isDropTarget ? 'ring-2 ring-blue-400 shadow-md' : ''} ${isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}`}
       style={{
         left: column.x,
         top: THEME_HEIGHT,
@@ -53,27 +58,34 @@ export default function BackboneHeader({ column, colorClasses, onRename, onDelet
       >
         ⠿
       </span>
-      {editing ? (
-        <input
-          ref={inputRef}
-          name="backboneName"
-          type="text"
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={handleKeyDown}
-          onClick={e => e.stopPropagation()}
-          className="bg-white/60 text-xs font-medium rounded px-1 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 w-full border-0"
-        />
-      ) : (
-        <span
-          className="text-xs font-medium line-clamp-2 min-w-0 flex-1 cursor-pointer hover:bg-white/30 rounded px-1 py-0.5 transition-colors"
-          onDoubleClick={startEditing}
-          title="Double-click to rename"
-        >
-          {column.backboneName}
-        </span>
-      )}
+      <HeaderName
+        target={{ kind: 'backbone', id: column.backboneId, themeIdAtClick: column.themeId }}
+        description={description}
+        editing={editing}
+        startEditing={startEditing}
+        onNameClick={onNameClick}
+        onNameDoubleClick={onNameDoubleClick}
+      >
+        {editing ? (
+          <input
+            ref={inputRef}
+            name="backboneName"
+            type="text"
+            autoComplete="off"
+            aria-label="Backbone name"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            onClick={e => e.stopPropagation()}
+            className="bg-white/60 text-xs font-medium rounded px-1 py-0.5 outline-none focus:ring-2 focus:ring-blue-300 w-full border-0"
+          />
+        ) : (
+          <span className="text-xs font-medium line-clamp-2 min-w-0 hover:bg-white/30 rounded px-1 py-0.5 transition-colors">
+            {column.backboneName}
+          </span>
+        )}
+      </HeaderName>
       {onDelete && (
         <button
           className="text-[10px] leading-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-900 text-red-700 flex-shrink-0 ml-auto transition-opacity"

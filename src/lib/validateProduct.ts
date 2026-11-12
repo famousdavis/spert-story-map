@@ -144,9 +144,9 @@ const _productFieldsGuard: FieldsOf<
 };
 const KNOWN_PRODUCT_FIELDS = new Set<string>(PRODUCT_FIELDS);
 
-const THEME_FIELDS = ['id', 'name', 'order', 'color', 'backboneItems'] as const;
+const THEME_FIELDS = ['id', 'name', 'description', 'order', 'color', 'backboneItems'] as const;
 const _themeFieldsGuard: FieldsOf<Theme, (typeof THEME_FIELDS)[number]> = {
-  id: 'id', name: 'name', order: 'order', color: 'color',
+  id: 'id', name: 'name', description: 'description', order: 'order', color: 'color',
   backboneItems: 'backboneItems',
 };
 const KNOWN_THEME_FIELDS = new Set<string>(THEME_FIELDS);
@@ -253,6 +253,23 @@ function stripObject(obj: any, allowed: Set<string>): any {
 }
 
 /**
+ * A theme or backbone `description` (v0.54.0). Anything present that is not text
+ * becomes '', as the product description does here and as `guardCloudProduct` does
+ * on a read, so a file and a cloud read give the same value. Absent stays absent:
+ * a file that never had one gains no key, and absent reads as ''.
+ *
+ * ⚠️ CLEARED, NOT REJECTED, AND NO LENGTH ASSERT. Backbone import never checked this
+ * field, so a description longer than 2000 characters can sit in a file the app
+ * itself exported (an older import let it through, and an export spreads the product
+ * as it stands). An assert would refuse that whole file. The 2000 limit is enforced
+ * where the text is written: the editor's `maxLength` and the Connect AI tools'
+ * schema. The rib description is still asserted, an older choice this does not touch.
+ */
+function clearNonTextDescription(o: { description?: unknown }): void {
+  if (o.description !== undefined && typeof o.description !== 'string') o.description = '';
+}
+
+/**
  * Validate and sanitize a parsed product object.
  *
  * @param {object} data - Raw parsed JSON object
@@ -356,6 +373,7 @@ export function validateProduct(data: unknown): Product {
       assert(typeof theme.name === 'string' && theme.name.length <= MAX_STRING,
         'Theme name must be a string');
     }
+    clearNonTextDescription(theme);
 
     for (const bb of theme.backboneItems) {
       assert(isValidId(bb.id), 'Backbone id must be a valid string');
@@ -365,6 +383,7 @@ export function validateProduct(data: unknown): Product {
         assert(typeof bb.name === 'string' && bb.name.length <= MAX_STRING,
           'Backbone name must be a string');
       }
+      clearNonTextDescription(bb);
 
       for (const rib of bb.ribItems) {
         totalRibs++;

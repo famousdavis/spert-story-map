@@ -12,6 +12,8 @@ import RibCell from './RibCell';
 import UnassignedLane from './UnassignedLane';
 import DropHighlight from './DropHighlight';
 import InsertionIndicator from './InsertionIndicator';
+import { entityKey } from './mapEntity';
+import type { MapEntityTarget } from './mapEntity';
 import { getThemeColorClasses } from '../../lib/themeColors';
 import { UNKNOWN_RELEASE_LABEL } from '../../lib/reconciliation';
 import { releaseHasAllocations } from '../../lib/settingsMutations';
@@ -51,6 +53,12 @@ interface MapContentProps {
   /** ID of the rib whose detail panel is open — visually anchored as "selected" so the
    * user can see which card the edit panel is attached to. */
   editingRibId?: string | null;
+  /** Theme and backbone descriptions, keyed by `entityKey`. Built once per product. */
+  descriptions: Map<string, string>;
+  /** `entityKey` of the theme or backbone whose panel is open: its header carries a ring. */
+  selectedEntityKey?: string | null;
+  onEntityNameClick?: (target: MapEntityTarget, anchor: HTMLElement) => void;
+  onEntityNameDoubleClick?: () => void;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -61,6 +69,7 @@ export default function MapContent({
   onAddTheme, onAddBackbone, onAddRib, onAddRibToRelease, onAddReleaseAfter,
   dragState, onDragStart, onBackboneDragStart, onThemeDragStart, onReleaseDragStart,
   onToggleCollapse, selectedIds, editingRibId,
+  descriptions, selectedEntityKey, onEntityNameClick, onEntityNameDoubleClick,
 }: MapContentProps) {
   const { columns, themeSpans, releaseLanes, cells, unknownLane, unassignedLane, totalWidth, totalHeight } = layout;
 
@@ -82,6 +91,13 @@ export default function MapContent({
       mapSizeRef.current = { width: mapWidth, height: mapHeight };
     }
   }, [mapWidth, mapHeight, mapSizeRef]);
+
+  // A header's description, ring and name handlers (D10: one lookup, built per product, read per header).
+  const nameProps = (target: MapEntityTarget) => {
+    const key = entityKey(target);
+    const isSelected = selectedEntityKey === key;
+    return { description: descriptions.get(key) ?? '', isSelected, onNameClick: onEntityNameClick, onNameDoubleClick: onEntityNameDoubleClick };
+  };
 
   // Build theme color lookup
   const themeColorMap: Record<string, ReturnType<typeof getThemeColorClasses>> = {};
@@ -148,6 +164,7 @@ export default function MapContent({
         <ThemeHeader
           key={ts.themeId}
           themeSpan={ts}
+          {...nameProps({ kind: 'theme', id: ts.themeId })}
           colorClasses={themeColorMap[ts.themeId]}
           onRename={onRenameTheme}
           onDelete={onDeleteTheme}
@@ -158,11 +175,12 @@ export default function MapContent({
         />
       ))}
 
-      {/* Backbone headers */}
+      {/* Backbone headers. Keyed by theme and backbone: Connect AI can give two themes the same backbone id. */}
       {columns.map(col => (
         <BackboneHeader
-          key={col.backboneId}
+          key={`${col.themeId}:${col.backboneId}`}
           column={col}
+          {...nameProps({ kind: 'backbone', id: col.backboneId, themeIdAtClick: col.themeId })}
           colorClasses={themeColorMap[col.themeId]}
           onRename={onRenameBackbone}
           onDelete={onDeleteBackbone}
@@ -227,7 +245,7 @@ export default function MapContent({
       {/* Column divider lines (subtle vertical guides) */}
       {columns.map(col => (
         <div
-          key={`vline-${col.backboneId}`}
+          key={`vline-${col.themeId}:${col.backboneId}`}
           className="absolute bg-gray-100"
           style={{
             left: col.x + col.width + 2,

@@ -110,6 +110,7 @@ export interface Backbone {
 export interface Theme {
   id: string;
   name: string;
+  description?: string;
   order: number;
   color?: ColorKey;
   backboneItems: Backbone[];

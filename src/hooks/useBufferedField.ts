@@ -28,12 +28,40 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * `externalValue` inside the handlers is the latest value: React attaches the
  * handlers of the latest render. It is read there, not from a ref written in
  * the sync effect below, which runs after the render and so can lag it.
+ *
+ * `commitOnUnmount` (opt-in, off by default): React fires no `onBlur` when a
+ * focused field is removed, so a field unmounted while focused would drop what
+ * was typed. With the option on, unmounting applies the blur rule to that
+ * missing blur: it commits only if the field is focused AND its value differs
+ * from the focus-time snapshot. Not "differs from the latest external value":
+ * that would write the old text back over a change that arrived while the
+ * field sat focused and untouched. Not without the focus check: a field that
+ * already committed on blur would commit a second time. It runs as a passive
+ * effect cleanup, after the parent's layout effects of the same commit.
  */
-export function useBufferedField(externalValue: string, onCommit: (v: string) => void) {
+export function useBufferedField(
+  externalValue: string,
+  onCommit: (v: string) => void,
+  options?: { commitOnUnmount?: boolean },
+) {
   const [localValue, setLocalValue] = useState(externalValue);
   const focusedSnapshot = useRef(externalValue);
   const suppressNextBlur = useRef(false);
   const isFocused = useRef(false);
+  const commitOnUnmount = options?.commitOnUnmount ?? false;
+
+  // What an unmount commits, and to whom: the last committed render's value and callback.
+  const latest = useRef({ localValue, onCommit });
+  useEffect(() => { latest.current = { localValue, onCommit }; });
+
+  useEffect(() => {
+    if (!commitOnUnmount) return;
+    return () => {
+      if (!isFocused.current) return;
+      const { localValue: value, onCommit: commit } = latest.current;
+      if (value !== focusedSnapshot.current) commit(value);
+    };
+  }, [commitOnUnmount]);
 
   // External → local sync, gated on focus state. setState-in-effect is the
   // whole point of this hook: a parent state change (cloud echo, undo/redo)

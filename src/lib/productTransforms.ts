@@ -277,11 +277,17 @@ export function cloneRibInProduct(
   };
 }
 
-/** Pure, idempotent: no-op if a theme with this ID already exists. */
+/**
+ * Pure, idempotent: no-op if a theme with this ID already exists — so a re-sent
+ * create with a description does not set it on the existing theme.
+ *
+ * `description` (v0.54.0) is set only when given: absent stays absent (a theme with
+ * no key reads as ''), so a theme created without one carries no `description` key.
+ */
 export function addNamedThemeToProduct(
   prev: Product,
   newId: string,
-  attrs: { name: string; color?: ColorKey },
+  attrs: { name: string; color?: ColorKey; description?: string },
 ): Product {
   if (prev.themes.some(t => t.id === newId)) return prev;
   const next = {
@@ -289,6 +295,7 @@ export function addNamedThemeToProduct(
     themes: [...prev.themes, {
       id: newId,
       name: attrs.name,
+      ...(attrs.description !== undefined && { description: attrs.description }),
       order: prev.themes.length + 1,
       // noUncheckedIndexedAccess makes the index access ColorKey | undefined,
       // which is assignable to the optional color field (mirrors addTheme).
