@@ -62,11 +62,42 @@ structure and entity IDs. This requires Read Mode — if I have not enabled it, 
 to turn it on in the Connect AI panel. Then use the fine-grained tools for targeted
 changes: storymap_create_theme, storymap_create_backbone, storymap_create_rib for
 additions; storymap_update_theme, storymap_update_backbone, storymap_update_rib for
-edits. Call tools sequentially — await each result and immediately call the next within
+edits (and storymap_bulk_update_backbones for many backbone descriptions — see THEME
+AND BACKBONE DESCRIPTIONS below). Call tools sequentially — await each result and immediately call the next within
 the same response. Do not pause between calls to report progress. Complete the full
 sequence before summarizing. Only stop mid-sequence if a tool returns an error or a
 structural mismatch requires user input.
 For each new entity (theme, backbone, rib), generate a fresh UUID as its ID.
+
+THEME AND BACKBONE DESCRIPTIONS:
+Themes and backbones can each carry a description (up to 2000 characters): what the theme
+or backbone covers, its goal, scope or context. I read and write them in the app by
+clicking a theme or backbone name on the Map.
+- While building, you may set them as you create: storymap_create_theme and
+  storymap_create_backbone take an optional description, and storymap_bulk_import takes one
+  per theme and per backbone. Keep them to a sentence or two unless I ask for more.
+- Create and import set a description only on a NEW theme or backbone. To change an
+  existing one, use storymap_update_theme (name and/or description),
+  storymap_update_backbone (name and/or description), or storymap_bulk_update_backbones
+  (many backbones' descriptions in one call, up to 100 per call; it never renames).
+- Those updates REPLACE the description. Descriptions are mine: call storymap_get_project
+  first (Read Mode), and do not overwrite a non-empty description unless I asked you to.
+  An empty string "" clears one. There is no append tool for descriptions.
+- storymap_get_project returns themeBackboneDescriptionsIncluded:
+  - true: every theme and backbone in the result carries its description.
+  - false: descriptions exist but were left out because the map is very large. This is NOT
+    an outdated tab. Do not write a theme or backbone description unless I explicitly asked
+    — you cannot see what you would replace.
+  - missing: my Story Map tab is older than v0.54.0 and silently drops theme descriptions
+    and storymap_bulk_update_backbones, although each call reports success. Ask me to
+    reload the Story Map tab and reconnect Connect AI, then send the descriptions again
+    with the update tools (create and import do not re-apply to an id that already exists).
+- storymap_update_backbone still finds a backbone that has been moved to another theme
+  since you last read the map.
+- Without Read Mode you cannot read descriptions or check the marker. Write descriptions
+  then only for themes and backbones you are creating, or ones I told you to change.
+- Descriptions take room in what storymap_get_project returns, so on a very large map rib
+  notes may be left out sooner than before (notesIncluded: false).
 
 RELEASE PLANNING (separate step — only when the user explicitly asks):
 Release planning is an optional second phase. Build and confirm the map structure first.
@@ -164,6 +195,9 @@ WHEN TO USE BULK:
   Its array-of-objects payload is a shape Microsoft Copilot Chat cannot reliably
   construct — if you are Copilot, use sequential storymap_move_rib calls instead.
 - Creating multiple releases at once → use storymap_bulk_create_releases.
+- Writing descriptions on more than a handful of backbones → use
+  storymap_bulk_update_backbones. It too takes an array of objects — if you are Copilot,
+  use storymap_update_backbone for each backbone instead.
 - A single targeted change (one rib, one action) → individual tools are fine.
 
 BULK RELEASE PLANNING (two calls total):
@@ -183,9 +217,10 @@ READ MODE SUMMARY:
 - storymap_bulk_create_releases and storymap_bulk_append_rib_notes: do NOT require Read
   Mode (but call storymap_get_project first anyway — you need it for ribIds and to verify).
 - storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign
-  / storymap_bulk_update_ribs / storymap_bulk_move_ribs: REQUIRE Read Mode.
+  / storymap_bulk_update_ribs / storymap_bulk_move_ribs / storymap_bulk_update_backbones:
+  REQUIRE Read Mode.
 
-ADDITIVE / RE-RUN SEMANTICS (all seven bulk tools):
+ADDITIVE / RE-RUN SEMANTICS (all eight bulk tools):
 - storymap_bulk_create_releases skips duplicate releaseIds.
 - storymap_bulk_allocate skips ribs that are locked, already allocated, or whose
   target release does not exist.
@@ -205,11 +240,15 @@ ADDITIVE / RE-RUN SEMANTICS (all seven bulk tools):
   never overwriting. NOT idempotent — re-running appends again; an append that would
   exceed the 2000-char cap is skipped for that rib. After a partial failure resend only
   the skipped ribIds.
+- storymap_bulk_update_backbones REPLACES each backbone's description; every backbone
+  holding the backboneId is updated, and an unknown backboneId is skipped. Re-running the
+  same descriptions changes nothing, but it can overwrite a description I edited since the
+  first run.
 Re-running these four is safe and ref-equal: storymap_bulk_create_releases,
-storymap_bulk_allocate, storymap_bulk_size, storymap_bulk_unassign. The other three are
-NOT ref-equal on re-run — storymap_bulk_update_ribs and storymap_bulk_move_ribs re-write
-their values (and can overwrite a manual change), and storymap_bulk_append_rib_notes
-appends again. Verify results by calling storymap_get_project after — the response confirms
+storymap_bulk_allocate, storymap_bulk_size, storymap_bulk_unassign. The other four are
+NOT safe to re-run blindly — storymap_bulk_update_ribs, storymap_bulk_move_ribs and
+storymap_bulk_update_backbones re-write their values (and can overwrite a manual change),
+and storymap_bulk_append_rib_notes appends again. Verify results by calling storymap_get_project after — the response confirms
 the call was queued, not which entries applied. storymap_get_project now returns each rib's
 notes (when notesIncluded is true), so description, category, AND notes are all verifiable.
 
@@ -217,6 +256,8 @@ CHUNKING:
 - More than 500 ribs to allocate, size, unassign, move, or update → split into bulk calls of ≤500 each.
 - More than 100 note-appends → split into storymap_bulk_append_rib_notes calls of ≤100
   each. This cap is 100, not 500 — the Firestore document-size limit.
+- More than 100 backbone descriptions → split into storymap_bulk_update_backbones calls of
+  ≤100 each (the same document-size limit).
 - More than 50 releases to create → split into calls of ≤50 each.
 
 BULK CONTENT UPDATES (description, category, notes):
