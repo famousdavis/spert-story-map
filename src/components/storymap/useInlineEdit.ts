@@ -12,10 +12,18 @@ import React, { useState, useRef, useEffect } from 'react';
  *
  * Automatically syncs `draft` when `value` changes externally (e.g. undo)
  * while not in edit mode.
+ *
+ * `commit` writes only when the trimmed draft differs from the value captured
+ * when editing turned on, never from the current `value`: a rename that
+ * arrived from elsewhere while the input was open (Connect AI, a collaborator,
+ * undo) changes `value`, and comparing with it would write the old name back.
+ * An empty draft never commits — release names must not be blank
+ * (`validateProduct` refuses them on import).
  */
 export default function useInlineEdit(value: string, onCommit: (trimmed: string) => void) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const startValue = useRef(value);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync draft when not editing (e.g. after undo)
@@ -33,7 +41,7 @@ export default function useInlineEdit(value: string, onCommit: (trimmed: string)
   const commit = () => {
     setEditing(false);
     const trimmed = draft.trim();
-    if (trimmed && trimmed !== value) {
+    if (trimmed && trimmed !== startValue.current) {
       onCommit(trimmed);
     } else {
       setDraft(value);
@@ -51,6 +59,9 @@ export default function useInlineEdit(value: string, onCommit: (trimmed: string)
 
   const startEditing = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    // Capture only as editing turns on: a double click inside the open input
+    // must not re-capture a value that arrived while it was open.
+    if (!editing) startValue.current = value;
     setEditing(true);
   };
 

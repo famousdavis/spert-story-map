@@ -59,8 +59,8 @@ describe('BufferedText — required', () => {
   });
 
   // ⚠️ The guard stops NEW blanks; it does not invent a name. Reverting
-  // restores the focus snapshot, which may itself be blank for data written
-  // before this shipped.
+  // restores the current saved value, which may itself be blank for data
+  // written before this shipped.
   it('does not repair a value that was already empty', () => {
     const onCommit = vi.fn();
     render(<BufferedText value="" onCommit={onCommit} name="f" required />);

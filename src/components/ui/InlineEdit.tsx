@@ -17,6 +17,7 @@ export default function InlineEdit({ value, onSave, className = '', placeholder 
   const Tag = tag;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const startValue = useRef(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync draft from external value only when NOT editing — otherwise an
@@ -38,9 +39,20 @@ export default function InlineEdit({ value, onSave, className = '', placeholder 
     }
   }, [editing]);
 
+  // Capture only as editing turns on. `commit` compares with this, not with the
+  // current `value`: a rename that arrived from elsewhere while the input was
+  // open changes `value`, and comparing with it would write the old name back.
+  const startEditing = () => {
+    if (!editing) startValue.current = value;
+    setEditing(true);
+  };
+
+  // An empty name still saves, as it always has: the validator accepts empty
+  // theme, backbone and rib names. When nothing is saved, the effect above
+  // resets the draft to the current value as editing turns off.
   const commit = () => {
     setEditing(false);
-    if (draft.trim() !== value) {
+    if (draft.trim() !== startValue.current) {
       onSave(draft.trim());
     }
   };
@@ -72,9 +84,9 @@ export default function InlineEdit({ value, onSave, className = '', placeholder 
   return (
     <Tag
       className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded px-1 py-0.5 transition-colors ${!value ? 'text-gray-400 dark:text-gray-500 italic' : ''} ${className}`}
-      onClick={() => setEditing(true)}
+      onClick={startEditing}
       tabIndex={0}
-      onKeyDown={e => { if (e.key === 'Enter') setEditing(true); }}
+      onKeyDown={e => { if (e.key === 'Enter') startEditing(); }}
       role="button"
       aria-label={`Edit ${value || placeholder}`}
     >

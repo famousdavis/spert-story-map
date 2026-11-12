@@ -17,7 +17,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * Commit semantics:
  *   - onCommit fires only when the buffered value differs from the snapshot
  *     captured at focus. No-op blurs (focus→blur with no typing) do nothing.
+ *     A blur that commits wins: last writer wins.
  *   - revertValue suppresses the next blur commit (used by Escape).
+ *   - A blur that commits nothing, and revertValue, show the LATEST external
+ *     value, not the focus-time one. While focused the field ignores outside
+ *     changes, so a value that arrived meanwhile (Connect AI, a collaborator,
+ *     undo) would otherwise stay hidden behind the old text, and the next
+ *     focus-and-blur would write that old text back over it.
+ *
+ * `externalValue` inside the handlers is the latest value: React attaches the
+ * handlers of the latest render. It is read there, not from a ref written in
+ * the sync effect below, which runs after the render and so can lag it.
  */
 export function useBufferedField(externalValue: string, onCommit: (v: string) => void) {
   const [localValue, setLocalValue] = useState(externalValue);
@@ -42,15 +52,17 @@ export function useBufferedField(externalValue: string, onCommit: (v: string) =>
     isFocused.current = false;
     if (suppressNextBlur.current) {
       suppressNextBlur.current = false;
+      setLocalValue(externalValue);
       return;
     }
     if (localValue !== focusedSnapshot.current) onCommit(localValue);
-  }, [localValue, onCommit]);
+    else setLocalValue(externalValue);
+  }, [localValue, onCommit, externalValue]);
 
   const revertValue = useCallback(() => {
     suppressNextBlur.current = true;
-    setLocalValue(focusedSnapshot.current);
-  }, []);
+    setLocalValue(externalValue);
+  }, [externalValue]);
 
   return { localValue, setLocalValue, handleFocus, handleBlur, revertValue };
 }
