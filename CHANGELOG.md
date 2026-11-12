@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.53.35 (2026-11-12)
+
+### Fixed
+
+- **A card you drag and let go off the board no longer stays picked up.** On the Story Map and Sizing tabs, letting go of a card over the zoom buttons, the colour legend, the filter, the + Rib button or the page header used to leave the drag live. Your next click on the board then dropped the card wherever the pointer happened to be: on the Story Map it moved to another release, and on Sizing it took a new size. Now the drag is simply cancelled, the card stays where it was, and nothing is saved.
+- **A drag the browser interrupts, such as an interrupted touch gesture, is cancelled the same way.**
+- Dropping a card on the board works as before.
+
 ## Version 0.53.34 (2026-11-12)
 
 ### Fixed

@@ -234,6 +234,7 @@ export default function StoryMapView() {
         dragState={dragState}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEndExpand}
+        onDragCancel={cancelDrag}
         onBackgroundClick={handleBackgroundDeselect}
         overlayControls={product.releases.length >= 2 ? (
           <button

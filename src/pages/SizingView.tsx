@@ -248,6 +248,7 @@ export default function SizingView() {
         dragState={dragState}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
+        onDragCancel={cancelDrag}
         overlayControls={
           <div className="flex flex-col items-end gap-2">
             <SizingFilterPanel
