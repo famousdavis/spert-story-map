@@ -1,5 +1,22 @@
 # Changelog
 
+## Version 0.54.0 (2026-11-12)
+
+### Added
+
+- **Themes and backbones can now have a description.** On the Map tab, click a theme or backbone name to open its panel. There you can write a description of up to 2,000 characters, see its rib items, points, % done and unsized items, and rename it. Double-click a name to rename it in place, as before.
+- **The panel sits beside the map instead of covering it,** so you can keep panning, dragging cards and clicking: click another theme or backbone name to switch to it. The map narrows to make room, and its zoom buttons and legend move with it. On a narrow screen the panel covers the map, and × closes it.
+- **A name that has a description shows a small icon,** and hovering the name shows the start of its description.
+- **What you type in a description is kept** when you switch to another theme, backbone, rib item or release, add a rib item, or start dragging a card.
+- **Connect AI can write theme and backbone descriptions,** and with Read Mode on it can read them. It can set a theme's description when it creates, updates or imports a theme, and set many backbone descriptions in one step. These Connect AI abilities become available once the Connect AI service is updated, shortly after this release.
+
+### Changed
+
+- **Escape closes the theme or backbone panel,** but not while you are typing in it. During a card drag, Escape cancels the drag and leaves the panel open, and it now also cancels a card you have pressed but not yet moved.
+- **When Connect AI updates a backbone that has since been moved to another theme, the update still goes through.**
+- **A theme's description is now kept when you export a project and import it again.** A theme or backbone description in an imported file that is not text imports as empty, the same way a project description does.
+- On a very large map, what Connect AI reads first leaves out rib notes, and then theme and backbone descriptions, to stay within its size limit. Because descriptions take room, a map close to that limit may lose its notes from that view sooner than before. Nothing is removed from the project itself.
+
 ## Version 0.53.35 (2026-11-12)
 
 ### Fixed

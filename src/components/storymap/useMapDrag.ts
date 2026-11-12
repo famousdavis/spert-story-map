@@ -23,7 +23,8 @@ type UpdateProduct = (updater: (prev: Product) => Product) => void;
  * Rib drags are free-form (2D) — both release and backbone targets update continuously.
  */
 
-const DRAG_THRESHOLD = 8; // pixels before committing to drag
+/** Pixels a press must travel before it becomes a drag. Shared with Sizing and with the map's name clicks. */
+export const DRAG_THRESHOLD = 8;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drag state is a union of RibDragState | BackboneDragState | ThemeDragState
 export default function useMapDrag({ layout, zoom, pan, updateProduct, selectedIds }: { layout: any; zoom: number; pan: { x: number; y: number }; updateProduct: UpdateProduct; selectedIds: Set<string> | null }) {

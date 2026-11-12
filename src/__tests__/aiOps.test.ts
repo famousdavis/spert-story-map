@@ -2799,3 +2799,332 @@ describe('Phase 8 drain / probe', () => {
     expect(nextSeq).toBe(2);
   });
 });
+
+// ── Phase 9 (v0.54.0): theme and backbone descriptions ──────────────────────
+// Built as a literal, not through the create ops, so the fixture does not lean on
+// the code under test. Backbone `dup` sits in t2 AND t3: Connect AI can create the
+// same backbone id in two themes (create_backbone deduplicates within a theme only).
+//   t1 'T1 desc' { b1 'B1 desc' (rib r1), b2 (no description key) }
+//   t2 (no key)  { b3 '', dup 'Dup in t2' }
+//   t3 (no key)  { dup 'Dup in t3' }
+function descProduct(): Product {
+  const bb = (id: string, description?: string, ribItems: Product['themes'][number]['backboneItems'][number]['ribItems'] = []) => ({
+    id, name: id.toUpperCase(), order: 1, ribItems,
+    ...(description !== undefined && { description }),
+  });
+  const rib = {
+    id: 'r1', name: 'Rib', description: 'Rib desc', order: 1, size: null, category: 'core' as const,
+    releaseAllocations: [], progressHistory: [], notes: 'Rib notes',
+  };
+  return {
+    ...makeProduct(),
+    themes: [
+      { id: 't1', name: 'T1', description: 'T1 desc', order: 1, backboneItems: [bb('b1', 'B1 desc', [rib]), bb('b2')] },
+      { id: 't2', name: 'T2', order: 2, backboneItems: [bb('b3', ''), bb('dup', 'Dup in t2')] },
+      { id: 't3', name: 'T3', order: 3, backboneItems: [bb('dup', 'Dup in t3')] },
+    ],
+  };
+}
+const themeOf = (p: Product, id: string) => req(p.themes.find(t => t.id === id), `theme ${id}`);
+const bbOf = (p: Product, themeId: string, id: string) =>
+  req(themeOf(p, themeId).backboneItems.find(b => b.id === id), `backbone ${themeId}/${id}`);
+const logLen = (p: Product) => (p._changeLog ?? []).length;
+const lastEntry = (p: Product) => req((p._changeLog ?? [])[logLen(p) - 1], 'last changelog entry');
+
+describe('applyAiOp — theme descriptions (v0.54.0)', () => {
+  it('create_theme stores a string description', () => {
+    const next = applyAiOp(makeProduct(), 'create_theme', { themeId: 'tn', name: 'N', description: 'Why' });
+    expect(themeOf(next, 'tn').description).toBe('Why');
+  });
+
+  it('create_theme without a description leaves the key absent', () => {
+    const next = applyAiOp(makeProduct(), 'create_theme', { themeId: 'tn', name: 'N' });
+    expect('description' in themeOf(next, 'tn')).toBe(false);
+  });
+
+  it('create_theme drops a non-string description and still creates the theme', () => {
+    const next = applyAiOp(makeProduct(), 'create_theme', { themeId: 'tn', name: 'N', description: 42 });
+    expect(themeOf(next, 'tn').name).toBe('N');
+    expect('description' in themeOf(next, 'tn')).toBe(false);
+  });
+
+  it('create_theme re-sent on an existing id does not set its description (ref-equal)', () => {
+    const p = descProduct();
+    expect(applyAiOp(p, 'create_theme', { themeId: 't2', name: 'T2', description: 'New' })).toBe(p);
+  });
+
+  it('update_theme name-only renames and leaves the description alone', () => {
+    const p = descProduct();
+    const next = applyAiOp(p, 'update_theme', { themeId: 't1', name: 'Renamed' });
+    expect(themeOf(next, 't1').name).toBe('Renamed');
+    expect(themeOf(next, 't1').description).toBe('T1 desc');
+    expect('description' in themeOf(applyAiOp(p, 'update_theme', { themeId: 't2', name: 'R2' }), 't2')).toBe(false);
+  });
+
+  it('update_theme description-only sets it, keeps the name, and appends one entry', () => {
+    const p = descProduct();
+    const next = applyAiOp(p, 'update_theme', { themeId: 't2', description: 'Now described' });
+    expect(themeOf(next, 't2').description).toBe('Now described');
+    expect(themeOf(next, 't2').name).toBe('T2');
+    expect(logLen(next)).toBe(logLen(p) + 1);
+    expect(lastEntry(next)).toMatchObject({ op: 'update', entity: 'theme', id: 't2', source: 'ai' });
+  });
+
+  it('update_theme with both applies both, and "" clears the description', () => {
+    const next = applyAiOp(descProduct(), 'update_theme', { themeId: 't1', name: 'N', description: '' });
+    expect(themeOf(next, 't1').name).toBe('N');
+    expect(themeOf(next, 't1').description).toBe('');
+  });
+
+  it('update_theme with neither field is ref-equal', () => {
+    const p = descProduct();
+    expect(applyAiOp(p, 'update_theme', { themeId: 't1' })).toBe(p);
+  });
+
+  it('update_theme drops a non-string description; the name still applies', () => {
+    const p = descProduct();
+    expect(applyAiOp(p, 'update_theme', { themeId: 't1', description: 42 })).toBe(p);
+    const next = applyAiOp(p, 'update_theme', { themeId: 't1', name: 'N', description: { text: 'x' } });
+    expect(themeOf(next, 't1').name).toBe('N');
+    expect(themeOf(next, 't1').description).toBe('T1 desc');
+  });
+
+  it('update_theme on a ghost id is ref-equal, with no changelog entry', () => {
+    const p = descProduct();
+    const next = applyAiOp(p, 'update_theme', { themeId: 'ghost', description: 'X' });
+    expect(next).toBe(p);
+    expect(logLen(next)).toBe(logLen(p));
+  });
+
+  it('bulk_import carries a theme description; absent or non-string leaves no key', () => {
+    const next = applyAiOp(makeProduct(), 'bulk_import', { themes: [
+      { themeId: 'ta', name: 'A', description: 'Theme A why',
+        backbones: [{ backboneId: 'ba', name: 'BA', description: 'BA why', ribs: [] }] },
+      { themeId: 'tb', name: 'B', backbones: [] },
+      { themeId: 'tc', name: 'C', description: 7, backbones: [] },
+    ] });
+    expect(themeOf(next, 'ta').description).toBe('Theme A why');
+    expect(bbOf(next, 'ta', 'ba').description).toBe('BA why');
+    expect('description' in themeOf(next, 'tb')).toBe(false);
+    expect('description' in themeOf(next, 'tc')).toBe(false);
+  });
+});
+
+describe('applyAiOp — update_backbone id fallback (v0.54.0)', () => {
+  it('updates a backbone that has moved to another theme since the AI read it', () => {
+    const p = descProduct();
+    const b1 = bbOf(p, 't1', 'b1');
+    const moved: Product = {
+      ...p,
+      themes: p.themes.map(t =>
+        t.id === 't1' ? { ...t, backboneItems: t.backboneItems.filter(b => b.id !== 'b1') }
+        : t.id === 't3' ? { ...t, backboneItems: [...t.backboneItems, b1] } : t),
+    };
+    const next = applyAiOp(moved, 'update_backbone', { themeId: 't1', backboneId: 'b1', description: 'Still lands' });
+    expect(bbOf(next, 't3', 'b1').description).toBe('Still lands');
+    expect(logLen(next)).toBe(logLen(moved) + 1);
+    expect(lastEntry(next)).toMatchObject({ op: 'update', entity: 'backbone', id: 'b1', source: 'ai' });
+  });
+
+  it('when the pair misses, updates EVERY backbone holding the id', () => {
+    const next = applyAiOp(descProduct(), 'update_backbone', { themeId: 't1', backboneId: 'dup', name: 'Both' });
+    expect(bbOf(next, 't2', 'dup').name).toBe('Both');
+    expect(bbOf(next, 't3', 'dup').name).toBe('Both');
+  });
+
+  it('a pair hit leaves a same-id backbone in another theme untouched', () => {
+    const p = descProduct();
+    const next = applyAiOp(p, 'update_backbone', { themeId: 't2', backboneId: 'dup', description: 'Only t2' });
+    expect(bbOf(next, 't2', 'dup').description).toBe('Only t2');
+    expect(bbOf(next, 't3', 'dup').description).toBe('Dup in t3');
+    expect(themeOf(next, 't3')).toBe(themeOf(p, 't3'));
+  });
+});
+
+describe('applyAiOp — bulk_update_backbones (v0.54.0)', () => {
+  it('updates several backbones in several themes in one call', () => {
+    const p = descProduct();
+    const next = applyAiOp(p, 'bulk_update_backbones', { updates: [
+      { backboneId: 'b1', description: 'One' },
+      { backboneId: 'b3', description: 'Three' },
+    ] });
+    expect(bbOf(next, 't1', 'b1').description).toBe('One');
+    expect(bbOf(next, 't2', 'b3').description).toBe('Three');
+    expect('description' in bbOf(next, 't1', 'b2')).toBe(false);
+  });
+
+  it('is ref-equal when every entry names a backbone that does not exist', () => {
+    const p = descProduct();
+    expect(applyAiOp(p, 'bulk_update_backbones', { updates: [
+      { backboneId: 'ghost', description: 'X' }, { backboneId: 'nope', description: '' },
+    ] })).toBe(p);
+  });
+
+  it('appends exactly one summary entry, with no id', () => {
+    const p = descProduct();
+    const next = applyAiOp(p, 'bulk_update_backbones', { updates: [
+      { backboneId: 'b1', description: 'One' },
+      { backboneId: 'b3', description: 'Three' },
+      { backboneId: 'dup', description: 'Both' },
+    ] });
+    expect(logLen(next)).toBe(logLen(p) + 1);
+    expect(lastEntry(next)).toMatchObject({ op: 'update', entity: 'backbone', source: 'ai' });
+    expect('id' in lastEntry(next)).toBe(false);
+  });
+
+  it('an applied batch replayed is ref-equal, with no second entry', () => {
+    const batch = { updates: [{ backboneId: 'b1', description: 'One' }, { backboneId: 'dup', description: 'Both' }] };
+    const p = descProduct();
+    const once = applyAiOp(p, 'bulk_update_backbones', batch);
+    expect(once).not.toBe(p);
+    expect(applyAiOp(once, 'bulk_update_backbones', batch)).toBe(once);
+  });
+
+  it('a duplicate id in two themes updates both', () => {
+    const next = applyAiOp(descProduct(), 'bulk_update_backbones', { updates: [{ backboneId: 'dup', description: 'Both' }] });
+    expect(bbOf(next, 't2', 'dup').description).toBe('Both');
+    expect(bbOf(next, 't3', 'dup').description).toBe('Both');
+  });
+
+  it('skips an entry whose description is not a string; the others apply', () => {
+    const next = applyAiOp(descProduct(), 'bulk_update_backbones', { updates: [
+      { backboneId: 'b1', description: 42 },
+      { backboneId: 'b3', description: 'Three' },
+    ] });
+    expect(bbOf(next, 't1', 'b1').description).toBe('B1 desc');
+    expect(bbOf(next, 't2', 'b3').description).toBe('Three');
+  });
+
+  it('"" clears a description', () => {
+    const next = applyAiOp(descProduct(), 'bulk_update_backbones', { updates: [{ backboneId: 'b1', description: '' }] });
+    expect(bbOf(next, 't1', 'b1').description).toBe('');
+  });
+
+  it('"" on a backbone with no description, or with "", changes nothing (absent reads as "")', () => {
+    const p = descProduct();
+    expect(applyAiOp(p, 'bulk_update_backbones', { updates: [
+      { backboneId: 'b2', description: '' }, { backboneId: 'b3', description: '' },
+    ] })).toBe(p);
+  });
+
+  it('is ref-equal and does not throw on malformed payloads and entries', () => {
+    const p = descProduct();
+    const payloads: unknown[] = [
+      {}, { updates: [] }, { updates: 'b1' },
+      { updates: [null, 5, 'b1', { description: 'no id' }, { backboneId: '', description: 'X' }, { backboneId: 7, description: 'X' }] },
+    ];
+    for (const payload of payloads) expect(applyAiOp(p, 'bulk_update_backbones', payload)).toBe(p);
+  });
+
+  it('replayed through applyDrainOps applies once, with one entry and the last seq', () => {
+    const p = descProduct();
+    const payload = { updates: [{ backboneId: 'b1', description: 'One' }, { backboneId: 'dup', description: 'Both' }] };
+    const { product, nextSeq } = applyDrainOps(p, [
+      { seq: 4, op: 'bulk_update_backbones', payload },
+      { seq: 5, op: 'bulk_update_backbones', payload },
+    ]);
+    expect(nextSeq).toBe(5);
+    expect(bbOf(product, 't1', 'b1').description).toBe('One');
+    expect(bbOf(product, 't3', 'dup').description).toBe('Both');
+    expect(logLen(product)).toBe(logLen(p) + 1);
+  });
+});
+
+describe('buildAiSnapshot — theme and backbone descriptions (v0.54.0)', () => {
+  it('carries each theme and backbone description, with the marker true', () => {
+    const snap = buildAiSnapshot(descProduct());
+    expect(snap.themeBackboneDescriptionsIncluded).toBe(true);
+    expect(snap.themes[0]?.description).toBe('T1 desc');
+    expect(snap.themes[0]?.backboneItems[0]?.description).toBe('B1 desc');
+  });
+
+  it('normalizes an absent theme description to "", and the key survives JSON', () => {
+    const snap = JSON.parse(JSON.stringify(buildAiSnapshot(descProduct()))) as AiSnapshotJson;
+    expect(snap.themes[1]?.description).toBe('');
+  });
+
+  it('normalizes an absent backbone description to "", and the key survives JSON', () => {
+    const snap = JSON.parse(JSON.stringify(buildAiSnapshot(descProduct()))) as AiSnapshotJson;
+    expect(snap.themes[0]?.backboneItems[1]?.description).toBe('');
+  });
+
+  it('{ includeThemeBackboneDescriptions:false } omits every theme and backbone description; ribs keep theirs', () => {
+    const snap = buildAiSnapshot(descProduct(), { includeThemeBackboneDescriptions: false });
+    expect(snap.themeBackboneDescriptionsIncluded).toBe(false);
+    for (const t of snap.themes) {
+      expect('description' in t).toBe(false);
+      for (const b of t.backboneItems) expect('description' in b).toBe(false);
+    }
+    expect(snap.themes[0]?.backboneItems[0]?.ribItems[0]?.description).toBe('Rib desc');
+    expect(snap.themes[0]?.backboneItems[0]?.ribItems[0]?.notes).toBe('Rib notes');
+  });
+
+  it('always emits the marker, whatever is left out', () => {
+    const p = descProduct();
+    for (const opts of [undefined, { includeNotes: false }, { includeThemeBackboneDescriptions: false },
+      { includeNotes: false, includeThemeBackboneDescriptions: false }]) {
+      expect(buildAiSnapshot(p, opts)).toHaveProperty('themeBackboneDescriptionsIncluded');
+    }
+  });
+});
+
+type AiSnapshotJson = ReturnType<typeof buildAiSnapshot>;
+
+describe('selectSnapshotForWrite — three rungs (v0.54.0)', () => {
+  const byteLen = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
+  /** Notes and descriptions large enough that each rung is strictly smaller. */
+  function sized() {
+    const p = descProduct();
+    p.themes[0]!.description = 'd'.repeat(500);
+    p.themes[0]!.backboneItems[0]!.ribItems[0]!.notes = 'n'.repeat(500);
+    const full = byteLen(buildAiSnapshot(p));
+    const lean = byteLen(buildAiSnapshot(p, { includeNotes: false }));
+    const leaner = byteLen(buildAiSnapshot(p, { includeNotes: false, includeThemeBackboneDescriptions: false }));
+    expect(lean).toBeLessThan(full);
+    expect(leaner).toBeLessThan(lean);
+    return { p, full, lean, leaner };
+  }
+  const rib0 = (s: AiSnapshotJson | null) => req(s?.themes[0]?.backboneItems[0]?.ribItems[0], 'rib');
+
+  it('rung 1 at exactly the full size: notes and descriptions, both markers true', () => {
+    const { p, full } = sized();
+    const { snapshot, degraded } = selectSnapshotForWrite(p, full);
+    expect(degraded).toBe(false);
+    expect(snapshot?.notesIncluded).toBe(true);
+    expect(snapshot?.themeBackboneDescriptionsIncluded).toBe(true);
+    expect(snapshot?.themes[0]?.description).toBe('d'.repeat(500));
+    expect(rib0(snapshot).notes).toBe('n'.repeat(500));
+  });
+
+  it('rung 2 one byte under full: notes dropped, descriptions kept', () => {
+    const { p, full } = sized();
+    const { snapshot, degraded } = selectSnapshotForWrite(p, full - 1);
+    expect(degraded).toBe(true);
+    expect(snapshot?.notesIncluded).toBe(false);
+    expect('notes' in rib0(snapshot)).toBe(false);
+    expect(snapshot?.themeBackboneDescriptionsIncluded).toBe(true);
+    expect(snapshot?.themes[0]?.description).toBe('d'.repeat(500));
+    expect(snapshot?.themes[0]?.backboneItems[0]?.description).toBe('B1 desc');
+  });
+
+  it('rung 3 one byte under rung 2: no notes, no theme or backbone descriptions, both markers false', () => {
+    const { p, lean } = sized();
+    const { snapshot, degraded } = selectSnapshotForWrite(p, lean - 1);
+    expect(degraded).toBe(true);
+    expect(snapshot?.notesIncluded).toBe(false);
+    expect(snapshot?.themeBackboneDescriptionsIncluded).toBe(false);
+    expect('description' in req(snapshot?.themes[0], 'theme')).toBe(false);
+    expect('description' in req(snapshot?.themes[0]?.backboneItems[0], 'backbone')).toBe(false);
+    expect('notes' in rib0(snapshot)).toBe(false);
+    expect(rib0(snapshot).description).toBe('Rib desc');
+  });
+
+  it('null one byte under rung 3', () => {
+    const { p, leaner } = sized();
+    expect(selectSnapshotForWrite(p, leaner)).toMatchObject({ degraded: true });
+    expect(selectSnapshotForWrite(p, leaner).snapshot).not.toBeNull();
+    const { snapshot, degraded } = selectSnapshotForWrite(p, leaner - 1);
+    expect(snapshot).toBeNull();
+    expect(degraded).toBe(true);
+  });
+});

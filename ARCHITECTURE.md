@@ -118,8 +118,12 @@ src/
 │   └── storymap/                     # Interactive story map components
 │       ├── MapCanvas.tsx             # Pan/zoom container with pointer events
 │       ├── MapContent.tsx            # Map rendering (headers, lanes, cells, add buttons)
-│       ├── ThemeHeader.tsx           # Theme label with inline rename, drag handle, delete
-│       ├── BackboneHeader.tsx        # Backbone label with inline rename, drag handle, delete
+│       ├── ThemeHeader.tsx           # Theme label: click opens its panel, double-click renames, drag handle, delete
+│       ├── BackboneHeader.tsx        # Backbone label: click opens its panel, double-click renames, drag handle, delete
+│       ├── HeaderName.tsx            # Name wrapper shared by both headers: click vs double-click, description glyph and tooltip
+│       ├── MapEntityPanel.tsx        # Docked theme/backbone panel: name, counts, description
+│       ├── useMapSelection.ts        # The map's one selection (rib/release/theme/backbone) and the pending name-click open
+│       ├── mapEntity.ts              # Pure helpers: entity keys, backbone resolver, description lookup
 │       ├── RibCell.tsx               # Rib card on the map with drag grip and delete
 │       ├── ReleaseDivider.tsx        # Release lane divider with clickable label
 │       ├── UnassignedLane.tsx        # Unassigned lane at bottom of map; also draws the Unknown release lane above it
@@ -165,7 +169,9 @@ Product
 ├── _changeLog: [{ t, op, entity, id?, source? }]   # Structural operation log (capped at 500). op: 'create'|'add'|'delete'|'import'|'cloud-migration'|'duplicate'|'split'. source: originating entity ID for 'duplicate' (product) and 'split' (rib).
 └── themes: [Theme]
     ├── color?                                      # Optional color key (blue, teal, violet, etc.)
+    ├── description?                                # Theme description (max 2,000 chars at the editor and AI; absent reads as '')
     └── backboneItems: [Backbone]
+        ├── description?                            # Backbone description (same rules)
         └── ribItems: [RibItem]
             ├── size, category (core/non-core)
             ├── notes?                                  # Free-form notes (max 2,000 chars)
@@ -258,3 +264,5 @@ receives are identical to the bytes the file would have contained.
 24. **The size lock on every surface (v0.53.22)** — A rib is locked when an effective entry above 0 sits on a current allocation, in any sprint. Sizing, the AI's guards and the AI snapshot read that through `isRibLocked`; the Structure tab and the Map's detail panel read it through `ribSizeLockNote`, which is null exactly when `isRibLocked` is false, so the lock and its explanation arrive together. Both offer `LockedSize` in place of `SizePicker`, so no size write is reachable. The Sizing dialog keeps its strip at the save boundary, because its form state can hold a size. There is no exception for a rib with no size yet. A rib in Unassigned is not locked, by the same rule, so dragging one out, resizing it and dragging it back still works; it is the way to re-estimate a rib without deleting its records. Editing a size's points in Settings is not covered by the lock.
 
 25. **A client's own save, in the cloud (v0.53.29)** — `onProductChange` never reports a client's own save: the local write fires with `hasPendingWrites`, which it skips, and the ack is a metadata-only change, which `onSnapshot` does not deliver. That is what keeps an edit made while a save is on its way, because a listener callback replaces the whole product. So `onProductSaved` reports each landed save with the `updatedAt` it stored, and `useProduct` takes the time from it and nothing else. A refused save does not report, and a save waiting offline reports when it lands.
+
+26. **Theme and backbone descriptions on the Map (v0.54.0)** — A single click on a theme or backbone name opens its panel 200 ms later; a double click renames instead. `useMapSelection` holds the map's one selection, so the rib, release, theme and backbone panels cannot be open together, and it owns the one pending name-click open: a different name replaces it, and any other selection, a press in the map or the panel, or a drag armed when it fires (read from `dragPointerRef`, never from state) cancels it. The theme/backbone panel has no backdrop: from `md` up it docks beside the map (the map area narrows and its controls, legend and badges move with it), below `md` it covers the map. Its description editor is keyed by entity (a backbone's key carries the theme it was clicked in, so two backbones sharing an id get separate editors), commits on blur, and commits on unmount while focused and changed (`useBufferedField`'s opt-in `commitOnUnmount`), because a rib-card press cancels pointerdown and moves no focus. A capture-phase pointerdown on the map area blurs the panel's field first. A backbone is resolved by id in the theme it was clicked in, else in whichever theme now holds it; nothing is written if it resolves nowhere. Import clears a non-text theme or backbone description to `''` and never asserts its length; the read guard does the same. Connect AI's snapshot carries both descriptions with a positive `themeBackboneDescriptionsIncluded` marker, and a third rung drops them (marker `false`) before the snapshot is skipped.

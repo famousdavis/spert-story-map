@@ -51,14 +51,16 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       let next = prev;
       for (const theme of (p.themes as unknown[])) {
         if (!theme || typeof theme !== 'object') continue;
-        const t = theme as { themeId?: unknown; name?: unknown; backbones?: unknown };
+        const t = theme as { themeId?: unknown; name?: unknown; description?: unknown; backbones?: unknown };
         // typeof-guard every field reaching state (defense-in-depth for the drain
         // path). A theme/backbone/rib with a non-string id or name is skipped, not
         // created with a cast-laundered value.
         if (typeof t.themeId !== 'string' || typeof t.name !== 'string') continue;
         if (!Array.isArray(t.backbones)) continue;
         const themeId = t.themeId;
-        next = addNamedThemeToProduct(next, themeId, { name: t.name });
+        // v0.54.0: a theme's description, when it is text. Absent stays absent.
+        next = addNamedThemeToProduct(next, themeId,
+          { name: t.name, description: typeof t.description === 'string' ? t.description : undefined });
         for (const backbone of t.backbones) {
           if (!backbone || typeof backbone !== 'object') continue;
           const b = backbone as { backboneId?: unknown; name?: unknown; description?: unknown; ribs?: unknown };
@@ -97,8 +99,12 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       // Defense-in-depth: payload field types are validated by the LP MCP Zod
       // schema on the write path, but the D5 drain replays raw docs. typeof-guard
       // every field reaching state so a non-string can never be cast-laundered.
+      // v0.54.0: an optional description, set only when it is text (absent stays
+      // absent). Idempotent on the id, so re-sending a create with a description
+      // does not set it on the existing theme: that is update_theme's job.
       if (typeof p.themeId !== 'string' || typeof p.name !== 'string') return prev;
-      return addNamedThemeToProduct(prev, p.themeId, { name: p.name });
+      return addNamedThemeToProduct(prev, p.themeId,
+        { name: p.name, description: typeof p.description === 'string' ? p.description : undefined });
     }
     case 'create_backbone': {
       if (typeof p.themeId !== 'string' || typeof p.backboneId !== 'string' ||
@@ -117,16 +123,24 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       });
     }
     case 'update_theme': {
-      // typeof-guard (not just !== undefined) so a non-string name cannot be
-      // cast-laundered into state. Local capture keeps the narrowing across the
-      // .map closure (property narrowing on `p` does not survive closures).
-      if (typeof p.name !== 'string') return prev;
-      const name = p.name;
+      // Mirrors update_backbone (v0.54.0): name and description are both optional,
+      // and neither -> prev. typeof-guard each (not just !== undefined) so a
+      // non-string cannot be cast-laundered into state; it is dropped and the other
+      // field still applies. Locals keep the narrowing across the .map closure
+      // (property narrowing on `p` does not survive closures). description
+      // REPLACES; '' clears. didUpdate fires on themeId match, as update_backbone.
+      const name = typeof p.name === 'string' ? p.name : undefined;
+      const description = typeof p.description === 'string' ? p.description : undefined;
+      if (name === undefined && description === undefined) return prev;
       let didUpdate = false;
       const themes = prev.themes.map(t => {
         if (t.id !== p.themeId) return t;
         didUpdate = true;
-        return { ...t, name };
+        return {
+          ...t,
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+        };
       });
       if (!didUpdate) return prev;
       const next = { ...prev, themes };
@@ -141,17 +155,23 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
       const name = typeof p.name === 'string' ? p.name : undefined;
       const description = typeof p.description === 'string' ? p.description : undefined;
       if (name === undefined && description === undefined) return prev;
+      // Addressed by the (themeId, backboneId) pair. v0.54.0 fallback: when the pair
+      // matches nothing (the backbone was moved to another theme after the AI read
+      // the snapshot, or the themeId is stale), EVERY backbone with this id, in any
+      // theme, is updated — as bulk_update_backbones does. A pair hit updates that
+      // backbone only, never a same-id backbone in another theme (Connect AI can
+      // create one: create_backbone deduplicates within a theme only).
+      const pairHit = prev.themes.some(t =>
+        t.id === p.themeId && t.backboneItems.some(b => b.id === p.backboneId));
       let didUpdate = false;
       const themes = prev.themes.map(t => {
-        if (t.id !== p.themeId) return t;
-        const backboneItems = t.backboneItems.map(b => {
-          if (b.id !== p.backboneId) return b;
-          didUpdate = true;
-          return {
-            ...b,
-            ...(name !== undefined && { name }),
-            ...(description !== undefined && { description }),
-          };
+        if (pairHit && t.id !== p.themeId) return t;
+        if (!t.backboneItems.some(b => b.id === p.backboneId)) return t;
+        didUpdate = true;
+        const backboneItems = t.backboneItems.map(b => b.id !== p.backboneId ? b : {
+          ...b,
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
         });
         return { ...t, backboneItems };
       });
@@ -510,6 +530,60 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
         ...next,
         _changeLog: appendChangeLogEntry(prev, {
           op: 'update', entity: 'rib', source: 'ai',
+        }),
+      };
+    }
+    // -- Phase 9 (v0.54.0) -- bulk backbone descriptions ------------------------
+    case 'bulk_update_backbones': {
+      // Payload: { updates: Array<{ backboneId: string, description: string }> }
+      // Read Mode required -- the AI reads backboneIds, and the descriptions when
+      // themeBackboneDescriptionsIncluded is true, from storymap_get_project.
+      // No name (contract). description REPLACES; '' clears. Addressed by
+      // backboneId ALONE, across every theme: EVERY backbone holding the id is
+      // updated (Connect AI can create the same id in two themes).
+      // A missing/empty backboneId or a non-string description skips the entry.
+      // didUpdate fires only when a description ACTUALLY CHANGES (absent reads as
+      // '', so '' on a backbone with none changes nothing). So an applied batch
+      // replayed is ref-equal with no changelog entry -- unlike bulk_update_ribs,
+      // whose didUpdate fires on id match (CLAUDE.md #54).
+      // Replace semantics on drain replay, accepted as for bulk_update_ribs (#54):
+      // a replay re-asserts the AI's text over a description the user edited in
+      // the null window. The cap (100) is the LP Zod schema's; no browser-side
+      // array cap (#51), and no length cap (the LP schema and the editor's
+      // maxLength enforce 2000 where text is written).
+      // @no-throw -- safe in drain path.
+      if (!Array.isArray(p.updates) || p.updates.length === 0) return prev;
+      let next = prev;
+      for (const raw of p.updates as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const e = raw as { backboneId?: unknown; description?: unknown };
+        if (typeof e.backboneId !== 'string' || !e.backboneId) continue;
+        if (typeof e.description !== 'string') continue;
+        const backboneId = e.backboneId;
+        const description = e.description;
+        const changes = (b: { id: string; description?: string }) =>
+          b.id === backboneId && (b.description ?? '') !== description;
+        let didUpdate = false;
+        // LOAD-BEARING: map source is `next.themes`, not `prev.themes`. Mapping
+        // prev silently discards every earlier entry in the batch; only the last
+        // would survive (the several-themes test).
+        const themes = next.themes.map(t => {
+          if (!t.backboneItems.some(changes)) return t;
+          didUpdate = true;
+          return { ...t, backboneItems: t.backboneItems.map(b => changes(b) ? { ...b, description } : b) };
+        });
+        // GUARD-BEARING: the assignment stays inside the if, so an entry that
+        // changes nothing keeps next ref-equal (the all-ghost and replay tests).
+        if (didUpdate) next = { ...next, themes };
+      }
+      if (next === prev) return prev;
+      // N updates -> ONE summary entry, no id. Base is `prev` (CLAUDE.md #51); for
+      // this inline walk prev._changeLog === next._changeLog throughout, so it is
+      // the convention here, not load-bearing.
+      return {
+        ...next,
+        _changeLog: appendChangeLogEntry(prev, {
+          op: 'update', entity: 'backbone', source: 'ai',
         }),
       };
     }

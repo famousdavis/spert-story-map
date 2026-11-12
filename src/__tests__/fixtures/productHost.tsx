@@ -3,8 +3,8 @@
 // See LICENSE file in the project root for full license text.
 
 import { useEffect, useState } from 'react';
-import type { ReactElement } from 'react';
-import { render } from '@testing-library/react';
+import type { Dispatch, ReactElement, SetStateAction } from 'react';
+import { act, render } from '@testing-library/react';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import type { Product } from '../../types';
 
@@ -12,6 +12,12 @@ import type { Product } from '../../types';
 export interface HostedProduct {
   product: Product;
   writes: number;
+  /**
+   * Change the product from outside the page, as a collaborator, Connect AI or an
+   * undo elsewhere would: the page sees a new product it did not write. Not counted
+   * in `writes`, which stays the page's own `updateProduct` calls.
+   */
+  replace: (next: Product | ((prev: Product) => Product)) => void;
 }
 
 /**
@@ -21,11 +27,21 @@ export interface HostedProduct {
  * component during render is what the hooks rules forbid.
  */
 export function mountHosted(View: () => ReactElement, initial: Product): HostedProduct {
-  const hosted: HostedProduct = { product: initial, writes: 0 };
+  const bridge: { set: Dispatch<SetStateAction<Product>> | null } = { set: null };
+  const hosted: HostedProduct = {
+    product: initial,
+    writes: 0,
+    replace: next => {
+      const set = bridge.set;
+      if (!set) throw new Error('replace() before the host mounted');
+      act(() => { set(next); });
+    },
+  };
 
   function Host() {
     const [product, setProduct] = useState(initial);
     useEffect(() => { hosted.product = product; }, [product]);
+    useEffect(() => { bridge.set = setProduct; }, []);
     const updateProduct = (updater: unknown) => {
       hosted.writes++;
       setProduct(updater as (prev: Product) => Product);

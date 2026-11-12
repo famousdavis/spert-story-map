@@ -2,26 +2,34 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { useSessionState } from '../hooks/useSessionState';
-import { stripOrphans, bulkNextCollapsed, pruneSelection } from '../components/storymap/collapseHelpers';
+import { stripOrphans, bulkNextCollapsed } from '../components/storymap/collapseHelpers';
 import MapCanvas from '../components/storymap/MapCanvas';
 import MapContent from '../components/storymap/MapContent';
 import RibDetailPanel from '../components/storymap/RibDetailPanel';
 import ReleaseDetailPanel from '../components/storymap/ReleaseDetailPanel';
+import MapEntityPanel from '../components/storymap/MapEntityPanel';
+import type { EntityPatch } from '../components/storymap/MapEntityPanel';
 import DragGhost from '../components/storymap/DragGhost';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { releaseDeleteMessage } from '../lib/settingsMutations';
 import useMapDrag from '../components/storymap/useMapDrag';
 import useMapLayout from '../components/storymap/useMapLayout';
-import type { MapCell } from '../components/storymap/useMapLayout';
 import useMapKeyboard from '../components/storymap/useMapKeyboard';
 import useMapHandlers from '../components/storymap/useMapHandlers';
+import useMapSelection from '../components/storymap/useMapSelection';
+import { buildDescriptionLookup, patchBackbone, resolveEntity, revealShift } from '../components/storymap/mapEntity';
+import type { MapEntityTarget } from '../components/storymap/mapEntity';
 import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
 import CardColorLegend from '../components/ui/CardColorLegend';
 import type { OutletContextValue } from '../types';
+
+/** The docked panel takes room beside the map from Tailwind's `md` breakpoint up. */
+const isDockedViewport = () => typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px)').matches;
 
 export default function StoryMapView() {
   const { product, updateProduct, undo, redo } = useOutletContext<OutletContextValue>();
@@ -30,18 +38,10 @@ export default function StoryMapView() {
   const layout = useMapLayout(product, collapsedIds);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [selectedRibId, setSelectedRibId] = useState<string | null>(null);
-  const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const [isNewRib, setIsNewRib] = useState(false);
-
-  // Derive selectedRib from layout so it stays in sync with product changes (e.g. renames)
-  const selectedRib = useMemo(() => {
-    if (!selectedRibId) return null;
-    return layout.cells.find(c => c.id === selectedRibId) || null;
-  }, [selectedRibId, layout.cells]);
   const mapSizeRef = useRef({ width: 0, height: 0 });
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const mapAreaRef = useRef<HTMLDivElement | null>(null);
   const didAutoFit = useRef(false);
 
   const { dragState, dragPointerRef, handleDragStart, handleBackboneDragStart, handleThemeDragStart, handleReleaseDragStart, handleDragMove, handleDragEnd, cancelDrag } = useMapDrag({
@@ -58,17 +58,42 @@ export default function StoryMapView() {
     setPan,
   });
 
-  // Track recent drag completion to suppress click-after-drag
-  const recentDragRef = useRef(false);
-  useEffect(() => {
-    if (dragState?.isDragging) {
-      recentDragRef.current = true;
-    } else if (recentDragRef.current) {
-      // Clear after a short delay so the click event can check it
-      const t = setTimeout(() => { recentDragRef.current = false; }, 100);
-      return () => clearTimeout(t);
-    }
-  }, [dragState]);
+  // A docked panel narrows the map: pan just enough that the name clicked to open it stays in view.
+  // Measures the name's text, not its flex-1 wrapper, which on a wide theme spans many columns.
+  const revealName = useCallback((anchor: HTMLElement | null) => {
+    const root = rootRef.current;
+    if (!anchor || !root || !isDockedViewport()) return;
+    const name = anchor.firstElementChild ?? anchor;
+    const dx = revealShift(name.getBoundingClientRect(), root.getBoundingClientRect());
+    if (dx > 0) setPan(p => ({ ...p, x: p.x - dx }));
+  }, []);
+
+  const sel = useMapSelection({
+    cells: layout.cells, themes: product.themes, dragState, dragPointerRef,
+    selectedIds, setSelectedIds, onEntityOpened: revealName,
+  });
+
+  // The latest product, for a commit that runs as a panel unmounts (a passive cleanup, so after this layout effect).
+  const productRef = useRef(product);
+  useLayoutEffect(() => { productRef.current = product; }, [product]);
+
+  /** A theme or backbone rename or description. Resolved against the latest product; no write when it is gone. */
+  const commitEntity = useCallback((target: MapEntityTarget, patch: EntityPatch) => {
+    if (!resolveEntity(productRef.current.themes, target)) return;
+    if (target.kind === 'theme') mutations.updateTheme(target.id, patch);
+    else updateProduct(prev => patchBackbone(prev, target.id, target.themeIdAtClick, patch));
+  }, [mutations, updateProduct]);
+
+  const descriptions = useMemo(() => buildDescriptionLookup(product.themes), [product.themes]);
+
+  // A press in the map: commit the panel's description first (React never blurs it for a
+  // card press, which prevents default), so keys reach the map; and cancel a pending open.
+  const { cancelPendingUnlessOn } = sel;
+  const handleMapAreaPointerDownCapture = useCallback((e: ReactPointerEvent) => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active.closest('[data-map-entity-panel]')) active.blur();
+    cancelPendingUnlessOn(e.target);
+  }, [cancelPendingUnlessOn]);
 
   // --- Collapsible release lanes ---
 
@@ -107,73 +132,11 @@ export default function StoryMapView() {
     if (wasBulkMove) setSelectedIds(new Set());
   }, [dragState, handleDragEnd, setCollapsedIds]);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- reconcile selection to cell visibility after a collapse/bulk/delete reflow; both setters are guarded and converge */
-  // Close a zombie panel selection when its rib is no longer visible (collapse / bulk / delete).
-  useEffect(() => {
-    if (selectedRibId && !selectedRib) setSelectedRibId(null);
-  }, [selectedRibId, selectedRib]);
-
-  // Prune multi-select to ids that still resolve to a visible cell.
-  useEffect(() => {
-    const visible = new Set(layout.cells.map(c => c.id));
-    const pruned = pruneSelection(selectedIds, visible);
-    if (pruned) setSelectedIds(pruned);
-  }, [selectedIds, layout.cells]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const handleRibClick = useCallback((ribData: MapCell, e: React.MouseEvent) => {
-    // Don't open detail panel if we just finished dragging
-    if (recentDragRef.current) return;
-
-    if (e?.shiftKey) {
-      // Toggle in/out of multi-selection
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        if (next.has(ribData.id)) {
-          next.delete(ribData.id);
-        } else {
-          next.add(ribData.id);
-        }
-        return next;
-      });
-      setSelectedRibId(null);
-      setSelectedReleaseId(null);
-    } else {
-      // Single select — clear multi-select, open detail panel
-      setSelectedIds(new Set());
-      setSelectedReleaseId(null);
-      setSelectedRibId(ribData.id);
-      setIsNewRib(false);
-    }
-  }, []);
-
-  const handleReleaseClick = useCallback((releaseId: string) => {
-    if (recentDragRef.current) return;
-    setSelectedIds(new Set());
-    setSelectedRibId(null);
-    setSelectedReleaseId(releaseId);
-  }, []);
-
-  const handleCloseDetail = useCallback(() => {
-    setSelectedRibId(null);
-    setSelectedReleaseId(null);
-    setIsNewRib(false);
-  }, []);
-
-  // Clicking empty canvas deselects everything — the escape hatch for a multi-selection
-  // (and any open detail panel) without having to click another card.
-  const handleBackgroundDeselect = useCallback(() => {
-    setSelectedIds(new Set());
-    setSelectedRibId(null);
-    setSelectedReleaseId(null);
-    setIsNewRib(false);
-  }, []);
-
-  // Auto-fit on first render once map dimensions are known
+  // Auto-fit on first render once map dimensions are known. Measures the map area, which a docked panel narrows.
   useEffect(() => {
     if (didAutoFit.current) return;
     const { width, height } = mapSizeRef.current;
-    const el = containerRef.current;
+    const el = mapAreaRef.current;
     if (width > 0 && height > 0 && el) {
       didAutoFit.current = true;
       const cw = el.clientWidth;
@@ -198,18 +161,12 @@ export default function StoryMapView() {
 
   // Keyboard shortcuts (undo/redo, escape, delete)
   useMapKeyboard({
-    undo, redo, dragState, cancelDrag,
+    undo, redo, dragPointerRef, cancelDrag,
+    entityPanelOpen: sel.entity !== null, closeEntityPanel: sel.close,
     selectedIds, setSelectedIds, layoutCells: layout.cells, mutations,
   });
 
   // CRUD handlers (rename, delete, add) + drag label
-  const handleRibAdded = useCallback((id: string) => {
-    setSelectedIds(new Set());
-    setSelectedReleaseId(null);
-    setSelectedRibId(id);
-    setIsNewRib(true);
-  }, []);
-
   const {
     handleRenameTheme, handleRenameBackbone, handleRenameRib, handleRenameRelease,
     handleDeleteTheme, handleDeleteBackbone, handleDeleteRib, handleDeleteRelease,
@@ -220,82 +177,117 @@ export default function StoryMapView() {
     dragLabel,
   } = useMapHandlers({
     product, updateProduct, mutations,
-    setSelectedReleaseId, onRibAdded: handleRibAdded, layout, dragState,
+    onReleaseDeleted: sel.closeRelease, onRibAdded: sel.handleRibAdded, layout, dragState,
   });
 
   return (
-    <div ref={containerRef} className="-mx-6 -mt-6 relative" style={{ height: 'calc(100vh - 112px)' }}>
-      <MapCanvas
-        zoom={zoom}
-        setZoom={setZoom}
-        pan={pan}
-        setPan={setPan}
-        onFit={handleFit}
-        dragState={dragState}
-        onDragMove={handleDragMove}
-        onDragEnd={handleDragEndExpand}
-        onDragCancel={cancelDrag}
-        onBackgroundClick={handleBackgroundDeselect}
-        overlayControls={product.releases.length >= 2 ? (
-          <button
-            type="button"
-            onClick={handleBulkCollapse}
-            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 px-2.5 py-1.5"
-            title="Collapse all release lanes except Unassigned"
-          >
-            {allCollapsed ? 'Expand all' : 'Collapse releases'}
-          </button>
-        ) : undefined}
-      >
-        <MapContent
-          layout={layout}
-          themes={product.themes}
-          product={product}
-          onRibClick={handleRibClick}
-          onReleaseClick={handleReleaseClick}
-          mapSizeRef={mapSizeRef}
-          onRenameTheme={handleRenameTheme}
-          onRenameBackbone={handleRenameBackbone}
-          onRenameRib={handleRenameRib}
-          onRenameRelease={handleRenameRelease}
-          onDeleteTheme={handleDeleteTheme}
-          onDeleteBackbone={handleDeleteBackbone}
-          onDeleteRib={handleDeleteRib}
-          onCloneRib={handleCloneRib}
-          onSetCardColor={handleSetRibCardColor}
-          onDeleteRelease={handleDeleteRelease}
-          onAddTheme={handleAddTheme}
-          onAddBackbone={handleAddBackbone}
-          onAddRib={handleAddRib}
-          onAddRibToRelease={handleAddRibToRelease}
-          onAddReleaseAfter={handleAddReleaseAfter}
+    <div ref={rootRef} className="-mx-6 -mt-6 relative flex" style={{ height: 'calc(100vh - 112px)' }}>
+      <div ref={mapAreaRef} data-map-area="" className="relative flex-1 min-w-0 h-full" onPointerDownCapture={handleMapAreaPointerDownCapture}>
+        <MapCanvas
+          zoom={zoom}
+          setZoom={setZoom}
+          pan={pan}
+          setPan={setPan}
+          onFit={handleFit}
           dragState={dragState}
-          onDragStart={handleDragStart}
-          onBackboneDragStart={handleBackboneDragStart}
-          onThemeDragStart={handleThemeDragStart}
-          onReleaseDragStart={handleReleaseDragStart}
-          onToggleCollapse={handleToggleCollapse}
-          selectedIds={selectedIds}
-          editingRibId={selectedRibId}
-        />
-      </MapCanvas>
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEndExpand}
+          onDragCancel={cancelDrag}
+          onBackgroundClick={sel.handleBackgroundDeselect}
+          overlayControls={product.releases.length >= 2 ? (
+            <button
+              type="button"
+              onClick={handleBulkCollapse}
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 px-2.5 py-1.5"
+              title="Collapse all release lanes except Unassigned"
+            >
+              {allCollapsed ? 'Expand all' : 'Collapse releases'}
+            </button>
+          ) : undefined}
+        >
+          <MapContent
+            layout={layout}
+            themes={product.themes}
+            product={product}
+            onRibClick={sel.handleRibClick}
+            onReleaseClick={sel.handleReleaseClick}
+            mapSizeRef={mapSizeRef}
+            onRenameTheme={handleRenameTheme}
+            onRenameBackbone={handleRenameBackbone}
+            onRenameRib={handleRenameRib}
+            onRenameRelease={handleRenameRelease}
+            onDeleteTheme={handleDeleteTheme}
+            onDeleteBackbone={handleDeleteBackbone}
+            onDeleteRib={handleDeleteRib}
+            onCloneRib={handleCloneRib}
+            onSetCardColor={handleSetRibCardColor}
+            onDeleteRelease={handleDeleteRelease}
+            onAddTheme={handleAddTheme}
+            onAddBackbone={handleAddBackbone}
+            onAddRib={handleAddRib}
+            onAddRibToRelease={handleAddRibToRelease}
+            onAddReleaseAfter={handleAddReleaseAfter}
+            dragState={dragState}
+            onDragStart={handleDragStart}
+            onBackboneDragStart={handleBackboneDragStart}
+            onThemeDragStart={handleThemeDragStart}
+            onReleaseDragStart={handleReleaseDragStart}
+            onToggleCollapse={handleToggleCollapse}
+            selectedIds={selectedIds}
+            editingRibId={sel.selectedRib?.id ?? null}
+            descriptions={descriptions}
+            selectedEntityKey={sel.entity?.ringKey ?? null}
+            onEntityNameClick={sel.armEntityOpen}
+            onEntityNameDoubleClick={sel.cancelPending}
+          />
+        </MapCanvas>
 
-      {selectedRib && (
-        <RibDetailPanel
-          rib={selectedRib}
+        {/* Color-flag legend (bottom-right; auto-hides when no card is colored) */}
+        <CardColorLegend product={product} onLabelChange={mutations.setCardColorLabel} />
+
+        {/* Drag indicator badge */}
+        {dragLabel && (
+          <div className="absolute top-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
+            {dragLabel}
+          </div>
+        )}
+
+        {/* Selection count badge */}
+        {selectedIds.size > 0 && !dragState?.isDragging && (
+          <div className="absolute bottom-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
+            {selectedIds.size} selected — press Delete to remove
+          </div>
+        )}
+      </div>
+
+      {/* Theme or backbone panel: no backdrop, docked from md up. Keyed, so a switch remounts it. */}
+      {sel.entity && (
+        <MapEntityPanel
+          key={sel.entity.editorKey}
+          target={sel.entity.target}
           product={product}
-          onClose={handleCloseDetail}
-          onRename={handleRenameRib}
-          onUpdate={(tid, bid, rid, updates) => mutations.updateRib(tid, bid, rid, updates)}
-          autoEdit={isNewRib}
+          onClose={sel.close}
+          onCommit={commitEntity}
+          onPointerDownCapture={sel.cancelPending}
         />
       )}
 
-      {selectedReleaseId && (
-        <ReleaseDetailPanel
-          releaseId={selectedReleaseId}
+      {sel.selectedRib && (
+        <RibDetailPanel
+          rib={sel.selectedRib}
           product={product}
-          onClose={handleCloseDetail}
+          onClose={sel.close}
+          onRename={handleRenameRib}
+          onUpdate={(tid, bid, rid, updates) => mutations.updateRib(tid, bid, rid, updates)}
+          autoEdit={sel.isNewRib}
+        />
+      )}
+
+      {sel.selectedReleaseId && (
+        <ReleaseDetailPanel
+          releaseId={sel.selectedReleaseId}
+          product={product}
+          onClose={sel.close}
           onRename={handleRenameRelease}
           onDelete={handleDeleteRelease}
         />
@@ -303,23 +295,6 @@ export default function StoryMapView() {
 
       {/* Drag ghost (follows cursor during rib drags) */}
       <DragGhost dragState={dragState} cells={layout.cells} zoom={zoom} />
-
-      {/* Color-flag legend (bottom-right; auto-hides when no card is colored) */}
-      <CardColorLegend product={product} onLabelChange={mutations.setCardColorLabel} />
-
-      {/* Drag indicator badge */}
-      {dragLabel && (
-        <div className="absolute top-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
-          {dragLabel}
-        </div>
-      )}
-
-      {/* Selection count badge */}
-      {selectedIds.size > 0 && !dragState?.isDragging && (
-        <div className="absolute bottom-3 left-3 bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded shadow z-50 pointer-events-none">
-          {selectedIds.size} selected — press Delete to remove
-        </div>
-      )}
 
       <ConfirmDialog
         open={!!deleteTarget}

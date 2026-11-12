@@ -3,20 +3,28 @@
 // See LICENSE file in the project root for full license text.
 
 import { useEffect } from 'react';
+import type { RefObject } from 'react';
 
 /**
  * Keyboard shortcuts for the story map.
  * Side-effect-only hook — returns nothing.
  *
- * Handles: undo/redo, Escape (cancel drag or clear selection),
- * Delete/Backspace (bulk-delete selected ribs).
+ * Handles: undo/redo, Escape, Delete/Backspace (bulk-delete selected ribs).
+ *
+ * Escape is decided here and only here, in this order: a press that may still become a
+ * drag (`dragPointerRef` set, whether or not it has passed the threshold) is cancelled
+ * and nothing else happens; else an open theme or backbone panel closes; else the
+ * multi-selection clears. A key typed in an input or textarea never reaches any of it.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- mutations, layout, and drag state have complex hook-derived shapes */
-export default function useMapKeyboard({ undo, redo, dragState, cancelDrag, selectedIds, setSelectedIds, layoutCells, mutations }: {
+/* eslint-disable @typescript-eslint/no-explicit-any -- mutations and layout cells have complex hook-derived shapes */
+export default function useMapKeyboard({ undo, redo, dragPointerRef, cancelDrag, entityPanelOpen, closeEntityPanel, selectedIds, setSelectedIds, layoutCells, mutations }: {
   undo: () => void;
   redo: () => void;
-  dragState: any;
+  /** Set from a drag's press until it ends or is cancelled. Read live. */
+  dragPointerRef: RefObject<unknown>;
   cancelDrag: () => void;
+  entityPanelOpen: boolean;
+  closeEntityPanel: () => void;
   selectedIds: Set<string>;
   setSelectedIds: (ids: Set<string>) => void;
   layoutCells: any[];
@@ -39,10 +47,11 @@ export default function useMapKeyboard({ undo, redo, dragState, cancelDrag, sele
         e.preventDefault();
         redo();
       }
-      // Escape cancels drag or clears selection
       if (e.key === 'Escape') {
-        if (dragState?.isDragging) {
+        if (dragPointerRef.current) {
           cancelDrag();
+        } else if (entityPanelOpen) {
+          closeEntityPanel();
         } else if (selectedIds.size > 0) {
           setSelectedIds(new Set());
         }
@@ -61,5 +70,5 @@ export default function useMapKeyboard({ undo, redo, dragState, cancelDrag, sele
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [undo, redo, dragState, cancelDrag, selectedIds, layoutCells, mutations, setSelectedIds]);
+  }, [undo, redo, dragPointerRef, cancelDrag, entityPanelOpen, closeEntityPanel, selectedIds, layoutCells, mutations, setSelectedIds]);
 }

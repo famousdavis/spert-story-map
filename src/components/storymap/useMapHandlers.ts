@@ -15,11 +15,12 @@ type UpdateProduct = (updater: (prev: Product) => Product) => void;
  * Extracted from StoryMapView to reduce its size.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- mutations and layout objects have complex hook-derived shapes */
-export default function useMapHandlers({ product, updateProduct, mutations, setSelectedReleaseId, onRibAdded, layout, dragState }: {
+export default function useMapHandlers({ product, updateProduct, mutations, onReleaseDeleted, onRibAdded, layout, dragState }: {
   product: Product;
   updateProduct: UpdateProduct;
   mutations: any;
-  setSelectedReleaseId: (id: string | null) => void;
+  /** A release was deleted: closes its panel if it is the open one. */
+  onReleaseDeleted: (releaseId: string) => void;
   onRibAdded: (id: string) => void;
   layout: MapLayout;
   dragState: any;
@@ -87,10 +88,10 @@ export default function useMapHandlers({ product, updateProduct, mutations, setS
       // Captured: narrowing does not survive into the updateProduct callback.
       const releaseId = deleteTarget.releaseId;
       updateProduct(prev => deleteReleaseFromProduct(prev, releaseId));
-      setSelectedReleaseId(null);
+      onReleaseDeleted(releaseId);
     }
     setDeleteTarget(null);
-  }, [deleteTarget, mutations, updateProduct, setSelectedReleaseId]);
+  }, [deleteTarget, mutations, updateProduct, onReleaseDeleted]);
 
   // --- Add handlers ---
 
