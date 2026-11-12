@@ -25,13 +25,15 @@ interface MapCanvasProps {
   dragState: any;
   onDragMove?: (e: React.PointerEvent) => void;
   onDragEnd?: (e: React.PointerEvent) => void;
+  /** Ends a drag without committing it: the pointer was let go off the canvas, or the browser cancelled it. */
+  onDragCancel?: () => void;
   /** Fired when the user clicks empty canvas (a press-release that didn't pan) — used to deselect. */
   onBackgroundClick?: () => void;
   overlayControls?: React.ReactNode;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children, dragState, onDragMove, onDragEnd, onBackgroundClick, overlayControls }: MapCanvasProps) {
+export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children, dragState, onDragMove, onDragEnd, onDragCancel, onBackgroundClick, overlayControls }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
@@ -125,6 +127,29 @@ export default function MapCanvas({ zoom, setZoom, pan, setPan, onFit, children,
     isPanningRef.current = false;
     setIsPanning(false);
   }, [dragState, onDragEnd, dismissHint, onBackgroundClick]);
+
+  // A drag hears its moves and its end only through the container's handlers above.
+  // Let go anywhere else (the legend, the zoom controls, the app header) and nothing
+  // ends it: it stays armed, and the next press-release on the canvas commits it. So
+  // while a drag is armed, a pointerup outside the container cancels it, and so does
+  // a pointercancel wherever it lands (it goes to the pressed card, inside the
+  // container). Bubble phase on purpose: a release inside the container reaches the
+  // container's own handler first, which ends the drag as usual.
+  const dragArmed = dragState != null;
+  useEffect(() => {
+    if (!dragArmed || !onDragCancel) return;
+    const handleWindowPointerUp = (e: PointerEvent) => {
+      const inside = e.target instanceof Node && !!containerRef.current?.contains(e.target);
+      if (!inside) onDragCancel();
+    };
+    const handleWindowPointerCancel = () => onDragCancel();
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerCancel);
+    return () => {
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerCancel);
+    };
+  }, [dragArmed, onDragCancel]);
 
   // Keyboard shortcuts
   useEffect(() => {
