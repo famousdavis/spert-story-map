@@ -49,6 +49,46 @@ function safeCell(v: unknown): unknown {
   return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
 }
 
+/** Rib Items' column count: the theme group rows merge across all of them. */
+const RIB_ITEM_COLUMNS = 10;
+
+/**
+ * Sheet 2: every theme and backbone with its description (v0.54.2), in the order the
+ * Map shows them. Unlike Rib Items, which is built rib by rib, this walks the themes
+ * themselves, so a theme with no backbones and a backbone with no ribs still appear.
+ * A theme row (shaded like Rib Items' theme rows) carries the theme's own description;
+ * each backbone row repeats its theme's name in column A so the sheet can be filtered.
+ */
+function addBackboneItemsSheet(workbook: Workbook, product: Product): void {
+  const ws = workbook.addWorksheet('Backbone Items');
+  ws.columns = [{ width: 25 }, { width: 30 }, { width: 80 }];
+
+  const title = ws.addRow([safeCell(product.name)]);
+  title.font = { bold: true, size: 16 };
+  ws.addRow([]);
+  const header = ws.addRow(['Theme', 'Backbone', 'Description']);
+  header.font = { bold: true };
+  header.eachCell((cell: Cell) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
+  ws.views = [{ state: 'frozen', ySplit: 3 }];
+
+  for (const theme of product.themes) {
+    const themeRow = ws.addRow([safeCell(theme.name), '', safeCell(theme.description ?? '')]);
+    themeRow.font = { bold: true };
+    const fill = argbFill(THEME_FILL_COLORS[theme.color ?? ''] ?? DEFAULT_FILL_COLOR);
+    for (const col of [1, 2, 3]) themeRow.getCell(col).fill = fill;
+    themeRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+
+    for (const backbone of theme.backboneItems) {
+      const row = ws.addRow([
+        safeCell(theme.name),
+        safeCell(backbone.name),
+        safeCell(backbone.description ?? ''),
+      ]);
+      row.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+    }
+  }
+}
+
 // ExcelJS is supplied by the dynamically-imported module (see downloadExcelExport).
 // Its module bag has no clean static type at this boundary, so the parameter stays
 // `any`; everything it produces is re-annotated (Workbook / Cell) below.
@@ -57,6 +97,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
   const workbook = new ExcelJS.Workbook();
 
   // ── Sheet 1: Rib Items ────────────────────────────────────────────────────
+  // Description (v0.54.2) sits just before Notes, so columns A–H keep their places.
   const ws1 = workbook.addWorksheet('Rib Items');
   ws1.columns = [
     { width: 20 },
@@ -67,6 +108,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     { width: 8 },
     { width: 12 },
     { width: 40 },
+    { width: 60 },
     { width: 80 },
   ];
 
@@ -78,7 +120,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
 
   // Row 3: column headers
   const headerRow = ws1.addRow([
-    'Theme', 'Backbone', 'Rib Item', 'Category', 'Size', 'Points', '% Complete', 'Release(s)', 'Notes',
+    'Theme', 'Backbone', 'Rib Item', 'Category', 'Size', 'Points', '% Complete', 'Release(s)', 'Description', 'Notes',
   ]);
   headerRow.font = { bold: true };
   headerRow.eachCell((cell: Cell) => { cell.fill = argbFill(DEFAULT_FILL_COLOR); });
@@ -97,7 +139,7 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
       currentThemeId = theme.id;
       const groupRow = ws1.addRow([]);
       const rowNum: number = groupRow.number;
-      ws1.mergeCells(rowNum, 1, rowNum, 9);
+      ws1.mergeCells(rowNum, 1, rowNum, RIB_ITEM_COLUMNS);
       const cell: Cell = ws1.getCell(rowNum, 1);
       // safeCell returns unknown (formula-injection guard); ExcelJS wants CellValue.
       cell.value = safeCell(theme.name) as CellValue;
@@ -133,12 +175,13 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
       points,
       pct / 100,
       safeCell(releaseStr),
+      safeCell(rib.description ?? ''),
       safeCell(rib.notes ?? ''),
     ]);
 
-    // Notes cell: wrap text, anchor to top (column 9)
-    const notesCell: Cell = dataRow.getCell(9);
-    notesCell.alignment = { wrapText: true, vertical: 'top' };
+    // Description and Notes cells: wrap text, anchor to top (columns 9 and 10)
+    dataRow.getCell(9).alignment = { wrapText: true, vertical: 'top' };
+    dataRow.getCell(10).alignment = { wrapText: true, vertical: 'top' };
 
     // % Complete cell: percentage format + conditional fill (column 7)
     const pctCell: Cell = dataRow.getCell(7);
@@ -150,7 +193,10 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     }
   });
 
-  // ── Sheet 2: Release Summary ──────────────────────────────────────────────
+  // ── Sheet 2: Backbone Items ───────────────────────────────────────────────
+  addBackboneItemsSheet(workbook, product);
+
+  // ── Sheet 3: Release Summary ──────────────────────────────────────────────
   const ws2 = workbook.addWorksheet('Release Summary');
   ws2.columns = [
     { width: 25 },  // Release
