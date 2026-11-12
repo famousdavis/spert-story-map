@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.54.3 (2026-11-12)
+
+### Changed
+
+- **The Excel export's sheets now run from the big picture to the detail,** and the workbook opens on the first one: **Themes & Backbones** (what is being built, with descriptions), then **Release Summary** (when, and how far along), then **Rib Items** (one row per rib item). Before, the workbook opened on Rib Items.
+- **The "Backbone Items" sheet added in 0.54.2 is now called "Themes & Backbones",** since each group on it starts with the theme and its description. Its contents are unchanged.
+- If you use a spreadsheet, macro or script that finds the export's sheets by position rather than by name, update it: Rib Items is now the third sheet.
+
 ## Version 0.54.2 (2026-11-12)
 
 ### Added
