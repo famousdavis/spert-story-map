@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.54.1 (2026-11-12)
+
+### Changed
+
+- **Connect AI can now write theme and backbone descriptions, and the prompt you copy from the Connect AI panel explains how.** It tells the assistant that it can set a description while it builds a map, that changing an existing description replaces it, and that it should read the current description first and not overwrite one you wrote unless you ask. For many backbones it uses one call per 100 backbones; Microsoft Copilot Chat writes them one at a time instead.
+- **The prompt also tells the assistant what to do on a very large map,** where descriptions are left out of what it reads: it should not write a description it cannot see unless you ask. And if your Story Map tab is from before 0.54.0, it asks you to reload the tab and reconnect.
+
 ## Version 0.54.0 (2026-11-12)
 
 ### Added

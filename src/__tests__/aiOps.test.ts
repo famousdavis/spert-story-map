@@ -2584,6 +2584,17 @@ describe('applyAiOp — a rib whose only progress is on a release it left', () =
     expect(buildCopyPrompt('CODE')).toContain('Moving a rib back to a release can restore progress recorded there');
   });
 
+  // v0.54.1: the prompt must teach the three marker states and the replace rule, or an
+  // assistant on a large map (marker false) overwrites descriptions it cannot see.
+  it('the Copy Prompt teaches theme and backbone descriptions', () => {
+    const prompt = buildCopyPrompt('CODE');
+    expect(prompt).toContain('THEME AND BACKBONE DESCRIPTIONS:');
+    expect(prompt).toContain('themeBackboneDescriptionsIncluded');
+    expect(prompt).toContain('This is NOT\n    an outdated tab');
+    expect(prompt).toContain('do not overwrite a non-empty description unless I asked you to');
+    expect(prompt).toContain('storymap_bulk_update_backbones calls of\n  ≤100 each');
+  });
+
   it('survives a hand-edited product with no sprints', () => {
     const p = holding([REL1]);
     delete (p as Partial<Product>).sprints;
