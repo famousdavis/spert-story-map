@@ -96,7 +96,7 @@ async function getWorkbook(product = BASE_PRODUCT): Promise<any> {
 }
 
 describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
-  it('1. Row 1 has project name (large bold), Row 3 is frozen header with 9 column labels', async () => {
+  it('1. Row 1 has project name (large bold), Row 3 is frozen header with 10 column labels', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
     // Row 1: project title
@@ -108,13 +108,13 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
     expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 3 });
     const header = ws.getRow(3);
     expect(header.getCell(1).font?.bold).toBe(true);
-    const labels = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((c: number) => header.getCell(c).value);
+    const labels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((c: number) => header.getCell(c).value);
     expect(labels).toEqual([
-      'Theme', 'Backbone', 'Rib Item', 'Category', 'Size', 'Points', '% Complete', 'Release(s)', 'Notes',
+      'Theme', 'Backbone', 'Rib Item', 'Category', 'Size', 'Points', '% Complete', 'Release(s)', 'Description', 'Notes',
     ]);
   });
 
-  it('2. theme group header has correct value and merges all 9 columns', async () => {
+  it('2. theme group header has correct value and merges all 10 columns', async () => {
     const wb = await getWorkbook();
     const ws = wb.getWorksheet('Rib Items');
     // Row 4 is the first theme group header (rows 1-2 title/spacer, row 3 header)
@@ -122,6 +122,9 @@ describe('buildExcelWorkbook — Sheet 1 (Rib Items)', () => {
     expect(cell.value).toBe('Theme Alpha');
     // ExcelJS represents merged cells via master cell or isMerged
     expect(cell.isMerged).toBe(true);
+    // The merge reaches the last column (Notes) and no further.
+    expect(ws.getCell(4, 10).master.address).toBe('A4');
+    expect(ws.getCell(4, 11).isMerged).toBe(false);
   });
 
   it('3. theme group header fill matches theme color key', async () => {
@@ -288,5 +291,101 @@ describe('buildExcelWorkbook — Sheet 2 (Release Summary)', () => {
       if (rowNum > 3) rows.push(ws.getRow(rowNum).getCell(1).value as string);
     });
     expect(rows).toContain('Empty Release');
+  });
+});
+
+// v0.54.2: descriptions in the export. A theme with no backbones and a backbone with
+// no ribs are included on purpose: Rib Items is built rib by rib and drops both.
+function makeDescriptionProduct() {
+  return {
+    ...BASE_PRODUCT,
+    themes: [
+      {
+        ...BASE_PRODUCT.themes[0]!,
+        description: 'Everything a customer sees',
+        backboneItems: [
+          {
+            ...BASE_PRODUCT.themes[0]!.backboneItems[0]!,
+            description: 'Signing up and getting started',
+            ribItems: BASE_PRODUCT.themes[0]!.backboneItems[0]!.ribItems.map((r, i) =>
+              (i === 0 ? { ...r, description: 'The first rib, described', notes: 'A note' } : r)),
+          },
+          { id: 'b-empty', name: 'Empty Backbone', order: 2, description: '=HYPERLINK("x")', ribItems: [] },
+        ],
+      },
+      BASE_PRODUCT.themes[1]!,
+      { id: 't-empty', name: 'Empty Theme', order: 3, color: 'teal', description: 'No backbones yet', backboneItems: [] },
+    ],
+  };
+}
+
+describe('buildExcelWorkbook — descriptions (v0.54.2)', () => {
+  it('15. sheets are Rib Items, Backbone Items, Release Summary, in that order', async () => {
+    const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(wb.worksheets.map((w: { name: string }) => w.name)).toEqual(['Rib Items', 'Backbone Items', 'Release Summary']);
+  });
+
+  it('16. Backbone Items: title, frozen header, then a theme row before its backbones', async () => {
+    const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const ws = wb.getWorksheet('Backbone Items');
+    expect(ws.getRow(1).getCell(1).value).toBe('Test Product');
+    expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 3 });
+    const cells = (r: number) => [1, 2, 3].map(c => ws.getRow(r).getCell(c).value);
+    expect(cells(3)).toEqual(['Theme', 'Backbone', 'Description']);
+    expect(cells(4)).toEqual(['Theme Alpha', '', 'Everything a customer sees']);
+    expect(cells(5)).toEqual(['Theme Alpha', 'Backbone One', 'Signing up and getting started']);
+    expect(cells(6)).toEqual(['Theme Alpha', 'Empty Backbone', '\'=HYPERLINK("x")']);
+    expect(cells(7)).toEqual(['Theme Beta', '', '']);
+    expect(cells(8)).toEqual(['Theme Beta', 'Backbone Two', '']);
+    expect(cells(9)).toEqual(['Empty Theme', '', 'No backbones yet']);
+    expect(ws.getRow(10).getCell(1).value).toBeNull();
+  });
+
+  it('17. Backbone Items: theme rows are bold and shaded by theme colour; backbone rows are not', async () => {
+    const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const ws = wb.getWorksheet('Backbone Items');
+    expect(ws.getRow(4).font?.bold).toBe(true);
+    for (const col of [1, 2, 3]) expect(ws.getRow(4).getCell(col).fill?.fgColor?.argb).toBe('FFDBEAFE');
+    expect(ws.getRow(7).getCell(1).fill?.fgColor?.argb).toBe('FFF3F4F6');
+    expect(ws.getRow(9).getCell(3).fill?.fgColor?.argb).toBe('FFCCFBF4');
+    expect(ws.getRow(5).font?.bold).toBeFalsy();
+    expect(ws.getRow(5).getCell(1).fill).toBeUndefined();
+  });
+
+  it('18. Backbone Items: descriptions wrap and sit at the top', async () => {
+    const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const ws = wb.getWorksheet('Backbone Items');
+    for (const r of [4, 5]) {
+      expect(ws.getRow(r).getCell(3).alignment).toMatchObject({ wrapText: true, vertical: 'top' });
+    }
+  });
+
+  it('19. Rib Items: Description holds the rib description, blank when it has none', async () => {
+    const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const ws = wb.getWorksheet('Rib Items');
+    expect(ws.getRow(5).getCell(9).value).toBe('The first rib, described');
+    expect(ws.getRow(5).getCell(10).value).toBe('A note');
+    expect(ws.getRow(6).getCell(9).value).toBe('');
+    expect(ws.getRow(5).getCell(9).alignment).toMatchObject({ wrapText: true, vertical: 'top' });
+    // The empty theme and the empty backbone have no ribs, so they add nothing here.
+    const firstColumn: unknown[] = [];
+    ws.eachRow((row: any) => { firstColumn.push(row.getCell(1).value); }); // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(firstColumn).not.toContain('Empty Theme');
+  });
+
+  it('20. survives being written to an .xlsx file and read back', async () => {
+    const ExcelJS = await import('exceljs');
+    const XL = (ExcelJS as any).default ?? ExcelJS; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const buffer = await wb.xlsx.writeBuffer();
+    const back = new XL.Workbook();
+    await back.xlsx.load(buffer);
+    expect(back.worksheets.map((w: { name: string }) => w.name)).toEqual(['Rib Items', 'Backbone Items', 'Release Summary']);
+    const bb = back.getWorksheet('Backbone Items');
+    expect(bb.getRow(5).getCell(3).value).toBe('Signing up and getting started');
+    expect(bb.getRow(5).getCell(3).alignment).toMatchObject({ wrapText: true, vertical: 'top' });
+    const ribs = back.getWorksheet('Rib Items');
+    expect(ribs.getRow(5).getCell(9).value).toBe('The first rib, described');
+    expect(ribs.getCell(4, 10).master.address).toBe('A4');
   });
 });

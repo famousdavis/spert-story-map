@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.54.2 (2026-11-12)
+
+### Added
+
+- **The Excel export has a new "Backbone Items" sheet** with every theme and backbone and their descriptions, in the order the Map shows them. Each theme gets a shaded row with its own description, followed by its backbones, one per row; the theme's name is repeated beside each backbone so you can filter by theme. Themes with no backbones and backbones with no rib items are included too. The sheet sits between Rib Items and Release Summary.
+- **The "Rib Items" sheet now has a Description column** with each rib item's description, just before Notes. The other columns keep their places; Notes moves one column to the right.
+
 ## Version 0.54.1 (2026-11-12)
 
 ### Changed
