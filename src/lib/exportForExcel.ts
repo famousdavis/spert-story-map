@@ -53,14 +53,15 @@ function safeCell(v: unknown): unknown {
 const RIB_ITEM_COLUMNS = 10;
 
 /**
- * Sheet 2: every theme and backbone with its description (v0.54.2), in the order the
+ * Themes & Backbones (v0.54.2; first sheet and renamed from "Backbone Items" in
+ * v0.54.3): every theme and backbone with its description, in the order the
  * Map shows them. Unlike Rib Items, which is built rib by rib, this walks the themes
  * themselves, so a theme with no backbones and a backbone with no ribs still appear.
  * A theme row (shaded like Rib Items' theme rows) carries the theme's own description;
  * each backbone row repeats its theme's name in column A so the sheet can be filtered.
  */
-function addBackboneItemsSheet(workbook: Workbook, product: Product): void {
-  const ws = workbook.addWorksheet('Backbone Items');
+function addThemesAndBackbonesSheet(workbook: Workbook, product: Product): void {
+  const ws = workbook.addWorksheet('Themes & Backbones');
   ws.columns = [{ width: 25 }, { width: 30 }, { width: 80 }];
 
   const title = ws.addRow([safeCell(product.name)]);
@@ -89,14 +90,11 @@ function addBackboneItemsSheet(workbook: Workbook, product: Product): void {
   }
 }
 
-// ExcelJS is supplied by the dynamically-imported module (see downloadExcelExport).
-// Its module bag has no clean static type at this boundary, so the parameter stays
-// `any`; everything it produces is re-annotated (Workbook / Cell) below.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamically-imported ExcelJS module bag, typed at the call boundary
-export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promise<Workbook> {
-  const workbook = new ExcelJS.Workbook();
-
-  // ── Sheet 1: Rib Items ────────────────────────────────────────────────────
+/**
+ * Rib Items: one row per rib, with a theme group row before each theme. The detail
+ * sheet, so it comes last (v0.54.3).
+ */
+function addRibItemsSheet(workbook: Workbook, product: Product): void {
   // Description (v0.54.2) sits just before Notes, so columns A–H keep their places.
   const ws1 = workbook.addWorksheet('Rib Items');
   ws1.columns = [
@@ -192,11 +190,10 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
       pctCell.fill = argbFill('FFFEF3C7'); // light yellow
     }
   });
+}
 
-  // ── Sheet 2: Backbone Items ───────────────────────────────────────────────
-  addBackboneItemsSheet(workbook, product);
-
-  // ── Sheet 3: Release Summary ──────────────────────────────────────────────
+/** Release Summary: one row per release, then the same lines Insights shows. */
+function addReleaseSummarySheet(workbook: Workbook, product: Product): void {
   const ws2 = workbook.addWorksheet('Release Summary');
   ws2.columns = [
     { width: 25 },  // Release
@@ -250,6 +247,20 @@ export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promis
     line.getCell(3).numFmt = '0%';
     if (row.kind === 'total') line.font = { bold: true };
   }
+}
+
+// ExcelJS is supplied by the dynamically-imported module (see downloadExcelExport).
+// Its module bag has no clean static type at this boundary, so the parameter stays
+// `any`; everything it produces is re-annotated (Workbook / Cell) below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamically-imported ExcelJS module bag, typed at the call boundary
+export async function buildExcelWorkbook(product: Product, ExcelJS: any): Promise<Workbook> {
+  const workbook = new ExcelJS.Workbook();
+
+  // Sheet order, high level to detail (v0.54.3): what is being built, then when and
+  // how far along, then the rib-by-rib detail. Excel opens on the first sheet.
+  addThemesAndBackbonesSheet(workbook, product);
+  addReleaseSummarySheet(workbook, product);
+  addRibItemsSheet(workbook, product);
 
   return workbook;
 }

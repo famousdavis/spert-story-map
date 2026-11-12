@@ -320,14 +320,14 @@ function makeDescriptionProduct() {
 }
 
 describe('buildExcelWorkbook — descriptions (v0.54.2)', () => {
-  it('15. sheets are Rib Items, Backbone Items, Release Summary, in that order', async () => {
+  it('15. sheets run high level to detail: Themes & Backbones, Release Summary, Rib Items', async () => {
     const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    expect(wb.worksheets.map((w: { name: string }) => w.name)).toEqual(['Rib Items', 'Backbone Items', 'Release Summary']);
+    expect(wb.worksheets.map((w: { name: string }) => w.name)).toEqual(['Themes & Backbones', 'Release Summary', 'Rib Items']);
   });
 
-  it('16. Backbone Items: title, frozen header, then a theme row before its backbones', async () => {
+  it('16. Themes & Backbones: title, frozen header, then a theme row before its backbones', async () => {
     const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    const ws = wb.getWorksheet('Backbone Items');
+    const ws = wb.getWorksheet('Themes & Backbones');
     expect(ws.getRow(1).getCell(1).value).toBe('Test Product');
     expect(ws.views[0]).toMatchObject({ state: 'frozen', ySplit: 3 });
     const cells = (r: number) => [1, 2, 3].map(c => ws.getRow(r).getCell(c).value);
@@ -341,9 +341,9 @@ describe('buildExcelWorkbook — descriptions (v0.54.2)', () => {
     expect(ws.getRow(10).getCell(1).value).toBeNull();
   });
 
-  it('17. Backbone Items: theme rows are bold and shaded by theme colour; backbone rows are not', async () => {
+  it('17. Themes & Backbones: theme rows are bold and shaded by theme colour; backbone rows are not', async () => {
     const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    const ws = wb.getWorksheet('Backbone Items');
+    const ws = wb.getWorksheet('Themes & Backbones');
     expect(ws.getRow(4).font?.bold).toBe(true);
     for (const col of [1, 2, 3]) expect(ws.getRow(4).getCell(col).fill?.fgColor?.argb).toBe('FFDBEAFE');
     expect(ws.getRow(7).getCell(1).fill?.fgColor?.argb).toBe('FFF3F4F6');
@@ -352,9 +352,9 @@ describe('buildExcelWorkbook — descriptions (v0.54.2)', () => {
     expect(ws.getRow(5).getCell(1).fill).toBeUndefined();
   });
 
-  it('18. Backbone Items: descriptions wrap and sit at the top', async () => {
+  it('18. Themes & Backbones: descriptions wrap and sit at the top', async () => {
     const wb = await getWorkbook(makeDescriptionProduct() as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    const ws = wb.getWorksheet('Backbone Items');
+    const ws = wb.getWorksheet('Themes & Backbones');
     for (const r of [4, 5]) {
       expect(ws.getRow(r).getCell(3).alignment).toMatchObject({ wrapText: true, vertical: 'top' });
     }
@@ -380,8 +380,8 @@ describe('buildExcelWorkbook — descriptions (v0.54.2)', () => {
     const buffer = await wb.xlsx.writeBuffer();
     const back = new XL.Workbook();
     await back.xlsx.load(buffer);
-    expect(back.worksheets.map((w: { name: string }) => w.name)).toEqual(['Rib Items', 'Backbone Items', 'Release Summary']);
-    const bb = back.getWorksheet('Backbone Items');
+    expect(back.worksheets.map((w: { name: string }) => w.name)).toEqual(['Themes & Backbones', 'Release Summary', 'Rib Items']);
+    const bb = back.getWorksheet('Themes & Backbones');
     expect(bb.getRow(5).getCell(3).value).toBe('Signing up and getting started');
     expect(bb.getRow(5).getCell(3).alignment).toMatchObject({ wrapText: true, vertical: 'top' });
     const ribs = back.getWorksheet('Rib Items');
