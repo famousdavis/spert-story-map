@@ -24,8 +24,8 @@ interface BufferedTextProps {
   rows?: number;
   multiline?: boolean;
   /**
-   * Refuse to commit a blank value: blur and Enter revert to what was there on
-   * focus, exactly as Escape does.
+   * Refuse to commit a blank value: blur and Enter revert to the current saved
+   * value, exactly as Escape does.
    *
    * ⚠️ Set this on every field `validateProduct` requires to be non-empty —
    * today the product, release and sprint names (`validateProduct.ts` :270,
@@ -35,7 +35,7 @@ interface BufferedTextProps {
    * accepts an empty one, so nothing downstream breaks.
    *
    * This stops new blanks being written. It does NOT repair an existing one —
-   * reverting restores the value held at focus, which may itself be blank. That
+   * reverting restores the current saved value, which may itself be blank. That
    * is deliberate: the field should not invent a name the user never typed.
    */
   required?: boolean;
@@ -47,7 +47,8 @@ export default function BufferedText({
   const { localValue, setLocalValue, handleFocus, handleBlur, revertValue } =
     useBufferedField(value, onCommit);
 
-  // `revertValue` suppresses the commit AND restores the focus snapshot;
+  // `revertValue` suppresses the commit AND restores the current saved value
+  // (the latest from outside, which may have changed since focus);
   // `handleBlur` must still run, because it is what clears the hook's focused
   // flag — and that flag is what re-enables the external→local sync. Skipping
   // it would leave the field deaf to cloud echoes and undo until refocused.

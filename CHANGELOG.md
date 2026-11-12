@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.53.34 (2026-11-12)
+
+### Fixed
+
+- **A name or text you were editing no longer saves an older value over a newer one.** If Connect AI, a collaborator or an undo changed a field while you had it open, leaving the field without typing kept showing the old text, and the next time you clicked in and out again, that old text was saved over the newer one. The field now shows the newer value as soon as you leave it, and nothing is saved. This covers the project, release and sprint fields in Settings, the colour legend labels, a rib's description and notes on the Map, and renaming on the Map, Release Planning and Structure tabs.
+- **Escape, and clearing a required name, now go back to the current saved value,** not to what the field held when you clicked into it.
+- **What you type still wins.** If you change the text yourself, your change is saved, as before. A blank release name is still never saved, and a blank name on the Structure tab still saves blank, as before.
+- If someone renames an item while you are renaming it, and you type back exactly the name it had when you started, nothing is saved and their name stays.
+
 ## Version 0.53.33 (2026-11-09)
 
 ### Fixed
