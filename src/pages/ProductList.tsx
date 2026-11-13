@@ -2,49 +2,77 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { exportProduct, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
 import { exportAllProductsBundled } from '../lib/importExport';
 import { useImportState } from '../hooks/useImportState';
+import { useProjectOrder } from '../hooks/useProjectOrder';
 import ImportPreviewSection from '../components/product/ImportPreviewSection';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete, isRibUnsized } from '../lib/calculations';
-import { sortByOrder } from '../lib/sortByOrder';
+import { getStrandedRows } from '../lib/reconciliation';
+import { cloneName } from '../lib/cloneName';
+import { swallowRestOfGesture } from '../lib/gestureGuard';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
 import { INVITATIONS_ENABLED } from '../lib/featureFlags';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
-import ThemeToggle from '../components/ui/ThemeToggle';
-import StorageStatusPill from '../components/ui/StorageStatusPill';
 import { useDarkMode } from '../hooks/useDarkMode';
 import AppSettingsModal from '../components/settings/AppSettingsModal';
 import AppNotices from '../components/ui/AppNotices';
-import CreateProjectModal from '../components/product/CreateProjectModal';
-import ProjectCard from '../components/product/ProjectCard';
-import ToolbarIcon from '../components/product/ToolbarIcon';
-import { TOOLBAR_ICON_PATHS } from '../components/product/toolbarIconPaths';
+import ProjectsHeader from '../components/product/ProjectsHeader';
+import ProjectsToolbar from '../components/product/ProjectsToolbar';
+import ProjectGrid, { type GridProject } from '../components/product/ProjectGrid';
+import ProjectsEmptyState from '../components/product/ProjectsEmptyState';
+import ProjectDialog, { type ProjectEdits } from '../components/product/ProjectDialog';
+import DeleteProjectDialog from '../components/product/DeleteProjectDialog';
+import { findTile, findTileControl } from '../components/product/tile-focus';
 import ShareDialog from '../components/product/ShareDialog';
 import { Footer } from './ChangelogView';
-import type { Product } from '../types';
+import type { MemberRole, Product, StorageDriver } from '../types';
 
 function enrichProduct(product: Product) {
   const allRibs = getAllRibItems(product);
   const totalPoints = getTotalProjectPoints(product);
   const unsized = allRibs.filter(r => isRibUnsized(r, product.sizeMapping)).length;
   const pctComplete = getProjectPercentComplete(product);
-  return { ...product, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
+  const stranded = getStrandedRows(product).length;
+  return {
+    ...product, totalItems: allRibs.length, totalPoints, unsized, pctComplete, stranded,
+    releaseCount: product.releases.length, sprintCount: product.sprints.length,
+  };
 }
 
-/** A Product plus the derived totals the project cards display. */
+/** A Product plus the derived figures its tile displays. */
 type EnrichedProduct = ReturnType<typeof enrichProduct>;
+
+type DialogState = { kind: 'new' } | { kind: 'edit'; id: string; name: string; description: string };
+type DeleteTarget = { id: string; name: string; next?: string; prev?: string };
+type FocusRequest = { kind: 'open'; id: string } | ({ kind: 'deleted' } & DeleteTarget);
+
+/**
+ * The person's role on a project, as the Firestore rules decide it (`members[uid]`). Local mode:
+ * owner. In the cloud anything else, an absent entry included, counts as a viewer: fail closed.
+ */
+function roleOf(p: Product, isCloud: boolean, uid: string | undefined): MemberRole | undefined {
+  if (!isCloud) return 'owner';
+  return uid ? p._members?.[uid] : undefined;
+}
 
 export default function ProductList() {
   const { driver, mode, storageReady } = useStorage();
   const [products, setProducts] = useState<EnrichedProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<EnrichedProduct | null>(null);
+  // "Loading projects..." is for the first load on a driver only. Every later refresh (an action,
+  // an import, an invitation) updates the list in place, so untouched tiles keep their DOM nodes
+  // and focus stays where it was.
+  const [loadedFor, setLoadedFor] = useState<StorageDriver | null>(null);
+  const loading = loadedFor !== driver;
+  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const [scrollTarget, setScrollTarget] = useState<{ id: string } | null>(null);
+  const [announcement, setAnnouncement] = useState('');
   const [cloudDataLoaded, setCloudDataLoaded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
@@ -64,24 +92,18 @@ export default function ProductList() {
   const location = useLocation();
   const { theme, toggleTheme, isDark } = useDarkMode();
 
-  // Drag-to-reorder state. projectOrder uses `undefined` (not null) for "no
-  // persisted order" so it matches both UserSettings.projectOrder?: string[]
-  // and sortByOrder's `string[] | undefined` parameter — the same concept had
-  // been spelled three ways. Behaviourally identical: sortByOrder's only guard
-  // is `if (!order || order.length === 0)`, and nothing else reads the value.
-  const [projectOrder, setProjectOrder] = useState<string[] | undefined>(undefined);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
-  const dropBeforeRef = useRef<string | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const newProjectRef = useRef<HTMLButtonElement>(null);
+  // The button that opened the New Project dialog: the toolbar's, or the welcome panel's.
+  const newOpenerRef = useRef<HTMLElement | null>(null);
+  const deleteConfirmedRef = useRef(false);
 
-  const sortedProducts = useMemo(
-    () => sortByOrder(products, projectOrder),
-    [products, projectOrder]
-  );
+  const order = useProjectOrder(driver, products);
+  const { refreshStarted, listed } = order;
 
   const refresh = useCallback(async () => {
     if (!driver) return;
-    setLoading(true);
+    const gen = refreshStarted();
     try {
       const allProducts = await driver.loadProductIndex();
       // Each project on its own: one that cannot be summarised is left off the
@@ -95,6 +117,7 @@ export default function ProductList() {
           return [];
         }
       });
+      listed(detailed, gen);
       setProducts(detailed);
       if (mode === 'cloud') setCloudDataLoaded(true);
       // In cloud mode, detect local projects that weren't migrated. Explicit
@@ -108,12 +131,11 @@ export default function ProductList() {
         setLocalOrphanCount(0);
       }
     } finally {
-      setLoading(false);
+      setLoadedFor(driver);
     }
-  }, [driver, mode]);
+  }, [driver, mode, refreshStarted, listed]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh sets state; intentional on storage ready
     if (storageReady) refresh();
   }, [storageReady, refresh]);
 
@@ -179,98 +201,95 @@ export default function ProductList() {
     return () => window.removeEventListener('spert:models-changed', onModelsChanged);
   }, [mode, refresh]);
 
-  // Load persisted project order from preferences
+  // Focus moves from an effect, after the re-render that shows the result: never from a handler
+  // or a dialog's cleanup, which run before the list holds it.
   useEffect(() => {
-    if (!driver) return;
-    driver.loadPreferences().then(prefs => {
-      if (prefs?.projectOrder) setProjectOrder(prefs.projectOrder);
-    });
-  }, [driver]);
-
-  // Drag-to-reorder handlers
-  const handleProjectDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.effectAllowed = 'move';
-    setDragId(id);
-  };
-
-  const handleProjectDragOver = (e: React.DragEvent, id: string) => {
-    e.preventDefault();
-    if (id === dragId) return;
-    if (dropBeforeRef.current !== id) {
-      dropBeforeRef.current = id;
-      setDropBeforeId(id);
+    if (!focusRequest) return;
+    const root = mainRef.current;
+    if (focusRequest.kind === 'open') {
+      findTileControl(root, focusRequest.id, 'open')?.focus();
+      return;
     }
-  };
+    // A refused delete leaves the project listed: focus goes back to its Delete. Otherwise the
+    // next tile's open button, else the previous one's, else New Project.
+    const { id, next, prev } = focusRequest;
+    const target = findTileControl(root, id, 'delete')
+      ?? (next ? findTileControl(root, next, 'open') : null)
+      ?? (prev ? findTileControl(root, prev, 'open') : null)
+      ?? newProjectRef.current;
+    target?.focus();
+  }, [focusRequest]);
 
-  const handleProjectDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!dragId) return;
-    const beforeId = dropBeforeRef.current;
-    const ids = sortedProducts.map(p => p.id);
-    const dragIdx = ids.indexOf(dragId);
-    if (dragIdx < 0) return;
-    ids.splice(dragIdx, 1);
-    if (beforeId) {
-      const beforeIdx = ids.indexOf(beforeId);
-      ids.splice(beforeIdx >= 0 ? beforeIdx : ids.length, 0, dragId);
-    } else {
-      ids.push(dragId);
-    }
-    setProjectOrder(ids);
-    // Persist to preferences
-    if (driver) {
-      driver.loadPreferences().then(prefs => {
-        driver.savePreferences({ ...prefs, projectOrder: ids });
-      });
-    }
-    handleProjectDragEnd();
-  };
-
-  const handleProjectDragEnd = () => {
-    setDragId(null);
-    setDropBeforeId(null);
-    dropBeforeRef.current = null;
-  };
+  // A new tile (a clone, the sample) is scrolled into view once it is on the page.
+  useEffect(() => {
+    if (scrollTarget) findTile(mainRef.current, scrollTarget.id)?.scrollIntoView({ block: 'nearest' });
+  }, [scrollTarget]);
 
   const handleCreate = async (name: string, desc: string) => {
     if (!driver) return;
     const product = createNewProduct(name, desc, driver.getWorkspaceId());
     await driver.createProduct(product);
-    setShowCreate(false);
+    setDialog(null);
     navigate(`/product/${product.id}/structure`);
   };
 
-  const handleLoadSample = async () => {
+  // Edit writes only what changed, onto a fresh load: an untouched field is left as stored, so a
+  // description written meanwhile elsewhere survives a rename. No changelog entry, as before.
+  const handleUpdate = async (id: string, edits: ProjectEdits) => {
+    setDialog(null);
+    if (!driver) return;
+    const product = await driver.loadProduct(id);
+    if (!product) return;
+    await driver.saveProductImmediate({ ...product, ...edits });
+    await refresh();
+  };
+
+  const handleLoadSample = async (fromWelcome: boolean) => {
     if (!driver) return;
     const sample = createSampleProduct();
     await driver.createProduct(sample);
-    refresh();
+    await refresh();
+    setAnnouncement('Loaded the sample project.');
+    setScrollTarget({ id: sample.id });
+    // The welcome panel goes once a project exists, and its button with it.
+    if (fromWelcome) setFocusRequest({ kind: 'open', id: sample.id });
   };
 
-  const handleDuplicate = async (id: string) => {
+  // Clone: import's numbering against every name taken, so a double-click gives (Copy) and
+  // (Copy 2), never longer than a name may be; placed right after its source. `duplicateProduct`
+  // is unchanged and still writes the one `duplicate` changelog entry.
+  const handleClone = async (id: string) => {
     if (!driver) return;
     const original = await driver.loadProduct(id);
     if (!original) return;
-    const dup = duplicateProduct(original, driver.getWorkspaceId());
+    const name = cloneName(original.name, order.takenNames());
+    const dup = { ...duplicateProduct(original, driver.getWorkspaceId()), name };
+    const flight = order.placeClone(id, dup.id, name);
     await driver.createProduct(dup);
-    refresh();
+    flight.settled();
+    await refresh();
+    setAnnouncement(`Cloned "${original.name}" as "${name}".`);
+    setScrollTarget({ id: dup.id });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!driver) return;
-    await driver.deleteProduct(id);
-    refresh();
+  const openDelete = (id: string) => {
+    const shown = order.sorted;
+    const index = shown.findIndex(p => p.id === id);
+    const p = shown[index];
+    if (!p) return;
+    deleteConfirmedRef.current = false;
+    setDeleteTarget({ id, name: p.name, next: shown[index + 1]?.id, prev: shown[index - 1]?.id });
   };
 
-  const handleRename = async (id: string, name: string) => {
-    if (!driver) return;
-    // Load fresh so we persist the real product, not the enriched list summary
-    // (which carries derived totals). saveProductImmediate bumps updatedAt and,
-    // in cloud mode, merges only changed fields — never owner/members.
-    const product = await driver.loadProduct(id);
-    if (!product) return;
-    await driver.saveProductImmediate({ ...product, name });
-    refresh();
+  // The dialog closes at once; then the delete, then the in-place refresh; then focus moves.
+  const confirmDelete = async () => {
+    const target = deleteTarget;
+    if (!target || !driver) return;
+    deleteConfirmedRef.current = true;
+    setDeleteTarget(null);
+    await driver.deleteProduct(target.id);
+    await refresh();
+    setFocusRequest({ kind: 'deleted', ...target });
   };
 
   const handleExport = async (id: string) => {
@@ -279,206 +298,161 @@ export default function ProductList() {
     if (product) await exportProduct(product, driver, driver.getWorkspaceId());
   };
 
+  const openNew = (e: React.MouseEvent<HTMLButtonElement>) => {
+    newOpenerRef.current = e.currentTarget;
+    setDialog({ kind: 'new' });
+  };
+
+  const openEdit = (id: string) => {
+    const p = products.find(x => x.id === id);
+    if (p) setDialog({ kind: 'edit', id, name: p.name, description: p.description ?? '' });
+  };
+
+  const openShare = (id: string) => {
+    const p = products.find(x => x.id === id);
+    if (p) setShareTarget({ id, name: p.name });
+  };
+
+  const openProject = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    // A mouse or touch click (not a key): the rest of a double-click must not land on Structure.
+    if (e.detail === 1) swallowRestOfGesture();
+    navigate(`/product/${id}/structure`);
+  };
+
+  const gridProjects: GridProject[] = order.sorted.map(p => {
+    const role = roleOf(p, isCloudMode, user?.uid);
+    return {
+      ...p,
+      isShared: !!(p._owner && user && p._owner !== user.uid),
+      canEdit: role === 'owner' || role === 'editor',
+      canDelete: role === 'owner',
+      showShare: isCloudMode && role === 'owner',
+    };
+  });
+
+  const editTarget = dialog?.kind === 'edit' ? dialog : null;
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-4xl mx-auto px-6 py-12 flex-1 w-full">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Link
-                to="/"
-                onClick={() => window.scrollTo(0, 0)}
-                aria-label="Go to projects home"
-                className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              >
-                <img
-                  src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
-                  alt="SPERT Story Map icon"
-                  className="h-7 w-7 rounded-lg ring-1 ring-white/20"
-                />
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                SPERT<sup className="text-[0.45em] text-gray-400 dark:text-gray-500 font-normal tracking-wide">®</sup> Story Map
-              </h1>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Plan and track agile project releases.{' '}
-              {mode === 'cloud'
-                ? 'Data is stored in your cloud account.'
-                : 'Data is stored locally in your browser.'}
-            </p>
-          </div>
-          <div className="flex items-center gap-3 mt-1">
-            <button
-              onClick={() => setShowSettings(true)}
-              title="App Settings"
-              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-              </svg>
-            </button>
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
-            <Link to="/about" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-              About
-            </Link>
-            <StorageStatusPill onClick={() => setShowSettings(true)} />
-          </div>
-        </div>
+    <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950">
+      <div className="max-w-[1200px] w-full mx-auto px-2 sm:px-4 md:px-8 p-4 sm:p-6 md:p-8 flex-1 flex flex-col">
+        <ProjectsHeader isDark={isDark} theme={theme} onToggleTheme={toggleTheme} onOpenSettings={() => setShowSettings(true)} />
 
         <AppNotices className="mb-4" />
 
-        {/* Access-denied banner — one-shot, shown after useProduct redirects
-            here because Firestore returned permission-denied (owner revoked
-            collaborator access mid-session, or revoked between sessions). */}
-        {accessDeniedMsg && (
-          <div className="mb-4 flex items-start justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg px-4 py-3">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              You no longer have access to that project.
-            </p>
-            <button
-              onClick={() => setAccessDeniedMsg(false)}
-              className="text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 ml-4"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        <main ref={mainRef}>
+          {/* Access-denied banner — one-shot, shown after useProduct redirects
+              here because Firestore returned permission-denied (owner revoked
+              collaborator access mid-session, or revoked between sessions). */}
+          {accessDeniedMsg && (
+            <div className="mb-4 flex items-start justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg px-4 py-3">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                You no longer have access to that project.
+              </p>
+              <button
+                onClick={() => setAccessDeniedMsg(false)}
+                className="text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 ml-4"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
-        {/* Save error banner — mode-aware copy (matches ProductLayout). */}
-        {saveError && (
-          <div className="mb-4 flex items-start justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 rounded-lg px-4 py-3">
-            <p className="text-sm text-red-800 dark:text-red-200">
-              {mode === 'cloud'
-                ? 'Changes may not have saved. Check your connection.'
-                : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
-            </p>
-            <button
-              onClick={() => setSaveError(false)}
-              className="text-xs font-medium text-red-700 hover:text-red-900 dark:text-red-300 dark:hover:text-red-100 ml-4"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+          {/* Save error banner — mode-aware copy (matches ProductLayout). */}
+          {saveError && (
+            <div className="mb-4 flex items-start justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 rounded-lg px-4 py-3">
+              <p className="text-sm text-red-800 dark:text-red-200">
+                {mode === 'cloud'
+                  ? 'Changes may not have saved. Check your connection.'
+                  : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
+              </p>
+              <button
+                onClick={() => setSaveError(false)}
+                className="text-xs font-medium text-red-700 hover:text-red-900 dark:text-red-300 dark:hover:text-red-100 ml-4"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
-        {/* Heading row + toolbar. Order is fixed across the SPERT Suite:
-            Export All · Import · Load Sample · New Project (primary, far right).
-            Every button always renders; gates disable, never hide. */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Projects</h2>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => driver && exportAllProductsBundled(driver, driver.getWorkspaceId())}
-              disabled={products.length === 0}
-              aria-label="Export all projects as JSON"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ToolbarIcon d={TOOLBAR_ICON_PATHS.export} />
-              Export All
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
-              aria-label="Import projects from JSON"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ToolbarIcon d={TOOLBAR_ICON_PATHS.import} />
-              Import
-            </button>
-            <button
-              onClick={handleLoadSample}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              <ToolbarIcon d={TOOLBAR_ICON_PATHS.sample} />
-              Load Sample
-            </button>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <ToolbarIcon d={TOOLBAR_ICON_PATHS.plus} />
-              New Project
-            </button>
-          </div>
-        </div>
+          <ProjectsToolbar
+            hasProjects={products.length > 0}
+            importDisabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
+            newProjectRef={newProjectRef}
+            onExportAll={() => driver && exportAllProductsBundled(driver, driver.getWorkspaceId())}
+            onImport={() => fileInputRef.current?.click()}
+            onLoadSample={() => handleLoadSample(false)}
+            onNewProject={openNew}
+          />
 
-        <ImportPreviewSection
-          phase={importPhase}
-          mode={mode}
-          cloudDataLoaded={cloudDataLoaded}
-          fileInputRef={fileInputRef}
-          onFileChange={handleFileChange}
-          onSetDecision={setImportDecision}
-          onConfirm={handleConfirmImport}
-          onCancel={cancelImport}
-        />
+          <ImportPreviewSection
+            phase={importPhase}
+            mode={mode}
+            cloudDataLoaded={cloudDataLoaded}
+            fileInputRef={fileInputRef}
+            onFileChange={handleFileChange}
+            onSetDecision={setImportDecision}
+            onConfirm={handleConfirmImport}
+            onCancel={cancelImport}
+          />
 
-        {/* Cloud orphan warning */}
-        {localOrphanCount > 0 && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg px-4 py-3 mb-6">
-            <p className="text-xs text-blue-800 dark:text-blue-200">
-              Your cloud account has no projects, but you have {localOrphanCount} project{localOrphanCount !== 1 ? 's' : ''} stored locally.
-              Go to App Settings → Storage to upload them, or switch back to Local mode.
-            </p>
-          </div>
-        )}
+          {/* Cloud orphan warning */}
+          {localOrphanCount > 0 && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg px-4 py-3 mb-6">
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                Your cloud account has no projects, but you have {localOrphanCount} project{localOrphanCount !== 1 ? 's' : ''} stored locally.
+                Go to App Settings → Storage to upload them, or switch back to Local mode.
+              </p>
+            </div>
+          )}
 
-        {/* Product List */}
-        {loading ? (
-          <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-            <p className="text-sm">Loading projects...</p>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-            <p className="text-lg mb-2">No projects yet</p>
-            <p className="text-sm">Create a new project or load the sample to get started.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {sortedProducts.map(p => {
-              // isOwner: local-mode users own all their projects; cloud-mode users
-              // own only projects where _owner matches their uid. isShared is the
-              // near-inverse: true when someone else's cloud project is shared with you.
-              const isOwner = mode !== 'cloud' || !p._owner || p._owner === user?.uid;
-              return (
-                <ProjectCard
-                  key={p.id}
-                  product={p}
-                  isShared={!!(p._owner && user && p._owner !== user.uid)}
-                  isOwner={isOwner}
-                  isCloudMode={isCloudMode}
-                  isDragging={dragId === p.id}
-                  isDropTarget={dropBeforeId === p.id}
-                  onNavigate={() => navigate(`/product/${p.id}/structure`)}
-                  onRename={newName => handleRename(p.id, newName)}
-                  onShare={() => setShareTarget({ id: p.id, name: p.name })}
-                  onExport={() => handleExport(p.id)}
-                  onDuplicate={() => handleDuplicate(p.id)}
-                  onDelete={() => setDeleteTarget(p)}
-                  onDragStart={e => handleProjectDragStart(e, p.id)}
-                  onDragOver={e => handleProjectDragOver(e, p.id)}
-                  onDrop={handleProjectDrop}
-                  onDragEnd={handleProjectDragEnd}
-                />
-              );
-            })}
-          </div>
-        )}
+          {loading ? (
+            <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+              <p className="text-sm">Loading projects...</p>
+            </div>
+          ) : products.length === 0 ? (
+            <ProjectsEmptyState onCreateNew={openNew} onLoadSample={() => handleLoadSample(true)} />
+          ) : (
+            <ProjectGrid
+              projects={gridProjects}
+              onOpen={openProject}
+              onShare={openShare}
+              onExport={handleExport}
+              onEdit={openEdit}
+              onClone={handleClone}
+              onDelete={openDelete}
+              onMove={order.moveOnto}
+            />
+          )}
+
+          {/* What Clone and Load Sample did, for a screen reader: the new tile may be out of sight. */}
+          <div role="status" className="sr-only">{announcement}</div>
+        </main>
       </div>
 
-      <CreateProjectModal open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
+      {dialog && (
+        <ProjectDialog
+          key={editTarget ? `edit:${editTarget.id}` : 'new'}
+          project={editTarget ? { name: editTarget.name, description: editTarget.description } : null}
+          onCancel={() => setDialog(null)}
+          onCreate={handleCreate}
+          onUpdate={edits => { if (editTarget) handleUpdate(editTarget.id, edits); }}
+          onUnchanged={() => setDialog(null)}
+          returnFocusTo={() => (editTarget
+            ? findTileControl(mainRef.current, editTarget.id, 'edit')
+            : newOpenerRef.current)}
+        />
+      )}
 
-      {/* Delete Confirm */}
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
-        title="Delete Project"
-        message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone. Consider exporting first.`}
-      />
+      {deleteTarget && (
+        <DeleteProjectDialog
+          projectName={deleteTarget.name}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDelete}
+          returnFocusTo={() => (deleteConfirmedRef.current
+            ? null
+            : findTileControl(mainRef.current, deleteTarget.id, 'delete'))}
+        />
+      )}
 
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
 

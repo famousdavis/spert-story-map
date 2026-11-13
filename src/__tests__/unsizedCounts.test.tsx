@@ -119,14 +119,17 @@ describe('the project list', () => {
   });
   afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); });
 
-  it("the project's card counts it, read from storage by the real local driver", async () => {
+  it("the project's tile counts it, read from storage by the real local driver", async () => {
     const product = orphanProduct();
     localStorage.setItem(`rp:local:product_${product.id}`, JSON.stringify(product));
     localStorage.setItem('rp:local:products_index', JSON.stringify([{ id: product.id, name: product.name }]));
     render(<MemoryRouter><ProductList /></MemoryRouter>);
     await screen.findByText(product.name);
+    const tile = req(document.querySelector('[data-tile="true"]'), 'the tile');
+    const lines = [...tile.querySelectorAll('p')].map(p => p.textContent);
     // 8 pts proves the stored list was read as written (only r2, on L, adds points).
-    const card = req(screen.getByText('8 pts').parentElement, 'card stats');
-    expect(card.textContent?.match(/\d+ items|\d+ pts|\d+ unsized/g)).toStrictEqual(['4 items', '8 pts', '2 unsized']);
+    expect(lines[0]).toMatch(/^4 items · 8 pts · /);
+    // r4 is sized at 0 points: a count by points would say 3.
+    expect(lines[lines.length - 1]).toBe('⚠ 2 items unsized');
   });
 });
