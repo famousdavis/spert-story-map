@@ -53,6 +53,7 @@ afterEach(() => {
   localStorage.clear();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 const classes = (el: Element | null) => (el?.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
@@ -221,6 +222,25 @@ describe('the open', () => {
     expect(screen.queryByText('Structure page')).not.toBeNull();
   });
 
+  it('neither the tile nor its name has a double-click handler: a dblclick alone opens nothing', async () => {
+    const [tile] = await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
+    const t = req(tile, 'tile');
+    fireEvent.dblClick(within(t).getByRole('button', { name: 'Open Structure for Alpha' }));
+    fireEvent.dblClick(t);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('input')).toBe(document.querySelector('input[type="file"]'));
+    expect(screen.queryByText('Structure page')).toBeNull();
+  });
+
+  it.each(['Delete', 'Export', 'Edit', 'Clone'])('a click on %s does not open the project (no click handler on the tile root)', async (label) => {
+    vi.spyOn(driver, 'loadProduct').mockResolvedValue(null);
+    const [tile] = await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
+    fireEvent.click(within(req(tile, 'tile')).getByRole('button', { name: `${label} Alpha` }), { detail: 1 });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByText('Structure page')).toBeNull();
+  });
+
   it('a double-click on the name opens no text field on the list', async () => {
     await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
     await userEvent.dblClick(screen.getByRole('button', { name: 'Open Structure for Alpha' }));
@@ -285,6 +305,17 @@ describe('who may Edit, Delete and Share (R6, R13, R21, O17)', () => {
     expect(describedText(del)).toBe(OWNER_ONLY);
     expect(edit.getAttribute('title')).toBe(VIEW_ONLY);
     expect(describedText(edit)).toBe(VIEW_ONLY);
+  });
+
+  it('the role is the members map\'s, not the owner field\'s: no owner field, a viewer entry, a viewer\'s tile', async () => {
+    const p = makeProject({ id: 'p1', name: 'Alpha', members: { me: 'viewer' } });
+    p._owner = null;
+    cloudAs('me', [p]);
+    renderPage();
+    const tile = req((await screen.findAllByRole('listitem'))[0], 'tile');
+    expect((within(tile).getByRole('button', { name: 'Delete Alpha' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(tile).getByRole('button', { name: 'Edit Alpha' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(tile).queryByRole('button', { name: 'Share project' })).toBeNull();
   });
 
   it('a role the members map does not give: fails closed, as a viewer', async () => {

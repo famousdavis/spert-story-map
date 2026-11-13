@@ -143,6 +143,11 @@ describe('the list updates in place (O4)', () => {
   };
 
   it.each(['Load Sample', 'Clone', 'Edit', 'Delete', 'an import'])('after %s, an untouched tile is the same node, and "Loading projects..." never shows', async (action) => {
+    // The list arrives a task later, as a cloud read does: a page that showed "Loading projects..."
+    // for every refresh would render it in between. On a same-task read it would never paint.
+    const realIndex = driver.loadProductIndex.bind(driver);
+    const slow: StorageDriver = { ...driver, loadProductIndex: () => new Promise(r => setTimeout(r, 0)).then(realIndex) };
+    storage.value = { driver: slow, mode: 'local', storageReady: true };
     await show([{ id: 'keep', name: 'Keep' }, { id: 'work', name: 'Work' }]);
     const keep = tileOf('Keep');
     const keepOpen = control('Keep', 'Open Structure for');
