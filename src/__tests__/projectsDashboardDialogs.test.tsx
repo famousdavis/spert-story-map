@@ -254,14 +254,15 @@ describe('Edit Project', () => {
     await showProjects(['Alpha']);
     await userEvent.click(control('Alpha', 'Edit'));
     const now = req(stored('p0'), 'p0');
-    localStorage.setItem('rp:local:product_p0', JSON.stringify({ ...now, name: 'Renamed elsewhere' }));
+    // With surrounding spaces: an untouched field is neither written nor trimmed.
+    localStorage.setItem('rp:local:product_p0', JSON.stringify({ ...now, name: '  Renamed elsewhere  ' }));
     const desc = screen.getByLabelText('Description (Optional)');
     await userEvent.clear(desc);
     await userEvent.type(desc, '  New words  ');
     await userEvent.click(screen.getByRole('button', { name: 'Update' }));
     await settle();
     const after = req(stored('p0'), 'p0');
-    expect([after.name, after.description]).toEqual(['Renamed elsewhere', 'New words']);
+    expect([after.name, after.description]).toEqual(['  Renamed elsewhere  ', 'New words']);
   });
 
   it('appends no changelog entry', async () => {
