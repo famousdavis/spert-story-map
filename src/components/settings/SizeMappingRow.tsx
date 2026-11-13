@@ -44,6 +44,11 @@ export default function SizeMappingRow({ row, index, reason, info, zero, note, o
   const points = String(row.points ?? '');
   const id = useId();
   const expected = useRef(label);
+  // A rename this row has just saved, until React renders it. A blur that renames and a
+  // focus on the same row can run with no render between them (Tab from the label to its
+  // points), and that focus's `label` is still the old one: without this, the points
+  // would be refused as "changed elsewhere".
+  const renamed = useRef<{ from: string; to: string } | null>(null);
   const focused = useRef(false);
   // Escape blurs, and the blur must not save what was typed. Not `revertValue`: when
   // focus stays it suppresses the NEXT blur too, which drops the following edit.
@@ -53,9 +58,13 @@ export default function SizeMappingRow({ row, index, reason, info, zero, note, o
   const [refocus, setRefocus] = useState<{ field: 'label' | 'points'; n: number } | null>(null);
   const [pointsFocused, setPointsFocused] = useState(false);
 
-  // While no field has focus, the expected label follows the stored one (a field can
-  // be blurred without having been focused, as `fireEvent` does).
-  useEffect(() => { if (!focused.current) expected.current = label; }, [label]);
+  // Once rendered, `label` is the truth again (a rename the list then refused leaves the
+  // old one). While no field has focus, the expected label follows it (a field can be
+  // blurred without having been focused, as `fireEvent` does).
+  useEffect(() => {
+    renamed.current = null;
+    if (!focused.current) expected.current = label;
+  });
   // Enter blurred to save; focus comes back after the re-render, so the hook's focus
   // snapshot, and `expected`, are the label just saved.
   useEffect(() => {
@@ -64,7 +73,9 @@ export default function SizeMappingRow({ row, index, reason, info, zero, note, o
 
   const labelField = useBufferedField(label, (text: string): void => {
     if (escaping.current) { escaping.current = false; labelField.setLocalValue(label); return; }
-    if (!onRename(index, expected.current, text)) labelField.setLocalValue(label);
+    if (!onRename(index, expected.current, text)) { labelField.setLocalValue(label); return; }
+    renamed.current = { from: label, to: text.trim() };
+    expected.current = renamed.current.to;
   });
   const pointsField = useBufferedField(points, (text: string): void => {
     if (escaping.current) { escaping.current = false; pointsField.setLocalValue(points); return; }
@@ -73,7 +84,7 @@ export default function SizeMappingRow({ row, index, reason, info, zero, note, o
 
   const onFocus = (field: ReturnType<typeof useBufferedField>) => {
     focused.current = true;
-    expected.current = label;
+    expected.current = renamed.current?.from === label ? renamed.current.to : label;
     escaping.current = false;
     field.handleFocus();
   };

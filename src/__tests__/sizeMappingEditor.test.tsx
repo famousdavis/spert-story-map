@@ -117,6 +117,20 @@ describe('rename', () => {
     expect(labelAt(2).value).toBe('Medium');
   });
 
+  it('2c. after a rename, Tab to the same row\'s points and a points commit saves', async () => {
+    const { hosted, user } = mount(product('XS:5 M:20', [free('m1', 'M')]));
+    await user.click(labelAt(1));
+    await user.type(labelAt(1), 'edium');
+    await user.tab();
+    expect(pointsAt(1)).toHaveFocus();
+    await user.clear(pointsAt(1));
+    await user.type(pointsAt(1), '30');
+    await user.tab();
+    expect({ rows: stored(hosted.product), m1: ribOf(hosted.product, 'm1').size, writes: hosted.writes })
+      .toEqual({ rows: 'XS:5 Medium:30', m1: 'Medium', writes: 2 });
+    expect(onPage(/changed elsewhere/)).toHaveLength(0);
+  });
+
   it('3. refuses a label import or the list would reject, shows why, and shows the stored label again', async () => {
     const { hosted, user } = mount(product(STANDARD, [free('xs1', 'XS')]));
     const cases: [string, string][] = [
