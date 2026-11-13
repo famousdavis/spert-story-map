@@ -5,6 +5,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { Size, SizeMapping } from '../../types';
+import { clearMissingLabel, missingSizeLabel, pickerMissingTitle } from '../../lib/missingSize';
 
 const SIZE_COLORS: Record<string, string> = {
   'XS': 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -61,7 +62,11 @@ export default function SizePicker({ value, sizeMapping, onChange }: SizePickerP
     setOpen(!open);
   };
 
-  const colorClass = value ? (SIZE_COLORS[value] || 'bg-gray-100 text-gray-800 border-gray-300') : '';
+  // A label the size list no longer holds draws exactly as no size, and is named in the
+  // tooltip and the Clear item. The value itself is left alone: it changes only on a pick.
+  const missing = missingSizeLabel(value, sizeMapping);
+  const shown = missing ? null : value;
+  const colorClass = shown ? (SIZE_COLORS[shown] || 'bg-gray-100 text-gray-800 border-gray-300') : '';
 
   const dropdown = open ? createPortal(
     <div
@@ -94,7 +99,7 @@ export default function SizePicker({ value, sizeMapping, onChange }: SizePickerP
             onClick={() => { onChange(null); setOpen(false); }}
             className="block w-full text-left px-3 py-1 text-sm text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
-            Clear size
+            {missing ? clearMissingLabel(missing) : 'Clear size'}
           </button>
         </>
       )}
@@ -106,13 +111,14 @@ export default function SizePicker({ value, sizeMapping, onChange }: SizePickerP
     <div className="relative inline-block" ref={ref}>
       <button
         onClick={handleToggle}
+        title={missing ? pickerMissingTitle(missing, sizeMapping) : undefined}
         className={`text-xs font-medium px-2 py-0.5 rounded border transition-colors ${
-          value
+          shown
             ? colorClass
             : 'bg-yellow-50 text-yellow-700 border-yellow-300 border-dashed dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-700/50'
         }`}
       >
-        {value || 'Size?'}
+        {shown || 'Size?'}
       </button>
       {dropdown}
     </div>
