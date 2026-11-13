@@ -349,8 +349,10 @@ describe('the stored size', () => {
     expect(added).toHaveLength(1);
     const labelInput = req(added[0], 'new size label');
     fireEvent.change(labelInput, { target: { value: 'XL' } });
+    fireEvent.blur(labelInput);
     const points = req(labelInput.closest('div')?.querySelector<HTMLInputElement>('input[type="number"]'), 'new size points');
     fireEvent.change(points, { target: { value: '13' } });
+    fireEvent.blur(points);
     const restored = settings.product;
     expect(getRibItemPoints(ribOf(restored, 'orphan'), restored.sizeMapping)).toBe(13);
 
