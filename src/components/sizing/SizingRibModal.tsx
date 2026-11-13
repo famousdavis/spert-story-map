@@ -355,7 +355,7 @@ export default function SizingRibModal({
 
         <Field label="Size">
           {locked ? (
-            <LockedSize size={size} note={sizeLockNote(lockedSprintName)} />
+            <LockedSize size={size} note={sizeLockNote(lockedSprintName)} sizeMapping={product.sizeMapping} />
           ) : (
             <SizePicker
               value={size}

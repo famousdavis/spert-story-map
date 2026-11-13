@@ -78,7 +78,7 @@ export default function RibRow({
         {/* Size */}
         <div className="text-center">
           {rib._sizeLockNote ? (
-            <LockedSize size={rib.size} note={rib._sizeLockNote} compact />
+            <LockedSize size={rib.size} note={rib._sizeLockNote} sizeMapping={sizeMapping} compact />
           ) : (
             <SizePicker
               value={rib.size}

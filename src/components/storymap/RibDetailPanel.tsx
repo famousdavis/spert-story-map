@@ -205,7 +205,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
             <DetailRow label="Size">
               <div className="flex items-center gap-2">
                 {lockNote ? (
-                  <LockedSize size={rib.size} note={lockNote} />
+                  <LockedSize size={rib.size} note={lockNote} sizeMapping={product.sizeMapping} />
                 ) : (
                   <SizePicker
                     value={rib.size || null}
