@@ -43,6 +43,7 @@ src/
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory
 │   ├── progressRule.ts              # The one rule for what counts: sprint order, effective entries, share, completion, lock, a row's records
 │   ├── calculations.ts              # Pure totals over the rule (points, project and release figures, stats)
+│   ├── missingSize.ts               # A size label the size list no longer holds: the one test for naming it, and the wording
 │   ├── reconciliation.ts            # Unallocated / Over-allocated / Unknown release / Total rows, and the stranded list
 │   ├── progressMutations.ts         # Progress helpers (update, remove, comment) + carry on move, allocation save, Bring here, Remove, Clear progress
 │   ├── settingsMutations.ts         # Pure cascade deletion (release, sprint) + what a delete would take with it
