@@ -4,7 +4,7 @@
 
 import { useEffect, Fragment } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { getRibItemPoints, round1 } from '../../lib/calculations';
+import { getRibItemPoints, isRibUnsized, round1 } from '../../lib/calculations';
 import ProgressBar from '../ui/ProgressBar';
 import CommentPanel from './CommentPanel';
 import type { RibItem, SizeMapping, Sprint } from '../../types';
@@ -114,7 +114,7 @@ export default function ProgressRow({
           </div>
         </td>
         <td className="text-center px-2 py-2">
-          <span className="text-xs text-gray-500 dark:text-gray-400">{rib.size || '—'}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{isRibUnsized(rib, sizeMapping) ? '—' : rib.size}</span>
         </td>
         <td className="text-center px-2 py-2">
           {pts ? (

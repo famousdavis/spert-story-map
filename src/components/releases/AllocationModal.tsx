@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useState } from 'react';
-import { getRibItemPoints } from '../../lib/calculations';
+import { getRibItemPoints, isRibUnsized } from '../../lib/calculations';
 import { describeAllocationMove, describeAllocationWarnings } from '../../lib/progressMutations';
 import type { AllocationWarning } from '../../lib/progressMutations';
 import { currentAllocations } from '../../lib/progressRule';
@@ -79,7 +79,7 @@ export default function AllocationModal({ rib, product, onSave, onUpdateCategory
     <Modal open onClose={onClose} title={`Allocate: ${rib.name}`} wide>
       <div className="space-y-4">
         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-          {rib.size && <span>Size: <strong>{rib.size}</strong></span>}
+          {!isRibUnsized(rib, product.sizeMapping) && <span>Size: <strong>{rib.size}</strong></span>}
           {pts > 0 && <span>Points: <strong>{pts}</strong></span>}
           <span className="flex items-center gap-1.5">Category:
             {(['core', 'non-core'] as const).map(cat => (

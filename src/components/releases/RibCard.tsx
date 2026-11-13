@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import React from 'react';
-import { getRibItemPoints, getAllocationTotal } from '../../lib/calculations';
+import { getRibItemPoints, getAllocationTotal, isRibUnsized } from '../../lib/calculations';
 import { SIZE_COLORS } from '../ui/SizePicker';
 import type { RibItem, Product, ReleaseAllocation } from '../../types';
 
@@ -29,7 +29,8 @@ export default function RibCard({ rib, product, allocation, isDragging, isDropBe
   const allocTotal = getAllocationTotal(rib);
   const isPartial = allocation && allocation.percentage < 100;
   const allocWarning = allocTotal > 0 && allocTotal !== 100;
-  const sizeColor = rib.size ? (SIZE_COLORS[rib.size] || 'bg-gray-100 text-gray-800') : '';
+  const shownSize = isRibUnsized(rib, product.sizeMapping) ? null : rib.size;
+  const sizeColor = shownSize ? (SIZE_COLORS[shownSize] || 'bg-gray-100 text-gray-800') : '';
 
   return (
     <div className="mb-1.5">
@@ -54,9 +55,9 @@ export default function RibCard({ rib, product, allocation, isDragging, isDropBe
       >
         <div className="flex items-start justify-between gap-2">
           <span className="text-sm text-gray-800 dark:text-gray-200 leading-tight flex-1">{rib.name}</span>
-          {rib.size && (
+          {shownSize && (
             <span className={`text-xs font-medium px-1.5 py-0.5 rounded flex-shrink-0 ${sizeColor}`}>
-              {rib.size}
+              {shownSize}
             </span>
           )}
         </div>

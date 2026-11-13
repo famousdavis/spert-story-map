@@ -46,6 +46,7 @@ function renderCell() {
   render(
     <RibCell
       cell={baseCell}
+      sizeMapping={[{ label: 'M', points: 3 }]}
       onClick={onClick}
       onRename={onRename}
       onDelete={onDelete}
