@@ -45,6 +45,7 @@ afterEach(() => {
   localStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 const tileOf = (name: string) => req(tiles().find(t => t.querySelector('h3')?.textContent === name), `tile ${name}`);
@@ -241,22 +242,41 @@ describe('the welcome panel (R22)', () => {
 });
 
 describe('a double-click on a tile opens the project once (O16)', () => {
+  // ⚠️ The guard's clock is the test's. It lives GESTURE_MS from the first click, so a test that
+  // waited in real time, from after the real Structure page had rendered, failed whenever that
+  // render was slow (CI's shipgate on 9db0668; 6 of 6 runs under CPU load). Only setTimeout and
+  // clearTimeout are faked, from just before the first click: the local driver's reads are
+  // promises, and React schedules its renders without either.
+  const fakeGestureClock = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  /** Flush promises and renders, with the clock stopped, until Structure's names are on the page. */
+  async function structureNames() {
+    for (let i = 0; i < 50; i++) {
+      const names = screen.queryAllByRole('button', { name: /^Edit / });
+      if (names.length > 0) return names;
+      await act(async () => { await Promise.resolve(); });
+    }
+    throw new Error('Structure never rendered');
+  }
+
   it('Structure renders, no text field opens, and typing then Enter changes nothing stored', async () => {
     const sample = createSampleProduct();
     seedLocal([sample]);
     renderPage('real');
     await screen.findByRole('list', { name: 'Projects' });
     const before = localStorage.getItem(`rp:local:product_${sample.id}`);
+    fakeGestureClock();
     // The first click opens the project at once.
     fireEvent.click(screen.getByRole('button', { name: `Open Structure for ${sample.name}` }), { detail: 1 });
     // The second click of the gesture, 120 ms on, lands on the first theme's name on Structure.
-    const themeName = (await screen.findAllByRole('button', { name: /^Edit / }))[0]!;
-    await act(async () => { await new Promise(r => setTimeout(r, 120)); });
+    const themeName = (await structureNames())[0]!;
+    act(() => { vi.advanceTimersByTime(120); });
     fireEvent.mouseDown(themeName, { detail: 2 });
     fireEvent.mouseUp(themeName, { detail: 2 });
     fireEvent.click(themeName, { detail: 2 });
     fireEvent.dblClick(themeName, { detail: 2 });
     expect(document.querySelectorAll('input[name="inlineEdit"]')).toHaveLength(0);
+    vi.useRealTimers();
     // Someone renaming the project as they used to types the new name and presses Enter.
     await userEvent.keyboard('Renamed{Enter}');
     flushPendingSaves();
@@ -269,9 +289,10 @@ describe('a double-click on a tile opens the project once (O16)', () => {
     seedLocal([sample]);
     renderPage('real');
     await screen.findByRole('list', { name: 'Projects' });
+    fakeGestureClock();
     fireEvent.click(screen.getByRole('button', { name: `Open Structure for ${sample.name}` }), { detail: 1 });
-    const themeName = (await screen.findAllByRole('button', { name: /^Edit / }))[0]!;
-    await act(async () => { await new Promise(r => setTimeout(r, 550)); });
+    const themeName = (await structureNames())[0]!;
+    act(() => { vi.advanceTimersByTime(550); });
     fireEvent.click(themeName, { detail: 1 });
     expect(document.querySelectorAll('input[name="inlineEdit"]')).toHaveLength(1);
   });
