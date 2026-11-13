@@ -150,7 +150,7 @@ export default function SettingsView() {
         </div>
       </Section>
 
-      <SizeMappingSection sizeMapping={product.sizeMapping} updateProduct={updateProduct} />
+      <SizeMappingSection product={product} updateProduct={updateProduct} />
 
       {/* Releases */}
       <Section title="Releases">
