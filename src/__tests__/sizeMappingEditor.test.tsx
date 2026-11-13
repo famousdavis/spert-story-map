@@ -399,6 +399,25 @@ describe('11. every row keeps its own inputs and lines', () => {
     check();
     expect(within(rowAt(4)).getByText(/at 0 points/)).toBeInTheDocument();
   });
+
+  it('a cleared line does not come back when the list returns to the state it was made for', async () => {
+    const { hosted, user } = mount(product('XS:5 S:10 L:40', [free('a', 'L')]));
+    const reason = '“S” is already in the list.';
+    await user.clear(labelAt(2));
+    await user.type(labelAt(2), 'S');
+    await user.tab();
+    expect(within(rowAt(2)).getByText(reason)).toBeInTheDocument();
+    await user.clear(pointsAt(0));
+    await user.type(pointsAt(0), '6');
+    await user.tab();
+    expect(onPage(reason)).toHaveLength(0);
+    await user.clear(pointsAt(0));
+    await user.type(pointsAt(0), '5');
+    await user.tab();
+    expect(stored(hosted.product)).toBe('XS:5 S:10 L:40');
+    expect(onPage(reason)).toHaveLength(0);
+    expect(labelAt(2)).not.toHaveAttribute('aria-invalid');
+  });
 });
 
 // ─── 13. Another editor changes the list mid-action ─────────────────

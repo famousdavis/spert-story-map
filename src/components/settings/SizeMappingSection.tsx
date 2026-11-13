@@ -66,6 +66,14 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     (at >= 0 ? find(`[data-size-remove="${at}"]`) : addRef.current)?.focus();
   }, [rows]);
 
+  // A line belongs to the list it was made for. Once the list is anything else the line
+  // goes for good, so a list that later returns to that state does not bring it back. A
+  // revival line is made for the list after its own write, which lands in the same render.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLines(prev => (prev.every(l => l.sig === sig) ? prev : prev.filter(l => l.sig === sig)));
+  }, [sig]);
+
   const putLine = (line: Omit<Line, 'sig'>, at = sig) =>
     setLines(prev => [...prev.filter(l => l.sig === sig && l.key !== line.key), { ...line, sig: at }]);
   const refuse = (index: number, field: SizeRowField, text: string) => {
