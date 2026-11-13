@@ -24,7 +24,8 @@
  * are individually sufficient for the RENDER. The converter half earns its place
  * elsewhere — `ProductLayout`'s "Saved ..." line feeds the same value to
  * `formatRelativeTime` — so it needs an assertion of its own rather than a
- * comment asserting one exists. That is the `describe` block at the bottom.
+ * comment asserting one exists. That block now lives in
+ * `firestoreUpdatedAtRead.test.ts` (moved v0.55.0, unchanged).
  *
  * ⚠️ THE CLOCK IS FROZEN, AND THAT IS LOAD-BEARING FOR PC-2. A fabricated
  * current date is indistinguishable from a correct one on the day the fixture
@@ -212,11 +213,7 @@ describe('PC-6 — the reachable production path: JSON import', () => {
     createdAt: '2026-01-01T00:00:00.000Z', schemaVersion: 2, themes: [],
   });
 
-  it('imports cleanly without updatedAt — validateProduct never required it', () => {
-    const p = importProductFromJSON(IMPORTABLE);
-    expect(p.name).toBe('Imported Project');   // harness control: the import ran
-    expect(p.updatedAt).toBeUndefined();       // the field really is absent
-  });
+  // 'imports cleanly without updatedAt' moved to importWithoutUpdatedAt.test.ts (v0.55.0).
 
   it('and the card renders the em dash rather than today', () => {
     const p = importProductFromJSON(IMPORTABLE);
@@ -225,34 +222,5 @@ describe('PC-6 — the reachable production path: JSON import', () => {
     expect(rendered).not.toBe(TODAY_RENDERED);
   });
 });
-/**
- * Pins the CONVERTER half independently of the render. Without this block,
- * deleting every `normalizeUpdatedAt` call from `firestoreDriver.ts` passes —
- * measured, not assumed.
- *
- * It matters beyond `ProjectCard`: `useProduct` derives `lastSaved` from the same
- * field and `ProductLayout` renders it through `formatRelativeTime`, which has no
- * normalization of its own. A degraded value reaching the store surfaces there.
- */
-describe('the Firestore read path normalizes before anything renders', () => {
-  it.each(RECOVERABLE)('recoverable: %s -> ISO 8601 in the store', async (_label, shape) => {
-    const product = await readThroughDriver(shape);
-    expect(product.updatedAt).toBe(new Date(INSTANT_MS).toISOString());
-  });
-
-  it.each(NO_INSTANT)('no instant: %s -> undefined in the store', async (_label, shape) => {
-    const product = await readThroughDriver(shape);
-    expect(product.updatedAt).toBeUndefined();
-  });
-
-  it('never leaves a non-string, non-undefined value in the store', async () => {
-    const seen: unknown[] = [];
-    for (const [, shape] of [...RECOVERABLE, ...NO_INSTANT]) {
-      seen.push((await readThroughDriver(shape)).updatedAt);
-    }
-    expect(seen).toHaveLength(11); // harness control: it looked 11 times
-    for (const v of seen) {
-      expect(v === undefined || typeof v === 'string').toBe(true);
-    }
-  });
-});
+// 'the Firestore read path normalizes before anything renders' moved to
+// firestoreUpdatedAtRead.test.ts (v0.55.0), unchanged.
