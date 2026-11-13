@@ -41,7 +41,7 @@ export function useProduct(productId: string | undefined) {
   // owner revoked their access between sessions), we navigate to / with
   // router state so ProductList can show a one-shot "access denied"
   // banner. Other errors fall through to the spinner-stops branch and
-  // let ProductLayout's "Project not found" UI render.
+  // let ProductLayout's "Product not found" UI render.
   /* eslint-disable react-hooks/set-state-in-effect -- loading async data requires setState in effect */
   useEffect(() => {
     if (!storageReady || !driver || !productId) {
@@ -68,7 +68,7 @@ export function useProduct(productId: string | undefined) {
           navigateRef.current('/', { replace: true, state: { productAccessDenied: true } });
         } else {
           // Stop the spinner so ProductLayout's `!loading && !product`
-          // branch renders the "Project not found" fallback. We do NOT
+          // branch renders the "Product not found" fallback. We do NOT
           // route through setSaveError here — that lives in ProductLayout
           // scope and is appropriate for write failures, not read ones.
           console.error('Failed to load product:', err);
@@ -91,7 +91,7 @@ export function useProduct(productId: string | undefined) {
   // session, the listener fires with `permission-denied`. We unsubscribe via
   // the unsub ref AND navigate to / with router state — without unsubscribe,
   // the listener keeps firing as Firestore retries; without navigation, the
-  // user is stranded on a "Project not found" dead end after the next
+  // user is stranded on a "Product not found" dead end after the next
   // setState(null) (which we deliberately avoid here — no state change keeps
   // the previous render visible until navigation completes).
   useEffect(() => {

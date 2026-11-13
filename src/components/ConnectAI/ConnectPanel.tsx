@@ -127,7 +127,7 @@ export default function ConnectPanel({
         </p>
 
         <p className="text-xs text-amber-700 dark:text-amber-400">
-          ⚠ Don’t switch projects while the AI is building.
+          ⚠ Don’t switch products while the AI is building.
         </p>
 
         <div className="flex items-center gap-2 text-xs">

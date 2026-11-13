@@ -811,23 +811,23 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       if (!db) return; // defensive: db is null when Firebase is unavailable
       // Guard 1 — pre-tx fast fail
       if (targetUid === uid) {
-        throw new Error('Cannot remove yourself from a project.');
+        throw new Error('Cannot remove yourself from a product.');
       }
       try {
         const ref = doc(requireDb(), PROJECTS_COL, productId);
         await runTransaction(db, async (tx) => {
           const snap = await tx.get(ref);
           if (!snap.exists()) {
-            throw new Error('Project not found.');
+            throw new Error('Product not found.');
           }
           const data = snap.data();
           // Guard 2 — defense-in-depth (UI is owner-gated)
           if (data.owner !== uid) {
-            throw new Error('Only the project owner can remove members.');
+            throw new Error('Only the owner can remove members.');
           }
           // Guard 3 — block removing the owner
           if (data.owner === targetUid) {
-            throw new Error('Cannot remove the project owner.');
+            throw new Error('Cannot remove the owner.');
           }
           tx.update(ref, { [`members.${targetUid}`]: deleteField() });
         });

@@ -2,13 +2,17 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
+import { PRODUCT_DEFINITION } from '../../lib/constants';
+
 /**
  * The "Copy Prompt" payload the user pastes into their AI chatbot. The
  * canonical WORD-NNNN pairing code is interpolated in. Keep the modeling
  * guidance in sync with the MCP tool descriptions in the Landing Page repo.
  */
 export function buildCopyPrompt(code: string): string {
-  return `I want to build a story map for a software product using SPERT Story Map.
+  return `I want to build a story map for a product using SPERT Story Map. ${PRODUCT_DEFINITION}
+Some tool names, descriptions and replies still say "project"; wherever they do, it means the product
+open in SPERT Story Map. When you talk to me, call it a product.
 
 WHAT IS A STORY MAP?
 A story map captures the breadth and depth of what a product team wants to build.
@@ -36,7 +40,7 @@ MY PAIRING CODE IS: ${code}
 
 INSTRUCTIONS FOR YOU:
 Call resolve_session_code with my code, then call get_session_info to confirm which
-project is open.
+product is open.
 Call resolve_session_code exactly once — it is single-use and will fail if called again. The session remains active for the entire conversation after that first successful call. Do not call resolve_session_code again at any point.
 To build a new map from scratch: first ask me what product I am planning and which modeling
 approach fits best — do not write anything until I have answered. Then pick a build method:
@@ -293,18 +297,18 @@ SIZING (separate step — only when the user explicitly asks):
 Sizing assigns a t-shirt size to each rib item. Build and confirm the map structure first.
 Only proceed with sizing after the user explicitly asks you to.
 
-READ MODE REQUIRED: Call storymap_get_project before any sizing. You need the project's
+READ MODE REQUIRED: Call storymap_get_project before any sizing. You need the product's
 sizeMapping (valid labels and point values), each rib's id and current size, and each rib's
 locked state. If Read Mode is off, ask the user to enable it in the Connect AI panel.
 
-SIZE MAPPING — CRITICAL: Use only size labels that appear in the project's sizeMapping. Never
-invent labels or assume the seven defaults (XS/S/M/L/XL/XXL/XXXL) — this project may use
+SIZE MAPPING — CRITICAL: Use only size labels that appear in the product's sizeMapping. Never
+invent labels or assume the seven defaults (XS/S/M/L/XL/XXL/XXXL) — this product may use
 entirely different labels. An unknown label is silently skipped with no error: you will not
 know the size was lost. Always read sizeMapping first.
 
 For sizing multiple ribs, use storymap_bulk_size (one call). For a single rib, use
 storymap_size_rib. Never use storymap_update_rib for sizing — it bypasses sizeMapping
-validation and can create invalid sizes for projects with custom size labels.
+validation and can create invalid sizes for products with custom size labels.
 For replacing description or category on multiple ribs, use storymap_bulk_update_ribs
 (one call) instead of repeated storymap_update_rib calls. To ADD to notes on multiple
 ribs without overwriting, use storymap_bulk_append_rib_notes instead.

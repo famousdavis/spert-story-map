@@ -22,7 +22,7 @@ export default function CloudLoadNotice({ productId, productName }: CloudLoadNot
   return (
     <div role="status" className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700/50 px-6 py-2 flex items-center justify-center gap-3">
       <p className="text-xs text-amber-800 dark:text-amber-200">
-        Part of &ldquo;{productName || 'this project'}&rdquo; could not be read and was left out so the project could open. If you make changes, that part will not be kept.
+        Part of &ldquo;{productName || 'this product'}&rdquo; could not be read and was left out so the product could open. If you make changes, that part will not be kept.
       </p>
       <button
         type="button"

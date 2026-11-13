@@ -12,9 +12,9 @@ import { itemsLine, plansLine, warningLine, type TileFigures } from './tile-meta
 
 /** Why Delete is disabled for anyone but the owner (SPERT Forecaster's `OWNER_ONLY_DELETE_REASON`). */
 export const OWNER_ONLY_DELETE_REASON =
-  "Only the project's owner can delete it. To remove it from your list, ask the owner to stop sharing it with you.";
+  "Only the owner can delete it. To remove it from your list, ask the owner to stop sharing it with you.";
 /** Why Edit is disabled for a viewer, or an access this page cannot name (Forecaster's `VIEW_ONLY_REASON`). */
-export const VIEW_ONLY_REASON = 'View only — this project is shared with you as a viewer.';
+export const VIEW_ONLY_REASON = 'View only — this product is shared with you as a viewer.';
 
 export interface TileProject extends TileFigures {
   id: string;
@@ -104,7 +104,7 @@ export default function ProjectTile({
           <TrashIconButton
             onClick={onDelete}
             ariaLabel={`Delete ${p.name}`}
-            title={canDelete ? 'Delete project' : OWNER_ONLY_DELETE_REASON}
+            title={canDelete ? 'Delete product' : OWNER_ONLY_DELETE_REASON}
             disabled={!canDelete}
             describedBy={canDelete ? undefined : deleteReasonId}
           />
@@ -120,17 +120,17 @@ export default function ProjectTile({
       )}
       <div className={ACTIONS}>
         <div className={`${REVEAL} ${ABOVE_OPEN}`}>
-          {showShare && <ShareIconButton onClick={onShare} ariaLabel="Share project" title="Share project" />}
-          <ExportIconButton onClick={onExport} ariaLabel={`Export ${p.name}`} title="Export project" />
+          {showShare && <ShareIconButton onClick={onShare} ariaLabel={`Share ${p.name}`} title="Share product" />}
+          <ExportIconButton onClick={onExport} ariaLabel={`Export ${p.name}`} title="Export product" />
           {!canEdit && <span id={editReasonId} className="sr-only">{VIEW_ONLY_REASON}</span>}
           <PencilIconButton
             onClick={onEdit}
             ariaLabel={`Edit ${p.name}`}
-            title={canEdit ? 'Edit project' : VIEW_ONLY_REASON}
+            title={canEdit ? 'Edit product' : VIEW_ONLY_REASON}
             disabled={!canEdit}
             describedBy={canEdit ? undefined : editReasonId}
           />
-          <CloneIconButton onClick={onClone} ariaLabel={`Clone ${p.name}`} title="Clone project" />
+          <CloneIconButton onClick={onClone} ariaLabel={`Clone ${p.name}`} title="Clone product" />
         </div>
       </div>
     </li>

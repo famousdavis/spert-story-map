@@ -149,16 +149,16 @@ function projectIssues(project: CheckableExport['projects'][number]): string[] {
   const issues: string[] = [];
   const name = asName(project.name);
   if (!name) {
-    issues.push('The project has no name. SPERT Forecaster requires one.');
+    issues.push('The product has no name. SPERT Forecaster requires one.');
   } else if (name.length > MAX_STRING_LENGTH) {
     issues.push(
-      `The project name is ${name.length} characters, above SPERT Forecaster's limit of ${MAX_STRING_LENGTH}.`,
+      `The product name is ${name.length} characters, above SPERT Forecaster's limit of ${MAX_STRING_LENGTH}.`,
     );
   }
   const milestones = project.milestones ?? [];
   if (milestones.length > MAX_MILESTONES) {
     issues.push(
-      `This project has ${milestones.length} releases carrying story points, and SPERT Forecaster accepts at most ${MAX_MILESTONES} milestones. ` +
+      `This product has ${milestones.length} releases carrying story points, and SPERT Forecaster accepts at most ${MAX_MILESTONES} milestones. ` +
       'Releases with no points are not counted.',
     );
   }

@@ -124,7 +124,7 @@ export default function SettingsView() {
       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Settings</h2>
 
       {/* Project Info */}
-      <Section title="Project Details">
+      <Section title="Product Details">
         <div className="space-y-3">
           <Field label="Name" htmlFor={`${baseId}-projectName`}>
             <BufferedText

@@ -75,7 +75,7 @@ export default function InsightsView() {
 
       {/* Project progress */}
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-6">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Project Progress</h3>
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Overall Progress</h3>
         <ProgressBar percent={projectPct} showLabel height="h-4" color="bg-blue-500" />
       </div>
 

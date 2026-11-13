@@ -30,7 +30,7 @@ export default function ProgressHeader({
       <div className="flex items-center gap-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Progress Tracking</h2>
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          Project: <span className="font-medium text-gray-700 dark:text-gray-300">{Math.round(percentComplete)}%</span> complete
+          Overall: <span className="font-medium text-gray-700 dark:text-gray-300">{Math.round(percentComplete)}%</span> complete
         </div>
       </div>
       <div className="flex items-center gap-4">

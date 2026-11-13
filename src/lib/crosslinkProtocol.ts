@@ -190,7 +190,7 @@ export function describeOutcome(outcome: SenderOutcome): string[] {
     case 'applied':
       return [];
     case 'needs-review':
-      return ['SPERT Forecaster opened this project for review. Switch to that tab to finish the import.'];
+      return ['SPERT Forecaster opened it as a project for review. Switch to that tab to finish the import.'];
     case 'refused':
       return [`SPERT Forecaster did not accept the transfer: ${outcome.nackReason}`];
     case 'timed-out':

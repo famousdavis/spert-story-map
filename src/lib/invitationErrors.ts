@@ -22,9 +22,9 @@ export function mapInvitationError(
   if (code === 'functions/unauthenticated')
     return 'You must be signed in to perform this action. Please sign in and try again.';
   if (code === 'functions/not-found')
-    return 'Project not found or you are not the owner.';
+    return 'Product not found or you are not the owner.';
   if (code === 'functions/permission-denied')
-    return 'Only the project owner can send invitations.';
+    return 'Only the owner can send invitations.';
   if (code === 'functions/invalid-argument')
     return 'One or more email addresses are invalid.';
   if (code === 'functions/resource-exhausted') {

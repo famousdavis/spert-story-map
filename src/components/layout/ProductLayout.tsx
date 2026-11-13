@@ -89,7 +89,7 @@ export default function ProductLayout() {
   // Safety net: if we end up in local mode with no loaded product
   // (e.g. because the driver swapped after a mode switch or sign-out
   // and the cloud-only product is no longer reachable), go home
-  // instead of showing "Project not found".
+  // instead of showing "Product not found".
   useEffect(() => {
     if (!loading && !product && mode === 'local') {
       navigate('/', { replace: true });
@@ -104,8 +104,8 @@ export default function ProductLayout() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">Project not found</p>
-          <Link to="/" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium">Back to projects</Link>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">Product not found</p>
+          <Link to="/" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium">Back to Products</Link>
         </div>
       </div>
     );
@@ -121,7 +121,7 @@ export default function ProductLayout() {
               <Link
                 to="/"
                 onClick={() => window.scrollTo(0, 0)}
-                aria-label="Go to projects home"
+                aria-label="Go to products home"
                 className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <img
@@ -135,7 +135,7 @@ export default function ProductLayout() {
                 onClick={() => window.scrollTo(0, 0)}
                 className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm"
               >
-                ← Projects
+                ← Products
               </Link>
               <div className="h-5 w-px bg-gray-200 dark:bg-gray-700" />
               <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate max-w-xs">

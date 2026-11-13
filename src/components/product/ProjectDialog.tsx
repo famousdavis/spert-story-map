@@ -2,15 +2,16 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// One dialog for New Project and Edit Project (v0.55.0). It replaces CreateProjectModal and the
+// One dialog for New Product and Edit Product (v0.55.0). It replaces CreateProjectModal and the
 // tile's rename in place. The look is SPERT Forecaster's project dialog; Ctrl+S / Cmd+S is
 // GanttApp's (`src/features/projects/ProjectDialog.tsx:162-167` at aa43ae7).
 
 import { useId, useRef, useState } from 'react';
 import DialogShell from './DialogShell';
 import { PROJECT_NAME_MAX } from '../../lib/cloneName';
+import { PRODUCT_DEFINITION } from '../../lib/constants';
 import {
-  DIALOG, DIALOG_BG, DIALOG_BUTTONS, DIALOG_CANCEL, DIALOG_SUBMIT, DIALOG_TITLE, FIELD, HINT,
+  DIALOG, DIALOG_BG, DIALOG_BUTTONS, DIALOG_CANCEL, DIALOG_SUBMIT, DIALOG_TITLE, FIELD, FIELD_HELP, HINT,
   INPUT_BASE, INPUT_BORDER, LABEL,
 } from './dashboard-styles';
 
@@ -21,7 +22,7 @@ export interface ProjectEdits {
 }
 
 interface ProjectDialogProps {
-  /** null for New Project; otherwise the project being edited, as the list shows it. */
+  /** null for New Product; otherwise the project being edited, as the list shows it. */
   project: { name: string; description?: string } | null;
   onCancel: () => void;
   onCreate: (name: string, description: string) => void;
@@ -41,7 +42,7 @@ export default function ProjectDialog({ project, onCancel, onCreate, onUpdate, o
   const [name, setName] = useState(prefill.name);
   const [description, setDescription] = useState(prefill.description);
   const isEdit = project !== null;
-  // Set by the first save. New Project stays open until its create has finished (a server round
+  // Set by the first save. New Product stays open until its create has finished (a server round
   // trip in the cloud), so without it a second Create, Enter or Ctrl/Cmd+S made a second project.
   // A ref as well as state: two presses in one task both read the ref, not a stale render.
   const savingRef = useRef(false);
@@ -66,7 +67,7 @@ export default function ProjectDialog({ project, onCancel, onCreate, onUpdate, o
   return (
     <DialogShell
       role="dialog"
-      title={isEdit ? 'Edit Project' : 'New Project'}
+      title={isEdit ? 'Edit Product' : 'New Product'}
       titleClassName={DIALOG_TITLE}
       className={`${DIALOG} ${DIALOG_BG}`}
       initialFocus={root => root.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), button:not([disabled])')}
@@ -76,7 +77,7 @@ export default function ProjectDialog({ project, onCancel, onCreate, onUpdate, o
       returnFocusTo={returnFocusTo}
     >
       <div className={FIELD}>
-        <label htmlFor={`${baseId}-name`} className={LABEL}>Project Name</label>
+        <label htmlFor={`${baseId}-name`} className={LABEL}>Product Name</label>
         <input
           id={`${baseId}-name`}
           name="projectName"
@@ -90,9 +91,11 @@ export default function ProjectDialog({ project, onCancel, onCreate, onUpdate, o
             save();
           }}
           maxLength={PROJECT_NAME_MAX}
+          aria-describedby={isEdit ? undefined : `${baseId}-name-help`}
           placeholder="e.g., Billing System v2"
           className={`${INPUT_BASE} ${INPUT_BORDER}`}
         />
+        {!isEdit && <p id={`${baseId}-name-help`} className={FIELD_HELP}>{PRODUCT_DEFINITION}</p>}
       </div>
       <div className={FIELD}>
         <label htmlFor={`${baseId}-desc`} className={LABEL}>Description (Optional)</label>
@@ -103,7 +106,7 @@ export default function ProjectDialog({ project, onCancel, onCreate, onUpdate, o
           value={description}
           onChange={e => setDescription(e.target.value)}
           rows={3}
-          placeholder="Brief description of the project"
+          placeholder="Brief description of the product"
           className={`${INPUT_BASE} ${INPUT_BORDER} resize-y`}
         />
       </div>
@@ -113,7 +116,7 @@ export default function ProjectDialog({ project, onCancel, onCreate, onUpdate, o
           {isEdit ? 'Update' : 'Create'}
         </button>
       </div>
-      <p className={HINT}>Enter in Project Name, or Ctrl+S (Cmd+S), saves. Esc cancels.</p>
+      <p className={HINT}>Enter in Product Name, or Ctrl+S (Cmd+S), saves. Esc cancels.</p>
     </DialogShell>
   );
 }

@@ -9,6 +9,7 @@
 // written here as its value.
 
 import type React from 'react';
+import { PRODUCT_DEFINITION } from '../../lib/constants';
 import { TOOLBAR_BUTTON, TOOLBAR_PRIMARY, TOOLBAR_SECONDARY } from './button-styles';
 
 interface ProjectsEmptyStateProps {
@@ -30,17 +31,18 @@ export default function ProjectsEmptyState({ onCreateNew, onLoadSample }: Projec
         Plan releases on a story map: themes, backbones and rib items, sized in story points, allocated to
         releases and tracked sprint by sprint.
       </p>
+      <p className="mt-2 text-sm text-[#666] dark:text-gray-400 max-w-prose mx-auto">{PRODUCT_DEFINITION}</p>
       {/* The secondary button is transparent in dark mode: it sits on this panel, not on the page. */}
       <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
         <button type="button" onClick={onCreateNew} className={`${TOOLBAR_BUTTON} ${TOOLBAR_PRIMARY}`}>
-          Create New Project
+          Create New Product
         </button>
         <button type="button" onClick={onLoadSample} className={`${TOOLBAR_BUTTON} ${TOOLBAR_SECONDARY} dark:bg-transparent`}>
-          Load Sample Project
+          Load Sample Product
         </button>
       </div>
       <p className="mt-4 text-xs italic text-[#666] dark:text-gray-500 max-w-prose mx-auto">
-        The sample project is a working example with four releases and four sprints of progress. You can explore
+        The sample product is a working example with four releases and four sprints of progress. You can explore
         it, edit it, or delete it at any time.
       </p>
     </div>

@@ -14,7 +14,7 @@ export default function AboutView() {
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
       <div className="max-w-3xl mx-auto px-6 py-12 flex-1 w-full">
         <div className="mb-8">
-          <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Projects</Link>
+          <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Products</Link>
         </div>
         <AppNotices className="mb-6" />
 
@@ -25,7 +25,7 @@ export default function AboutView() {
           <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
             <strong>SPERT<R /> Story Map</strong> is a browser-based agile release planning tool that
             replaces spreadsheet-driven story mapping workflows. It provides a three-level hierarchy
-            (Theme → Backbone → Rib Item) for organizing project work, with features for:
+            (Theme → Backbone → Rib Item) for organizing product work, with features for:
           </p>
           <ul className="mt-2 ml-6 list-disc text-sm text-gray-600 dark:text-gray-400 leading-relaxed space-y-1">
             <li><strong>Story map structure:</strong> Organize work into themes, backbone items, and rib items with inline editing and drag-to-reorder</li>
@@ -80,12 +80,12 @@ export default function AboutView() {
             <li>Data is stored in your <strong>browser's localStorage</strong> and never leaves your device</li>
             <li>No external servers, no third-party access, no data governance concerns</li>
             <li>Ideal for corporate or organizational environments where data must stay in-house</li>
-            <li><strong>Note:</strong> Clearing your browser cache/data will delete all stored projects unless you've exported a backup</li>
+            <li><strong>Note:</strong> Clearing your browser cache/data will delete all stored products unless you've exported a backup</li>
           </ul>
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-3 mb-1">Cloud storage (optional)</p>
           <ul className="ml-6 list-disc text-sm text-gray-600 dark:text-gray-400 leading-relaxed space-y-1">
-            <li>Sign in with <strong>Google</strong> or <strong>Microsoft</strong> to sync projects across devices</li>
-            <li>Share projects with collaborators (owner, editor, and viewer roles)</li>
+            <li>Sign in with <strong>Google</strong> or <strong>Microsoft</strong> to sync products across devices</li>
+            <li>Share products with collaborators (owner, editor, and viewer roles)</li>
             <li>Data is stored in Firebase/Firestore — ideal for users who want cross-device access and collaboration</li>
           </ul>
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-3 mb-1">Import & Export</p>

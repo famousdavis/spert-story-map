@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Projects dashboard's grid of tiles (v0.55.0): one column, two from 560 px of the grid's own
+// The Products dashboard's grid of tiles (v0.55.0): one column, two from 560 px of the grid's own
 // width, three from 860. Reordering is by dragging a tile's grip onto another tile, and the
 // dragged project takes that tile's place, in both directions: a box drawn round a whole tile
 // promises "this project will go here" (SPERT Forecaster's
@@ -68,7 +68,7 @@ export default function ProjectGrid({ projects, onOpen, onShare, onExport, onEdi
 
   return (
     <div className={GRID_AREA}>
-      <ul className={GRID} aria-label="Projects">
+      <ul className={GRID} aria-label="Products">
         {projects.map((p, index) => (
           <ProjectTile
             key={p.id}

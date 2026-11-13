@@ -18,7 +18,7 @@ interface ShareDialogProps {
  */
 export default function ShareDialog({ productId, productName, onClose }: ShareDialogProps) {
   return (
-    <Modal open onClose={onClose} title="Share Project" wide>
+    <Modal open onClose={onClose} title="Share Product" wide>
       <p className="text-sm text-gray-500 dark:text-gray-400 -mt-1 mb-5 truncate">
         {productName}
       </p>

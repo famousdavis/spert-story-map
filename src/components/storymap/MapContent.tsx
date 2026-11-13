@@ -229,7 +229,7 @@ export default function MapContent({
           totalWidth={totalWidth}
           isDropTarget={false}
           label={UNKNOWN_RELEASE_LABEL}
-          note="Allocated to a release this project does not have. Drag to a release to fix."
+          note="Allocated to a release this product does not have. Drag to a release to fix."
         />
       )}
 

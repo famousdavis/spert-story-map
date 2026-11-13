@@ -70,7 +70,7 @@ export function parseImportFile(
   // Bundle format: top-level array from exportAllProductsBundled()
   if (Array.isArray(raw)) {
     if (raw.length === 0) {
-      return { ok: false, error: 'Export file contains no projects.' };
+      return { ok: false, error: 'Export file contains no products.' };
     }
     const products: Product[] = [];
     const validationErrors: string[] = [];
@@ -91,7 +91,7 @@ export function parseImportFile(
       }
     }
     if (validationErrors.length > 0) {
-      return { ok: false, error: `Bundle contains invalid project(s):\n${validationErrors.join('\n')}` };
+      return { ok: false, error: `Bundle contains invalid product(s):\n${validationErrors.join('\n')}` };
     }
     return { ok: true, products };
   }
@@ -221,7 +221,7 @@ export async function applyImport(
       } else if (freshNameHolder.id !== decision.originalExistingId) {
         outcome.driftSkipped.push({
           productName: prod.name,
-          reason: `A different project ("${freshNameHolder.name}") now holds the conflicting name. Skipped to avoid overwriting unrelated data.`,
+          reason: `A different product ("${freshNameHolder.name}") now holds the conflicting name. Skipped to avoid overwriting unrelated data.`,
         });
       } else {
         toReplace.push({ ...prod, id: freshNameHolder.id });
