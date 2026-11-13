@@ -167,6 +167,17 @@ describe('isRibUnsized', () => {
     expect([isRibUnsized(rib, before), isRibUnsized(rib, after), isRibUnsized(rib, before)])
       .toStrictEqual([true, false, true]);
   });
+
+  it('follows a rename, which keeps the list the same length, and the old array keeps its answer', () => {
+    // Renaming M to Medium in T-Shirt Size Mapping: a new array of the same length.
+    // A cache keyed by anything but the array itself, such as its length, goes stale here.
+    const before: SizeMapping[] = [{ label: 'S', points: 10 }, { label: 'M', points: 20 }];
+    const after = before.map(m => m.label === 'M' ? { ...m, label: 'Medium' } : m);
+    const onM = ribWith('M');
+    const onMedium = ribWith('Medium');
+    expect([isRibUnsized(onM, before), isRibUnsized(onM, after), isRibUnsized(onMedium, after), isRibUnsized(onM, before)])
+      .toStrictEqual([false, true, false, false]);
+  });
 });
 
 // --- getAllRibItems ---

@@ -52,7 +52,11 @@ export function getRibItemPoints(ribItem: Pick<RibItem, 'size'>, sizeMapping: Si
 
 /**
  * True when the rib contributes no size row to points: no size, or a label not in the size list.
- * The one meaning of "unsized" for every count. A size whose row has 0 points is sized.
+ * A size whose row has 0 points is sized. Needs Attention, the project card, Structure, the Map's
+ * theme and backbone panels and the Sizing tab count unsized items with this. Three places keep
+ * their own copy of the rule: `getSizingDistribution` (the Insights chart), the AI snapshot and
+ * `sizeRibInProduct`. The chart's differs for a label equal to an `Object.prototype` key, such as
+ * `constructor`.
  */
 export function isRibUnsized(rib: Pick<RibItem, 'size'>, sizeMapping: SizeMapping[]): boolean {
   return !rib.size || !sizeIndex(sizeMapping).has(rib.size);

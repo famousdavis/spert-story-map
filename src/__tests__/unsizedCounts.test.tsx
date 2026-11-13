@@ -41,18 +41,22 @@ function rib(id: string, size: Size): RibItem {
 }
 
 /**
- * The size list holds only L. Backbone A: r1 on M, which is no longer in it.
- * Backbone B: r2 on L, and r3 with no size. So 2 unsized in Theme One, 1 per backbone.
+ * The size list holds L (8 points) and XS (0 points). Backbone A: r1 on M, which is no
+ * longer in it. Backbone B: r2 on L, r3 with no size, and r4 on XS. So 2 unsized in Theme
+ * One, 1 per backbone. r4 is sized at 0 points: it is what tells counting by the size row
+ * from counting by points, which would make it 3.
  */
 function orphanProduct(): Product {
   const base = mapProduct();
   return {
     ...base,
-    sizeMapping: [{ label: 'L', points: 8 }],
+    sizeMapping: [{ label: 'L', points: 8 }, { label: 'XS', points: 0 }],
     themes: base.themes.map(t => t.id !== 't1' ? t : {
       ...t,
       backboneItems: t.backboneItems.map(b =>
-        b.id === 'b1' ? { ...b, ribItems: [rib('r1', 'M')] } : { ...b, ribItems: [rib('r2', 'L'), rib('r3', null)] }),
+        b.id === 'b1'
+          ? { ...b, ribItems: [rib('r1', 'M')] }
+          : { ...b, ribItems: [rib('r2', 'L'), rib('r3', null), rib('r4', 'XS')] }),
     }),
   };
 }
@@ -121,8 +125,8 @@ describe('the project list', () => {
     localStorage.setItem('rp:local:products_index', JSON.stringify([{ id: product.id, name: product.name }]));
     render(<MemoryRouter><ProductList /></MemoryRouter>);
     await screen.findByText(product.name);
-    // 8 pts proves the stored list was read as written (only r2, on L, counts).
+    // 8 pts proves the stored list was read as written (only r2, on L, adds points).
     const card = req(screen.getByText('8 pts').parentElement, 'card stats');
-    expect(card.textContent?.match(/\d+ items|\d+ pts|\d+ unsized/g)).toStrictEqual(['3 items', '8 pts', '2 unsized']);
+    expect(card.textContent?.match(/\d+ items|\d+ pts|\d+ unsized/g)).toStrictEqual(['4 items', '8 pts', '2 unsized']);
   });
 });
