@@ -354,3 +354,28 @@ describe('the stored size', () => {
     expect(structurePicker('orphan')).toMatchObject({ text: 'XL', title: null });
   });
 });
+
+// ─── Where the locked size's sentence sits ──────────────────────────
+
+/**
+ * jsdom draws nothing, so this reads the classes that place it. In the Map panel the label
+ * and the value sit at opposite ends of a row: without a gap the label ran into the
+ * sentence ("Size“XL” is no longer…"), and left-aligned the chip sat apart from every other
+ * value. The Sizing dialog's field is a left-aligned block and stays so.
+ */
+describe('the locked sentence\'s layout', () => {
+  const stackOf = (container: HTMLElement) =>
+    req(container.querySelector('[title^="Size locked"]')?.parentElement ?? null, 'chip and sentence').className.split(/\s+/);
+
+  it('in the Map panel, keeps a gap after the label and right-aligns the chip and sentence', () => {
+    const row = mapPanelSizeRow('lockedorphan');
+    const stack = stackOf(row);
+    expect({ gap: row.className.split(/\s+/).includes('gap-3'), end: stack.includes('items-end'), right: stack.includes('text-right') })
+      .toStrictEqual({ gap: true, end: true, right: true });
+  });
+
+  it('in the Sizing dialog, keeps them on the left', () => {
+    const stack = stackOf(sizingDialogSizeField('lockedorphan').field);
+    expect({ start: stack.includes('items-start'), right: stack.includes('text-right') }).toStrictEqual({ start: true, right: false });
+  });
+});

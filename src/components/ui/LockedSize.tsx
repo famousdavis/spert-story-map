@@ -16,6 +16,11 @@ interface LockedSizeProps {
   sizeMapping: SizeMapping[];
   /** For a narrow column: a padlock stands in for the word. */
   compact?: boolean;
+  /**
+   * Right-align the chip and the sentence under it, for a panel whose values sit on the
+   * right (the Map panel). The Sizing dialog's form keeps them on the left.
+   */
+  alignEnd?: boolean;
 }
 
 /**
@@ -23,7 +28,7 @@ interface LockedSizeProps {
  * no longer holds shows as no size, with a sentence naming it: visible under the chip in the
  * full form, and in the tooltip and the screen-reader text in the compact one.
  */
-export default function LockedSize({ size, note, sizeMapping, compact = false }: LockedSizeProps) {
+export default function LockedSize({ size, note, sizeMapping, compact = false, alignEnd = false }: LockedSizeProps) {
   const missing = missingSizeLabel(size, sizeMapping);
   const missingNote = missing ? lockedMissingNote(missing, sizeMapping) : null;
   const chip = (
@@ -50,7 +55,7 @@ export default function LockedSize({ size, note, sizeMapping, compact = false }:
   );
   if (compact || !missingNote) return chip;
   return (
-    <span className="inline-flex flex-col items-start gap-1">
+    <span className={`inline-flex flex-col gap-1 ${alignEnd ? 'items-end text-right' : 'items-start'}`}>
       {chip}
       <span className="text-xs text-amber-700 dark:text-amber-400">{missingNote}</span>
     </span>

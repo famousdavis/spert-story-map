@@ -205,7 +205,7 @@ export default function RibDetailPanel({ rib, product, onClose, onRename, onUpda
             <DetailRow label="Size">
               <div className="flex items-center gap-2">
                 {lockNote ? (
-                  <LockedSize size={rib.size} note={lockNote} sizeMapping={product.sizeMapping} />
+                  <LockedSize size={rib.size} note={lockNote} sizeMapping={product.sizeMapping} alignEnd />
                 ) : (
                   <SizePicker
                     value={rib.size || null}
@@ -283,7 +283,7 @@ interface DetailRowProps {
 
 function DetailRow({ label, value, children }: DetailRowProps) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-3">
       <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
       {children || <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>}
     </div>
