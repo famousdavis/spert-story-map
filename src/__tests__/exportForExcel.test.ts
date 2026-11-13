@@ -389,3 +389,35 @@ describe('buildExcelWorkbook — descriptions (v0.54.2)', () => {
     expect(ribs.getCell(4, 10).master.address).toBe('A4');
   });
 });
+
+// v0.55.2: a size label is user text (Settings → T-Shirt Size Mapping takes custom
+// labels), so the Size cell is escaped like every other text cell. It was the one
+// text cell written raw.
+describe('buildExcelWorkbook — formula escaping', () => {
+  it('21. Rib Items: a size label starting with "=" is escaped, in a real .xlsx file', async () => {
+    const ExcelJS = await import('exceljs');
+    const XL = (ExcelJS as any).default ?? ExcelJS; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const theme = BASE_PRODUCT.themes[0]!;
+    const backbone = theme.backboneItems[0]!;
+    const product = {
+      ...BASE_PRODUCT,
+      sizeMapping: [...BASE_PRODUCT.sizeMapping, { label: '=1+1', points: 3 }],
+      themes: [{
+        ...theme,
+        name: '=T',
+        backboneItems: [{
+          ...backbone,
+          ribItems: [{ ...backbone.ribItems[0]!, size: '=1+1' }],
+        }],
+      }],
+    };
+    const wb = await getWorkbook(product as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const buffer = await wb.xlsx.writeBuffer();
+    const back = new XL.Workbook();
+    await back.xlsx.load(buffer);
+    const row = back.getWorksheet('Rib Items').getRow(5);
+    expect(row.getCell(1).value).toBe("'=T");      // the theme name, escaped already
+    expect(row.getCell(5).value).toBe("'=1+1");    // the size label, escaped the same way
+    expect(row.getCell(6).value).toBe(3);          // escaping is output only: the label still finds its points
+  });
+});
