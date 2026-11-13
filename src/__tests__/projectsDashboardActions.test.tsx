@@ -220,6 +220,23 @@ describe('Load Sample', () => {
     expect(document.activeElement).toBe(button);
   });
 
+  it('says so again the second time: the region is emptied, then set, so the same words are heard twice', async () => {
+    await show([{ id: 'x', name: 'X' }]);
+    const region = screen.getByRole('status');
+    let heard = 0;
+    const observer = new MutationObserver(() => { if (region.textContent === 'Loaded the sample project.') heard += 1; });
+    observer.observe(region, { childList: true, subtree: true, characterData: true });
+    try {
+      await userEvent.click(screen.getByRole('button', { name: 'Load Sample' }));
+      await waitFor(() => expect(heard).toBe(1));
+      await userEvent.click(screen.getByRole('button', { name: 'Load Sample' }));
+      await waitFor(() => expect(tiles()).toHaveLength(3));
+      await waitFor(() => expect(heard).toBe(2));
+    } finally {
+      observer.disconnect();
+    }
+  });
+
   it('from the welcome panel, which goes: focus to the sample tile\'s open button', async () => {
     seedLocal([]);
     renderPage();

@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import type React from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { exportProduct, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
@@ -73,6 +74,7 @@ export default function ProductList() {
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [scrollTarget, setScrollTarget] = useState<{ id: string } | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const announceTimerRef = useRef<number | null>(null);
   const [cloudDataLoaded, setCloudDataLoaded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
@@ -225,6 +227,20 @@ export default function ProductList() {
     if (scrollTarget) findTile(mainRef.current, scrollTarget.id)?.scrollIntoView({ block: 'nearest' });
   }, [scrollTarget]);
 
+  // A live region speaks only when its text changes, so the same message twice (a second Load
+  // Sample) would be silent. Empty it first, in its own render, then set the message a tick later.
+  const announce = (message: string) => {
+    if (announceTimerRef.current !== null) window.clearTimeout(announceTimerRef.current);
+    flushSync(() => setAnnouncement(''));
+    announceTimerRef.current = window.setTimeout(() => {
+      announceTimerRef.current = null;
+      setAnnouncement(message);
+    }, 0);
+  };
+  useEffect(() => () => {
+    if (announceTimerRef.current !== null) window.clearTimeout(announceTimerRef.current);
+  }, []);
+
   const handleCreate = async (name: string, desc: string) => {
     if (!driver) return;
     const product = createNewProduct(name, desc, driver.getWorkspaceId());
@@ -249,7 +265,7 @@ export default function ProductList() {
     const sample = createSampleProduct();
     await driver.createProduct(sample);
     await refresh();
-    setAnnouncement('Loaded the sample project.');
+    announce('Loaded the sample project.');
     setScrollTarget({ id: sample.id });
     // The welcome panel goes once a project exists, and its button with it.
     if (fromWelcome) setFocusRequest({ kind: 'open', id: sample.id });
@@ -268,7 +284,7 @@ export default function ProductList() {
     await driver.createProduct(dup);
     flight.settled();
     await refresh();
-    setAnnouncement(`Cloned "${original.name}" as "${name}".`);
+    announce(`Cloned "${original.name}" as "${name}".`);
     setScrollTarget({ id: dup.id });
   };
 
