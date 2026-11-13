@@ -52,7 +52,7 @@ const NAMES = ['A', 'B', 'C', 'D'];
 async function showFour(order?: string[]) {
   seedLocal(NAMES.map(n => makeProject({ id: `p-${n}`, name: n })), order);
   renderPage();
-  await screen.findByRole('list', { name: 'Projects' });
+  await screen.findByRole('list', { name: 'Products' });
   await settle(); // the saved order arrives from the preferences
 }
 

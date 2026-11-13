@@ -106,13 +106,13 @@ describe('project name', () => {
   it('blocks 201, naming both lengths', () => {
     const issues = check(makeProduct({ name: 'N'.repeat(201) }));
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toContain('The project name is 201 characters');
+    expect(issues[0]).toContain('The product name is 201 characters');
     expect(issues[0]).toContain(`limit of ${FORECASTER_LIMITS.MAX_STRING_LENGTH}`);
   });
 
   it('blocks an empty name', () => {
     // Reachable: SettingsView's commitName has no non-empty guard.
-    expect(check(makeProduct({ name: '' }))).toEqual(['The project has no name. SPERT Forecaster requires one.']);
+    expect(check(makeProduct({ name: '' }))).toEqual(['The product has no name. SPERT Forecaster requires one.']);
   });
 });
 

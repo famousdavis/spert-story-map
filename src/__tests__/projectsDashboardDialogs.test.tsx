@@ -50,33 +50,33 @@ afterEach(() => {
 async function showProjects(names: string[], extra: Partial<Parameters<typeof makeProject>[0]> = {}) {
   seedLocal(names.map((n, i) => makeProject({ id: `p${i}`, name: n, description: `${n} described`, ...extra })));
   renderPage();
-  await screen.findByRole('list', { name: 'Projects' });
+  await screen.findByRole('list', { name: 'Products' });
 }
 
 const tileOf = (name: string) => req(tiles().find(t => t.querySelector('h3')?.textContent === name), `tile ${name}`);
 const control = (name: string, label: string) => within(tileOf(name)).getByRole('button', { name: `${label} ${name}` });
 
-describe('New Project', () => {
+describe('New Product', () => {
   it('is a modal dialog named by its title, focus in Project Name; Cancel then Create; the hint', async () => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
-    const dialog = screen.getByRole('dialog', { name: 'New Project' });
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
+    const dialog = screen.getByRole('dialog', { name: 'New Product' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
-    expect(document.activeElement).toBe(within(dialog).getByLabelText('Project Name'));
+    expect(document.activeElement).toBe(within(dialog).getByLabelText('Product Name'));
     expect(within(dialog).getByLabelText('Description (Optional)').tagName).toBe('TEXTAREA');
     expect(within(dialog).getAllByRole('button').map(b => b.textContent)).toEqual(['Cancel', 'Create']);
-    expect(within(dialog).getByText('Enter in Project Name, or Ctrl+S (Cmd+S), saves. Esc cancels.')).toBeTruthy();
+    expect(within(dialog).getByText('Enter in Product Name, or Ctrl+S (Cmd+S), saves. Esc cancels.')).toBeTruthy();
     expect(within(dialog).queryByRole('button', { name: /close|×/i })).toBeNull();
   });
 
   it('Create is disabled while the trimmed name is empty', async () => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
     const create = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement;
     expect(create.disabled).toBe(true);
-    await userEvent.type(screen.getByLabelText('Project Name'), '   ');
+    await userEvent.type(screen.getByLabelText('Product Name'), '   ');
     expect(create.disabled).toBe(true);
-    await userEvent.type(screen.getByLabelText('Project Name'), 'x');
+    await userEvent.type(screen.getByLabelText('Product Name'), 'x');
     expect(create.disabled).toBe(false);
   });
 
@@ -85,8 +85,8 @@ describe('New Project', () => {
     seedLocal([makeProject({ id: 'p0', name: 'Alpha' })]);
     renderPage();
     await screen.findByText('Alpha');
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
-    await userEvent.type(screen.getByLabelText('Project Name'), '  Beta  ');
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
+    await userEvent.type(screen.getByLabelText('Product Name'), '  Beta  ');
     await userEvent.type(screen.getByLabelText(/^Description \(optional\)$/i), '  about beta  ');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
     await screen.findByText('Structure page');
@@ -104,8 +104,8 @@ describe('New Project', () => {
     const slow: StorageDriver = { ...driver, createProduct: p => gate.then(() => realCreate(p)) };
     storage.value = { driver: slow, mode: 'local', storageReady: true };
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
-    const name = screen.getByLabelText('Project Name');
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
+    const name = screen.getByLabelText('Product Name');
     await userEvent.type(name, 'Beta');
     const press = () => (how === 'Create'
       ? fireEvent.click(screen.getByRole('button', { name: 'Create' }))
@@ -124,18 +124,18 @@ describe('New Project', () => {
 
   it('Enter in Project Name creates; Enter in the description is a line break', async () => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
     await userEvent.type(screen.getByLabelText('Description (Optional)'), 'one{Enter}two');
     expect((screen.getByLabelText('Description (Optional)') as HTMLTextAreaElement).value).toBe('one\ntwo');
     expect(screen.queryByText('Structure page')).toBeNull();
-    await userEvent.type(screen.getByLabelText('Project Name'), 'Gamma{Enter}');
+    await userEvent.type(screen.getByLabelText('Product Name'), 'Gamma{Enter}');
     await screen.findByText('Structure page');
   });
 
   it('a 1001st character cannot be typed in the name', async () => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
-    const name = screen.getByLabelText('Project Name') as HTMLInputElement;
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
+    const name = screen.getByLabelText('Product Name') as HTMLInputElement;
     expect(name.maxLength).toBe(1000);
     fireEvent.change(name, { target: { value: 'x'.repeat(1000) } });
     await userEvent.type(name, 'y');
@@ -145,9 +145,9 @@ describe('New Project', () => {
 
   it('Tab and Shift+Tab wrap at the dialog\'s ends', async () => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
-    await userEvent.type(screen.getByLabelText('Project Name'), 'x');
-    const name = screen.getByLabelText('Project Name');
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
+    await userEvent.type(screen.getByLabelText('Product Name'), 'x');
+    const name = screen.getByLabelText('Product Name');
     const create = screen.getByRole('button', { name: 'Create' });
     await userEvent.tab({ shift: true });
     expect(document.activeElement).toBe(create);
@@ -165,7 +165,7 @@ describe('New Project', () => {
       const file = new File([JSON.stringify(createSampleProduct())], 'p.json', { type: 'application/json' });
       await userEvent.upload(req(document.querySelector<HTMLInputElement>('input[type="file"]'), 'file input'), file);
       await screen.findByRole('button', { name: 'Confirm Import' });
-      await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
+      await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
       await userEvent.keyboard('{Escape}');
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(seen).not.toContain('Escape');
@@ -178,30 +178,30 @@ describe('New Project', () => {
 
   it.each([['Ctrl+S', { ctrlKey: true }], ['Cmd+S', { metaKey: true }]])('%s saves, and is consumed', async (_label, mods) => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
-    await userEvent.type(screen.getByLabelText('Project Name'), 'Delta');
-    const notPrevented = fireEvent.keyDown(screen.getByLabelText('Project Name'), { key: 's', ...mods });
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
+    await userEvent.type(screen.getByLabelText('Product Name'), 'Delta');
+    const notPrevented = fireEvent.keyDown(screen.getByLabelText('Product Name'), { key: 's', ...mods });
     expect(notPrevented).toBe(false);
     await screen.findByText('Structure page');
   });
 
   it.each([['Ctrl+S', { ctrlKey: true }], ['Cmd+S', { metaKey: true }]])('%s with an empty name saves nothing and is still consumed', async (_label, mods) => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
-    const notPrevented = fireEvent.keyDown(screen.getByLabelText('Project Name'), { key: 's', ...mods });
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
+    const notPrevented = fireEvent.keyDown(screen.getByLabelText('Product Name'), { key: 's', ...mods });
     expect(notPrevented).toBe(false);
     await settle();
-    expect(screen.getByRole('dialog', { name: 'New Project' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'New Product' })).toBeTruthy();
     expect(tileNames()).toEqual(['Alpha']);
   });
 
   it('a click on the backdrop does not close it', async () => {
     await showProjects(['Alpha']);
-    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
+    await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
     const overlay = req(screen.getByRole('dialog').parentElement, 'overlay');
     fireEvent.mouseDown(overlay);
     fireEvent.click(overlay);
-    expect(screen.getByRole('dialog', { name: 'New Project' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'New Product' })).toBeTruthy();
   });
 
   it('the page behind is inert while it is open, and only what it made inert is restored', async () => {
@@ -210,7 +210,7 @@ describe('New Project', () => {
     already.setAttribute('inert', '');
     document.body.appendChild(already);
     try {
-      await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
+      await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
       const overlay = req(screen.getByRole('dialog').parentElement, 'overlay');
       const others = [...document.body.children].filter(el => el !== overlay);
       expect(others.every(el => el.hasAttribute('inert'))).toBe(true);
@@ -222,12 +222,12 @@ describe('New Project', () => {
   });
 });
 
-describe('Edit Project', () => {
+describe('Edit Product', () => {
   it('opens on the tile\'s Edit with both fields prefilled, the name selected', async () => {
     await showProjects(['Alpha']);
     await userEvent.click(control('Alpha', 'Edit'));
-    const dialog = screen.getByRole('dialog', { name: 'Edit Project' });
-    const name = within(dialog).getByLabelText('Project Name') as HTMLInputElement;
+    const dialog = screen.getByRole('dialog', { name: 'Edit Product' });
+    const name = within(dialog).getByLabelText('Product Name') as HTMLInputElement;
     expect([name.value, (within(dialog).getByLabelText('Description (Optional)') as HTMLTextAreaElement).value])
       .toEqual(['Alpha', 'Alpha described']);
     expect(document.activeElement).toBe(name);
@@ -241,7 +241,7 @@ describe('Edit Project', () => {
     // Written elsewhere while the dialog is open: another tab, Settings, a collaborator.
     const now = req(stored('p0'), 'p0');
     localStorage.setItem('rp:local:product_p0', JSON.stringify({ ...now, description: '  Rewritten in Settings  ' }));
-    const name = screen.getByLabelText('Project Name');
+    const name = screen.getByLabelText('Product Name');
     await userEvent.clear(name);
     await userEvent.type(name, 'Alpha 2');
     await userEvent.click(screen.getByRole('button', { name: 'Update' }));
@@ -269,7 +269,7 @@ describe('Edit Project', () => {
     await showProjects(['Alpha']);
     const before = req(stored('p0'), 'p0')._changeLog?.length;
     await userEvent.click(control('Alpha', 'Edit'));
-    await userEvent.type(screen.getByLabelText('Project Name'), ' 2');
+    await userEvent.type(screen.getByLabelText('Product Name'), ' 2');
     await userEvent.click(screen.getByRole('button', { name: 'Update' }));
     await waitFor(() => expect(tileNames()).toEqual(['Alpha 2']));
     expect(req(stored('p0'), 'p0')._changeLog?.length).toBe(before);
@@ -279,7 +279,7 @@ describe('Edit Project', () => {
     const save = vi.spyOn(driver, 'saveProductImmediate');
     await showProjects(['Alpha']);
     await userEvent.click(control('Alpha', 'Edit'));
-    await userEvent.type(screen.getByLabelText('Project Name'), '   ');
+    await userEvent.type(screen.getByLabelText('Product Name'), '   ');
     await userEvent.click(screen.getByRole('button', { name: 'Update' }));
     await settle();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -290,7 +290,7 @@ describe('Edit Project', () => {
 describe('focus when a dialog closes (§5.8)', () => {
   it('New Project, Cancel and Escape: back to the toolbar\'s New Project', async () => {
     await showProjects(['Alpha']);
-    const newProject = screen.getByRole('button', { name: 'New Project' });
+    const newProject = screen.getByRole('button', { name: 'New Product' });
     await userEvent.click(newProject);
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(document.activeElement).toBe(newProject);
@@ -302,9 +302,9 @@ describe('focus when a dialog closes (§5.8)', () => {
   it('New Project from the welcome panel: back to its Create New Project', async () => {
     seedLocal([]);
     renderPage();
-    const create = await screen.findByRole('button', { name: 'Create New Project' });
+    const create = await screen.findByRole('button', { name: 'Create New Product' });
     await userEvent.click(create);
-    expect(screen.getByRole('dialog', { name: 'New Project' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'New Product' })).toBeTruthy();
     await userEvent.keyboard('{Escape}');
     expect(document.activeElement).toBe(create);
   });
@@ -314,7 +314,7 @@ describe('focus when a dialog closes (§5.8)', () => {
     await userEvent.click(control('Beta', 'Edit'));
     if (how === 'Escape') await userEvent.keyboard('{Escape}');
     else {
-      if (how === 'Update') await userEvent.type(screen.getByLabelText('Project Name'), 'x');
+      if (how === 'Update') await userEvent.type(screen.getByLabelText('Product Name'), 'x');
       await userEvent.click(screen.getByRole('button', { name: how }));
     }
     await settle();
@@ -341,7 +341,7 @@ describe('focus when a dialog closes (§5.8)', () => {
   it.each([
     ['the next tile\'s open button', ['A', 'B', 'C'], 'B', 'Open Structure for C'],
     ['the previous one\'s, when it was the last', ['A', 'B', 'C'], 'C', 'Open Structure for B'],
-    ['New Project, when none is left', ['A'], 'A', 'New Project'],
+    ['New Project, when none is left', ['A'], 'A', 'New Product'],
   ])('Delete, confirmed: %s', async (_label, names, target, focusName) => {
     await showProjects(names);
     await userEvent.click(control(target, 'Delete'));
@@ -355,7 +355,7 @@ describe('focus when a dialog closes (§5.8)', () => {
   it('Delete, confirmed, with a saved order unlike the driver\'s: the next SHOWN tile', async () => {
     seedLocal(['A', 'B', 'C'].map((n, i) => makeProject({ id: `p${i}`, name: n })), ['p2', 'p1', 'p0']);
     renderPage();
-    await screen.findByRole('list', { name: 'Projects' });
+    await screen.findByRole('list', { name: 'Products' });
     await settle();
     expect(tileNames()).toEqual(['C', 'B', 'A']);
     await userEvent.click(control('B', 'Delete'));
@@ -394,7 +394,7 @@ describe('focus when a dialog closes (§5.8)', () => {
     const name = 'Say "hi" \\ there';
     seedLocal([makeProject({ id: 'p0', name: 'First' }), makeProject({ id: odd, name }), makeProject({ id: 'p2', name: 'Last' })]);
     renderPage();
-    await screen.findByRole('list', { name: 'Projects' });
+    await screen.findByRole('list', { name: 'Products' });
     await userEvent.click(control(name, 'Edit'));
     await userEvent.keyboard('{Escape}');
     expect(document.activeElement).toBe(control(name, 'Edit'));
@@ -413,7 +413,7 @@ describe('the Delete confirmation', () => {
   it('is an alertdialog named by its title and described by its message; focus on Cancel; Cancel then Delete', async () => {
     await showProjects(['Alpha']);
     await userEvent.click(control('Alpha', 'Delete'));
-    const dialog = screen.getByRole('alertdialog', { name: 'Delete Project' });
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete Product' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     const message = document.getElementById(req(dialog.getAttribute('aria-describedby'), 'describedby'));
     expect(message?.textContent).toBe('Are you sure you want to delete "Alpha"? This cannot be undone. Consider exporting first.');
