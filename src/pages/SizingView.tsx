@@ -158,8 +158,8 @@ export default function SizingView() {
     // locks the rib, and the dialog it opened unlocked still shows a picker. Only `size`
     // is stripped. cardColor is kept — color is an organizational flag, independent
     // of work state, and stays editable on locked cards (matches the kebab picker).
-    // Unlocked, `size` is in `updates` only when the person changed it in the dialog,
-    // so a size that changed while the dialog was open is not written back over.
+    // Each field, `size` included, is in `updates` only when the person changed it in
+    // the dialog, so a value that changed while the dialog was open is not written back.
     const { size: _size, ...withoutSize } = updates;
     const sprints = product.sprints;
     mutations.updateRib(editingCell.themeId, editingCell.backboneId, editingCell.id, rib =>

@@ -27,19 +27,19 @@ export interface SizingRibModalCreateInput {
   cardColor: RibCardColorKey | undefined;
 }
 
+/**
+ * Each field is present only when the person changed it in the dialog. Absent, the
+ * save leaves that field alone, so a value that changed while the dialog was open
+ * (a drag, a collaborator, Connect AI) is not written back over.
+ */
 export interface SizingRibModalSaveInput {
-  name: string;
-  description: string;
-  category: Category;
-  /**
-   * Present only when the person changed the size in the dialog. Absent, the save
-   * leaves the rib's size alone, so a size that changed while the dialog was open
-   * (a drag, a collaborator, Connect AI) is not written back over. Stripped by the
-   * caller when locked.
-   */
-  size?: Size;
-  notes: string;
-  cardColor: RibCardColorKey | undefined;  // honored even when locked
+  name?: string;
+  description?: string;
+  category?: Category;
+  size?: Size;  // stripped by the caller when locked
+  notes?: string;
+  /** Present as `undefined` when the person cleared the color. Honored even when locked. */
+  cardColor?: RibCardColorKey | undefined;
 }
 
 export interface SizingRibModalProps {
@@ -178,18 +178,21 @@ export default function SizingRibModal({
         cardColor,
       });
     } else {
-      // Size is sent only when the person changed it here (compared with the value the
-      // dialog opened with); the key is left out, not set to undefined, because
-      // updateRib spreads the payload over the rib. SizingView stays the size-omission
-      // boundary when locked. cardColor is always sent — color is allowed on locked
-      // cards (it's an organizational flag).
+      // Each field is sent only when the person changed it here (compared with the value
+      // the dialog opened with), so a value that changed while the dialog was open is not
+      // written back over. An unchanged field's key is left out, not set to undefined,
+      // because updateRib spreads the payload over the rib; a color cleared here is sent
+      // as undefined, which is how it is cleared. The name is compared as typed and sent
+      // trimmed: compared trimmed, a stored name with spaces around it would always count
+      // as changed. SizingView stays the size-omission boundary when locked. cardColor is
+      // allowed on locked cards (it's an organizational flag).
       onSave?.({
-        name: trimmedName,
-        description,
-        category,
+        ...(name !== initial.name ? { name: trimmedName } : {}),
+        ...(description !== initial.description ? { description } : {}),
+        ...(category !== initial.category ? { category } : {}),
         ...(size !== initial.size ? { size } : {}),
-        notes,
-        cardColor,
+        ...(notes !== initial.notes ? { notes } : {}),
+        ...(cardColor !== initial.cardColor ? { cardColor } : {}),
       });
     }
     return true;

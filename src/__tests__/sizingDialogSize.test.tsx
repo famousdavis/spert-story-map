@@ -6,11 +6,11 @@
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import { cleanup, fireEvent, screen } from '@testing-library/react';
 import SizingView from '../pages/SizingView';
-import type { Product, ProgressEntry, RibItem, Size } from '../types';
+import type { ProgressEntry, Size } from '../types';
 import { mountHosted } from './fixtures/productHost';
 import type { HostedProduct } from './fixtures/productHost';
 import { entry, makeProduct, makeRib, ribOf } from './fixtures/progressIntegrity';
-import { req } from './testHelpers';
+import { changeRib, openDialog, pick, save, type } from './fixtures/sizingDialog';
 
 /**
  * The Sizing tab's edit dialog holds the size it opened with. Before v0.55.3 it sent
@@ -38,38 +38,7 @@ function mountOnRelease(size: Size = 'L'): HostedProduct {
   return mountHosted(SizingView, makeProduct([makeRib('r', [{ releaseId: 'R1', percentage: 100 }], [], size)]));
 }
 
-function openDialog() {
-  fireEvent.click(req(document.querySelector<HTMLElement>('[data-rib-id="r"]'), 'card r'));
-  screen.getByRole('heading', { name: 'Edit Rib Item' });
-}
-
-function rename(to: string) {
-  const input = req(document.querySelector<HTMLInputElement>('input[name="ribName"]'), 'name field');
-  fireEvent.change(input, { target: { value: to } });
-}
-
-/**
- * Open the dialog's size picker (its button shows `current`) and choose `option`: a size
- * label, whose row reads "M20 pts", or `null` for "Clear size".
- */
-function pick(current: string, option: string | null) {
-  fireEvent.click(screen.getByRole('button', { name: current }));
-  const row = option === null ? /^Clear size$/ : new RegExp(`^${option}\\s*\\d+ pts$`);
-  fireEvent.click(screen.getByRole('button', { name: row }));
-}
-
-const save = () => fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-const changeRib = (change: (rib: RibItem) => RibItem) => (prev: Product): Product => ({
-  ...prev,
-  themes: prev.themes.map(t => ({
-    ...t,
-    backboneItems: t.backboneItems.map(b => ({
-      ...b,
-      ribItems: b.ribItems.map(r => (r.id === 'r' ? change(r) : r)),
-    })),
-  })),
-});
+const rename = (to: string) => type('ribName', to);
 
 const setSize = (size: Size) => changeRib(r => ({ ...r, size }));
 

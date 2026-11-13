@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.55.7 (2026-11-13)
+
+### Fixed
+
+- **Saving the Sizing tab's Edit Rib Item dialog no longer puts back a name, description, category, notes or card color that changed while it was open.** Version 0.55.3 fixed this for the size. If you opened an item's dialog and one of those changed before you saved (a collaborator edited the item, or Connect AI updated it), saving put back the value the dialog opened with, even if you had changed only something else. Now the dialog saves only what you changed in it.
+- **What you change in the dialog is still saved, as before.** A name is still saved without spaces around it, and clearing the card color still clears it.
+
 ## Version 0.55.6 (2026-11-13)
 
 ### Fixed
