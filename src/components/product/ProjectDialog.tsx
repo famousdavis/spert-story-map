@@ -6,7 +6,7 @@
 // tile's rename in place. The look is SPERT Forecaster's project dialog; Ctrl+S / Cmd+S is
 // GanttApp's (`src/features/projects/ProjectDialog.tsx:162-167` at aa43ae7).
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import DialogShell from './DialogShell';
 import { PROJECT_NAME_MAX } from '../../lib/cloneName';
 import {
@@ -41,10 +41,17 @@ export default function ProjectDialog({ project, onCancel, onCreate, onUpdate, o
   const [name, setName] = useState(prefill.name);
   const [description, setDescription] = useState(prefill.description);
   const isEdit = project !== null;
-  const canSave = name.trim().length > 0;
+  // Set by the first save. New Project stays open until its create has finished (a server round
+  // trip in the cloud), so without it a second Create, Enter or Ctrl/Cmd+S made a second project.
+  // A ref as well as state: two presses in one task both read the ref, not a stale render.
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const canSave = name.trim().length > 0 && !saving;
 
   const save = () => {
-    if (!canSave) return;
+    if (!canSave || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     if (!isEdit) {
       onCreate(name.trim(), description.trim());
       return;

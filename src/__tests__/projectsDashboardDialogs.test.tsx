@@ -96,6 +96,32 @@ describe('New Project', () => {
     expect(req(stored(beta.id), 'Beta').description).toBe('about beta');
   });
 
+  it.each(['Create', 'Enter', 'Ctrl+S'])('%s pressed twice while the create is in flight makes one project, and the second press is still consumed', async (how) => {
+    // The create held until both presses are in, as a cloud round trip would hold it.
+    let release: () => void = () => {};
+    const gate = new Promise<void>(r => { release = r; });
+    const realCreate = driver.createProduct.bind(driver);
+    const slow: StorageDriver = { ...driver, createProduct: p => gate.then(() => realCreate(p)) };
+    storage.value = { driver: slow, mode: 'local', storageReady: true };
+    await showProjects(['Alpha']);
+    await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
+    const name = screen.getByLabelText('Project Name');
+    await userEvent.type(name, 'Beta');
+    const press = () => (how === 'Create'
+      ? fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+      : fireEvent.keyDown(name, how === 'Enter' ? { key: 'Enter' } : { key: 's', ctrlKey: true }));
+    press();
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
+    const second = press();
+    if (how !== 'Create') expect(second).toBe(false);
+    release();
+    await screen.findByText('Structure page');
+    await settle();
+    flushPendingSaves();
+    const index = JSON.parse(localStorage.getItem('rp:local:products_index') ?? '[]') as { name: string }[];
+    expect(index.filter(e => e.name === 'Beta')).toHaveLength(1);
+  });
+
   it('Enter in Project Name creates; Enter in the description is a line break', async () => {
     await showProjects(['Alpha']);
     await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
