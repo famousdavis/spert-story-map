@@ -357,6 +357,22 @@ describe('10. sizes items still use that are not in the list', () => {
     expect(screen.queryByText(/at 0 points/)).toBeNull();
   });
 
+  it('says what Add back did, and its "at 0 points" line describes the points field it focuses', async () => {
+    const { user } = mount(product('XS:5 S:10 M:20', xl()));
+    await user.click(screen.getByRole('button', { name: 'Add back “XL”' }));
+    expect(pointsAt(3)).toHaveFocus();
+    // After the recorded-progress note: one of the three is locked.
+    expect(pointsAt(3)).toHaveAccessibleDescription(/ 3 items use “XL” at 0 points\. Enter its points to count them\.$/);
+    await waitFor(() => expect(announced()).toBe('Added back “XL”. 3 items use it at 0 points.'));
+  });
+
+  it('agrees the Add back line with one item', async () => {
+    const { user } = mount(product('XS:5', [free('x1', 'XL')]));
+    await user.click(screen.getByRole('button', { name: 'Add back “XL”' }));
+    expect(pointsAt(1)).toHaveAccessibleDescription('1 item uses “XL” at 0 points. Enter its points to count it.');
+    await waitFor(() => expect(announced()).toBe('Added back “XL”. 1 item uses it at 0 points.'));
+  });
+
   it('gives the reason instead of a button for a label a row cannot hold, and lists no empty label', () => {
     mount(product('XS:5 m:20', [free('a', 'XL '), free('b', 'M'), free('c', ''), free('d', 'XS')]));
     expect(screen.getByText('“XL ” has a space at the start or end, which a size label can\'t have.')).toBeInTheDocument();

@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -15,7 +15,7 @@ import {
 } from '../../lib/settingsMutations';
 import type { SizeUse } from '../../lib/settingsMutations';
 import {
-  lockedPointsNote, MAX_SIZES_LINE, ORPHAN_HINT, ORPHAN_TITLE, orphanLine, POINTS_PROBLEM, quoted, removeConfirmMessage,
+  addedBackLine, lockedPointsNote, MAX_SIZES_LINE, ORPHAN_HINT, ORPHAN_TITLE, orphanLine, POINTS_PROBLEM, quoted, removeConfirmMessage,
   removedLine, removeRefusal, revivalLines, staleLine, zeroPointsLine,
 } from './sizeMappingText';
 import type { Product, ProductUpdater, SizeMapping } from '../../types';
@@ -40,7 +40,9 @@ const rowKey = (rows: SizeMapping[], index: number) => {
 };
 const signature = (rows: SizeMapping[]) => JSON.stringify(rows.map(r => [r.label, r.points]));
 
-type FocusIntent = { kind: 'remove'; index: number; length: number } | { kind: 'points'; length: number };
+type FocusIntent =
+  | { kind: 'remove'; index: number; length: number }
+  | { kind: 'points'; length: number; label: string; items: number };
 
 export default function SizeMappingSection({ product, updateProduct }: SizeMappingSectionProps) {
   const rows = product.sizeMapping;
@@ -49,24 +51,27 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
   const [lines, setLines] = useState<Line[]>([]);
   const [addedBack, setAddedBack] = useState<string[]>([]);
   const [dialog, setDialog] = useState<{ index: number; label: string } | null>(null);
-  const [announcement, setAnnouncement] = useState('');
+  const { announcement, announce, announceLater, silence } = useAnnouncer();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const addRef = useRef<HTMLButtonElement | null>(null);
   const focusIntent = useRef<FocusIntent | null>(null);
-  const announceTimer = useRef<number | null>(null);
   const sig = signature(rows);
 
   // After a remove: the next row's Remove, else the previous row's, else "+ Add Size".
-  // After Add back: the new row's points.
+  // After Add back: the new row's points, and what it brought back is said.
   useEffect(() => {
     const intent = focusIntent.current;
     focusIntent.current = null;
     if (!intent || rows.length !== intent.length) return;
     const find = (selector: string) => rootRef.current?.querySelector<HTMLElement>(selector) ?? null;
-    if (intent.kind === 'points') { find(`[data-size-points="${rows.length - 1}"]`)?.focus(); return; }
+    if (intent.kind === 'points') {
+      find(`[data-size-points="${rows.length - 1}"]`)?.focus();
+      announceLater(addedBackLine(intent.label, intent.items));
+      return;
+    }
     const at = Math.min(intent.index, rows.length - 1);
     (at >= 0 ? find(`[data-size-remove="${at}"]`) : addRef.current)?.focus();
-  }, [rows]);
+  }, [rows, announceLater]);
 
   // A line belongs to the list it was made for. Once the list is anything else the line
   // goes for good, so a list that later returns to that state does not bring it back. A
@@ -75,28 +80,6 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLines(prev => (prev.every(l => l.sig === sig) ? prev : prev.filter(l => l.sig === sig)));
   }, [sig]);
-
-  // A live region speaks only when its text changes, so the same refusal twice would be
-  // heard once. As on the Projects page (CLAUDE.md #75): empty it in its own render, then
-  // set the text a tick later. Called before any write in the same handler, so the flush
-  // carries only the emptying.
-  const announce = (text: string) => {
-    if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
-    flushSync(() => setAnnouncement(''));
-    announceTimer.current = window.setTimeout(() => {
-      announceTimer.current = null;
-      setAnnouncement(text);
-    }, 0);
-  };
-  /** A save went through: the last refusal does not stay in the region. */
-  const silence = () => {
-    if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
-    announceTimer.current = null;
-    setAnnouncement('');
-  };
-  useEffect(() => () => {
-    if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
-  }, []);
 
   const putLine = (line: Omit<Line, 'sig'>, at = sig) =>
     setLines(prev => [...prev.filter(l => l.sig === sig && l.key !== line.key), { ...line, sig: at }]);
@@ -148,10 +131,10 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     else commitRemove(index, label, confirmed);
   };
 
-  const addBack = (label: string) => {
+  const addBack = (label: string, items: number) => {
     silence();
     setAddedBack(prev => [...prev, label]);
-    focusIntent.current = { kind: 'points', length: rows.length + 1 };
+    focusIntent.current = { kind: 'points', length: rows.length + 1, label, items };
     updateProduct(prev => addBackSizeToProduct(prev, label));
   };
 
@@ -169,7 +152,8 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
               row={m}
               index={i}
               reason={[...mine].reverse().find(l => l.reason)?.reason ?? null}
-              info={[...mine.flatMap(l => l.info ?? []), ...zeroLine(rows, i, usage, addedBack)]}
+              info={mine.flatMap(l => l.info ?? [])}
+              zero={zeroLine(rows, i, usage, addedBack)}
               note={lockNote(rows, i, usage)}
               onRename={rename}
               onPoints={setPoints}
@@ -204,6 +188,41 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
   );
 }
 
+/**
+ * The section's polite live region. It speaks only when its text changes, so the same
+ * refusal twice would be heard once. As on the Projects page (CLAUDE.md #75): empty it in
+ * its own render, then set the text a tick later.
+ */
+function useAnnouncer() {
+  const [announcement, setAnnouncement] = useState('');
+  const timer = useRef<number | null>(null);
+  const stop = useCallback(() => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  }, []);
+  /** From a handler. Called before any write in that handler, so the flush carries only the emptying. */
+  const announce = useCallback((text: string) => {
+    stop();
+    flushSync(() => setAnnouncement(''));
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      setAnnouncement(text);
+    }, 0);
+  }, [stop]);
+  /** From an effect, where flushSync cannot flush while React commits: a tick later. */
+  const announceLater = useCallback((text: string) => {
+    stop();
+    timer.current = window.setTimeout(() => announce(text), 0);
+  }, [stop, announce]);
+  /** A save went through: the last refusal does not stay in the region. */
+  const silence = useCallback(() => {
+    stop();
+    setAnnouncement('');
+  }, [stop]);
+  useEffect(() => stop, [stop]);
+  return { announcement, announce, announceLater, silence };
+}
+
 /** R37's note, under the effective row for a label that locked items use. */
 function lockNote(rows: SizeMapping[], index: number, usage: Map<string, SizeUse>): string | null {
   const row = rows[index];
@@ -213,17 +232,17 @@ function lockNote(rows: SizeMapping[], index: number, usage: Map<string, SizeUse
 }
 
 /** Derived, not stored: a row added back during this visit, still at 0 points, that items use. */
-function zeroLine(rows: SizeMapping[], index: number, usage: Map<string, SizeUse>, addedBack: string[]): string[] {
+function zeroLine(rows: SizeMapping[], index: number, usage: Map<string, SizeUse>, addedBack: string[]): string | null {
   const row = rows[index];
   const items = row?.label ? usage.get(row.label)?.items ?? 0 : 0;
-  if (!row || items === 0 || !addedBack.includes(row.label) || sizeRowPoints(row) !== 0) return [];
-  return effectiveSizeIndex(rows, row.label) === index ? [zeroPointsLine(row.label, items)] : [];
+  if (!row || items === 0 || !addedBack.includes(row.label) || sizeRowPoints(row) !== 0) return null;
+  return effectiveSizeIndex(rows, row.label) === index ? zeroPointsLine(row.label, items) : null;
 }
 
 function OrphanSizes({ rows, orphans, onAddBack }: {
   rows: SizeMapping[];
   orphans: { label: string; items: number }[];
-  onAddBack: (label: string) => void;
+  onAddBack: (label: string, items: number) => void;
 }) {
   if (orphans.length === 0) return null;
   return (
@@ -239,7 +258,7 @@ function OrphanSizes({ rows, orphans, onAddBack }: {
                 ? <span className="text-xs text-amber-800 dark:text-amber-300">{problem}</span>
                 : (
                   <button
-                    onClick={() => onAddBack(o.label)}
+                    onClick={() => onAddBack(o.label, o.items)}
                     aria-label={`Add back ${quoted(o.label)}`}
                     className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                   >

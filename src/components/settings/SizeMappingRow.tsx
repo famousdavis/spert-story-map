@@ -15,8 +15,10 @@ interface SizeMappingRowProps {
   index: number;
   /** The row's refusal or reason line, and the control it is about. */
   reason: { text: string; field: SizeRowField } | null;
-  /** Lines that report what a write did (a revival), and the "at 0 points" line. */
+  /** Lines that report what a write did (a revival). */
   info: string[];
+  /** The "at 0 points" line under a row added back during this visit. Describes the points field. */
+  zero: string | null;
   /** R37's note, under the effective row a locked item uses. Shown while its points are being edited. */
   note: string | null;
   /** Each returns whether it wrote. When it did not, the field shows the stored value again. */
@@ -37,7 +39,7 @@ const INPUT = 'w-24 border border-gray-300 dark:border-gray-600 dark:bg-gray-800
  * so a list changed underneath a focused field (another editor, an undo) refuses the
  * write instead of landing on whatever row now sits at this index (rows are `key={i}`).
  */
-export default function SizeMappingRow({ row, index, reason, info, note, onRename, onPoints, onRemove }: SizeMappingRowProps) {
+export default function SizeMappingRow({ row, index, reason, info, zero, note, onRename, onPoints, onRemove }: SizeMappingRowProps) {
   const label = String(row.label ?? '');
   const points = String(row.points ?? '');
   const id = useId();
@@ -93,6 +95,7 @@ export default function SizeMappingRow({ row, index, reason, info, note, onRenam
 
   const reasonId = `${id}-reason`;
   const noteId = `${id}-note`;
+  const zeroId = `${id}-zero`;
   const showNote = note !== null && (pointsFocused || pointsField.localValue !== points);
   const describe = (...ids: (string | false)[]) => ids.filter(Boolean).join(' ') || undefined;
 
@@ -126,7 +129,7 @@ export default function SizeMappingRow({ row, index, reason, info, note, onRenam
           step="any"
           aria-label={`Points of size ${quoted(label)}`}
           aria-invalid={reason?.field === 'points' || undefined}
-          aria-describedby={describe(note !== null && noteId, reason?.field === 'points' && reasonId)}
+          aria-describedby={describe(note !== null && noteId, zero !== null && zeroId, reason?.field === 'points' && reasonId)}
           data-size-points={index}
           value={pointsField.localValue}
           onChange={e => pointsField.setLocalValue(e.target.value)}
@@ -149,6 +152,7 @@ export default function SizeMappingRow({ row, index, reason, info, note, onRenam
       </div>
       {reason && <p id={reasonId} className="mt-1 text-xs text-red-600 dark:text-red-400">{reason.text}</p>}
       {info.map(line => <p key={line} className="mt-1 text-xs text-gray-600 dark:text-gray-400">{line}</p>)}
+      {zero !== null && <p id={zeroId} className="mt-1 text-xs text-gray-600 dark:text-gray-400">{zero}</p>}
       {note !== null && (
         <p id={noteId} hidden={!showNote} className="mt-1 text-xs text-amber-700 dark:text-amber-400">{note}</p>
       )}

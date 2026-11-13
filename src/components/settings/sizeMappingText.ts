@@ -39,6 +39,11 @@ export function zeroPointsLine(label: string, items: number): string {
     + `Enter its points to count ${agree(items, 'it', 'them')}.`;
 }
 
+/** Said once an added-back row is in the list. */
+export function addedBackLine(label: string, items: number): string {
+  return `Added back ${quoted(label)}. ${count(items, 'item')} ${agree(items, 'uses', 'use')} it at 0 points.`;
+}
+
 /** After a rename that brought orphans holding the new label back. */
 export function revivalLines(label: string, items: number, locked: number, points: number): string[] {
   const lines = [`${count(items, 'item')} joined ${quoted(label)}.`];
