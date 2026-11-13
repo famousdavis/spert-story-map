@@ -88,9 +88,13 @@ describe('Structure: the size picker', () => {
     });
   });
 
-  it('quotes a label with a stray space, so the space shows', () => {
+  it('quotes a label with a stray space, so the space shows, in the tooltip and the Clear item', () => {
     mountHosted(StructureView, orphanProduct());
-    expect(structurePicker('spaced').title).toBe('“M ” is no longer in your size list. Pick a size, or add “M ” back in Settings → T-Shirt Size Mapping.');
+    const { title, items } = structurePicker('spaced');
+    expect({ title, clear: items[items.length - 1] }).toStrictEqual({
+      title: '“M ” is no longer in your size list. Pick a size, or add “M ” back in Settings → T-Shirt Size Mapping.',
+      clear: 'Clear “M ” (not in size list)',
+    });
   });
 
   it('draws a valid size and a 0-point size as before, with "Clear size"', () => {
@@ -378,5 +382,20 @@ describe('the locked sentence\'s layout', () => {
   it('in the Sizing dialog, keeps them on the left', () => {
     const stack = stackOf(sizingDialogSizeField('lockedorphan').field);
     expect({ start: stack.includes('items-start'), right: stack.includes('text-right') }).toStrictEqual({ start: true, right: false });
+  });
+});
+
+// ─── A stray space in the locked size's sentence ────────────────────
+
+describe('the locked size quotes a label with a stray space', () => {
+  const SPACED_SENTENCE = '“M ” is no longer in your size list. Add “M ” back in Settings → T-Shirt Size Mapping to count its points again.';
+
+  it('in Structure\'s tooltip', () => {
+    mountHosted(StructureView, orphanProduct());
+    expect(readLocked(structureSizeCell('lockedspaced')).title).toBe(`${LOCK_NOTE}. ${SPACED_SENTENCE}`);
+  });
+
+  it('in the Map panel\'s sentence', () => {
+    expect(readLocked(mapPanelSizeRow('lockedspaced')).sentence).toBe(SPACED_SENTENCE);
   });
 });
