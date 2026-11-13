@@ -11,6 +11,9 @@ import type {
   ParsedImport,
 } from '../types';
 import { importProductFromJSON, appendChangeLogEntry, duplicateProduct } from './storage';
+// cloneName.ts imports nextCopyName from this file, so the two import each other. That is safe
+// only while neither uses the other's exports at module load, as now (calls happen at run time).
+import { cloneName } from './cloneName';
 
 // ---------------------------------------------------------------------------
 // Name normalization
@@ -247,7 +250,9 @@ export async function applyImport(
   const runningNames = freshProducts.map(p => p.name);
   for (const prod of toCopy) {
     try {
-      const copyName = nextCopyName(prod.name, runningNames);
+      // cloneName, not nextCopyName: it shortens the base name so the copy stays within the
+      // 1000-character name limit and the copy's own export still imports (v0.55.1).
+      const copyName = cloneName(prod.name, runningNames);
       runningNames.push(copyName);
 
       // duplicateProduct regenerates ALL nested IDs but REPLACES _changeLog with

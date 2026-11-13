@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.55.1 (2026-11-13)
+
+### Fixed
+
+- **"Import as copy" no longer makes a project name too long to import again.** When an imported project's name is already taken and you choose Import as copy, the copy is named "Billing (Copy)", then "Billing (Copy 2)". If the original name was close to 1,000 characters, the copy's name went over 1,000, and a file exported from that copy would not import: it reported "Product name must be a non-empty string (max 1000 chars)". Now the end of the original name is left off so the copy's name fits, as Clone has done since 0.55.0.
+
 ## Version 0.55.0 (2026-11-13)
 
 ### Changed

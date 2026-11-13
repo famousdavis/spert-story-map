@@ -11,16 +11,16 @@ import { nextCopyName } from './import-utils';
 export const PROJECT_NAME_MAX = 1000;
 
 /**
- * A clone's name (v0.55.0): import's own numbering, `X (Copy)`, then `X (Copy 2)`
+ * A copy's name (v0.55.0): import's own numbering, `X (Copy)`, then `X (Copy 2)`
  * (`nextCopyName`), never longer than `PROJECT_NAME_MAX`.
  *
- * ⚠️ Without the cap a 1000-character name clones to 1007, and the clone's own export then
+ * ⚠️ Without the cap a 1000-character name copies to 1007, and the copy's own export then
  * refuses to import. The base name is shortened until the suffixed name fits, and the collision
  * check runs again on the shortened base, since a shorter base can collide where the long one
  * did not. Trailing spaces left by the cut go, so the suffix never sits after a space.
  *
- * Only the Clone button calls this. Import's copy path still calls `nextCopyName` directly and
- * keeps the same defect, reported rather than fixed in this release.
+ * Two callers: the Clone button (v0.55.0) and import's copy path in `applyImport` (v0.55.1).
+ * Call this, not `nextCopyName`, anywhere a copy's name is made.
  */
 export function cloneName(sourceName: string, takenNames: string[]): string {
   let base = sourceName;
