@@ -5,6 +5,7 @@
 import { useMemo, useState } from 'react';
 import { getAllRibItems, getAllocationTotal, isRibUnsized } from '../../lib/calculations';
 import { UNDO_HINT } from '../../lib/constants';
+import { attentionUnsizedLine, missingSizeLabel } from '../../lib/missingSize';
 import { bringRecordsHere, previewBringHere, removeRowRecords } from '../../lib/progressMutations';
 import { getStrandedRows } from '../../lib/reconciliation';
 import type { StrandedRow } from '../../lib/reconciliation';
@@ -126,7 +127,7 @@ export default function NeedsAttention({ product, updateProduct }: {
           <AttentionSection
             title={`${unsizedItems.length} unsized items`}
             color="text-amber-600 dark:text-amber-400"
-            items={unsizedItems.map(r => `${r.name} (${r.backboneName})`)}
+            items={unsizedItems.map(r => attentionUnsizedLine(r.name, r.backboneName, missingSizeLabel(r.size, product.sizeMapping)))}
           />
         )}
         {unassignedItems.length > 0 && (

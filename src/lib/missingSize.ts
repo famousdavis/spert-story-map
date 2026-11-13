@@ -8,7 +8,7 @@ import type { Size, SizeMapping } from '../types';
 /**
  * A size label that the size list no longer holds, so the rib shows as unsized. Every surface
  * that names such a label reads it here: the size picker's tooltip and Clear item, the locked
- * size and the Excel Size cell. Drawing a rib as unsized is `isRibUnsized`
+ * size, Needs Attention and the Excel Size cell. Drawing a rib as unsized is `isRibUnsized`
  * alone; this adds that the rib has a label at all, so a rib with no size (`null`, `undefined`,
  * `''`) is never missing anything. Never decide this by points: a size whose row has 0 points
  * is sized.
@@ -44,3 +44,8 @@ export const clearMissingLabel = (label: string) => `Clear ${quoted(label)} (not
 
 /** The Excel Size cell on a missing label. Its Points cell is 0. */
 export const excelMissingCell = (label: string) => `${quoted(label)} (not in size list)`;
+
+/** Needs Attention's line for an unsized rib, naming a missing label after the rib and its backbone. */
+export function attentionUnsizedLine(name: string, backboneName: string, missing: string | null): string {
+  return missing ? `${name} (${backboneName}): ${quoted(missing)} is not in your size list` : `${name} (${backboneName})`;
+}
