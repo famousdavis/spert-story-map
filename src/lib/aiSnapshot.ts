@@ -8,7 +8,7 @@ import { isRibLocked } from './ribHelpers';
 
 /**
  * The typed shape of the compact product snapshot written to Firestore
- * and returned verbatim by the MCP storymap_get_project tool.
+ * and returned verbatim by the MCP storymap_get_product tool.
  *
  * Phase 2 additions over the Phase 1 compact:
  *   - releases: sorted by order; id/name/order only (no targetDate, no description)

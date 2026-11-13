@@ -8,12 +8,12 @@
 // names that machines read (`projectName`, `ProjectTile`, `spertstorymap_projects`,
 // `storymap_get_project`), so none of them needs an entry here.
 //
-// Three sentences keep the word, because there it means something else. An entry matches by FILE and
+// Two sentences keep the word, because there it means something else. An entry matches by FILE and
 // by its EXACT sentence (whitespace collapsed), and must be used exactly once. The sentence is removed
 // from its string and the rest of the string is checked again, so a new "project" beside an allowed
-// sentence still fails. Never match a whole string (the bridge sits inside a template part of about
-// 1,600 characters, so any edit to the prompt's opening would break it) and never by line (a new
-// string on that line would pass). A product's name is user data and is never allowed here.
+// sentence still fails. Never match a whole string (an allowed sentence can sit inside a long template
+// part, and any edit to the rest of it would break the entry) and never by line (a new string on that
+// line would pass). A product's name is user data and is never allowed here.
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -30,9 +30,6 @@ const ALLOWED = [
     reason: "SPERT Forecaster's side of Send to SPERT Forecaster: there it is a project (R43)" },
   { id: 'A75', file: 'pages/AboutView.tsx', text: 'of project management tools.',
     reason: 'the SPERT® Suite describes itself (D9)' },
-  { id: 'D13 bridge', file: 'components/ConnectAI/copyPrompt.ts',
-    text: 'Some tool names, descriptions and replies still say "project"; wherever they do, it means the product open in SPERT Story Map.',
-    reason: 'tells the AI what "project" means in the tools it calls (D13)' },
 ];
 
 const squash = (s: string) => s.replace(/\s+/g, ' ').trim();
@@ -97,12 +94,12 @@ export function scanForProject(root: string, allowed: typeof ALLOWED = ALLOWED) 
 }
 
 describe('"product" on Story Map\'s screens (v0.55.9)', () => {
-  it('no production string says "project", except the three allowed sentences', () => {
+  it('no production string says "project", except the two allowed sentences', () => {
     expect(scanForProject(SRC).hits).toEqual([]);
   });
 
   it('each allowed sentence is found exactly once, where it is listed (A75 is the must-find control)', () => {
-    expect(scanForProject(SRC).used).toEqual({ A60: 1, A75: 1, 'D13 bridge': 1 });
+    expect(scanForProject(SRC).used).toEqual({ A60: 1, A75: 1 });
   });
 
   it('every skipped file still exists, so a rename cannot widen the skip', () => {
