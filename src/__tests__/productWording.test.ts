@@ -108,12 +108,13 @@ describe('"product" on every screen (v0.55.9)', () => {
 
   it('the scan reads JSX text, attributes, templates and plain strings, and skips what it should', () => {
     const dir = join(import.meta.dirname, 'fixtures', 'productWording');
-    const { hits } = scanForProject(dir);
+    // Reported as "line N", not as the probe's file:line, which crossRepoCitations would read as a citation.
+    const hits = scanForProject(dir).hits.map(h => h.replace(/^probe\.tsx:(\d+) /, 'line $1: '));
     expect(hits).toEqual([
-      'probe.tsx:9 Open the project',
-      'probe.tsx:10 Delete project',
-      'probe.tsx:11 projects',
-      'probe.tsx:12 Old Project',
+      'line 9: Open the project',
+      'line 10: Delete project',
+      'line 11: projects',
+      'line 12: Old Project',
     ]);
   });
 });
