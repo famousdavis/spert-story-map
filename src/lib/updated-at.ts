@@ -9,7 +9,8 @@
  * ---------------------------------------------------------------------
  * CFD and Forecaster carry a near-identical classifier because `date-fns`
  * `format()` throws `RangeError` on an Invalid Date, so a bad shape CRASHES the
- * row. This app never crashes: `ProjectCard` rendered
+ * row. This app never crashes: the project list's `ProjectCard` (retired in
+ * v0.55.0, with the date it showed) rendered
  * `(parseDate(p.updatedAt) || new Date()).toLocaleDateString()`, and
  * `ProductLayout`'s "Saved ..." line feeds the same value to
  * `formatRelativeTime`. So the bad shapes did not throw — they RENDERED, and
