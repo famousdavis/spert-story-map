@@ -44,6 +44,12 @@ const EXPECTED = [
 
 const driver = createLocalStorageDriver();
 
+/**
+ * The first load has finished. Until v0.55.0 these tests waited for "No projects yet", which the
+ * welcome panel replaced; "Loading projects..." going is what both pages share.
+ */
+const loaded = () => waitFor(() => expect(screen.queryByText('Loading projects...')).toBeNull());
+
 function seedProject() {
   const p = createSampleProduct();
   localStorage.setItem(`rp:local:product_${p.id}`, JSON.stringify(p));
@@ -77,14 +83,14 @@ afterEach(() => {
 describe('project list toolbar', () => {
   it('shows Export All · Import · Load Sample · New Project, in that order, beside a Projects heading', async () => {
     render(<MemoryRouter><ProductList /></MemoryRouter>);
-    await screen.findByText('No projects yet');
+    await loaded();
     const buttons = toolbarButtons();
     expect(buttons.map(b => b.textContent)).toEqual(EXPECTED.map(e => e.label));
   });
 
   it('gives each button an accessible name that begins with its visible label', async () => {
     render(<MemoryRouter><ProductList /></MemoryRouter>);
-    await screen.findByText('No projects yet');
+    await loaded();
     for (const [i, button] of toolbarButtons().entries()) {
       const want = EXPECTED[i]!;
       const name = button.getAttribute('aria-label') ?? button.textContent ?? '';
@@ -95,7 +101,7 @@ describe('project list toolbar', () => {
 
   it('puts GanttApp\'s icon, 18 px and hidden from assistive tech, before each label', async () => {
     render(<MemoryRouter><ProductList /></MemoryRouter>);
-    await screen.findByText('No projects yet');
+    await loaded();
     for (const [i, button] of toolbarButtons().entries()) {
       const svgs = button.querySelectorAll('svg');
       expect(svgs).toHaveLength(1);
@@ -113,7 +119,7 @@ describe('project list toolbar', () => {
 
   it('keeps Export All in place but disabled with no projects; the rest stay enabled', async () => {
     render(<MemoryRouter><ProductList /></MemoryRouter>);
-    await screen.findByText('No projects yet');
+    await loaded();
     expect(toolbarButtons().map(b => b.disabled)).toEqual([true, false, false, false]);
   });
 
@@ -156,7 +162,7 @@ describe('project list toolbar', () => {
     const blocked = { ...driver, createProduct: () => created };
     storage.value = { driver: blocked, mode: 'local', storageReady: true };
     render(<MemoryRouter><ProductList /></MemoryRouter>);
-    await screen.findByText('No projects yet');
+    await loaded();
     const file = new File([JSON.stringify(createSampleProduct())], 'p.json', { type: 'application/json' });
     await userEvent.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, file);
     await userEvent.click(await screen.findByRole('button', { name: 'Confirm Import' }));

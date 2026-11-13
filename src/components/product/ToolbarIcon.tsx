@@ -4,12 +4,12 @@
 
 /**
  * A dashboard toolbar icon: stroke and size copied exactly from GanttApp's
- * `ProjectsToolbar`. Takes the text colour and is hidden from assistive tech.
+ * `ProjectsToolbar`. Takes the text colour, or `className`'s, and is hidden from assistive tech.
  * Paths live in `toolbarIconPaths.ts`.
  */
-export default function ToolbarIcon({ d, size = 18 }: { d: string; size?: number }) {
+export default function ToolbarIcon({ d, size = 18, className }: { d: string; size?: number; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className={className}>
       <path d={d} stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

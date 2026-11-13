@@ -1,5 +1,30 @@
 # Changelog
 
+## Version 0.55.0 (2026-11-13)
+
+### Changed
+
+- **The Projects page now looks and works like the Projects pages of SPERT® GanttApp and SPERT® Forecaster.** Your projects show as tiles in a grid: three across on a wide screen, two or one on a narrower one. The page is now white in light mode; the project pages keep their grey background.
+- **The header matches the other SPERT® apps:** a larger title in the suite's blue, and an italic tagline. The sentence saying where your data is stored is no longer under the title; the storage button at the top right still shows it.
+- **Each tile shows the project's figures on up to three lines:** its items, points and % complete; its releases and sprints; and, only when something needs attention, how many items are unsized and how many rows of progress are not counting (the same count as Needs Attention on the Insights tab).
+- **Click anywhere on a tile to open the project's Structure tab, at once.** Before, the project opened after a short wait.
+- **A double-click on a tile now opens the project, once.** Before, a double-click renamed the project in place. The second click of a double-click is now ignored, so it cannot start editing a name on the Structure tab.
+- **Edit a project's name and description in the new Edit Project dialog** (the pencil on a tile). Update saves only what you changed, so a description changed somewhere else since the page loaded is kept when you rename the project. Renaming in place on the project list is gone.
+- **New Project opens the same dialog.** Enter in Project Name, or Ctrl+S (Cmd+S), saves; Esc cancels. The dialog has no × and clicking outside it no longer closes it: use Cancel or Esc. App Settings and Share project, opened from the same page, still close when you click outside them.
+- **Deleting a project now asks in a new confirmation dialog,** in GanttApp's look. It has no ×; the keyboard focus starts on Cancel, so Enter does not delete; Esc or a click outside it cancels.
+- **Duplicate is now called Clone, and repeated clones are numbered:** "Billing (Copy)", then "Billing (Copy 2)". A clone now appears right after the project it was cloned from, and that order is saved. If the copy's name would be longer than 1,000 characters, the end of the original name is left off so the copy can still be exported and imported.
+- **Delete stays beside each project's name. Export, Edit, Clone and Share appear when you point at a tile or move into it with the keyboard,** and all the time on a touch screen. Share is offered on cloud projects you own.
+- **Reordering projects: drag a tile by its six-dot grip,** the only place a drag starts. A project dropped on another tile now takes that tile's place, whether you drag it up or down. Before, it landed just before the tile, so a project dragged down landed one place short and could never reach the last place.
+- **On a cloud project shared with you, Delete is greyed out unless you own the project, and Edit is greyed out if you can only view it.** The reason shows when you point at the button and is read by screen readers; a greyed-out button cannot be reached with Tab. Before, both were always offered.
+- **After you delete a project, the next project's tile has the keyboard focus** (or the previous one's, or New Project's). Clone, Edit, Delete, Load Sample and Import now update the list in place instead of reloading it, and a screen reader is told what Clone and Load Sample did.
+- **With no projects, a welcome panel offers Create New Project and Load Sample Project.**
+
+### Removed
+
+- **The last-updated date on each project.** When a project is open, its last save still shows in its header.
+
+The terms notice and the local-storage caution at the top of the page have not changed.
+
 ## Version 0.54.4 (2026-11-12)
 
 ### Fixed

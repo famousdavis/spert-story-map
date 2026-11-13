@@ -37,6 +37,8 @@ src/
 │   ├── cloudLoadGuard.ts             # Shape check on projects read from either store: sets aside what cannot be read, gives a missing or unreadable size list the default rows, never rejects a project
 │   ├── cloudLoadNotices.ts           # Which open projects had data set aside (read by CloudLoadNotice)
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
+│   ├── cloneName.ts                  # A clone's name: import's (Copy) numbering, never longer than 1000 characters
+│   ├── gestureGuard.ts               # Swallows the rest of a double-click after a tile opens its project
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory
 │   ├── progressRule.ts              # The one rule for what counts: sprint order, effective entries, share, completion, lock, a row's records
@@ -61,6 +63,7 @@ src/
 │   ├── aiConnectivityUtils.ts        # Pure helpers for useAiConnectivity (seq cursor, consent parse, ops query)
 │   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag) + pure applyCardDrop
 │   ├── useImportState.ts             # State machine for multi-project import (idle/preview/applying/done/error)
+│   ├── useProjectOrder.ts            # Projects page order: saved order, drops, and where a clone goes
 │   └── useDarkMode.ts                # Theme toggle hook (localStorage + system preference)
 │
 ├── components/
@@ -88,8 +91,19 @@ src/
 │   │   ├── SizeMappingSection.tsx    # T-shirt size mapping editor
 │   │   └── DataSection.tsx           # Per-project import (parseImportFile + updateProduct) and export buttons
 │   ├── product/
-│   │   ├── CreateProjectModal.tsx    # New-project create dialog
-│   │   ├── ProjectCard.tsx           # Project list card (inline rename via pencil/double-click, export, duplicate, delete)
+│   │   ├── ProjectsHeader.tsx        # Projects page header: suite title and tagline, gear, theme, About, storage pill
+│   │   ├── ProjectsToolbar.tsx       # "Projects" heading row: Export All · Import · Load Sample · New Project
+│   │   ├── ProjectGrid.tsx           # Grid of tiles (1/2/3 columns by container width); grip drag, drop takes the target's place
+│   │   ├── ProjectTile.tsx           # One project's tile: grip, open button over the whole tile, lines, Delete, revealed Share · Export · Edit · Clone
+│   │   ├── tile-meta.ts              # A tile's lines: items/points/% complete, releases/sprints, unsized and progress not counting
+│   │   ├── tile-focus.ts             # Finds a tile's controls by project id and name, never by a selector built from them
+│   │   ├── IconButtons.tsx           # The tile's icon buttons and six-dot grip
+│   │   ├── ProjectsEmptyState.tsx    # Welcome panel with Create New Project and Load Sample Project
+│   │   ├── DialogShell.tsx           # The page's own dialog shell: portal, inert page, Tab wrap, capture-phase Escape and Ctrl/Cmd+S
+│   │   ├── ProjectDialog.tsx         # New Project / Edit Project dialog; Update writes only the fields changed
+│   │   ├── DeleteProjectDialog.tsx   # Delete confirmation (alertdialog, focus on Cancel)
+│   │   ├── dashboard-styles.ts       # The dashboard's class strings (copied from SPERT Forecaster through a token map)
+│   │   ├── button-styles.ts          # Toolbar and icon-button class strings
 │   │   ├── ShareDialog.tsx           # Cloud-mode project sharing dialog
 │   │   └── ImportPreviewSection.tsx  # Homepage import preview UI: phase rendering + decision rows + result banner
 │   ├── insights/
@@ -139,7 +153,7 @@ src/
 │       └── mapDragHelpers.ts         # Drag commit logic (dispatches to mapMutations)
 │
 └── pages/                            # Route-level views
-    ├── ProductList.tsx               # Home — product listing with CRUD
+    ├── ProductList.tsx               # Home: the Projects dashboard (tiles, dialogs, order, focus)
     ├── StructureView.tsx             # Story map editor (themes/backbones/ribs)
     ├── StoryMapView.tsx              # Interactive visual story map
     ├── SizingView.tsx                # Drag-and-drop t-shirt sizing board
