@@ -238,6 +238,8 @@ describe('the open', () => {
     const [tile] = await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
     fireEvent.click(within(req(tile, 'tile')).getByRole('button', { name: `${label} Alpha` }), { detail: 1 });
     await act(async () => { await Promise.resolve(); });
+    // Still on the list: a navigation would have unmounted it, whatever the project page then did.
+    expect(screen.getByRole('list', { name: 'Projects' })).toBeTruthy();
     expect(screen.queryByText('Structure page')).toBeNull();
   });
 
