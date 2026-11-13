@@ -56,7 +56,7 @@ async function showProjects(names: string[], extra: Partial<Parameters<typeof ma
 const tileOf = (name: string) => req(tiles().find(t => t.querySelector('h3')?.textContent === name), `tile ${name}`);
 const control = (name: string, label: string) => within(tileOf(name)).getByRole('button', { name: `${label} ${name}` });
 
-describe('New Product', () => {
+describe('New Project', () => {
   it('is a modal dialog named by its title, focus in Project Name; Cancel then Create; the hint', async () => {
     await showProjects(['Alpha']);
     await userEvent.click(screen.getByRole('button', { name: 'New Product' }));
@@ -222,7 +222,7 @@ describe('New Product', () => {
   });
 });
 
-describe('Edit Product', () => {
+describe('Edit Project', () => {
   it('opens on the tile\'s Edit with both fields prefilled, the name selected', async () => {
     await showProjects(['Alpha']);
     await userEvent.click(control('Alpha', 'Edit'));

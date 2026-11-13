@@ -6,7 +6,7 @@
 
 /**
  * The project page's two ways back to the project list (v0.53.33): "← Projects"
- * in the header and "Back to projects" on the "Product not found" screen. Both
+ * in the header and "Back to projects" on the "Project not found" screen. Both
  * are router links, so leaving a project keeps the page loaded.
  *
  * jsdom cannot show a page load: a plain `<a href="/">` neither reloads nor
@@ -92,7 +92,7 @@ describe('"← Projects" on a project page', () => {
   });
 });
 
-describe('"Back to projects" on "Product not found"', () => {
+describe('"Back to projects" on "Project not found"', () => {
   it('opens the project list in the app', async () => {
     // Only a cloud project can reach this screen: local mode goes home by itself.
     const missing: StorageDriver = {
