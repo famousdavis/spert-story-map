@@ -184,6 +184,20 @@ describe('add and remove', () => {
     expect(again.hosted.product.sizeMapping).toHaveLength(20);
   });
 
+  it('"+ Add Size" puts focus in the new row\'s label, also when the button then disables itself', async () => {
+    const { user } = mount(product(STANDARD, []));
+    await user.click(screen.getByText('+ Add Size'));
+    expect(labelAt(5)).toHaveFocus();
+    expect(labelAt(5).value).toBe('New');
+    cleanup();
+    const nineteen = Array.from({ length: 19 }, (_, i) => ({ label: `Z${i}`, points: i }));
+    const again = mount(product(nineteen, []));
+    await again.user.click(screen.getByText('+ Add Size'));
+    expect(screen.getByText('+ Add Size')).toBeDisabled();
+    expect(labelAt(19)).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it('5. (control) an unused size goes at once: one write, no dialog', async () => {
     const { hosted, user } = mount(product(STANDARD, [free('m1', 'M')]));
     await user.click(removeAt(0));

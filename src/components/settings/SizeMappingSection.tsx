@@ -42,6 +42,7 @@ const signature = (rows: SizeMapping[]) => JSON.stringify(rows.map(r => [r.label
 
 type FocusIntent =
   | { kind: 'remove'; index: number; length: number }
+  | { kind: 'label'; length: number }
   | { kind: 'points'; length: number; label: string; items: number };
 
 export default function SizeMappingSection({ product, updateProduct }: SizeMappingSectionProps) {
@@ -59,6 +60,8 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
 
   // After a remove: the next row's Remove, else the previous row's, else "+ Add Size".
   // After Add back: the new row's points, and what it brought back is said.
+  // After "+ Add Size": the new row's label, so focus is not left on a button that has
+  // just disabled itself (the 20th row).
   useEffect(() => {
     const intent = focusIntent.current;
     focusIntent.current = null;
@@ -69,6 +72,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
       announceLater(addedBackLine(intent.label, intent.items));
       return;
     }
+    if (intent.kind === 'label') { find(`[data-size-label="${rows.length - 1}"]`)?.focus(); return; }
     const at = Math.min(intent.index, rows.length - 1);
     (at >= 0 ? find(`[data-size-remove="${at}"]`) : addRef.current)?.focus();
   }, [rows, announceLater]);
@@ -138,6 +142,12 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     updateProduct(prev => addBackSizeToProduct(prev, label));
   };
 
+  const addSize = () => {
+    silence();
+    focusIntent.current = { kind: 'label', length: rows.length + 1 };
+    updateProduct(addSizeToProduct);
+  };
+
   const shown = lines.filter(l => l.sig === sig);
   const dialogDecision = dialog ? removeSizeDecision(product, dialog.index, dialog.label) : null;
 
@@ -163,7 +173,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
         })}
         <button
           ref={addRef}
-          onClick={() => { silence(); updateProduct(addSizeToProduct); }}
+          onClick={addSize}
           disabled={rows.length >= MAX_SIZES}
           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2 disabled:text-gray-400 disabled:cursor-not-allowed"
         >
