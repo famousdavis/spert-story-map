@@ -84,8 +84,10 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
   /** Hold a clone's name and place it right after its source; call `settled` once it is created. */
   const placeClone = useCallback((sourceId: string, cloneId: string, name: string) => {
     const flight: InFlight = { name };
+    // The order WITHOUT this clone, then the clone in its place: once in flight, currentOrder()
+    // would already list it, at the end.
+    const ids = currentOrder().filter(id => id !== cloneId);
     inFlightRef.current.set(cloneId, flight);
-    const ids = currentOrder();
     const at = ids.indexOf(sourceId);
     ids.splice(at < 0 ? ids.length : at + 1, 0, cloneId);
     saveOrder(ids);
