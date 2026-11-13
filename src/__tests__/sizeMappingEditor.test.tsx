@@ -17,7 +17,7 @@
 
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, screen, within } from '@testing-library/react';
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../lib/StorageProvider', () => ({ useStorage: () => ({ driver: null, mode: 'local', storageReady: true }) }));
@@ -420,6 +420,34 @@ describe('11. every row keeps its own inputs and lines', () => {
   });
 });
 
+// ─── The live region ────────────────────────────────────────────────
+
+describe('the live region', () => {
+  it('says the same refusal again the second time, and empties once a save goes through', async () => {
+    const { hosted, user } = mount(product(STANDARD, []));
+    const region = req(document.querySelector<HTMLElement>('[aria-live="polite"]'), 'live region');
+    const reason = '“S” is already in the list.';
+    let heard = 0;
+    const observer = new MutationObserver(() => { if (region.textContent === reason) heard += 1; });
+    observer.observe(region, { childList: true, subtree: true, characterData: true });
+    try {
+      for (const n of [1, 2]) {
+        await user.clear(labelAt(0));
+        await user.type(labelAt(0), 'S');
+        await user.tab();
+        await waitFor(() => expect(heard).toBe(n));
+      }
+    } finally {
+      observer.disconnect();
+    }
+    await user.clear(labelAt(0));
+    await user.type(labelAt(0), 'Tiny');
+    await user.tab();
+    expect(hosted.product.sizeMapping[0]?.label).toBe('Tiny');
+    await waitFor(() => expect(region.textContent).toBe(''));
+  });
+});
+
 // ─── 13. Another editor changes the list mid-action ─────────────────
 
 describe('13. a list changed elsewhere during an edit', () => {
@@ -435,7 +463,7 @@ describe('13. a list changed elsewhere during an edit', () => {
     expect({ rows: stored(hosted.product), xl: ribOf(hosted.product, 'x1').size, l: ribOf(hosted.product, 'l1').size })
       .toEqual({ rows: 'S:10 M:20 L:40 XL:100', xl: 'XL', l: 'L' });
     expect(onPage('“L” was changed elsewhere. Nothing was saved.')).toHaveLength(1);
-    expect(announced()).toBe('“L” was changed elsewhere. Nothing was saved.');
+    await waitFor(() => expect(announced()).toBe('“L” was changed elsewhere. Nothing was saved.'));
   });
 
   it('points typed on L save nothing once XS is removed elsewhere', async () => {

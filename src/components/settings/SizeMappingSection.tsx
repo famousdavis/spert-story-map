@@ -3,6 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import SizeMappingRow from './SizeMappingRow';
@@ -52,6 +53,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
   const rootRef = useRef<HTMLDivElement | null>(null);
   const addRef = useRef<HTMLButtonElement | null>(null);
   const focusIntent = useRef<FocusIntent | null>(null);
+  const announceTimer = useRef<number | null>(null);
   const sig = signature(rows);
 
   // After a remove: the next row's Remove, else the previous row's, else "+ Add Size".
@@ -74,11 +76,33 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     setLines(prev => (prev.every(l => l.sig === sig) ? prev : prev.filter(l => l.sig === sig)));
   }, [sig]);
 
+  // A live region speaks only when its text changes, so the same refusal twice would be
+  // heard once. As on the Projects page (CLAUDE.md #75): empty it in its own render, then
+  // set the text a tick later. Called before any write in the same handler, so the flush
+  // carries only the emptying.
+  const announce = (text: string) => {
+    if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
+    flushSync(() => setAnnouncement(''));
+    announceTimer.current = window.setTimeout(() => {
+      announceTimer.current = null;
+      setAnnouncement(text);
+    }, 0);
+  };
+  /** A save went through: the last refusal does not stay in the region. */
+  const silence = () => {
+    if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
+    announceTimer.current = null;
+    setAnnouncement('');
+  };
+  useEffect(() => () => {
+    if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
+  }, []);
+
   const putLine = (line: Omit<Line, 'sig'>, at = sig) =>
     setLines(prev => [...prev.filter(l => l.sig === sig && l.key !== line.key), { ...line, sig: at }]);
   const refuse = (index: number, field: SizeRowField, text: string) => {
+    announce(text);
     if (rows[index]) putLine({ key: rowKey(rows, index), reason: { text, field } });
-    setAnnouncement(text);
   };
 
   const rename = (index: number, expected: string, text: string): boolean => {
@@ -92,9 +116,9 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     if (revived) {
       const after = renameSizeInProduct(product, index, expected, label).sizeMapping;
       const info = revivalLines(label, revived.items, revived.locked, sizeRowPoints(row));
+      announce(info.join(' '));
       putLine({ key: rowKey(after, index), info }, signature(after));
-      setAnnouncement(info.join(' '));
-    }
+    } else silence();
     updateProduct(prev => renameSizeInProduct(prev, index, expected, label));
     return true;
   };
@@ -105,14 +129,15 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     if (row && points !== null && points === Number(row.points)) return false;
     if (!row || row.label !== expected) { refuse(index, 'points', staleLine(expected)); return false; }
     if (points === null) { refuse(index, 'points', POINTS_PROBLEM); return false; }
+    silence();
     updateProduct(prev => setSizePointsInProduct(prev, index, expected, points));
     return true;
   };
 
   const commitRemove = (index: number, label: string, confirmed: boolean) => {
+    announce(removedLine(label));
     focusIntent.current = { kind: 'remove', index, length: rows.length - 1 };
     updateProduct(prev => removeSizeFromProduct(prev, index, label, confirmed));
-    setAnnouncement(removedLine(label));
   };
   // The click and the confirm decide the same way, against the list as it is now.
   const remove = (index: number, label: string, confirmed: boolean) => {
@@ -124,6 +149,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
   };
 
   const addBack = (label: string) => {
+    silence();
     setAddedBack(prev => [...prev, label]);
     focusIntent.current = { kind: 'points', length: rows.length + 1 };
     updateProduct(prev => addBackSizeToProduct(prev, label));
@@ -153,7 +179,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
         })}
         <button
           ref={addRef}
-          onClick={() => updateProduct(addSizeToProduct)}
+          onClick={() => { silence(); updateProduct(addSizeToProduct); }}
           disabled={rows.length >= MAX_SIZES}
           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-2 disabled:text-gray-400 disabled:cursor-not-allowed"
         >
