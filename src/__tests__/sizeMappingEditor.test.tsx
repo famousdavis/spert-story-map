@@ -325,12 +325,17 @@ describe('9. points', () => {
     expect(() => importProductFromJSON(JSON.stringify(hosted.product))).not.toThrow();
   });
 
-  it('keep a decimal', async () => {
+  it('keep a decimal, and accept 0', async () => {
     const { hosted, user } = mount(product(STANDARD, [free('xs1', 'XS')]));
     await user.clear(pointsAt(0));
     await user.type(pointsAt(0), '0.5');
     await user.tab();
     expect(hosted.product.sizeMapping[0]?.points).toBe(0.5);
+    await user.clear(pointsAt(1));
+    await user.type(pointsAt(1), '0');
+    await user.tab();
+    expect({ writes: hosted.writes, points: hosted.product.sizeMapping[1]?.points, line: onPage(/Points must be/).length })
+      .toEqual({ writes: 2, points: 0, line: 0 });
   });
 
   it('show the recorded-points note while the field is edited, under the effective row a locked item uses only', async () => {
