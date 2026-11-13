@@ -60,10 +60,13 @@ function shownText(node: ts.Node): string | null {
   return null;
 }
 
-/** Every string that says "project", as `file:line text`, and how often each allowed sentence was used. */
-export function scanForProject(root: string) {
+/**
+ * Every string that says "project", as `file:line text`, and how often each allowed sentence was used.
+ * `allowed` is the real list unless a test passes its own, which is how the allow-list rule is tested.
+ */
+export function scanForProject(root: string, allowed: typeof ALLOWED = ALLOWED) {
   const hits: string[] = [];
-  const used = Object.fromEntries(ALLOWED.map(a => [a.id, 0]));
+  const used = Object.fromEntries(allowed.map(a => [a.id, 0]));
   for (const path of sourceFiles(root)) {
     const file = relative(root, path).split(sep).join('/');
     if (SKIPPED.includes(file)) continue;
@@ -75,7 +78,7 @@ export function scanForProject(root: string) {
       if (text !== null && WORD.test(text) && !ts.isLiteralTypeNode(node.parent)
         && !ts.isImportDeclaration(node.parent) && !inConsoleCall(node)) {
         let rest = squash(text);
-        for (const entry of ALLOWED) {
+        for (const entry of allowed) {
           if (entry.file !== file) continue;
           const parts = rest.split(entry.text);
           used[entry.id] = (used[entry.id] ?? 0) + parts.length - 1;
@@ -116,5 +119,21 @@ describe('"product" on every screen (v0.55.9)', () => {
       'line 11: projects',
       'line 12: Old Project',
     ]);
+  });
+
+  it('an allowed sentence is taken out of its string and the rest is checked again; each use counts', () => {
+    const dir = join(import.meta.dirname, 'fixtures', 'productWordingAllowed');
+    const entry = (id: string, text: string, file = 'allowed.ts') => ({ id, file, text, reason: 'fixture' });
+    const { hits, used } = scanForProject(dir, [
+      entry('beside', 'Case one keeps its project.'),
+      // Listed for a file that does not exist, and ahead of 'twice', so it matches nothing only by the file rule.
+      entry('unused', 'Case two keeps its project.', 'elsewhere.ts'),
+      entry('twice', 'Case two keeps its project.'),
+    ]);
+    // The removed sentence leaves a space where it was, so the rest starts with two spaces.
+    expect(hits.map(h => h.replace(/^allowed\.ts:(\d+) /, 'line $1: '))).toEqual([
+      'line 8:   A project beside it is new.',
+    ]);
+    expect(used).toEqual({ beside: 1, unused: 0, twice: 2 });
   });
 });
