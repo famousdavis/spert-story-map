@@ -318,6 +318,19 @@ describe('size list transforms', () => {
     expect(orphanLabels(prev)).toEqual([]);
   });
 
+  it('decides a remove in order: shadowed, unused, next row equal or different, locked, confirm', () => {
+    const ribs = [lockedRib('a', 'M'), freeRib('b', 'M'), freeRib('c', 'L')];
+    const dup = sized(rows(['M', 20], ['M', 20], ['M', 50], ['L', 40], ['XS', 5]), ribs);
+    expect([2, 4, 0, 3].map(i => removeSizeDecision(dup, i, dup.sizeMapping[i]?.label ?? '').kind))
+      .toEqual(['shadowed', 'unused', 'samePoints', 'confirmUnsized']);
+    const diff = sized(rows(['M', 20], ['M', 50]), ribs);
+    expect(removeSizeDecision(diff, 0, 'M')).toEqual({ kind: 'refusedNext', locked: 1 });
+    const free = sized(rows(['M', 20], ['M', 50], ['S', 1], ['S', 2]), [freeRib('b', 'M')]);
+    expect(removeSizeDecision(free, 0, 'M')).toEqual({ kind: 'confirmNext', items: 1, points: 20, nextPoints: 50 });
+    expect(removeSizeDecision(free, 2, 'S')).toEqual({ kind: 'unused', dropKey: false });
+    expect(removeSizeDecision(sized(rows(['M', 20]), ribs), 0, 'M')).toEqual({ kind: 'refusedLocked', locked: 1 });
+  });
+
   it('an unused remove drops its card-order key, never the unsized key', () => {
     const prev = sized(rows(['XS', 5], ['unsized', 1]), [], { XS: ['gone'], unsized: ['u'] });
     expect(removeSizeFromProduct(prev, 0, 'XS').sizingCardOrder).toEqual({ unsized: ['u'] });

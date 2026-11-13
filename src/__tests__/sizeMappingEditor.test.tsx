@@ -195,6 +195,19 @@ describe('add and remove', () => {
     expect(stored(hosted.product)).toBe('XS:5 S:10 L:40 XL:100');
   });
 
+  it('focus after a remove goes to the next row\'s Remove, else the previous row\'s, else "+ Add Size"', async () => {
+    const { user } = mount(product(STANDARD, [free('m1', 'M')]));
+    await user.click(removeAt(2));
+    await user.click(within(req(dialog(), 'dialog')).getByRole('button', { name: 'Remove' }));
+    expect(screen.getByRole('button', { name: 'Remove “L”' })).toHaveFocus();
+    await user.click(removeAt(3));
+    expect(screen.getByRole('button', { name: 'Remove “L”' })).toHaveFocus();
+    cleanup();
+    const single = mount(product('XS:5', []));
+    await single.user.click(removeAt(0));
+    expect(screen.getByText('+ Add Size')).toHaveFocus();
+  });
+
   it('7. a size a locked item uses is refused without advice; one used only by a record left behind is not', async () => {
     const base = product(STANDARD, [locked('m1', 'M'), free('m2', 'M'), left('l1', 'L')]);
     const { hosted, user } = mount(base);
@@ -255,6 +268,13 @@ describe('8. duplicate rows: points come from the first', () => {
     await user.click(removeAt(0));
     expect({ dialog: dialog(), rows: stored(hosted.product), line: screen.queryByText(/can't be removed/) })
       .toEqual({ dialog: null, rows: 'M:20 M:50', line: null });
+  });
+
+  it('(control) a shadowed M is removed alone even when the row before it has different points', async () => {
+    const { hosted, user } = mount(product('M:20 M:20 M:50', mRibs()));
+    await user.click(removeAt(2));
+    expect({ dialog: dialog(), rows: stored(hosted.product), line: onPage(/can't be removed/).length })
+      .toEqual({ dialog: null, rows: 'M:20 M:20', line: 0 });
   });
 
   it('with only unlocked items on [M:20, M:50], removing the first asks with the next row\'s points', async () => {
@@ -406,6 +426,7 @@ describe('13. a list changed elsewhere during an edit', () => {
     hosted.replace(dropXS);
     await user.tab();
     expect(stored(hosted.product)).toBe('S:10 M:20 L:40 XL:100');
+    expect(onPage('“L” was changed elsewhere. Nothing was saved.')).toHaveLength(1);
   });
 
   it('the M confirm does not remove L once XS is removed elsewhere', async () => {
