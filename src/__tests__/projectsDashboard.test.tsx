@@ -236,10 +236,12 @@ describe('the open', () => {
   it.each(['Delete', 'Export', 'Edit', 'Clone'])('a click on %s does not open the project (no click handler on the tile root)', async (label) => {
     vi.spyOn(driver, 'loadProduct').mockResolvedValue(null);
     const [tile] = await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
+    const list = screen.getByRole('list', { name: 'Projects' });
     fireEvent.click(within(req(tile, 'tile')).getByRole('button', { name: `${label} Alpha` }), { detail: 1 });
     await act(async () => { await Promise.resolve(); });
-    // Still on the list: a navigation would have unmounted it, whatever the project page then did.
-    expect(screen.getByRole('list', { name: 'Projects' })).toBeTruthy();
+    // The same list, never unmounted: with the project stubbed out, a navigation would come
+    // straight back home (local mode does), so "the list is there" alone cannot tell.
+    expect(list.isConnected).toBe(true);
     expect(screen.queryByText('Structure page')).toBeNull();
   });
 
