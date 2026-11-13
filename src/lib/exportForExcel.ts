@@ -2,9 +2,10 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import type { Product } from '../types';
+import type { Product, RibItem, SizeMapping } from '../types';
 import type { Workbook, Cell, FillPattern, CellValue } from 'exceljs';
 import { forEachRib } from './ribHelpers';
+import { excelMissingCell, missingSizeLabel } from './missingSize';
 import {
   getRibItemPoints,
   getRibItemPercentComplete,
@@ -90,6 +91,12 @@ function addThemesAndBackbonesSheet(workbook: Workbook, product: Product): void 
   }
 }
 
+/** The Size cell: the label, or a label the size list no longer holds, marked. Its Points cell is 0. */
+function sizeCell(size: RibItem['size'] | undefined, sizeMapping: SizeMapping[]): string {
+  const missing = missingSizeLabel(size, sizeMapping);
+  return missing ? excelMissingCell(missing) : (size ?? '');
+}
+
 /**
  * Rib Items: one row per rib, with a theme group row before each theme. The detail
  * sheet, so it comes last (v0.54.3).
@@ -102,7 +109,7 @@ function addRibItemsSheet(workbook: Workbook, product: Product): void {
     { width: 22 },
     { width: 35 },
     { width: 12 },
-    { width: 8 },
+    { width: 26 },  // Size: fits the marker on a missing label, “XXXL” (not in size list)
     { width: 8 },
     { width: 12 },
     { width: 40 },
@@ -169,7 +176,7 @@ function addRibItemsSheet(workbook: Workbook, product: Product): void {
       safeCell(backbone.name),
       safeCell(rib.name),
       safeCell(rib.category),
-      safeCell(rib.size ?? ''),
+      safeCell(sizeCell(rib.size, product.sizeMapping)),
       points,
       pct / 100,
       safeCell(releaseStr),
