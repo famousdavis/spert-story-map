@@ -168,7 +168,7 @@ function addRibItemsSheet(workbook: Workbook, product: Product): void {
       safeCell(theme.name),
       safeCell(backbone.name),
       safeCell(rib.name),
-      rib.category,
+      safeCell(rib.category),
       safeCell(rib.size ?? ''),
       points,
       pct / 100,
@@ -229,7 +229,7 @@ function addReleaseSummarySheet(workbook: Workbook, product: Product): void {
       pctComplete / 100,
       core,
       nonCore,
-      release.targetDate ?? '',
+      safeCell(release.targetDate ?? ''),
     ]);
     relRow.getCell(3).numFmt = '0%';
   }

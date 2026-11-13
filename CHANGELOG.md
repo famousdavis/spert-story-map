@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.55.4 (2026-11-13)
+
+### Fixed
+
+- **The Excel export now guards a release's target date and an item's category against being read as formulas, as 0.55.2 did for size labels.** The app sets a target date only from a date picker and a category only as Core or Non-core, but a project loaded from the cloud is checked only for text in those fields, so either could arrive starting with =, +, -, @, a tab or a carriage return and go into the file as it was. Both now get an apostrophe in front, like the rest of the export's text. Ordinary dates and categories are written as before.
+
 ## Version 0.55.2 (2026-11-13)
 
 ### Fixed
