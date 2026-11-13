@@ -104,6 +104,10 @@ export const CONFIRM_BUTTONS = 'flex justify-end gap-3';
  * page sets 1.5, which buttons inherit, and which would make them taller than GanttApp's.
  */
 const CONFIRM_BUTTON = 'px-5 py-[0.6rem] rounded-[6px] text-[0.9rem] leading-[normal] font-semibold cursor-pointer';
-/** On the dialog's surface, with GanttApp's border colour. */
-export const CONFIRM_CANCEL = `${CONFIRM_BUTTON} border border-[#eee] bg-[#f9f9f9] text-[#333] dark:border-[#2d3748] dark:bg-[#16213e] dark:text-[#e2e8f0]`;
+/**
+ * On the dialog's surface. The border is GanttApp's Projects tab's: it hands the dialog
+ * `patchedColors`, whose border is the button border (`projectsTabPalette.ts` at aa43ae7), not
+ * theme.ts's `#eee`, which is nearly invisible on the surface (about 1.1:1).
+ */
+export const CONFIRM_CANCEL = `${CONFIRM_BUTTON} border border-[#8a8a8a] bg-[#f9f9f9] text-[#333] dark:border-[#8b9bb4] dark:bg-[#16213e] dark:text-[#e2e8f0]`;
 export const CONFIRM_DELETE = `${CONFIRM_BUTTON} border-0 bg-[#dc3545] text-white`;

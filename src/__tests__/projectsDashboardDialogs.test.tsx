@@ -393,5 +393,8 @@ describe('the Delete confirmation', () => {
     expect(message?.textContent).toBe('Are you sure you want to delete "Alpha"? This cannot be undone. Consider exporting first.');
     expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(within(dialog).getAllByRole('button').map(b => b.textContent)).toEqual(['Cancel', 'Delete']);
+    // GanttApp's Projects-tab button border, in both themes: theme.ts's #eee is nearly invisible here.
+    const cancelClasses = (within(dialog).getByRole('button', { name: 'Cancel' }).getAttribute('class') ?? '').split(/\s+/);
+    expect(cancelClasses).toEqual(expect.arrayContaining(['border-[#8a8a8a]', 'dark:border-[#8b9bb4]']));
   });
 });
