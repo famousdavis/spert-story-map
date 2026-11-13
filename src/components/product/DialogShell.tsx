@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Projects page's own dialog shell (v0.55.0): the New Project / Edit Project dialog and the
+// The Products page's own dialog shell (v0.55.0): the New Product / Edit Product dialog and the
 // Delete confirmation. Its behaviour is SPERT Forecaster's `ProjectDialog.tsx` at 38f1a63, which is
 // GanttApp's:
 // - rendered into document.body; while it is open every other child of body is `inert`, so the page

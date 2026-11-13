@@ -35,7 +35,7 @@ describe('ErrorBoundary inline (around the project view)', () => {
     );
     expect(screen.getByText('header and tabs')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('This view could not be displayed');
-    expect(screen.getByRole('link', { name: 'Back to projects' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Back to Products' })).toHaveAttribute('href', '/');
     err.mockRestore();
   });
 

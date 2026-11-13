@@ -2,8 +2,8 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The heading row (v0.55.0): "Projects" and the toolbar, in SPERT Forecaster's look. The order is
-// fixed across the SPERT® Suite: Export All · Import · Load Sample · New Project (primary, far
+// The heading row (v0.55.0): "Products" and the toolbar, in SPERT Forecaster's look. The order is
+// fixed across the SPERT® Suite: Export All · Import · Load Sample · New Product (primary, far
 // right). Every button always renders; gates disable, never hide.
 
 import type React from 'react';
@@ -30,13 +30,13 @@ export default function ProjectsToolbar({
 }: ProjectsToolbarProps) {
   return (
     <div className={`${HEAD_ROW} mb-4`}>
-      <h2 className={HEADING}>Projects</h2>
+      <h2 className={HEADING}>Products</h2>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={onExportAll} disabled={!hasProjects} aria-label="Export all projects as JSON" className={SECONDARY}>
+        <button type="button" onClick={onExportAll} disabled={!hasProjects} aria-label="Export all products as JSON" className={SECONDARY}>
           <ToolbarIcon d={TOOLBAR_ICON_PATHS.export} className={TOOLBAR_ICON_SECONDARY} />
           Export All
         </button>
-        <button type="button" onClick={onImport} disabled={importDisabled} aria-label="Import projects from JSON" className={SECONDARY}>
+        <button type="button" onClick={onImport} disabled={importDisabled} aria-label="Import products from JSON" className={SECONDARY}>
           <ToolbarIcon d={TOOLBAR_ICON_PATHS.import} className={TOOLBAR_ICON_SECONDARY} />
           Import
         </button>
@@ -46,7 +46,7 @@ export default function ProjectsToolbar({
         </button>
         <button type="button" ref={newProjectRef} onClick={onNewProject} className={PRIMARY}>
           <ToolbarIcon d={TOOLBAR_ICON_PATHS.plus} className={TOOLBAR_ICON_PRIMARY} />
-          New Project
+          New Product
         </button>
       </div>
     </div>

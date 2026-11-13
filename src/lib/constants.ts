@@ -45,6 +45,9 @@ export const NOTES_MAX = 2000;
  */
 export const CARD_COLOR_LABEL_MAX = 40;
 
+/** R31: what a product is. On the welcome panel, under New Product's name field, and in the copy prompt. */
+export const PRODUCT_DEFINITION = 'A product can be an application, a service, an internal capability or any other initiative.';
+
 /**
  * Where undo is, for a confirm on a tab with no undo key of its own. The stack
  * lives in `ProductLayout`, so it survives the tab change this sends the user on;

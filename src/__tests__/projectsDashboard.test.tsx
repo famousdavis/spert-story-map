@@ -35,8 +35,8 @@ import type { Product, StorageDriver } from '../types';
 
 const driver = createLocalStorageDriver();
 
-const OWNER_ONLY = "Only the project's owner can delete it. To remove it from your list, ask the owner to stop sharing it with you.";
-const VIEW_ONLY = 'View only — this project is shared with you as a viewer.';
+const OWNER_ONLY = "Only the owner can delete it. To remove it from your list, ask the owner to stop sharing it with you.";
+const VIEW_ONLY = 'View only — this product is shared with you as a viewer.';
 
 beforeEach(() => {
   localStorage.clear();
@@ -61,7 +61,7 @@ const classes = (el: Element | null) => (el?.getAttribute('class') ?? '').split(
 async function showProjects(products: Product[]) {
   seedLocal(products);
   renderPage();
-  await screen.findByRole('list', { name: 'Projects' });
+  await screen.findByRole('list', { name: 'Products' });
   return tiles();
 }
 
@@ -78,11 +78,11 @@ describe('the header and the page', () => {
     const header = req(document.querySelector('header'), 'header');
     const h1 = within(header).getByRole('heading', { level: 1 });
     expect([...h1.querySelectorAll('span')].map(s => s.textContent)).toEqual(['SPERT', '®', ' Story Map']);
-    expect(req(header.querySelector('p'), 'tagline').textContent).toBe('Plan and track agile project releases');
+    expect(req(header.querySelector('p'), 'tagline').textContent).toBe('Plan and track agile product releases');
     expect(document.body.textContent).not.toMatch(/Data is stored (locally|in your cloud)/);
     const main = req(document.querySelector('main'), 'main');
-    expect(within(main).getByRole('heading', { level: 2, name: 'Projects' })).toBeTruthy();
-    expect(within(main).getByRole('list', { name: 'Projects' })).toBeTruthy();
+    expect(within(main).getByRole('heading', { level: 2, name: 'Products' })).toBeTruthy();
+    expect(within(main).getByRole('list', { name: 'Products' })).toBeTruthy();
   });
 
   it('keeps the logo\'s link home, the gear, About and the theme toggle', async () => {
@@ -90,7 +90,7 @@ describe('the header and the page', () => {
     renderPage();
     await screen.findByText('Welcome to SPERT® Story Map');
     const header = req(document.querySelector('header'), 'header');
-    expect(within(header).getByRole('link', { name: 'Go to projects home' }).getAttribute('href')).toBe('/');
+    expect(within(header).getByRole('link', { name: 'Go to products home' }).getAttribute('href')).toBe('/');
     expect(within(header).getByTitle('App Settings')).toBeTruthy();
     expect(within(header).getByRole('link', { name: 'About' })).toBeTruthy();
   });
@@ -99,7 +99,7 @@ describe('the header and the page', () => {
 describe('the grid: the class pairs a look depends on', () => {
   it('the grid\'s column queries are answered by an ANCESTOR carrying @container, never by the grid itself', async () => {
     await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
-    const grid = screen.getByRole('list', { name: 'Projects' });
+    const grid = screen.getByRole('list', { name: 'Products' });
     expect(classes(grid)).toEqual(expect.arrayContaining(['grid', 'grid-cols-1', '@min-[560px]:grid-cols-2', '@min-[860px]:grid-cols-3', 'gap-4']));
     expect(classes(grid)).not.toContain('@container');
     expect(classes(grid.parentElement)).toContain('@container');
@@ -236,7 +236,7 @@ describe('the open', () => {
   it.each(['Delete', 'Export', 'Edit', 'Clone'])('a click on %s does not open the project (no click handler on the tile root)', async (label) => {
     vi.spyOn(driver, 'loadProduct').mockResolvedValue(null);
     const [tile] = await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
-    const list = screen.getByRole('list', { name: 'Projects' });
+    const list = screen.getByRole('list', { name: 'Products' });
     fireEvent.click(within(req(tile, 'tile')).getByRole('button', { name: `${label} Alpha` }), { detail: 1 });
     await act(async () => { await Promise.resolve(); });
     // The same list, never unmounted: with the project stubbed out, a navigation would come
@@ -253,18 +253,18 @@ describe('the open', () => {
 });
 
 describe('names and titles (O14)', () => {
-  it('each control names its project, except Share; each title names the action', async () => {
+  it('each control names its product; each title names the action', async () => {
     cloudAs('me', [makeProject({ id: 'p1', name: 'Alpha', owner: 'me', members: { me: 'owner' } })]);
     renderPage();
     const tile = req((await screen.findAllByRole('listitem'))[0], 'tile');
     const named = [...tile.querySelectorAll('button')].map(b => [b.getAttribute('aria-label'), b.getAttribute('title')]);
     expect(named).toEqual([
       ['Open Structure for Alpha', 'Open Structure'],
-      ['Delete Alpha', 'Delete project'],
-      ['Share project', 'Share project'],
-      ['Export Alpha', 'Export project'],
-      ['Edit Alpha', 'Edit project'],
-      ['Clone Alpha', 'Clone project'],
+      ['Delete Alpha', 'Delete product'],
+      ['Share Alpha', 'Share product'],
+      ['Export Alpha', 'Export product'],
+      ['Edit Alpha', 'Edit product'],
+      ['Clone Alpha', 'Clone product'],
     ]);
   });
 
@@ -286,7 +286,7 @@ describe('who may Edit, Delete and Share (R6, R13, R21, O17)', () => {
     const tile = req((await screen.findAllByRole('listitem'))[0], 'tile');
     const del = within(tile).getByRole('button', { name: 'Delete Alpha' }) as HTMLButtonElement;
     const edit = within(tile).getByRole('button', { name: 'Edit Alpha' }) as HTMLButtonElement;
-    const share = within(tile).queryByRole('button', { name: 'Share project' });
+    const share = within(tile).queryByRole('button', { name: 'Share Alpha' });
     return { del, edit, share };
   };
 
@@ -319,7 +319,7 @@ describe('who may Edit, Delete and Share (R6, R13, R21, O17)', () => {
     const tile = req((await screen.findAllByRole('listitem'))[0], 'tile');
     expect((within(tile).getByRole('button', { name: 'Delete Alpha' }) as HTMLButtonElement).disabled).toBe(true);
     expect((within(tile).getByRole('button', { name: 'Edit Alpha' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(within(tile).queryByRole('button', { name: 'Share project' })).toBeNull();
+    expect(within(tile).queryByRole('button', { name: 'Share Alpha' })).toBeNull();
   });
 
   it('a role the members map does not give: fails closed, as a viewer', async () => {
@@ -332,7 +332,7 @@ describe('who may Edit, Delete and Share (R6, R13, R21, O17)', () => {
     const t = req(tile, 'tile');
     expect((within(t).getByRole('button', { name: 'Delete Alpha' }) as HTMLButtonElement).disabled).toBe(false);
     expect((within(t).getByRole('button', { name: 'Edit Alpha' }) as HTMLButtonElement).disabled).toBe(false);
-    expect(within(t).queryByRole('button', { name: 'Share project' })).toBeNull();
+    expect(within(t).queryByRole('button', { name: 'Share Alpha' })).toBeNull();
   });
 
   it('Export and Clone stay offered to a viewer', async () => {

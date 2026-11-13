@@ -163,7 +163,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
     } catch (e) {
       console.error('Failed to remove member:', e instanceof Error ? e.message : 'Unknown error');
       // Surface the driver's guard messages directly so the user sees
-      // "Cannot remove yourself…" / "Cannot remove the project owner." etc.
+      // "Cannot remove yourself…" / "Cannot remove the owner." etc.
       // (Lesson 50: removeCollaborator three-guard pattern.)
       setError(e instanceof Error ? e.message : 'Failed to remove member. Please try again.');
     }
@@ -186,7 +186,7 @@ export default function ProjectSharingPanel({ productId, withSectionWrapper = fa
   const content = (
     <>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-        Share this project with others. Members can view or edit based on their role.
+        Share this product with others. Members can view or edit based on their role.
       </p>
 
       {/* Members list */}

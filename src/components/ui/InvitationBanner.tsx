@@ -35,7 +35,7 @@ export default function InvitationBanner() {
     return (
       <BannerShell color="blue" onDismiss={dismiss}>
         <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-          You've been invited to a SPERT Story Map project.
+          You've been invited to collaborate in SPERT Story Map.
         </p>
         <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
           Sign in to accept the invitation.
@@ -78,7 +78,7 @@ export default function InvitationBanner() {
         </p>
         {mode === 'local' && (
           <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-            Switch to Cloud Storage in Settings to view this project.
+            Switch to Cloud Storage in Settings to view {claimedNames.length > 1 ? 'them' : 'it'}.
           </p>
         )}
       </BannerShell>
@@ -91,7 +91,7 @@ export default function InvitationBanner() {
       <BannerShell color="amber" onDismiss={dismiss}>
         <p className="text-xs text-amber-800 dark:text-amber-200">
           We couldn't match this invitation to your account. If this seems wrong,
-          ask the project owner to resend the invitation.
+          ask the person who invited you to resend the invitation.
         </p>
       </BannerShell>
     );

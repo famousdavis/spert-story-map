@@ -52,7 +52,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
     if (newMode === 'local') {
       // Cloud → Local: simple mode switch, no migration.
       // Navigate to / so that any currently-open cloud product page
-      // does not become a "Project not found" dead end after the
+      // does not become a "Product not found" dead end after the
       // driver swaps to local.
       switchMode('local');
       navigate('/');
@@ -99,7 +99,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
       switchMode('cloud');
       savePreferences({ ...loadPreferences(), _hasUploadedToCloud: true });
 
-      const msg = `Uploaded ${result.uploaded} project${result.uploaded !== 1 ? 's' : ''} to cloud${result.skipped ? ` (${result.skipped} already in cloud)` : ''}.`;
+      const msg = `Uploaded ${result.uploaded} product${result.uploaded !== 1 ? 's' : ''} to cloud${result.skipped ? ` (${result.skipped} already in cloud)` : ''}.`;
       setMigrateResult(msg);
 
       // Offer to clear local data after successful upload
@@ -128,7 +128,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
     setExporting(true);
     try {
       const result = await exportAllProducts(driver, user?.uid);
-      setMigrateResult(`Downloaded ${result.exported} project${result.exported !== 1 ? 's' : ''} as JSON.`);
+      setMigrateResult(`Downloaded ${result.exported} product${result.exported !== 1 ? 's' : ''} as JSON.`);
     } catch (e) {
       console.error('Export failed:', e instanceof Error ? e.message : 'Unknown error');
       setMigrateResult('Export failed. Please try again.');
@@ -253,10 +253,10 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
             disabled={exporting}
             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
           >
-            {exporting ? 'Downloading...' : 'Download All Projects as JSON'}
+            {exporting ? 'Downloading...' : 'Download All Products as JSON'}
           </button>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Export all your cloud projects as individual JSON files.
+            Export all your cloud products as individual JSON files.
           </p>
         </div>
       )}
@@ -266,8 +266,8 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
         open={showUploadConfirm}
         onClose={() => setShowUploadConfirm(false)}
         onConfirm={confirmUpload}
-        title="Upload Local Projects"
-        message={`You have ${localCount} local project${localCount !== 1 ? 's' : ''}. Upload them to cloud?${hasUploadedBefore ? ' Projects already in cloud will be skipped.' : ''}`}
+        title="Upload Local Products"
+        message={`You have ${localCount} local product${localCount !== 1 ? 's' : ''}. Upload them to cloud?${hasUploadedBefore ? ' Products already in cloud will be skipped.' : ''}`}
         confirmLabel="Upload"
         danger={false}
       />
@@ -278,7 +278,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
         onClose={() => setShowCleanupConfirm(false)}
         onConfirm={confirmCleanup}
         title="Clear Local Data"
-        message="Your projects are now in the cloud. Clear local copies to prevent duplicates on future sign-ins?"
+        message="Your products are now in the cloud. Clear local copies to prevent duplicates on future sign-ins?"
         confirmLabel="Clear Local Data"
         danger={true}
       />

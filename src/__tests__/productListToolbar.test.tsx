@@ -36,10 +36,10 @@ const GANTT_ICON_PATHS = {
 
 /** Visible label, the start of its accessible name, and its icon, left to right. */
 const EXPECTED = [
-  { label: 'Export All', name: 'Export all projects as JSON', icon: GANTT_ICON_PATHS.export },
-  { label: 'Import', name: 'Import projects from JSON', icon: GANTT_ICON_PATHS.import },
+  { label: 'Export All', name: 'Export all products as JSON', icon: GANTT_ICON_PATHS.export },
+  { label: 'Import', name: 'Import products from JSON', icon: GANTT_ICON_PATHS.import },
   { label: 'Load Sample', name: 'Load Sample', icon: GANTT_ICON_PATHS.sample },
-  { label: 'New Project', name: 'New Project', icon: GANTT_ICON_PATHS.plus },
+  { label: 'New Product', name: 'New Product', icon: GANTT_ICON_PATHS.plus },
 ];
 
 const driver = createLocalStorageDriver();
@@ -48,7 +48,7 @@ const driver = createLocalStorageDriver();
  * The first load has finished. Until v0.55.0 these tests waited for "No projects yet", which the
  * welcome panel replaced; "Loading projects..." going is what both pages share.
  */
-const loaded = () => waitFor(() => expect(screen.queryByText('Loading projects...')).toBeNull());
+const loaded = () => waitFor(() => expect(screen.queryByText('Loading products...')).toBeNull());
 
 function seedProject() {
   const p = createSampleProduct();
@@ -59,7 +59,7 @@ function seedProject() {
 
 /** The toolbar's buttons: the button siblings of the `Projects` heading's row. */
 function toolbarButtons(): HTMLButtonElement[] {
-  const heading = screen.getByRole('heading', { level: 2, name: 'Projects' });
+  const heading = screen.getByRole('heading', { level: 2, name: 'Products' });
   const row = heading.parentElement!;
   return within(row).getAllByRole('button') as HTMLButtonElement[];
 }
@@ -136,7 +136,7 @@ describe('project list toolbar', () => {
     const p = seedProject();
     render(<MemoryRouter><ProductList /></MemoryRouter>);
     await screen.findByText(p.name);
-    const heading = screen.getByRole('heading', { level: 2, name: 'Projects' });
+    const heading = screen.getByRole('heading', { level: 2, name: 'Products' });
     const terms = screen.getByText(/SPERT® Suite web apps are free to use/);
     const caution = await screen.findByText(/Your data exists only in this browser/);
     const fileInput = document.querySelector('input[type="file"]')!;
@@ -150,7 +150,7 @@ describe('project list toolbar', () => {
     const pending = { ...driver, loadProductIndex: () => new Promise<never>(() => {}) };
     storage.value = { driver: pending, mode: 'cloud', storageReady: true };
     render(<MemoryRouter><ProductList /></MemoryRouter>);
-    await screen.findByText('Loading projects...');
+    await screen.findByText('Loading products...');
     const buttons = toolbarButtons();
     expect(buttons.map(b => b.textContent)).toEqual(EXPECTED.map(e => e.label));
     expect(buttons.map(b => b.disabled)).toEqual([true, true, false, false]);

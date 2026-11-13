@@ -68,7 +68,7 @@ function DecisionRow({
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {isId
-              ? 'Same project ID as an existing project'
+              ? 'Same product ID as an existing product'
               : `Matches the name of "${conflict.existingProduct.name}"`}
           </p>
         </div>
@@ -141,7 +141,7 @@ function ImportPreviewBody({
           Import preview — {parsed.fileName}
         </h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          {parsed.products.length} project{parsed.products.length !== 1 ? 's' : ''} in file
+          {parsed.products.length} product{parsed.products.length !== 1 ? 's' : ''} in file
         </p>
       </div>
 
@@ -184,12 +184,12 @@ function ImportPreviewBody({
         {hasReplaceDecisions && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 space-y-1">
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              One or more projects will <strong>permanently replace</strong> existing data.
+              One or more products will <strong>permanently replace</strong> existing data.
               This cannot be undone. Consider exporting first.
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              The existing project's audit history will also be replaced by the incoming
-              file's history. If the destination project's prior history matters, export it
+              The existing product's audit history will also be replaced by the incoming
+              file's history. If the destination product's prior history matters, export it
               before proceeding.
             </p>
           </div>
@@ -242,7 +242,7 @@ export default function ImportPreviewSection({
         {hiddenInput}
         {mode === 'cloud' && !cloudDataLoaded && (
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Loading cloud projects… Import will be available once your workspace loads.
+            Loading cloud products… Import will be available once your workspace loads.
           </p>
         )}
       </>

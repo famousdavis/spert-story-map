@@ -51,7 +51,7 @@ describe('AiTeardownBanner', () => {
 
     expect(await screen.findByText(/AI assistant may still be connected/i)).toBeInTheDocument();
     expect(screen.getByText(/could not reach the server to end your Connect AI session/i)).toBeInTheDocument();
-    expect(screen.getByText(/read and change your last-open project/i)).toBeInTheDocument();
+    expect(screen.getByText(/read and change your last-open product/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
     // Accurate guidance (review 3): keeps trying + 7-day fallback...
     expect(screen.getByText(/keeps trying whenever you are online/i)).toBeInTheDocument();

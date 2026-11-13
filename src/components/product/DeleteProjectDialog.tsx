@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Projects page's Delete confirmation (v0.55.0): GanttApp's look (`ConfirmDialog.tsx`'s modal
+// The Products page's Delete confirmation (v0.55.0): GanttApp's look (`ConfirmDialog.tsx`'s modal
 // variant at aa43ae7), Forecaster's `alertdialog`, in the page's own dialog shell. Focus opens on
 // Cancel, so Enter never deletes by default. A press and release on the backdrop is Cancel.
 
@@ -24,7 +24,7 @@ export default function DeleteProjectDialog({ projectName, onCancel, onConfirm, 
   return (
     <DialogShell
       role="alertdialog"
-      title="Delete Project"
+      title="Delete Product"
       titleClassName={DIALOG_TITLE}
       className={`${CONFIRM_DIALOG} ${DIALOG_BG}`}
       describedBy={messageId}

@@ -75,7 +75,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
 
       if (result.products.length > 1) {
         setImportError(
-          'This file contains multiple projects. To import a bundled file, use the "Import" button on the project list homepage.',
+          'This file contains multiple products. To import a bundled file, use the "Import" button on the Products page.',
         );
         return;
       }
@@ -141,7 +141,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
     const now = new Date().toISOString();
     const template = {
       id: 'example-id',
-      name: 'Example Project',
+      name: 'Example Product',
       description: '',
       schemaVersion: 2,
       sizeMapping: product.sizeMapping,
@@ -227,20 +227,20 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
       />
 
       <Section title="Data">
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Export and import this project's data.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Export and import this product's data.</p>
         <div className="flex flex-wrap gap-3">
           <button onClick={handleExport} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Export as JSON</button>
           <button onClick={handleForecasterExport} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">Export for SPERT Forecaster</button>
           <button
             onClick={handleSendToForecaster}
             disabled={isSending}
-            title="Opens SPERT Forecaster in a new tab and hands this project over once. Nothing stays connected afterwards."
+            title="Opens SPERT Forecaster in a new tab and hands this product over once. Nothing stays connected afterwards."
             className="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 rounded-lg"
           >
             {isSending ? 'Sending…' : 'Send to SPERT Forecaster'}
           </button>
           <button onClick={handleExcelExport} disabled={isExporting} className="px-4 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg">{isExporting ? 'Exporting…' : 'Export as Excel'}</button>
-          <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Project from JSON</button>
+          <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Product from JSON</button>
           <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
         </div>
         {importError && (
@@ -248,7 +248,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
         )}
         {forecasterIssues && (
           <div role="alert" className="text-sm text-red-600 dark:text-red-400 mt-3 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
-            <p className="font-medium">This project cannot be exported to SPERT Forecaster yet:</p>
+            <p className="font-medium">This product cannot be exported to SPERT Forecaster yet:</p>
             <ul className="list-disc list-inside mt-1 space-y-1">
               {forecasterIssues.map((issue, i) => <li key={i}>{issue}</li>)}
             </ul>
@@ -256,7 +256,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
         )}
         {sendIssues && (
           <div role="alert" className="text-sm text-amber-700 dark:text-amber-400 mt-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-            <p className="font-medium">The project was not imported:</p>
+            <p className="font-medium">This product has not been imported into SPERT Forecaster:</p>
             <ul className="list-disc list-inside mt-1 space-y-1">
               {sendIssues.map((issue, i) => <li key={i}>{issue}</li>)}
             </ul>
@@ -268,7 +268,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
         open={!!importConfirm}
         onClose={() => setImportConfirm(null)}
         onConfirm={confirmImport}
-        title="Replace Project Data"
+        title="Replace Product Data"
         message={`Importing "${importConfirm?.name}" will permanently replace all data in "${product.name}" — themes, backbones, rib items, releases, sprints, and progress history. This cannot be undone.`}
         confirmLabel="Replace All Data"
       />

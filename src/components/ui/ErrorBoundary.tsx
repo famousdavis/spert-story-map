@@ -43,7 +43,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">This view could not be displayed</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{this.state.error.message}</p>
           <Link to="/" className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
-            Back to projects
+            Back to Products
           </Link>
         </div>
       );

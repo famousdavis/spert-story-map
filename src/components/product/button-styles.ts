@@ -2,12 +2,12 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Projects page's labelled buttons and its tiles' icon buttons (v0.55.0): SPERT Forecaster's
+// The Products page's labelled buttons and its tiles' icon buttons (v0.55.0): SPERT Forecaster's
 // strings at 38f1a63 (`src/shared/components/toolbar-button-styles.ts` and
 // `icon-button-styles.ts`), which are GanttApp's `.pt-btn` and icon buttons written as Tailwind.
 //
 // ⚠️ Copied through the brief's token map. Forecaster's SPERT blue is a theme colour Story Map
-// does not define: written as Forecaster names it, the class produces NO CSS and New Project's
+// does not define: written as Forecaster names it, the class produces NO CSS and New Product's
 // label is white on white. Here it is the literal `[#0070f3]`. Forecaster's dark page is gray-900 and Story
 // Map's is gray-950, so the secondary button's dark background, which is meant to be the page
 // colour, is gray-950 here.

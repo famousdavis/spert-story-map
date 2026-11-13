@@ -64,7 +64,7 @@ function roleOf(p: Product, isCloud: boolean, uid: string | undefined): MemberRo
 export default function ProductList() {
   const { driver, mode, storageReady } = useStorage();
   const [products, setProducts] = useState<EnrichedProduct[]>([]);
-  // "Loading projects..." is for the first load on a driver only. Every later refresh (an action,
+  // "Loading products..." is for the first load on a driver only. Every later refresh (an action,
   // an import, an invitation) updates the list in place, so untouched tiles keep their DOM nodes
   // and focus stays where it was.
   const [loadedFor, setLoadedFor] = useState<StorageDriver | null>(null);
@@ -96,7 +96,7 @@ export default function ProductList() {
 
   const mainRef = useRef<HTMLElement>(null);
   const newProjectRef = useRef<HTMLButtonElement>(null);
-  // The button that opened the New Project dialog: the toolbar's, or the welcome panel's.
+  // The button that opened the New Product dialog: the toolbar's, or the welcome panel's.
   const newOpenerRef = useRef<HTMLElement | null>(null);
   const deleteConfirmedRef = useRef(false);
 
@@ -213,7 +213,7 @@ export default function ProductList() {
       return;
     }
     // A refused delete leaves the project listed: focus goes back to its Delete. Otherwise the
-    // next tile's open button, else the previous one's, else New Project.
+    // next tile's open button, else the previous one's, else New Product.
     const { id, next, prev } = focusRequest;
     const target = findTileControl(root, id, 'delete')
       ?? (next ? findTileControl(root, next, 'open') : null)
@@ -265,7 +265,7 @@ export default function ProductList() {
     const sample = createSampleProduct();
     await driver.createProduct(sample);
     await refresh();
-    announce('Loaded the sample project.');
+    announce('Loaded the sample product.');
     setScrollTarget({ id: sample.id });
     // The welcome panel goes once a project exists, and its button with it.
     if (fromWelcome) setFocusRequest({ kind: 'open', id: sample.id });
@@ -356,7 +356,7 @@ export default function ProductList() {
             <Link
               to="/"
               onClick={() => window.scrollTo(0, 0)}
-              aria-label="Go to projects home"
+              aria-label="Go to products home"
               className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <img
@@ -380,7 +380,7 @@ export default function ProductList() {
           {accessDeniedMsg && (
             <div className="mb-4 flex items-start justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg px-4 py-3">
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                You no longer have access to that project.
+                You no longer have access to that product.
               </p>
               <button
                 onClick={() => setAccessDeniedMsg(false)}
@@ -433,7 +433,7 @@ export default function ProductList() {
           {localOrphanCount > 0 && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg px-4 py-3 mb-6">
               <p className="text-xs text-blue-800 dark:text-blue-200">
-                Your cloud account has no projects, but you have {localOrphanCount} project{localOrphanCount !== 1 ? 's' : ''} stored locally.
+                Your cloud account has no products, but you have {localOrphanCount} product{localOrphanCount !== 1 ? 's' : ''} stored locally.
                 Go to App Settings → Storage to upload them, or switch back to Local mode.
               </p>
             </div>
@@ -441,7 +441,7 @@ export default function ProductList() {
 
           {loading ? (
             <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-              <p className="text-sm">Loading projects...</p>
+              <p className="text-sm">Loading products...</p>
             </div>
           ) : products.length === 0 ? (
             <ProjectsEmptyState onCreateNew={openNew} onLoadSample={() => handleLoadSample(true)} />

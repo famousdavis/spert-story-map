@@ -50,7 +50,7 @@ function renderAt(path: string) {
   );
 }
 
-const listHeading = () => screen.findByRole('heading', { level: 2, name: 'Projects' });
+const listHeading = () => screen.findByRole('heading', { level: 2, name: 'Products' });
 const settle = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 
 let scrollTo: ReturnType<typeof vi.fn>;
@@ -81,7 +81,7 @@ describe('"← Projects" on a project page', () => {
     const caution = await screen.findByText(CAUTION);
     await userEvent.click(caution.closest('div')!.querySelector('button')!);
 
-    await userEvent.click(screen.getByRole('link', { name: '← Projects' }));
+    await userEvent.click(screen.getByRole('link', { name: '← Products' }));
 
     expect(await listHeading()).toBeTruthy();
     expect(screen.queryByText('Structure page')).toBeNull();
@@ -104,11 +104,11 @@ describe('"Back to projects" on "Project not found"', () => {
     };
     storage.value = { driver: missing, mode: 'cloud', storageReady: true };
     renderAt('/product/gone/structure');
-    await screen.findByText('Project not found');
+    await screen.findByText('Product not found');
 
-    await userEvent.click(screen.getByRole('link', { name: 'Back to projects' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Back to Products' }));
 
     expect(await listHeading()).toBeTruthy();
-    expect(screen.queryByText('Project not found')).toBeNull();
+    expect(screen.queryByText('Product not found')).toBeNull();
   });
 });

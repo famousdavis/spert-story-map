@@ -33,7 +33,7 @@ export default function ConsentModal({
     <Modal open={open} onClose={onClose} title="Connect an AI assistant">
       <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
         <p>
-          Connecting lets your AI chatbot build a story map in this project. You stay
+          Connecting lets your AI chatbot build a story map in this product. You stay
           in control: the AI asks what to build before doing anything, and you choose
           what it can access.
         </p>
@@ -48,7 +48,7 @@ export default function ConsentModal({
               <span className="font-medium text-gray-900 dark:text-gray-100">Write Mode</span>
               {' '}(required)
               <span className="block text-xs text-gray-500 dark:text-gray-400">
-                The AI can create themes, backbones, and rib items in this project.
+                The AI can create themes, backbones, and rib items in this product.
               </span>
             </span>
           </label>

@@ -55,7 +55,7 @@ const indexIds = () => (JSON.parse(localStorage.getItem('rp:local:products_index
 async function show(specs: Parameters<typeof makeProject>[0][]) {
   seedLocal(specs.map(makeProject));
   renderPage();
-  await screen.findByRole('list', { name: 'Projects' });
+  await screen.findByRole('list', { name: 'Products' });
   await settle();
 }
 
@@ -82,7 +82,7 @@ describe('Clone (R8, R15, R20)', () => {
     cleanup();
     release();
     renderPage();
-    await screen.findByRole('list', { name: 'Projects' });
+    await screen.findByRole('list', { name: 'Products' });
     let hold: () => void = () => {};
     const held = new Promise<void>(r => { hold = r; });
     slow.loadProductIndex = () => held.then(realIndex);
@@ -153,7 +153,7 @@ describe('the list updates in place (O4)', () => {
   const watchLoading = () => {
     const seen = { loading: false };
     const observer = new MutationObserver(() => {
-      if ((document.body.textContent ?? '').includes('Loading projects...')) seen.loading = true;
+      if ((document.body.textContent ?? '').includes('Loading products...')) seen.loading = true;
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     return { seen, stop: () => observer.disconnect() };
@@ -178,7 +178,7 @@ describe('the list updates in place (O4)', () => {
         await waitFor(() => expect(tiles()).toHaveLength(3));
       } else if (action === 'Edit') {
         await userEvent.click(control('Work', 'Edit'));
-        await userEvent.type(screen.getByLabelText('Project Name'), '!');
+        await userEvent.type(screen.getByLabelText('Product Name'), '!');
         await userEvent.click(screen.getByRole('button', { name: 'Update' }));
         await waitFor(() => expect(tileNames()).toContain('Work!'));
       } else if (action === 'Delete') {
@@ -205,7 +205,7 @@ describe('the list updates in place (O4)', () => {
     const pending: StorageDriver = { ...driver, loadProductIndex: () => new Promise<never>(() => {}) };
     storage.value = { driver: pending, mode: 'local', storageReady: true };
     renderPage();
-    expect(await screen.findByText('Loading projects...')).toBeTruthy();
+    expect(await screen.findByText('Loading products...')).toBeTruthy();
   });
 });
 
@@ -216,7 +216,7 @@ describe('Load Sample', () => {
     await userEvent.click(button);
     await waitFor(() => expect(tiles()).toHaveLength(2));
     expect(tileNames()[1]).toBe(createSampleProduct().name);
-    expect(screen.getByRole('status').textContent).toBe('Loaded the sample project.');
+    expect(screen.getByRole('status').textContent).toBe('Loaded the sample product.');
     expect(document.activeElement).toBe(button);
   });
 
@@ -224,7 +224,7 @@ describe('Load Sample', () => {
     await show([{ id: 'x', name: 'X' }]);
     const region = screen.getByRole('status');
     let heard = 0;
-    const observer = new MutationObserver(() => { if (region.textContent === 'Loaded the sample project.') heard += 1; });
+    const observer = new MutationObserver(() => { if (region.textContent === 'Loaded the sample product.') heard += 1; });
     observer.observe(region, { childList: true, subtree: true, characterData: true });
     try {
       await userEvent.click(screen.getByRole('button', { name: 'Load Sample' }));
@@ -240,7 +240,7 @@ describe('Load Sample', () => {
   it('from the welcome panel, which goes: focus to the sample tile\'s open button', async () => {
     seedLocal([]);
     renderPage();
-    await userEvent.click(await screen.findByRole('button', { name: 'Load Sample Project' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Load Sample Product' }));
     await waitFor(() => expect(tiles()).toHaveLength(1));
     await settle();
     expect(document.activeElement).toBe(within(tiles()[0]!).getByRole('button', { name: /^Open Structure for / }));
@@ -256,21 +256,22 @@ describe('the welcome panel (R22)', () => {
     const texts = [...panel.querySelectorAll('p')].map(p => (p.textContent ?? '').replace(/\s+/g, ' ').trim());
     expect(texts).toEqual([
       'Plan releases on a story map: themes, backbones and rib items, sized in story points, allocated to releases and tracked sprint by sprint.',
-      'The sample project is a working example with four releases and four sprints of progress. You can explore it, edit it, or delete it at any time.',
+      'A product can be an application, a service, an internal capability or any other initiative.',
+      'The sample product is a working example with four releases and four sprints of progress. You can explore it, edit it, or delete it at any time.',
     ]);
     const sample = createSampleProduct();
     const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
     const withProgress = sample.sprints.filter(s =>
       sample.themes.some(t => t.backboneItems.some(b => b.ribItems.some(r => r.progressHistory.some(e => e.sprintId === s.id))))).length;
-    expect(texts[1]).toContain(`with ${words[sample.releases.length]} releases and ${words[withProgress]} sprints of progress`);
+    expect(texts[2]).toContain(`with ${words[sample.releases.length]} releases and ${words[withProgress]} sprints of progress`);
     expect(sample.sprints).toHaveLength(withProgress);
   });
 
   it('Create New Project opens the New Project dialog', async () => {
     seedLocal([]);
     renderPage();
-    await userEvent.click(await screen.findByRole('button', { name: 'Create New Project' }));
-    expect(screen.getByRole('dialog', { name: 'New Project' })).toBeTruthy();
+    await userEvent.click(await screen.findByRole('button', { name: 'Create New Product' }));
+    expect(screen.getByRole('dialog', { name: 'New Product' })).toBeTruthy();
   });
 });
 
@@ -296,7 +297,7 @@ describe('a double-click on a tile opens the project once (O16)', () => {
     const sample = createSampleProduct();
     seedLocal([sample]);
     renderPage('real');
-    await screen.findByRole('list', { name: 'Projects' });
+    await screen.findByRole('list', { name: 'Products' });
     const before = localStorage.getItem(`rp:local:product_${sample.id}`);
     fakeGestureClock();
     // The first click opens the project at once.
@@ -321,7 +322,7 @@ describe('a double-click on a tile opens the project once (O16)', () => {
     const sample = createSampleProduct();
     seedLocal([sample]);
     renderPage('real');
-    await screen.findByRole('list', { name: 'Projects' });
+    await screen.findByRole('list', { name: 'Products' });
     fakeGestureClock();
     fireEvent.click(screen.getByRole('button', { name: `Open Structure for ${sample.name}` }), { detail: 1 });
     const themeName = (await structureNames())[0]!;
@@ -354,7 +355,7 @@ describe('a double-click on a tile opens the project once (O16)', () => {
     const sample = createSampleProduct();
     seedLocal([sample]);
     renderPage('real');
-    await screen.findByRole('list', { name: 'Projects' });
+    await screen.findByRole('list', { name: 'Products' });
     fireEvent.click(screen.getByRole('button', { name: `Open Structure for ${sample.name}` }), { detail: 0 });
     const themeName = (await screen.findAllByRole('button', { name: /^Edit / }))[0]!;
     fireEvent.click(themeName, { detail: 1 });

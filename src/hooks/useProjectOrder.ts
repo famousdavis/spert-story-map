@@ -10,7 +10,7 @@ import type { StorageDriver } from '../types';
 interface InFlight { name: string; settledAt?: number }
 
 /**
- * The Projects page's order (v0.55.0): the persisted `projectOrder`, drops, and where a clone goes.
+ * The Products page's order (v0.55.0): the persisted `projectOrder`, drops, and where a clone goes.
  *
  * `projectOrder` (state) is what the list is sorted by. `orderRef` is the LATEST order, updated at
  * once by every clone, drop and refresh. A clone is placed from it, not from the list as shown:

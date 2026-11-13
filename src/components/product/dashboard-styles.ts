@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Projects dashboard's look (v0.55.0): SPERT Forecaster's grid, tile and project dialog
+// The Products dashboard's look (v0.55.0): SPERT Forecaster's grid, tile and project dialog
 // (`src/features/projects/components/dashboard-styles.ts` at 38f1a63), which are GanttApp's, as
 // literal class strings, plus GanttApp's Delete confirmation.
 //
@@ -21,7 +21,7 @@
 //   grip, Delete and the revealed row sit above it only because each is `relative z-[1]`.
 // `projectsDashboard.test.tsx` pins each pair; the release's browser check pins the rendering.
 
-/** The heading row: "Projects" on the left, the toolbar on the right; wraps on a narrow screen. */
+/** The heading row: "Products" on the left, the toolbar on the right; wraps on a narrow screen. */
 export const HEAD_ROW = 'flex flex-wrap items-center justify-between gap-x-4 gap-y-3';
 export const HEADING = 'text-2xl leading-[normal] font-bold text-[#333] dark:text-[#e2e8f0]';
 
@@ -71,7 +71,7 @@ export const ACTIONS = 'flex flex-wrap items-center justify-between gap-x-2 gap-
 export const REVEAL =
   'flex flex-wrap items-center gap-0.5 opacity-0 transition-opacity duration-[120ms] ease-in-out group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100';
 
-// ── The project dialog (New Project / Edit Project) ──
+// ── The project dialog (New Product / Edit Product) ──
 export const OVERLAY = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50';
 export const DIALOG =
   'w-full max-w-[560px] max-h-full overflow-auto px-8 py-7 rounded-[12px] text-[#333] dark:text-[#e2e8f0] shadow-[0_20px_60px_rgba(0,0,0,0.3)]';
@@ -92,6 +92,8 @@ export const DIALOG_CANCEL = `${DIALOG_BUTTON} bg-white text-[#333] border-[#8a8
 /** Create / Update. */
 export const DIALOG_SUBMIT = `${DIALOG_BUTTON} bg-[#0070f3] text-white border-[#0070f3] enabled:hover:bg-[#005bc4] enabled:hover:border-[#005bc4]`;
 export const HINT = 'mt-3 text-right text-[0.78rem] leading-[normal] text-[#666] dark:text-[#a0aec0]';
+/** Help under a field (New Product's name): the hint's type, left-aligned under the input. */
+export const FIELD_HELP = 'mt-1 text-[0.78rem] leading-[normal] text-[#666] dark:text-[#a0aec0]';
 
 // ── The Delete confirmation: GanttApp's (`src/shared/components/ConfirmDialog.tsx` at aa43ae7,
 // its modal variant and `modalBtnStyle`), in the same shell as the project dialog. ──

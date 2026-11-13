@@ -2,7 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Projects page's header (v0.55.0): SPERT Forecaster's
+// The Products page's header (v0.55.0): SPERT Forecaster's
 // (`src/shell/components/AppShell.tsx:121-152` at 38f1a63), the suite's header. The title's
 // gradient runs between Forecaster's two light and dark SPERT blues, written here as their values:
 // Story Map's theme does not define Forecaster's names for them, which as classes produce no CSS,
@@ -40,7 +40,7 @@ export default function ProjectsHeader({ logo, theme, onToggleTheme, onOpenSetti
           </h1>
         </div>
         <p className="text-sm leading-[normal] text-gray-500 dark:text-gray-400 italic">
-          Plan and track agile project releases
+          Plan and track agile product releases
         </p>
       </div>
       <div className="flex items-center gap-3 mt-1">

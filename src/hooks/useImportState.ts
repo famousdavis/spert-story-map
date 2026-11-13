@@ -94,7 +94,7 @@ export function useImportState(
     // Cloud readiness gate — defense-in-depth inside the hook so future callers
     // that omit the button-disabled guard cannot bypass it.
     if (mode === 'cloud' && !cloudDataLoaded) {
-      setPhase({ tag: 'error', message: 'Cloud projects are still loading. Please wait a moment and try again.' });
+      setPhase({ tag: 'error', message: 'Cloud products are still loading. Please wait a moment and try again.' });
       return;
     }
 

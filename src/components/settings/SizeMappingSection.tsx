@@ -234,7 +234,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
 
 /**
  * The section's polite live region. It speaks only when its text changes, so the same
- * refusal twice would be heard once. As on the Projects page (CLAUDE.md #75): empty it in
+ * refusal twice would be heard once. As on the Products page (CLAUDE.md #75): empty it in
  * its own render, then set the text a tick later.
  */
 function useAnnouncer() {

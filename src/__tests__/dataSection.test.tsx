@@ -87,9 +87,9 @@ describe('DataSection — bundle rejection', () => {
     await pickFile(bundle);
 
     await waitFor(() => {
-      expect(screen.getByText(/multiple projects/i)).toBeInTheDocument();
+      expect(screen.getByText(/multiple products/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/project list homepage/i)).toBeInTheDocument();
+    expect(screen.getByText(/Products page/i)).toBeInTheDocument();
   });
 });
 
@@ -216,7 +216,7 @@ describe('DataSection — Forecaster buttons refuse a sprint with no finish date
     await userEvent.click(screen.getByRole('button', { name: 'Export for SPERT Forecaster' }));
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('This project cannot be exported to SPERT Forecaster yet:');
+    expect(alert).toHaveTextContent('This product cannot be exported to SPERT Forecaster yet:');
     expect(alert).toHaveTextContent('"Sprint 1" has no finish date');
   });
 
@@ -227,7 +227,7 @@ describe('DataSection — Forecaster buttons refuse a sprint with no finish date
       await userEvent.click(screen.getByRole('button', { name: 'Send to SPERT Forecaster' }));
 
       const alert = await screen.findByRole('alert');
-      expect(alert).toHaveTextContent('The project was not imported:');
+      expect(alert).toHaveTextContent('This product has not been imported into SPERT Forecaster:');
       expect(alert).toHaveTextContent('"Sprint 1" has no finish date');
       expect(open).not.toHaveBeenCalled();
     } finally {
