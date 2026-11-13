@@ -3,9 +3,9 @@
 // See LICENSE file in the project root for full license text.
 
 // @vitest-environment jsdom
-// v0.55.9 (BRIEF_product-rename-v3 D4, D5, D8, D12): the product wording through the real pages:
+// v0.55.9 (BRIEF_product-rename-v3 D4, D5, D8, D12, D14): the product wording through the real pages:
 // R31's definition on the welcome panel and under New Product's name field, the ways home, About,
-// and the Progress and Insights figures that now say "Overall".
+// the Progress and Insights figures that now say "Overall", and the form names Settings keeps.
 import type React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
@@ -25,6 +25,7 @@ import AboutView from '../pages/AboutView';
 import ChangelogView from '../pages/ChangelogView';
 import InsightsView from '../pages/InsightsView';
 import ProgressTrackingView from '../pages/ProgressTrackingView';
+import SettingsView from '../pages/SettingsView';
 import type { Product } from '../types';
 import { req } from './testHelpers';
 import { describedText, installPageEnv, makeProject, renderPage, seedLocal } from './fixtures/projectsPage';
@@ -123,5 +124,18 @@ describe('the planned work\'s completion says "Overall" (D5, R41)', () => {
   it('the Insights card', () => {
     mount(InsightsView, createSampleProduct());
     expect(screen.getByRole('heading', { name: 'Overall Progress' })).toBeInTheDocument();
+  });
+});
+
+describe('Settings → Product Details keeps its form names (D14)', () => {
+  it('Name is still name="projectName" and Description name="projectDescription", ids to match', () => {
+    mount(SettingsView, createSampleProduct());
+    const section = req(screen.getByRole('heading', { name: 'Product Details' }).parentElement, 'Product Details');
+    const name = within(section).getByLabelText('Name');
+    const description = within(section).getByLabelText('Description');
+    expect(name).toHaveAttribute('name', 'projectName');
+    expect(name.id).toMatch(/-projectName$/);
+    expect(description).toHaveAttribute('name', 'projectDescription');
+    expect(description.id).toMatch(/-projectDesc$/);
   });
 });
