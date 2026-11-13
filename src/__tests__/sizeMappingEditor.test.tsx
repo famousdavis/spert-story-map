@@ -354,6 +354,29 @@ describe('9. points', () => {
   });
 });
 
+describe('§3.3 and §3.7, as promised', () => {
+  it('the recorded-progress note describes the points field even while it is not shown', () => {
+    mount(product('M:20', [locked('a', 'M')]));
+    expect(pointsAt(0)).not.toHaveFocus();
+    expect(pointsAt(0)).toHaveAccessibleDescription(
+      '1 item with recorded progress uses “M”: changing its points changes the points recorded for past sprints.',
+    );
+  });
+
+  it('the open remove confirm follows the current product, not the one at the click', async () => {
+    const { hosted, user } = mount(product('XS:5 M:20', [free('a', 'M'), free('b', 'M')]));
+    await user.click(removeAt(1));
+    expect(req(dialog(), 'dialog').textContent).toContain('2 items use “M” (40 points).');
+    hosted.replace(p => ({
+      ...p,
+      themes: p.themes.map(t => ({ ...t, backboneItems: t.backboneItems.map(b => ({
+        ...b, ribItems: b.ribItems.map(r => (r.id === 'b' ? { ...r, size: 'XS' as Size } : r)),
+      })) })),
+    }));
+    expect(req(dialog(), 'dialog').textContent).toContain('1 item uses “M” (20 points). Removing it leaves it unsized.');
+  });
+});
+
 // ─── 10. Add back ───────────────────────────────────────────────────
 
 describe('10. sizes items still use that are not in the list', () => {
