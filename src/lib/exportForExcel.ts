@@ -169,7 +169,7 @@ function addRibItemsSheet(workbook: Workbook, product: Product): void {
       safeCell(backbone.name),
       safeCell(rib.name),
       rib.category,
-      rib.size ?? '',
+      safeCell(rib.size ?? ''),
       points,
       pct / 100,
       safeCell(releaseStr),

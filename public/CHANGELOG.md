@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.55.2 (2026-11-13)
+
+### Fixed
+
+- **The Excel export now guards T-shirt size labels against being read as formulas, like the rest of its text.** Text that starts with =, +, -, @, a tab or a carriage return can be taken by a spreadsheet as a formula, so the export puts an apostrophe in front of it: a theme named "=T" goes into the file as "'=T". The Size column on the Rib Items sheet was missing that guard, so a custom size label such as "=1+1" (set in Settings, T-Shirt Size Mapping) went into the file as it was. It now gets the apostrophe too. The size label stored in the project is not changed.
+
 ## Version 0.55.1 (2026-11-13)
 
 ### Fixed
