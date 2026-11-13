@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.55.3 (2026-11-13)
+
+### Fixed
+
+- **Saving the Sizing tab's Edit Rib Item dialog no longer puts back a size that changed while it was open.** If you opened an item's dialog and its size then changed (you or someone else dragged its card on the Sizing tab, a collaborator changed it, or Connect AI sized it), saving the dialog put back the size it had when you opened it, even if you had changed only the name. Now the dialog saves a size only when you choose one, or clear it, in the dialog itself.
+- **Choosing or clearing a size in the dialog still saves it, as before.** A locked item's size still cannot be changed there.
+
 ## Version 0.55.2 (2026-11-13)
 
 ### Fixed

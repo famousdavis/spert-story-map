@@ -154,6 +154,8 @@ export default function SizingView() {
     // strip `size` from the mutation payload so historical points/percent math is
     // preserved. cardColor is kept — color is an organizational flag, independent
     // of work state, and stays editable on locked cards (matches the kebab picker).
+    // Unlocked, `size` is in `updates` only when the person changed it in the dialog,
+    // so a size that changed while the dialog was open is not written back over.
     const payload = editingCell.locked
       ? { name: updates.name, description: updates.description, category: updates.category, notes: updates.notes, cardColor: updates.cardColor }
       : updates;

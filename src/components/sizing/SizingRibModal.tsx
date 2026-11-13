@@ -31,7 +31,13 @@ export interface SizingRibModalSaveInput {
   name: string;
   description: string;
   category: Category;
-  size: Size;          // ignored by caller when locked
+  /**
+   * Present only when the person changed the size in the dialog. Absent, the save
+   * leaves the rib's size alone, so a size that changed while the dialog was open
+   * (a drag, a collaborator, Connect AI) is not written back over. Stripped by the
+   * caller when locked.
+   */
+  size?: Size;
   notes: string;
   cardColor: RibCardColorKey | undefined;  // honored even when locked
 }
@@ -172,13 +178,16 @@ export default function SizingRibModal({
         cardColor,
       });
     } else {
-      // Modal always sends size in payload; SizingView is the size-omission boundary when locked.
-      // cardColor is always sent — color is allowed on locked cards (it's an organizational flag).
+      // Size is sent only when the person changed it here (compared with the value the
+      // dialog opened with); the key is left out, not set to undefined, because
+      // updateRib spreads the payload over the rib. SizingView stays the size-omission
+      // boundary when locked. cardColor is always sent — color is allowed on locked
+      // cards (it's an organizational flag).
       onSave?.({
         name: trimmedName,
         description,
         category,
-        size,
+        ...(size !== initial.size ? { size } : {}),
         notes,
         cardColor,
       });
