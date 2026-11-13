@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 0.55.8 (2026-11-13)
+
+### Fixed
+
+- **Renaming a size in Settings → T-Shirt Size Mapping no longer leaves your items on a size that does not exist.** The label used to save on every keystroke, so typing "Medium" over "M" moved the list to "Me" at once and left every item sized M on a label no row had: those items counted 0 points, and the points recorded for past sprints fell, with no warning. A rename now saves when you leave the field or press Enter (Escape puts the old label back), and every item on that size moves to the new label with it, in one step. If your list holds the same label twice, only the first row gives items their points; renaming or removing a later one changes that row alone.
+- **Removing a size that items use now asks first.** The question says how many items use it and how many points they count. Removing it leaves those items unsized or, if another row holds the same label, counts them at that row's points. A size used by an item with recorded progress cannot be removed when that would change the points already recorded for past sprints; the row says how many such items there are. A size nothing uses is still removed at once.
+- **The size list now keeps to what an import accepts, so a backup of it can be read back in.** A label must be 1 to 20 characters, different from every other size (capital letters do not count as a difference), and not "unsized". The list holds at most 20 sizes, and "+ Add Size" names new rows New, New 2 and so on. Points must be a number, 0 or more; decimals are kept. A label or number the list cannot take is not saved, and the row says why.
+- **Points now save when you leave the field or press Enter, not on every keystroke.** While you edit the points of a size that items with recorded progress use, a note under it says that changing them changes the points recorded for past sprints.
+- **If the size list changes while you are editing it** (a collaborator, Connect AI, or an undo), your edit is not saved onto whichever size now sits in that row; the row says "was changed elsewhere. Nothing was saved."
+
+### Added
+
+- **Sizes your items still use that are not in the list are listed under it, each with the number of items and an Add back button.** Add back puts the size at the end of the list at 0 points and places you in its points, so you can enter them and those items count again. A label that cannot be a size as it is stored (a space at the start or end, for example) shows why instead of the button. Renaming a size back to its old label also brings its items back, at that size's points.
+
+### Changed
+
+- **A size renamed away from the standard labels (XS to XXXL) is drawn in grey**, because the size colours belong to those seven labels.
+
 ## Version 0.55.7 (2026-11-13)
 
 ### Fixed
