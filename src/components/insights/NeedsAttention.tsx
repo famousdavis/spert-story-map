@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { useMemo, useState } from 'react';
-import { getAllRibItems, getAllocationTotal } from '../../lib/calculations';
+import { getAllRibItems, getAllocationTotal, isRibUnsized } from '../../lib/calculations';
 import { UNDO_HINT } from '../../lib/constants';
 import { bringRecordsHere, previewBringHere, removeRowRecords } from '../../lib/progressMutations';
 import { getStrandedRows } from '../../lib/reconciliation';
@@ -108,7 +108,7 @@ export default function NeedsAttention({ product, updateProduct }: {
   const allRibs = useMemo(() => getAllRibItems(product), [product]);
   const stranded = useMemo(() => getStrandedRows(product), [product]);
 
-  const unsizedItems = allRibs.filter(r => !r.size);
+  const unsizedItems = allRibs.filter(r => isRibUnsized(r, product.sizeMapping));
   const unassignedItems = allRibs.filter(r => r.releaseAllocations.length === 0);
   const partialAllocItems = allRibs.filter(r => {
     const total = getAllocationTotal(r);

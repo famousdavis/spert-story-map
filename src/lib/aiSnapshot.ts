@@ -17,7 +17,7 @@ import { isRibLocked } from './ribHelpers';
  * Phase 3 additions:
  *   - sizeMapping: sorted by points ascending; label/points only
  *   - ribItems: include size (string | null); orphan/empty sizes normalized to null
- *     to match useSizingLayout.ts:118's definition of "unsized"
+ *     to match isRibUnsized's definition of "unsized" in calculations.ts
  *
  * Phase 7 additions:
  *   - ribItems: include partial boolean — true only for a single allocation at

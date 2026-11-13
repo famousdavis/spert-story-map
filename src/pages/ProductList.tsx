@@ -9,7 +9,7 @@ import { exportAllProductsBundled } from '../lib/importExport';
 import { useImportState } from '../hooks/useImportState';
 import ImportPreviewSection from '../components/product/ImportPreviewSection';
 import { createSampleProduct } from '../lib/sampleData';
-import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete } from '../lib/calculations';
+import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete, isRibUnsized } from '../lib/calculations';
 import { sortByOrder } from '../lib/sortByOrder';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
@@ -31,7 +31,7 @@ import type { Product } from '../types';
 function enrichProduct(product: Product) {
   const allRibs = getAllRibItems(product);
   const totalPoints = getTotalProjectPoints(product);
-  const unsized = allRibs.filter(r => !r.size).length;
+  const unsized = allRibs.filter(r => isRibUnsized(r, product.sizeMapping)).length;
   const pctComplete = getProjectPercentComplete(product);
   return { ...product, totalItems: allRibs.length, totalPoints, unsized, pctComplete };
 }

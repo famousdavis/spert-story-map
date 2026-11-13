@@ -7,7 +7,7 @@ import { useOutletContext } from 'react-router-dom';
 import InlineEdit from '../components/ui/InlineEdit';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import BackboneSection from '../components/structure/BackboneSection';
-import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, getRibItemPercentComplete, round1 } from '../lib/calculations';
+import { getThemeStats, getBackboneStats, getRibItemPoints, getAllocationTotal, getRibItemPercentComplete, isRibUnsized, round1 } from '../lib/calculations';
 import { reduceRibs, ribSizeLockNote } from '../lib/ribHelpers';
 import { useProductMutations } from '../hooks/useProductMutations';
 import { THEME_COLOR_OPTIONS, getThemeColorClasses } from '../lib/themeColors';
@@ -184,7 +184,7 @@ export default function StructureView() {
   const stats = useMemo(() => reduceRibs(product, (acc, rib) => {
     acc.totalItems++;
     acc.totalPoints += getRibItemPoints(rib, product.sizeMapping);
-    if (!rib.size) acc.unsized++;
+    if (isRibUnsized(rib, product.sizeMapping)) acc.unsized++;
     return acc;
   }, { totalItems: 0, totalPoints: 0, unsized: 0 }), [product]);
 
