@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.55.6 (2026-11-13)
+
+### Fixed
+
+- **A size chosen in the Sizing tab's Edit Rib Item dialog is no longer saved onto an item that became locked while the dialog was open.** An item's size locks once progress is recorded for it on a release it is on, so that past figures (points times percent complete) do not change. The dialog checked the lock only when it opened. If you opened an unlocked item, chose or cleared a size, and progress was recorded for it before you saved (on the Progress tab, by a collaborator, or by Connect AI), saving wrote that size onto the locked item. The dialog now checks the lock when you save: the item keeps its size, and the rest of the dialog, including the card color, is saved as before. The dialog still shows the size control until you close it; opened again, it shows the lock.
+
 ## Version 0.55.5 (2026-11-13)
 
 ### Fixed

@@ -20,6 +20,7 @@ import SizingRibModal from '../components/sizing/SizingRibModal';
 import type { SizingRibModalSaveInput, SizingRibModalCreateInput } from '../components/sizing/SizingRibModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import CardColorLegend from '../components/ui/CardColorLegend';
+import { isRibLocked } from '../lib/ribHelpers';
 import type { OutletContextValue } from '../types';
 
 export default function SizingView() {
@@ -150,17 +151,20 @@ export default function SizingView() {
 
   const handleEditSave = useCallback((updates: SizingRibModalSaveInput) => {
     if (!editingCell) return;
-    // Locked-state size-omission boundary: when the original cell was locked,
-    // strip `size` from the mutation payload so historical points/percent math is
-    // preserved. cardColor is kept — color is an organizational flag, independent
+    // Locked-state size-omission boundary: a locked rib's `size` is stripped from the
+    // save so historical points/percent math is preserved. The lock is read here, at
+    // Save, from the rib as the write finds it, not from `editingCell.locked`: progress
+    // recorded while the dialog was open (the Progress tab, a collaborator, Connect AI)
+    // locks the rib, and the dialog it opened unlocked still shows a picker. Only `size`
+    // is stripped. cardColor is kept — color is an organizational flag, independent
     // of work state, and stays editable on locked cards (matches the kebab picker).
     // Unlocked, `size` is in `updates` only when the person changed it in the dialog,
     // so a size that changed while the dialog was open is not written back over.
-    const payload = editingCell.locked
-      ? { name: updates.name, description: updates.description, category: updates.category, notes: updates.notes, cardColor: updates.cardColor }
-      : updates;
-    mutations.updateRib(editingCell.themeId, editingCell.backboneId, editingCell.id, payload);
-  }, [editingCell, mutations]);
+    const { size: _size, ...withoutSize } = updates;
+    const sprints = product.sprints;
+    mutations.updateRib(editingCell.themeId, editingCell.backboneId, editingCell.id, rib =>
+      ({ ...rib, ...(isRibLocked(rib, sprints) ? withoutSize : updates) }));
+  }, [editingCell, mutations, product.sprints]);
 
   // Add Rib flow — modal create mode with smart defaults frozen at click time
   const [createPresets, setCreatePresets] = useState<{ presetThemeId?: string; presetBackboneId?: string } | null>(null);
