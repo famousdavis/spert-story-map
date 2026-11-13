@@ -36,7 +36,7 @@ const INPUT = 'w-24 border border-gray-300 dark:border-gray-600 dark:bg-gray-800
  * (`setLocalValue`) and Enter must not send focus to the page.
  *
  * `expected` is the label this row showed when the edit started. Every write passes it,
- * so a list changed underneath a focused field (another editor, an undo) refuses the
+ * so a list changed underneath a focused field (another editor, in cloud storage) refuses the
  * write instead of landing on whatever row now sits at this index (rows are `key={i}`).
  */
 export default function SizeMappingRow({ row, index, reason, info, zero, note, onRename, onPoints, onRemove }: SizeMappingRowProps) {
