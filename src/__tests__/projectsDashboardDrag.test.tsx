@@ -155,13 +155,22 @@ describe('the drag itself', () => {
 });
 
 describe('the saved order (unchanged)', () => {
+  // Read by heading, as both versions of the page render a project's name.
+  const headings = () => [...document.querySelectorAll('h3')].map(h => h.textContent);
+  const shown = async (order: string[]) => {
+    seedLocal(NAMES.map(n => makeProject({ id: `p-${n}`, name: n })), order);
+    renderPage();
+    await screen.findByText('A');
+    await settle();
+  };
+
   it('a saved order is what the page shows, on load', async () => {
-    await showFour(['p-C', 'p-A', 'p-D', 'p-B']);
-    expect(tileNames()).toEqual(['C', 'A', 'D', 'B']);
+    await shown(['p-C', 'p-A', 'p-D', 'p-B']);
+    expect(headings()).toEqual(['C', 'A', 'D', 'B']);
   });
 
   it('a project the saved order does not hold shows after those it does', async () => {
-    await showFour(['p-D', 'p-B']);
-    expect(tileNames()).toEqual(['D', 'B', 'A', 'C']);
+    await shown(['p-D', 'p-B']);
+    expect(headings()).toEqual(['D', 'B', 'A', 'C']);
   });
 });

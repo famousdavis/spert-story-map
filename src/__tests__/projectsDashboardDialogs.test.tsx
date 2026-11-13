@@ -84,7 +84,8 @@ describe('New Project', () => {
     await showProjects(['Alpha']);
     await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
     await userEvent.type(screen.getByLabelText('Project Name'), '  Beta  ');
-    await userEvent.type(screen.getByLabelText('Description (Optional)'), '  about beta  ');
+    // Matched as both versions of the dialog spell it: this behaviour is unchanged.
+    await userEvent.type(screen.getByLabelText(/^Description \(optional\)$/i), '  about beta  ');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
     await screen.findByText('Structure page');
     flushPendingSaves();
