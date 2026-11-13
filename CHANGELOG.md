@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.55.9 (2026-11-13)
+
+### Changed
+
+- **Story Map now calls the work on each tile a product.** A product can be an application, a service, an internal capability or any other initiative, and may cover one or more projects, or none. The Products page, the New Product dialog, Settings, About, the Progress tab, Insights, Connect AI and the messages say "product". "Project" stays for SPERT Forecaster's projects, the SPERT® Suite's description on About, and the entries below.
+- **Progress and Insights say "Overall".** The Progress tab reads "Overall: N% complete" and the Insights card is "Overall Progress".
+- **A tile's Share button names its product to a screen reader**, as Export and Clone do.
+- **The copy prompt says "product".** The AI tools keep their names (`storymap_get_project`) and their descriptions still say "project"; the prompt tells the AI that "project" there means the product.
+- **Links, saved data, the JSON and Excel formats, and what Send to SPERT Forecaster sends are unchanged.** The template's example is now "Example Product". The Quick Reference and Connect AI guides and the invitation emails still say "project".
+
 ## Version 0.55.8 (2026-11-13)
 
 ### Fixed
