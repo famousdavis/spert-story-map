@@ -38,10 +38,11 @@ function sizeIndex(sizeMapping: SizeMapping[]): Map<string, SizeMapping> {
 }
 
 /**
- * A rib's points, always as a number. `SizeMappingSection` writes the input's
- * text while a size is being typed, and that text can persist. Passed through
- * as text it concatenates: two sizes summed to "04020", and the export sent a
- * backlog in the thousands with nothing to refuse it.
+ * A rib's points, always as a number. Before v0.55.8 `SizeMappingSection` wrote
+ * the input's text while a size was being typed, and that text persisted; since
+ * v0.55.8 it writes only a number, but data saved earlier can still hold text.
+ * Passed through as text it concatenates: two sizes summed to "04020", and the
+ * export sent a backlog in the thousands with nothing to refuse it.
  */
 export function getRibItemPoints(ribItem: Pick<RibItem, 'size'>, sizeMapping: SizeMapping[]): number {
   if (!ribItem.size) return 0;

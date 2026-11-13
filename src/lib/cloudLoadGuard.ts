@@ -17,7 +17,8 @@
  * ⚠️ THIS IS NOT `validateProduct`, AND MUST NEVER BECOME IT. The validator
  * rejects a whole file on its first violation and is STRICTER than what the app
  * itself writes (census-10: pasted text passes `MAX_STRING`, the cloud
- * `_changeLog` passes 500, `SizeMappingSection` stores `points` as a string).
+ * `_changeLog` passes 500, and before v0.55.8 `SizeMappingSection` stored `points`
+ * as a string, which saved data can still hold).
  * Run on reads, it would make real projects unloadable. This guard instead:
  *
  *   - checks SHAPE ONLY — type and container, never length, count or range;
@@ -129,8 +130,10 @@ const isString = (v: unknown) => typeof v === 'string';
 const keepById = (v: unknown): v is Obj => hasStringKey(v, 'id');
 
 function fixSizeRow(row: Obj, hits: Hits): void {
-  // `points` is a string while a user is mid-edit (SizeMappingSection writes
-  // `e.target.value`), and that string is persisted. Both are legitimate.
+  // `points` can be a string: before v0.55.8 SizeMappingSection wrote the input's
+  // text while a size was being typed, and that string persisted. Since v0.55.8 it
+  // writes only a number, but data saved earlier can still hold text. Both are
+  // legitimate.
   if (!isNumOrString(row.points)) { row.points = 0; hits.add('sizeMapping.points'); }
 }
 
