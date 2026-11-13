@@ -48,7 +48,8 @@ const EMPTY_LOCKED_SENTENCE = (label: string) => `Your size list is empty. Add �
 
 /** What a picker shows: its text, its tooltip, and its menu's items, read by opening it. */
 function readPicker(button: HTMLElement) {
-  const shown = { text: button.textContent, title: button.getAttribute('title') };
+  // `dashed` is the "Size?" look: a rib that draws as no size must not keep a size's colour.
+  const shown = { text: button.textContent, title: button.getAttribute('title'), dashed: button.className.split(/\s+/).includes('border-dashed') };
   fireEvent.click(button);
   const menu = [...document.body.querySelectorAll<HTMLElement>('.fixed.z-\\[9999\\] button')];
   const read = {
@@ -82,7 +83,7 @@ describe('Structure: the size picker', () => {
   it('draws an orphan as no size, names it in the tooltip, highlights no row and names it in the Clear item', () => {
     mountHosted(StructureView, orphanProduct());
     expect(structurePicker('orphan')).toStrictEqual({
-      text: 'Size?', title: PICKER_TITLE,
+      text: 'Size?', title: PICKER_TITLE, dashed: true,
       items: ['L40 pts', 'M20 pts', 'Tiny0 pts', 'Clear “XL” (not in size list)'], highlighted: [],
     });
   });
@@ -95,23 +96,23 @@ describe('Structure: the size picker', () => {
   it('draws a valid size and a 0-point size as before, with "Clear size"', () => {
     mountHosted(StructureView, orphanProduct());
     expect([structurePicker('valid'), structurePicker('zero')]).toStrictEqual([
-      { text: 'L', title: null, items: ['L40 pts', 'M20 pts', 'Tiny0 pts', 'Clear size'], highlighted: ['L40 pts'] },
-      { text: 'Tiny', title: null, items: ['L40 pts', 'M20 pts', 'Tiny0 pts', 'Clear size'], highlighted: ['Tiny0 pts'] },
+      { text: 'L', title: null, dashed: false, items: ['L40 pts', 'M20 pts', 'Tiny0 pts', 'Clear size'], highlighted: ['L40 pts'] },
+      { text: 'Tiny', title: null, dashed: false, items: ['L40 pts', 'M20 pts', 'Tiny0 pts', 'Clear size'], highlighted: ['Tiny0 pts'] },
     ]);
   });
 
   it('names nothing on a rib with no size, null or empty, and offers no Clear item', () => {
     mountHosted(StructureView, orphanProduct());
-    const noSize = { text: 'Size?', title: null, items: ['L40 pts', 'M20 pts', 'Tiny0 pts'], highlighted: [] };
+    const noSize = { text: 'Size?', title: null, dashed: true, items: ['L40 pts', 'M20 pts', 'Tiny0 pts'], highlighted: [] };
     expect([structurePicker('none'), structurePicker('empty')]).toStrictEqual([noSize, noSize]);
   });
 
   it('with an empty size list, says so, offers only the Clear item, and still names nothing on a rib with no size', () => {
     mountHosted(StructureView, orphanProduct([]));
     expect([structurePicker('orphan'), structurePicker('valid'), structurePicker('none')]).toStrictEqual([
-      { text: 'Size?', title: EMPTY_PICKER_TITLE('XL'), items: ['Clear “XL” (not in size list)'], highlighted: [] },
-      { text: 'Size?', title: EMPTY_PICKER_TITLE('L'), items: ['Clear “L” (not in size list)'], highlighted: [] },
-      { text: 'Size?', title: null, items: [], highlighted: [] },
+      { text: 'Size?', title: EMPTY_PICKER_TITLE('XL'), dashed: true, items: ['Clear “XL” (not in size list)'], highlighted: [] },
+      { text: 'Size?', title: EMPTY_PICKER_TITLE('L'), dashed: true, items: ['Clear “L” (not in size list)'], highlighted: [] },
+      { text: 'Size?', title: null, dashed: true, items: [], highlighted: [] },
     ]);
   });
 
@@ -176,18 +177,18 @@ describe('the Map panel', () => {
   it('its picker draws an orphan as no size and names it', () => {
     const row = mapPanelSizeRow('orphan');
     expect(readPicker(within(row).getByRole('button'))).toStrictEqual({
-      text: 'Size?', title: PICKER_TITLE,
+      text: 'Size?', title: PICKER_TITLE, dashed: true,
       items: ['L40 pts', 'M20 pts', 'Tiny0 pts', 'Clear “XL” (not in size list)'], highlighted: [],
     });
   });
 
   it.each([
-    ['valid', { text: 'L', title: null }],
-    ['none', { text: 'Size?', title: null }],
-    ['empty', { text: 'Size?', title: null }],
+    ['valid', { text: 'L', title: null, dashed: false }],
+    ['none', { text: 'Size?', title: null, dashed: true }],
+    ['empty', { text: 'Size?', title: null, dashed: true }],
   ])('its picker on %s names nothing', (name, expected) => {
-    const { text, title } = readPicker(within(mapPanelSizeRow(name)).getByRole('button'));
-    expect({ text, title }).toStrictEqual(expected);
+    const { text, title, dashed } = readPicker(within(mapPanelSizeRow(name)).getByRole('button'));
+    expect({ text, title, dashed }).toStrictEqual(expected);
   });
 
   it('its locked size shows an orphan as no size, with the sentence visible and the tooltip the lock note alone', () => {
@@ -239,18 +240,18 @@ describe('the Sizing dialog', () => {
   it('its picker draws an orphan as no size and names it', () => {
     const { field } = sizingDialogSizeField('orphan');
     expect(readPicker(within(field).getByRole('button'))).toStrictEqual({
-      text: 'Size?', title: PICKER_TITLE,
+      text: 'Size?', title: PICKER_TITLE, dashed: true,
       items: ['L40 pts', 'M20 pts', 'Tiny0 pts', 'Clear “XL” (not in size list)'], highlighted: [],
     });
   });
 
   it.each([
-    ['valid', { text: 'L', title: null }],
-    ['none', { text: 'Size?', title: null }],
-    ['empty', { text: 'Size?', title: null }],
+    ['valid', { text: 'L', title: null, dashed: false }],
+    ['none', { text: 'Size?', title: null, dashed: true }],
+    ['empty', { text: 'Size?', title: null, dashed: true }],
   ])('its picker on %s names nothing', (name, expected) => {
-    const { text, title } = readPicker(within(sizingDialogSizeField(name).field).getByRole('button'));
-    expect({ text, title }).toStrictEqual(expected);
+    const { text, title, dashed } = readPicker(within(sizingDialogSizeField(name).field).getByRole('button'));
+    expect({ text, title, dashed }).toStrictEqual(expected);
   });
 
   it('its locked size shows an orphan as no size, with the sentence visible and the tooltip the lock note alone', () => {
@@ -351,7 +352,7 @@ describe('the stored size', () => {
 
     cleanup();
     mountHosted(StructureView, restored);
-    expect(structurePicker('orphan')).toMatchObject({ text: 'XL', title: null });
+    expect(structurePicker('orphan')).toMatchObject({ text: 'XL', title: null, dashed: false });
   });
 });
 
