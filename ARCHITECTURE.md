@@ -37,7 +37,7 @@ src/
 │   ├── cloudLoadGuard.ts             # Shape check on projects read from either store: sets aside what cannot be read, gives a missing or unreadable size list the default rows, never rejects a project
 │   ├── cloudLoadNotices.ts           # Which open projects had data set aside (read by CloudLoadNotice)
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
-│   ├── cloneName.ts                  # A clone's name: import's (Copy) numbering, never longer than 1000 characters
+│   ├── cloneName.ts                  # A copy's name (Clone, Import as copy): import's (Copy) numbering, never longer than 1000 characters
 │   ├── gestureGuard.ts               # Swallows the rest of a double-click after a tile opens its project
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory

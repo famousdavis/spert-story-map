@@ -11,6 +11,7 @@ import {
   buildDefaultDecisions,
   applyImport,
 } from '../lib/import-utils';
+import { importProductFromJSON } from '../lib/importExport';
 import type { Product, StorageDriver } from '../types';
 
 // Override randomUUID with a counter for deterministic test IDs. The spread is
@@ -165,6 +166,41 @@ describe('applyImport', () => {
     expect(ops).toContain('create');     // from original file
     expect(ops).toContain('duplicate');  // from duplicateProduct
     expect(ops).toContain('import');     // appended by applyImport
+  });
+
+  // v0.55.1: a copy of a 1000-character name came out at 1007, and that copy's own export
+  // then refused to import ("Product name must be a non-empty string (max 1000 chars)").
+  it('copy path keeps a 1000-character name within 1000, and the copy imports', async () => {
+    const long = 'L'.repeat(1000);
+    const driver = makeDriver({ loadProductIndex: vi.fn().mockResolvedValue([makeProduct('p1', long)]) });
+    const decision = { importedProductId: 'p2', kind: 'name' as const, originalExistingId: 'p1', action: 'copy' as const };
+    const outcome = await applyImport(driver, makeParsedImport([makeProduct('p2', long)]), [decision]);
+    expect(outcome.copied).toBe(1);
+    const created = (driver.createProduct as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Product;
+    expect(created.name).toBe(`${'L'.repeat(993)} (Copy)`);
+    expect(() => importProductFromJSON(JSON.stringify(created))).not.toThrow();
+  });
+
+  it('copy path keeps numbered copies within 1000 and distinct, in the same run', async () => {
+    const long = 'L'.repeat(1000);
+    const taken = `${'L'.repeat(993)} (Copy)`;
+    const driver = makeDriver({
+      loadProductIndex: vi.fn().mockResolvedValue([makeProduct('p1', long), makeProduct('p2', taken)]),
+    });
+    const copy = (id: string) => ({ importedProductId: id, kind: 'name' as const, originalExistingId: 'p1', action: 'copy' as const });
+    const outcome = await applyImport(
+      driver, makeParsedImport([makeProduct('p3', long), makeProduct('p4', long)]), [copy('p3'), copy('p4')],
+    );
+    expect(outcome.copied).toBe(2);
+    const names = (driver.createProduct as ReturnType<typeof vi.fn>).mock.calls.map(c => (c[0] as Product).name);
+    const occupied = [long, taken].map(normalizeProductName);
+    for (const name of names) {
+      expect(name.length).toBeLessThanOrEqual(1000);
+      expect(occupied).not.toContain(normalizeProductName(name));
+    }
+    expect(normalizeProductName(names[0]!)).not.toBe(normalizeProductName(names[1]!));
+    const created = (driver.createProduct as ReturnType<typeof vi.fn>).mock.calls.map(c => c[0] as Product);
+    for (const product of created) expect(() => importProductFromJSON(JSON.stringify(product))).not.toThrow();
   });
 
   it('drift-skips a conflict-free add when a collision appears at Layer 2', async () => {
