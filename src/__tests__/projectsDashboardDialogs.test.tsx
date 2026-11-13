@@ -351,6 +351,31 @@ describe('focus when a dialog closes (§5.8)', () => {
     expect(stored(`p${names.indexOf(target)}`)).toBeNull();
   });
 
+  it('Delete, confirmed, with a saved order unlike the driver\'s: the next SHOWN tile', async () => {
+    seedLocal(['A', 'B', 'C'].map((n, i) => makeProject({ id: `p${i}`, name: n })), ['p2', 'p1', 'p0']);
+    renderPage();
+    await screen.findByRole('list', { name: 'Projects' });
+    await settle();
+    expect(tileNames()).toEqual(['C', 'B', 'A']);
+    await userEvent.click(control('B', 'Delete'));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(tileNames()).toEqual(['C', 'A']));
+    await settle();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open Structure for A' }));
+  });
+
+  it('Delete, confirmed, with the list arriving a task later (a cloud read): the next tile, after the refresh', async () => {
+    const realIndex = driver.loadProductIndex.bind(driver);
+    const slow: StorageDriver = { ...driver, loadProductIndex: () => new Promise(r => setTimeout(r, 0)).then(realIndex) };
+    storage.value = { driver: slow, mode: 'local', storageReady: true };
+    await showProjects(['A', 'B', 'C']);
+    await userEvent.click(control('B', 'Delete'));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(tileNames()).toEqual(['A', 'C']));
+    await settle();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open Structure for C' }));
+  });
+
   it('Delete, confirmed but refused (a cloud delete that failed): back to that tile\'s Delete', async () => {
     const refusing: StorageDriver = { ...driver, deleteProduct: () => Promise.resolve() };
     storage.value = { driver: refusing, mode: 'local', storageReady: true };

@@ -97,6 +97,22 @@ describe('Clone (R8, R15, R20)', () => {
     expect(storedOrder()).toEqual(['X', 'X (Copy 2)', 'X (Copy)', 'Y'].map(n => byName.get(n)));
   });
 
+  it('a clone whose create failed does not hold its name: the next clone is "(Copy)" again', async () => {
+    const realCreate = driver.createProduct.bind(driver);
+    let fail = true;
+    // A cloud create that failed: handleWriteError swallows it, and nothing is stored.
+    const flaky: StorageDriver = { ...driver, createProduct: (p, o) => (fail ? Promise.resolve() : realCreate(p, o)) };
+    storage.value = { driver: flaky, mode: 'local', storageReady: true };
+    await show([{ id: 'x', name: 'X' }]);
+    await userEvent.click(control('X', 'Clone'));
+    await settle();
+    expect(tileNames()).toEqual(['X']);
+    fail = false;
+    await userEvent.click(control('X', 'Clone'));
+    await waitFor(() => expect(tiles()).toHaveLength(2));
+    expect(tileNames()).toEqual(['X', 'X (Copy)']);
+  });
+
   it('keeps the changelog to the one duplicate entry', async () => {
     await show([{ id: 'x', name: 'X' }]);
     await userEvent.click(control('X', 'Clone'));
@@ -295,6 +311,26 @@ describe('a double-click on a tile opens the project once (O16)', () => {
     act(() => { vi.advanceTimersByTime(550); });
     fireEvent.click(themeName, { detail: 1 });
     expect(document.querySelectorAll('input[name="inlineEdit"]')).toHaveLength(1);
+  });
+
+  it('the guard ends at its dblclick: a click right after a double-click is not swallowed', async () => {
+    const { swallowRestOfGesture } = await import('../lib/gestureGuard');
+    fakeGestureClock(); // so only the dblclick, never the timeout, can end it
+    const seen: string[] = [];
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+    button.addEventListener('click', () => seen.push('click'));
+    try {
+      swallowRestOfGesture();
+      fireEvent.mouseDown(button, { detail: 2 });
+      fireEvent.click(button, { detail: 2 });
+      fireEvent.dblClick(button, { detail: 2 });
+      expect(seen).toEqual([]);
+      fireEvent.click(button, { detail: 1 });
+      expect(seen).toEqual(['click']);
+    } finally {
+      button.remove();
+    }
   });
 
   it('a keyboard open (detail 0) swallows nothing', async () => {
