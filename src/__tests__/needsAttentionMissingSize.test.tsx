@@ -42,7 +42,7 @@ function unsizedLines(product: Product): Record<string, string> {
   return Object.fromEntries(lines.map(line => [line.split(' ')[0], line]));
 }
 
-/** Only the four cases, so the list stays under its cut at ten. */
+/** Six unlocked cases (orphan, valid, 0-point, null, empty, stray space) and no locked ones, so the list stays under its cut at ten. */
 const four = (sizeMapping?: Product['sizeMapping']): Product => {
   const product = orphanProduct(sizeMapping);
   return {
