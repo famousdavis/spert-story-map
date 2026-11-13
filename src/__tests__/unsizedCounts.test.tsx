@@ -77,7 +77,7 @@ describe('pages', () => {
     const names = [...req(title.nextElementSibling, 'unsized list').querySelectorAll('li')].map(li => li.textContent);
     expect({ title: title.textContent, names }).toStrictEqual({
       title: '2 unsized items',
-      names: ['Rib r1 (Backbone A)', 'Rib r3 (Backbone B)'],
+      names: ['Rib r1 (Backbone A): “M” is not in your size list', 'Rib r3 (Backbone B)'],
     });
   });
 

@@ -16,6 +16,8 @@ import {
 import { isInteractiveChild } from '../../lib/domHelpers';
 import { RIB_NAME_TOOLTIP_DELAY } from '../../lib/constants';
 import type { MapCell } from './useMapLayout';
+import { isRibUnsized } from '../../lib/calculations';
+import type { SizeMapping } from '../../types';
 
 /**
  * The cell this component renders IS a MapCell — computeLayout is the only
@@ -28,6 +30,12 @@ type CellData = MapCell;
 
 interface RibCellProps {
   cell: CellData;
+  /**
+   * The project's size list. Required, never defaulted: a size it does not hold gets no
+   * badge, exactly as no size, so a caller passing no list would hide every size. Not
+   * on the layout cell, because the Map panel reads the cell's raw `size` to name it.
+   */
+  sizeMapping: SizeMapping[];
   onClick: (cell: CellData, e: React.MouseEvent) => void;
   onRename: (themeId: string, backboneId: string, ribId: string, name: string) => void;
   onDelete?: (themeId: string, backboneId: string, ribId: string) => void;
@@ -38,8 +46,9 @@ interface RibCellProps {
   isSelected: boolean;
 }
 
-export default function RibCell({ cell, onClick, onRename, onDelete, onClone, onSetCardColor, onDragStart, isDragging, isSelected }: RibCellProps) {
-  const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
+export default function RibCell({ cell, sizeMapping, onClick, onRename, onDelete, onClone, onSetCardColor, onDragStart, isDragging, isSelected }: RibCellProps) {
+  const shownSize = isRibUnsized(cell, sizeMapping) ? null : cell.size;
+  const sizeColor = shownSize ? (SIZE_COLORS[shownSize] || 'bg-gray-100 text-gray-800') : '';
   const allocWarning = cell.allocTotal > 0 && cell.allocTotal !== 100;
   const cardColorKey: RibCardColorKey | undefined = isRibCardColorKey(cell.cardColor) ? cell.cardColor : undefined;
 
@@ -153,9 +162,9 @@ export default function RibCell({ cell, onClick, onRename, onDelete, onClone, on
             flex-shrink-0. See "Design decisions ratified in v2" for the worst-case width math
             and why the kebab itself stays safe under realistic data. */}
         <div className="flex items-center gap-1.5 text-[10px]">
-          {cell.size && (
+          {shownSize && (
             <span className={`text-[10px] font-medium px-1 py-0.5 rounded flex-shrink-0 leading-none ${sizeColor}`}>
-              {cell.size}
+              {shownSize}
             </span>
           )}
           {cell.points > 0 && <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">{cell.points}pts</span>}

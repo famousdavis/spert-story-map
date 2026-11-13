@@ -279,6 +279,7 @@ export default function MapContent({
           <RibCell
             key={`${cell.id}-${cell.releaseId || 'unassigned'}`}
             cell={cell}
+            sizeMapping={product.sizeMapping}
             onClick={onRibClick}
             onRename={onRenameRib}
             onDelete={onDeleteRib}

@@ -239,7 +239,9 @@ interface SizingRibCellProps {
 }
 
 function SizingRibCell({ cell, onDragStart, onRibClick, isDragging, onEdit, onSplit, onDelete, onSetCardColor }: SizingRibCellProps) {
-  const sizeColor = cell.size ? (SIZE_COLORS[cell.size] || 'bg-gray-100 text-gray-800') : '';
+  // `sizeLabel` is null exactly when the rib is unsized, a label the size list no longer
+  // holds included; `size` keeps the stored label (the layout pins it).
+  const sizeColor = cell.sizeLabel ? (SIZE_COLORS[cell.sizeLabel] || 'bg-gray-100 text-gray-800') : '';
   const locked = cell.locked;
   const cardColorKey: RibCardColorKey | undefined = isRibCardColorKey(cell.cardColor) ? cell.cardColor : undefined;
   const { triggerRef, onMouseEnter, onMouseLeave, tooltipEl } = useTooltip<HTMLDivElement>(cell.name, RIB_NAME_TOOLTIP_DELAY);
@@ -310,9 +312,9 @@ function SizingRibCell({ cell, onDragStart, onRibClick, isDragging, onEdit, onSp
         <span className={`text-xs leading-tight line-clamp-2 flex-1 font-medium ${locked ? 'text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
           {cell.name}
         </span>
-        {cell.size && (
+        {cell.sizeLabel && (
           <span className={`text-[10px] font-medium px-1 py-0.5 rounded flex-shrink-0 leading-none ${locked ? 'opacity-50' : ''} ${sizeColor}`}>
-            {cell.size}
+            {cell.sizeLabel}
           </span>
         )}
         <KebabMenu

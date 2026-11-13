@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.55.5 (2026-11-13)
+
+### Fixed
+
+- **An item whose size is no longer in the size list now shows as unsized wherever its size appears.** When you remove a size in Settings, T-Shirt Size Mapping, or change its label, the items left on the old label count 0 points, and the counts of unsized items already included them, but their cards and rows still showed the old label as if it were a size. Now they look exactly like an item with no size: "Size?" in the size control (on the Structure tab, in the Story Map's item panel and in the Sizing tab's Edit Rib Item dialog), no size on the Story Map, Sizing and Release Planning cards, no Size line in the Allocate dialog, and "—" on the Progress tab. A size worth 0 points is still a size and shows as before.
+- **The size control and the locked size name the missing size, in quotes, and say how to bring it back.** Hover over "Size?" to read, for example, "“XL” is no longer in your size list. Pick a size, or add “XL” back in Settings → T-Shirt Size Mapping." If the size list is empty, it says so. The control's list offers "Clear “XL” (not in size list)" in place of "Clear size", because clearing it removes the only copy of the old label. An item whose missing size is locked shows "—" with a sentence naming the size and saying how to add it back: written under it in the Story Map's item panel and the Sizing dialog, and in its tooltip on the Structure tab. The label is quoted so that a stray space or a change of case shows: it has to be typed back exactly.
+- **Needs Attention, on the Insights tab, names the missing size beside each such item it lists,** for example "Login (Accounts): “XL” is not in your size list".
+- **The Excel export marks it.** On the Rib Items sheet the Size column reads "“XL” (not in size list)", and Points stays 0. The Size column is wider so the mark fits for the standard size labels.
+- **Nothing stored changes.** Each item keeps its old label, and adding a size with exactly that label back in Settings, T-Shirt Size Mapping, restores every item on it. Saving the Sizing dialog without changing the size keeps the label too.
+
 ## Version 0.55.4 (2026-11-13)
 
 ### Fixed

@@ -454,3 +454,68 @@ describe('buildExcelWorkbook — formula escaping', () => {
     expect(back.getWorksheet('Rib Items').getRow(5).getCell(4).value).toBe("'=C");
   });
 });
+
+// v0.55.5: a rib on a label its size list no longer holds (removed or relabelled in
+// Settings) counts 0 points and shows as unsized everywhere; the Size cell still names
+// the label, marked, so it can be read and typed back. Built in memory: an import would
+// clear the label (validateProduct), and the test would then pass on the old code.
+describe('buildExcelWorkbook — a size missing from the size list', () => {
+  const theme = BASE_PRODUCT.themes[0]!;
+  const backbone = theme.backboneItems[0]!;
+  const template = backbone.ribItems[0]!;
+  const withSizes = (sizes: Record<string, string | null>, sizeMapping: { label: string; points: number }[]) => ({
+    ...BASE_PRODUCT,
+    sizeMapping,
+    themes: [{
+      ...theme,
+      backboneItems: [{
+        ...backbone,
+        ribItems: Object.entries(sizes).map(([name, size], i) => ({ ...template, id: `x${i}`, name, size, order: i + 1 })),
+      }],
+    }],
+  });
+  // A 0-point row, so a cell decided by points would fail.
+  const LIST = [...BASE_PRODUCT.sizeMapping, { label: 'Tiny', points: 0 }];
+
+  /** Rib name → [Size cell, Points cell], read back from a real .xlsx file. */
+  async function sizeCells(product: unknown) {
+    const ExcelJS = await import('exceljs');
+    const XL = (ExcelJS as any).default ?? ExcelJS; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const wb = await getWorkbook(product as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const back = new XL.Workbook();
+    await back.xlsx.load(await wb.xlsx.writeBuffer());
+    const ws = back.getWorksheet('Rib Items');
+    const cells: Record<string, [unknown, unknown]> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ws.eachRow((row: any, n: number) => { if (n > 4) cells[String(row.getCell(3).value)] = [row.getCell(5).value, row.getCell(6).value]; });
+    return { cells, width: ws.getColumn(5).width };
+  }
+
+  it('23. marks the label, quoted; its Points cell stays 0', async () => {
+    const { cells } = await sizeCells(withSizes({ orphan: 'XL' }, LIST));
+    expect(cells).toStrictEqual({ orphan: ['“XL” (not in size list)', 0] });
+  });
+
+  it('24. leaves a valid size, a 0-point size, a null and an empty size as they were', async () => {
+    const { cells } = await sizeCells(withSizes({ valid: 'L', zero: 'Tiny', none: null, empty: '' }, LIST));
+    expect(cells).toStrictEqual({ valid: ['L', 8], zero: ['Tiny', 0], none: ['', 0], empty: ['', 0] });
+  });
+
+  it('25. shows a stray space inside the quotes, and a label starting with "=" needs no escaping', async () => {
+    const { cells } = await sizeCells(withSizes({ spaced: 'M ', formula: '=X' }, LIST));
+    expect(cells).toStrictEqual({
+      spaced: ['“M ” (not in size list)', 0],
+      formula: ['“=X” (not in size list)', 0],
+    });
+  });
+
+  it('26. marks every sized rib when the size list is empty, and still not a rib with no size', async () => {
+    const { cells } = await sizeCells(withSizes({ was: 'L', none: null, empty: '' }, []));
+    expect(cells).toStrictEqual({ was: ['“L” (not in size list)', 0], none: ['', 0], empty: ['', 0] });
+  });
+
+  it('27. the Size column is 26 wide, so “XXXL” (not in size list) fits', async () => {
+    const { width } = await sizeCells(withSizes({ orphan: 'XXXL' }, LIST));
+    expect(width).toBe(26);
+  });
+});
