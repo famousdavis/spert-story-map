@@ -23,8 +23,9 @@ vi.mock('../lib/AuthProvider', () => ({ useAuth: () => ({ user: null }) }));
 import InsightsView from '../pages/InsightsView';
 import { mountHosted } from './fixtures/productHost';
 import { orphanProduct } from './fixtures/orphanSizes';
+import { makeProduct, makeRib } from './fixtures/progressIntegrity';
 import { req } from './testHelpers';
-import type { Product } from '../types';
+import type { Product, Size } from '../types';
 
 afterEach(cleanup);
 
@@ -71,5 +72,23 @@ describe('Needs Attention: unsized items', () => {
   it('with an empty size list, names every sized rib\'s label, and still not a rib with no size', () => {
     const lines = unsizedLines(four([]));
     expect({ valid: lines.valid, none: lines.none }).toStrictEqual({ valid: 'valid (B): “L” is not in your size list', none: 'none (B)' });
+  });
+});
+
+describe('Needs Attention: the unsized list\'s order and its cut', () => {
+  it('keeps tree order and shows ten, so an orphan after the tenth item is under "...and N more"', () => {
+    // r02 and r11 are on XL, which the list (L, M) does not hold; the rest have no size.
+    const sizes: Record<string, Size> = { r02: 'XL', r11: 'XL' };
+    const ids = Array.from({ length: 12 }, (_, i) => `r${String(i + 1).padStart(2, '0')}`);
+    mountHosted(InsightsView, makeProduct(ids.map(id => makeRib(id, [{ releaseId: 'R1', percentage: 100 }], [], sizes[id] ?? null))));
+    const title = screen.getByText(/unsized items$/);
+    const lines = [...req(title.nextElementSibling, 'unsized list').querySelectorAll('li')].map(li => li.textContent);
+    expect({ title: title.textContent, lines }).toStrictEqual({
+      title: '12 unsized items',
+      lines: [
+        'r01 (B)', 'r02 (B): “XL” is not in your size list', 'r03 (B)', 'r04 (B)', 'r05 (B)',
+        'r06 (B)', 'r07 (B)', 'r08 (B)', 'r09 (B)', 'r10 (B)', '...and 2 more',
+      ],
+    });
   });
 });
