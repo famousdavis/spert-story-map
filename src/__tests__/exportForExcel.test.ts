@@ -420,4 +420,37 @@ describe('buildExcelWorkbook — formula escaping', () => {
     expect(row.getCell(5).value).toBe("'=1+1");    // the size label, escaped the same way
     expect(row.getCell(6).value).toBe(3);          // escaping is output only: the label still finds its points
   });
+
+  // v0.55.4: the last two text cells written raw. The app sets a target date only from a
+  // date input and a category only from core / non-core, but a cloud project is checked
+  // on load only for text (cloudLoadGuard), so either can arrive starting with "=".
+  it('22. a target date and a category starting with "=" are escaped, in a real .xlsx file', async () => {
+    const ExcelJS = await import('exceljs');
+    const XL = (ExcelJS as any).default ?? ExcelJS; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const theme = BASE_PRODUCT.themes[0]!;
+    const backbone = theme.backboneItems[0]!;
+    const product = {
+      ...BASE_PRODUCT,
+      releases: [
+        { ...BASE_PRODUCT.releases[0]!, name: '=R', targetDate: '=1+1' },
+        { ...BASE_PRODUCT.releases[1]!, targetDate: '2026-06-01' },
+      ],
+      themes: [{
+        ...theme,
+        backboneItems: [{
+          ...backbone,
+          ribItems: [{ ...backbone.ribItems[0]!, category: '=C' }],
+        }],
+      }],
+    };
+    const wb = await getWorkbook(product as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const buffer = await wb.xlsx.writeBuffer();
+    const back = new XL.Workbook();
+    await back.xlsx.load(buffer);
+    const summary = back.getWorksheet('Release Summary');
+    expect(summary.getRow(4).getCell(1).value).toBe("'=R");       // the release name, escaped already
+    expect(summary.getRow(4).getCell(6).value).toBe("'=1+1");     // the target date, escaped the same way
+    expect(summary.getRow(5).getCell(6).value).toBe('2026-06-01'); // an ordinary date is written as it was
+    expect(back.getWorksheet('Rib Items').getRow(5).getCell(4).value).toBe("'=C");
+  });
 });
