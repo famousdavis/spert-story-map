@@ -2,45 +2,37 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Projects page's header (v0.55.0): SPERT Forecaster's (`src/shell/components/AppShell.tsx:121-152` at 38f1a63),
-// the suite's header. The title's gradient is Forecaster's `from-spert-blue-light to-spert-blue-dark`,
-// written as its two values because Story Map's theme defines neither (as names they produce no
-// CSS, and with `text-transparent` the title would be invisible). The logo keeps its link home and
-// its label; the gear, theme toggle, About and storage pill are Story Map's, unchanged.
+// The Projects page's header (v0.55.0): SPERT Forecaster's
+// (`src/shell/components/AppShell.tsx:121-152` at 38f1a63), the suite's header. The title's
+// gradient runs between Forecaster's two light and dark SPERT blues, written here as their values:
+// Story Map's theme does not define Forecaster's names for them, which as classes produce no CSS,
+// and with `text-transparent` the title would be invisible. The logo (passed in by the page, which
+// keeps it as it was) links home; the gear, theme toggle, About and storage pill are Story Map's,
+// unchanged.
 
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../ui/ThemeToggle';
 import StorageStatusPill from '../ui/StorageStatusPill';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
 type ThemeMode = ComponentProps<typeof ThemeToggle>['theme'];
 
 const GRADIENT = 'font-bold bg-gradient-to-r from-[#0099ff] to-[#0051cc] bg-clip-text text-transparent';
 
 interface ProjectsHeaderProps {
-  isDark: boolean;
+  /** Story Map's own logo, linked home: the page renders it, unchanged. */
+  logo: ReactNode;
   theme: ThemeMode;
   onToggleTheme: () => void;
   onOpenSettings: () => void;
 }
 
-export default function ProjectsHeader({ isDark, theme, onToggleTheme, onOpenSettings }: ProjectsHeaderProps) {
+export default function ProjectsHeader({ logo, theme, onToggleTheme, onOpenSettings }: ProjectsHeaderProps) {
   return (
     <header className="mb-6 flex items-start justify-between">
       <div>
         <div className="flex items-center gap-3 mb-1">
-          <Link
-            to="/"
-            onClick={() => window.scrollTo(0, 0)}
-            aria-label="Go to projects home"
-            className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          >
-            <img
-              src={isDark ? '/spert-favicon-storymap-dark.png' : '/spert-favicon-storymap.png'}
-              alt="SPERT Story Map icon"
-              className="h-7 w-7 rounded-lg ring-1 ring-white/20"
-            />
-          </Link>
+          {logo}
           <h1 className="text-2xl sm:text-[1.75rem] md:text-[2.1rem] leading-[normal]">
             <span className={GRADIENT}>SPERT</span>
             <span className="text-gray-400 dark:text-gray-500 font-normal text-base sm:text-lg align-top">®</span>

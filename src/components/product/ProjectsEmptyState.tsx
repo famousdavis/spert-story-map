@@ -3,10 +3,10 @@
 // See LICENSE file in the project root for full license text.
 
 // The welcome panel shown when there are no projects (v0.55.0): SPERT Forecaster's
-// `ProjectsEmptyState` at 38f1a63, with Story Map's words. Forecaster's `bg-card`, `border-border`
-// and `text-spert-text*` are theme colours Story Map does not define (written as is they produce
-// no CSS: a transparent panel with a black dashed border), and its `rounded-lg` is 10 px, Story
-// Map's 8 px. Each is written here as its value.
+// `ProjectsEmptyState` at 38f1a63, with Story Map's words. Its card, border and text colours are
+// Forecaster theme names Story Map does not define (as classes they produce no CSS: a transparent
+// panel with a black dashed border), and its large radius is 10 px there, 8 px here. Each is
+// written here as its value.
 
 import type React from 'react';
 import { TOOLBAR_BUTTON, TOOLBAR_PRIMARY, TOOLBAR_SECONDARY } from './button-styles';

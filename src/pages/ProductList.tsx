@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { exportProduct, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
 import { exportAllProductsBundled } from '../lib/importExport';
 import { useImportState } from '../hooks/useImportState';
@@ -335,7 +335,25 @@ export default function ProductList() {
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950">
       <div className="max-w-[1200px] w-full mx-auto px-2 sm:px-4 md:px-8 p-4 sm:p-6 md:p-8 flex-1 flex flex-col">
-        <ProjectsHeader isDark={isDark} theme={theme} onToggleTheme={toggleTheme} onOpenSettings={() => setShowSettings(true)} />
+        <ProjectsHeader
+          logo={(
+            <Link
+              to="/"
+              onClick={() => window.scrollTo(0, 0)}
+              aria-label="Go to projects home"
+              className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              <img
+                src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
+                alt="SPERT Story Map icon"
+                className="h-7 w-7 rounded-lg ring-1 ring-white/20"
+              />
+            </Link>
+          )}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onOpenSettings={() => setShowSettings(true)}
+        />
 
         <AppNotices className="mb-4" />
 

@@ -6,9 +6,9 @@
 // strings at 38f1a63 (`src/shared/components/toolbar-button-styles.ts` and
 // `icon-button-styles.ts`), which are GanttApp's `.pt-btn` and icon buttons written as Tailwind.
 //
-// ⚠️ Copied through the brief's token map. Forecaster's `spert-blue` is a theme colour Story Map
-// does not define: written as is, `bg-spert-blue` produces NO CSS and New Project's label is white
-// on white. Here it is the literal `[#0070f3]`. Forecaster's dark page is gray-900 and Story
+// ⚠️ Copied through the brief's token map. Forecaster's SPERT blue is a theme colour Story Map
+// does not define: written as Forecaster names it, the class produces NO CSS and New Project's
+// label is white on white. Here it is the literal `[#0070f3]`. Forecaster's dark page is gray-900 and Story
 // Map's is gray-950, so the secondary button's dark background, which is meant to be the page
 // colour, is gray-950 here.
 //
