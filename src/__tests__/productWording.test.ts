@@ -96,7 +96,7 @@ export function scanForProject(root: string, allowed: typeof ALLOWED = ALLOWED) 
   return { hits, used };
 }
 
-describe('"product" on every screen (v0.55.9)', () => {
+describe('"product" on Story Map\'s screens (v0.55.9)', () => {
   it('no production string says "project", except the three allowed sentences', () => {
     expect(scanForProject(SRC).hits).toEqual([]);
   });
