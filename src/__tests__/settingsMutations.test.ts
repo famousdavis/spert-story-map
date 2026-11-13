@@ -257,3 +257,119 @@ describe('a rib with no progress list', () => {
     expect('progressHistory' in firstRib(next)).toBe(false);
   });
 });
+
+// ─── The size list (v0.55.8) ───────────────────────────────────────
+
+import {
+  addBackSizeToProduct, addSizeToProduct, orphanLabels, removeSizeDecision, removeSizeFromProduct, renameSizeInProduct,
+  setSizePointsInProduct, sizeLabelProblem, sizeUsage,
+} from '../lib/settingsMutations';
+import { entry, makeProduct as makeRibProduct, makeRib, ribOf } from './fixtures/progressIntegrity';
+import type { Size, SizeMapping } from '../types';
+
+describe('size list transforms', () => {
+  const ON = [{ releaseId: 'R1', percentage: 100 }];
+  const lockedRib = (id: string, size: string) => makeRib(id, ON, [entry('S1', 'R1', 10)], size as Size);
+  const freeRib = (id: string, size: string) => makeRib(id, ON, [], size as Size);
+  const sized = (rows: SizeMapping[], ribs: RibItem[], order?: Record<string, string[]>): Product =>
+    ({ ...makeRibProduct(ribs), sizeMapping: rows, ...(order ? { sizingCardOrder: order } : {}) });
+  const rows = (...pairs: [string, number][]) => pairs.map(([label, points]) => ({ label, points }));
+
+  it('rename carries items and merges the card order ahead of stale ids, with no id twice', () => {
+    const prev = sized(rows(['M', 20], ['L', 40]), [freeRib('a', 'M'), freeRib('b', 'M'), freeRib('c', 'L')],
+      { M: ['b', 'a'], Big: ['z', 'a'], unsized: ['u'] });
+    const next = renameSizeInProduct(prev, 0, 'M', '  Big ');
+    expect(next.sizeMapping.map(r => r.label)).toEqual(['Big', 'L']);
+    expect(['a', 'b', 'c'].map(id => ribOf(next, id).size)).toEqual(['Big', 'Big', 'L']);
+    expect(next.sizingCardOrder).toEqual({ Big: ['b', 'a', 'z'], unsized: ['u'] });
+    expect(prev.sizeMapping[0]).toEqual({ label: 'M', points: 20 });
+  });
+
+  it('rename revives items already on the new label, and allows a case-only change of the same row', () => {
+    const prev = sized(rows(['M', 20]), [freeRib('a', 'M'), lockedRib('o', 'm')]);
+    const next = renameSizeInProduct(prev, 0, 'M', 'm');
+    expect(['a', 'o'].map(id => ribOf(next, id).size)).toEqual(['m', 'm']);
+    expect(next.sizeMapping).toEqual([{ label: 'm', points: 20 }]);
+  });
+
+  it('rename never moves the unsized key, and a shadowed row changes alone', () => {
+    const legacy = sized(rows(['unsized', 5]), [freeRib('a', 'unsized')], { unsized: ['a'] });
+    expect(renameSizeInProduct(legacy, 0, 'unsized', 'U').sizingCardOrder).toEqual({ unsized: ['a'] });
+    const dup = sized(rows(['M', 20], ['M', 50]), [freeRib('a', 'M')], { M: ['a'] });
+    const next = renameSizeInProduct(dup, 1, 'M', 'Big');
+    expect([next.sizeMapping.map(r => r.label), ribOf(next, 'a').size, next.sizingCardOrder]).toEqual([['M', 'Big'], 'M', { M: ['a'] }]);
+  });
+
+  it('a label such as constructor is renamed and removed without throwing', () => {
+    const prev = sized(rows(['constructor', 3], ['__proto__', 4]), [freeRib('a', 'constructor')], {});
+    const renamed = renameSizeInProduct(prev, 0, 'constructor', 'toString');
+    expect(ribOf(renamed, 'a').size).toBe('toString');
+    expect(Object.keys(renamed.sizingCardOrder ?? {})).toEqual([]);
+    const removed = removeSizeFromProduct(renameSizeInProduct(prev, 1, '__proto__', 'hasOwnProperty'), 1, 'hasOwnProperty');
+    expect(removed.sizeMapping.map(r => r.label)).toEqual(['constructor']);
+    expect(removeSizeFromProduct(prev, 0, 'constructor', true).sizeMapping.map(r => r.label)).toEqual(['__proto__']);
+  });
+
+  it('a falsy label is used by nothing: not carried, counted or cleared', () => {
+    const prev = sized(rows(['', 5], ['L', 40]), [lockedRib('e', ''), freeRib('n', null as unknown as string)]);
+    expect(sizeUsage(prev).has('')).toBe(false);
+    expect(ribOf(renameSizeInProduct(prev, 0, '', 'XS'), 'e').size).toBe('');
+    expect(removeSizeDecision(prev, 0, '')).toEqual({ kind: 'unused', dropKey: true });
+    expect(orphanLabels(prev)).toEqual([]);
+  });
+
+  it('decides a remove in order: shadowed, unused, next row equal or different, locked, confirm', () => {
+    const ribs = [lockedRib('a', 'M'), freeRib('b', 'M'), freeRib('c', 'L')];
+    const dup = sized(rows(['M', 20], ['M', 20], ['M', 50], ['L', 40], ['XS', 5]), ribs);
+    expect([2, 4, 0, 3].map(i => removeSizeDecision(dup, i, dup.sizeMapping[i]?.label ?? '').kind))
+      .toEqual(['shadowed', 'unused', 'samePoints', 'confirmUnsized']);
+    const diff = sized(rows(['M', 20], ['M', 50]), ribs);
+    expect(removeSizeDecision(diff, 0, 'M')).toEqual({ kind: 'refusedNext', locked: 1 });
+    const free = sized(rows(['M', 20], ['M', 50], ['S', 1], ['S', 2]), [freeRib('b', 'M')]);
+    expect(removeSizeDecision(free, 0, 'M')).toEqual({ kind: 'confirmNext', items: 1, points: 20, nextPoints: 50 });
+    expect(removeSizeDecision(free, 2, 'S')).toEqual({ kind: 'unused', dropKey: false });
+    expect(removeSizeDecision(sized(rows(['M', 20]), ribs), 0, 'M')).toEqual({ kind: 'refusedLocked', locked: 1 });
+  });
+
+  it('an unused remove drops its card-order key, never the unsized key', () => {
+    const prev = sized(rows(['XS', 5], ['unsized', 1]), [], { XS: ['gone'], unsized: ['u'] });
+    expect(removeSizeFromProduct(prev, 0, 'XS').sizingCardOrder).toEqual({ unsized: ['u'] });
+    expect(removeSizeFromProduct(prev, 1, 'unsized').sizingCardOrder).toEqual({ XS: ['gone'], unsized: ['u'] });
+  });
+
+  it('returns prev on a mismatched expected label, a lock found in the updater, or a confirm not given', () => {
+    const prev = sized(rows(['XS', 5], ['M', 20]), [freeRib('a', 'M'), lockedRib('b', 'M')]);
+    expect(renameSizeInProduct(prev, 0, 'M', 'Medium')).toBe(prev);
+    expect(setSizePointsInProduct(prev, 0, 'M', 30)).toBe(prev);
+    expect(removeSizeFromProduct(prev, 0, 'M', true)).toBe(prev);
+    expect(removeSizeFromProduct(prev, 1, 'M', true)).toBe(prev);
+    const unlocked = sized(rows(['M', 20]), [freeRib('a', 'M')]);
+    expect(removeSizeFromProduct(unlocked, 0, 'M')).toBe(unlocked);
+    expect(ribOf(removeSizeFromProduct(unlocked, 0, 'M', true), 'a').size).toBeNull();
+  });
+
+  it('points: refuses what import refuses, keeps decimals, writes nothing unchanged', () => {
+    const prev = sized(rows(['M', 20]), []);
+    expect([-1, NaN, Infinity, 20].map(p => setSizePointsInProduct(prev, 0, 'M', p))).toEqual([prev, prev, prev, prev]);
+    expect(setSizePointsInProduct(prev, 0, 'M', 0.5).sizeMapping).toEqual([{ label: 'M', points: 0.5 }]);
+  });
+
+  it('labels: trimmed, 1-20 characters, not unsized, unique ignoring case', () => {
+    const list = rows(['M', 20], ['L', 40]);
+    expect(['', ' ', 'x'.repeat(21), 'Unsized', 'l', ' M ', 'Medium'].map(t => sizeLabelProblem(list, 0, t))).toEqual([
+      'A size needs a label.', 'A size needs a label.', 'At most 20 characters.', '“unsized” is reserved.',
+      '“L” is already in the list.', null, null,
+    ]);
+  });
+
+  it('Add Size and Add back decide their row inside the updater', () => {
+    const prev = sized(rows(['new', 1]), [freeRib('a', 'XL')]);
+    const twice = addSizeToProduct(addSizeToProduct(prev));
+    expect(twice.sizeMapping.map(r => r.label)).toEqual(['new', 'New 2', 'New 3']);
+    const back = addBackSizeToProduct(prev, 'XL');
+    expect(addBackSizeToProduct(back, 'XL')).toBe(back);
+    expect(addBackSizeToProduct(prev, 'XL ')).toBe(prev);
+    const full = sized(Array.from({ length: 20 }, (_, i) => ({ label: `Z${i}`, points: i })), []);
+    expect([addSizeToProduct(full), addBackSizeToProduct(full, 'XL')]).toEqual([full, full]);
+  });
+});
