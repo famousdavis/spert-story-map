@@ -478,3 +478,23 @@ describe('computeSizingLayout cell identity fields', () => {
     expect(req(byId.r2, 'byId.r2').backboneId).toBe('b2');
   });
 });
+
+describe('computeSizingLayout orphan sizes', () => {
+  it('puts a rib on a size no longer in the list in Unsized, keeping its label, and a 0-point size in its column', () => {
+    // L was removed from the list; S is still in it, at 0 points.
+    const product = makeProduct({
+      ribs: [{ id: 'r1', size: 'M' }, { id: 'r2', size: 'L' }, { id: 'r3', size: 'S' }],
+      sizeMapping: [{ label: 'S', points: 0 }, { label: 'M', points: 3 }],
+    });
+    const layout = computeSizingLayout(product);
+    const placed = layout.cells.map(c => ({ id: c.id, zone: c.zone, sizeLabel: c.sizeLabel, size: c.size }));
+    expect({ unsizedCount: layout.unsizedCount, placed }).toStrictEqual({
+      unsizedCount: 1,
+      placed: [
+        { id: 'r2', zone: 'unsized', sizeLabel: null, size: 'L' },
+        { id: 'r3', zone: 'sized', sizeLabel: 'S', size: 'S' },
+        { id: 'r1', zone: 'sized', sizeLabel: 'M', size: 'M' },
+      ],
+    });
+  });
+});

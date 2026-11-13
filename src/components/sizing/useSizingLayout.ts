@@ -5,7 +5,7 @@
 import { useMemo } from 'react';
 import type { Product, Category, Size } from '../../types';
 import { forEachRib } from '../../lib/ribHelpers';
-import { getRibItemPoints, getRibItemPercentComplete } from '../../lib/calculations';
+import { getRibItemPoints, getRibItemPercentComplete, isRibUnsized } from '../../lib/calculations';
 import { lockingSprintId } from '../../lib/progressRule';
 import { isRibLocked } from '../../lib/ribHelpers';
 
@@ -114,7 +114,6 @@ export interface SizingLayout {
 
 export function computeSizingLayout(product: Product, filter: SizingFilter = DEFAULT_SIZING_FILTER, targetWidth: number = 0): SizingLayout {
   const sizeMapping = product.sizeMapping || [];
-  const sizeLabels = new Set(sizeMapping.map(m => m.label));
   const sprintNames = new Map((product.sprints ?? []).map(s => [s.id, s.name]));
 
   // 1. Build size columns (positions/widths are set in step 1.5 once we know expansion)
@@ -183,12 +182,12 @@ export function computeSizingLayout(product: Product, filter: SizingFilter = DEF
     };
 
     // Treat ribs with orphan sizes (not in current sizeMapping) as unsized
-    if (!rib.size || !sizeLabels.has(rib.size)) {
+    if (isRibUnsized(rib, sizeMapping)) {
       unsizedRibs.push(enriched);
     } else {
-      // sizedByLabel is seeded from the same sizeMapping as sizeLabels, so the
-      // bucket is always present once the label has passed the check above.
-      const bucket = sizedByLabel.get(rib.size);
+      // sizedByLabel is seeded from the same sizeMapping isRibUnsized reads, so the
+      // bucket is always present once the rib has passed the check above.
+      const bucket = rib.size ? sizedByLabel.get(rib.size) : undefined;
       if (bucket) bucket.push(enriched);
     }
   });

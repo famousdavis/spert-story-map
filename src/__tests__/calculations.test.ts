@@ -26,6 +26,7 @@ import {
   getProgressOverTime,
   getSprintSummary,
   getReleaseProgressOverTime,
+  isRibUnsized,
 } from '../lib/calculations';
 import type { Product, Theme, Backbone, RibItem, Release, Sprint, ReleaseAllocation, ProgressEntry, SizeMapping, Size, Category } from '../types';
 import { req } from './testHelpers';
@@ -124,6 +125,58 @@ describe('getRibItemPoints', () => {
       });
       expect(getTotalProjectPoints(product)).toBe(60);
     });
+  });
+});
+
+// --- isRibUnsized ---
+describe('isRibUnsized', () => {
+  // A rib's size as storage can hold it: a label the Size type does not list, '' and an
+  // absent key all reach this function, so the fixtures are not held to the type.
+  const ribWith = (size: unknown) => ({ size }) as Pick<RibItem, 'size'>;
+  const absent = {} as Pick<RibItem, 'size'>;
+  const LIST: SizeMapping[] = [{ label: 'S', points: 10 }, { label: 'M', points: 20 }, { label: 'XS', points: 0 }];
+
+  it.each([
+    ['null', true, ribWith(null)],
+    ["''", true, ribWith('')],
+    ['absent', true, absent],
+    ['a label in the list', false, ribWith('M')],
+    ['a label not in the list', true, ribWith('XXL')],
+    ['a renamed label', true, ribWith('Medium')],
+    ['a label whose row has 0 points', false, ribWith('XS')],
+    ['a label equal to an Object.prototype key', true, ribWith('constructor')],
+  ])('%s → unsized %s', (_, expected, rib) => {
+    expect(isRibUnsized(rib, LIST)).toBe(expected);
+  });
+
+  it('a row labelled with an empty string does not size a rib with none', () => {
+    // getRibItemPoints gives such a rib 0 before it looks at the list, so it gets no row.
+    const list: SizeMapping[] = [{ label: '', points: 5 }];
+    expect({ unsized: isRibUnsized(ribWith(''), list), points: getRibItemPoints(ribWith(''), list) })
+      .toStrictEqual({ unsized: true, points: 0 });
+  });
+
+  it('an empty size list leaves every rib unsized', () => {
+    expect(isRibUnsized(ribWith('M'), [])).toBe(true);
+  });
+
+  it('follows a size list replaced by a new array, and the old array keeps its answer', () => {
+    const before: SizeMapping[] = [{ label: 'S', points: 10 }];
+    const after: SizeMapping[] = [...before, { label: 'XXL', points: 80 }];
+    const rib = ribWith('XXL');
+    expect([isRibUnsized(rib, before), isRibUnsized(rib, after), isRibUnsized(rib, before)])
+      .toStrictEqual([true, false, true]);
+  });
+
+  it('follows a rename, which keeps the list the same length, and the old array keeps its answer', () => {
+    // Renaming M to Medium in T-Shirt Size Mapping: a new array of the same length.
+    // A cache keyed by anything but the array itself, such as its length, goes stale here.
+    const before: SizeMapping[] = [{ label: 'S', points: 10 }, { label: 'M', points: 20 }];
+    const after = before.map(m => m.label === 'M' ? { ...m, label: 'Medium' } : m);
+    const onM = ribWith('M');
+    const onMedium = ribWith('Medium');
+    expect([isRibUnsized(onM, before), isRibUnsized(onM, after), isRibUnsized(onMedium, after), isRibUnsized(onM, before)])
+      .toStrictEqual([false, true, false, false]);
   });
 });
 
@@ -491,6 +544,19 @@ describe('computeItemStats', () => {
     expect(stats.percentComplete).toBe(5);
     expect(stats.remainingPoints).toBe(95);
   });
+
+  it('counts a rib on a size no longer in the list as unsized, and a 0-point size as sized', () => {
+    // XXL was removed from the list; XS is still in it, at 0 points.
+    const list: SizeMapping[] = [...SIZE_MAPPING, { label: 'XS', points: 0 }];
+    const items = [makeRib('r1', { size: 'M' }), makeRib('r2', { size: 'XXL' }), makeRib('r3', { size: 'XS' })];
+    const { totalItems, totalPoints, unsized } = computeItemStats(items, list, SP);
+    expect({ totalItems, totalPoints, unsized }).toStrictEqual({ totalItems: 3, totalPoints: 20, unsized: 1 });
+  });
+
+  it('counts every rib as unsized against an empty size list', () => {
+    const items = [makeRib('r1', { size: 'M' }), makeRib('r2', { size: 'S' }), makeRib('r3')];
+    expect(computeItemStats(items, [], SP).unsized).toBe(3);
+  });
 });
 
 // --- getThemeStats ---
@@ -505,6 +571,11 @@ describe('getThemeStats', () => {
     expect(stats.totalPoints).toBe(20);
     expect(stats.unsized).toBe(1);
     expect(stats.percentComplete).toBe(0);
+  });
+
+  it('counts a rib on a size no longer in the list as unsized', () => {
+    const theme = makeTheme('t1', [makeBackbone('b1', [makeRib('r1', { size: 'M' })]), makeBackbone('b2', [makeRib('r2', { size: 'XXL' })])]);
+    expect(getThemeStats(theme, SIZE_MAPPING, SP).unsized).toBe(1);
   });
 });
 
@@ -524,6 +595,11 @@ describe('getBackboneStats', () => {
     expect(stats.totalPoints).toBe(20);
     expect(stats.percentComplete).toBe(50); // 10/20
     expect(stats.remainingPoints).toBe(10);
+  });
+
+  it('counts a rib on a size no longer in the list as unsized', () => {
+    const backbone = makeBackbone('b1', [makeRib('r1', { size: 'S' }), makeRib('r2', { size: 'XXL' })]);
+    expect(getBackboneStats(backbone, SIZE_MAPPING, SP).unsized).toBe(1);
   });
 });
 

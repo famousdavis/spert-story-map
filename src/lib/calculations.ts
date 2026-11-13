@@ -50,6 +50,18 @@ export function getRibItemPoints(ribItem: Pick<RibItem, 'size'>, sizeMapping: Si
   return Number.isFinite(points) ? points : 0;
 }
 
+/**
+ * True when the rib contributes no size row to points: no size, or a label not in the size list.
+ * A size whose row has 0 points is sized. Needs Attention, the project card, Structure, the Map's
+ * theme and backbone panels and the Sizing tab count unsized items with this. Three places keep
+ * their own copy of the rule: `getSizingDistribution` (the Insights chart), the AI snapshot and
+ * `sizeRibInProduct`. The chart's differs for a label equal to an `Object.prototype` key, such as
+ * `constructor`.
+ */
+export function isRibUnsized(rib: Pick<RibItem, 'size'>, sizeMapping: SizeMapping[]): boolean {
+  return !rib.size || !sizeIndex(sizeMapping).has(rib.size);
+}
+
 export function getAllRibItems(product: Product) {
   const items: (RibItem & { themeName: string; themeId: string; backboneName: string; backboneId: string })[] = [];
   forEachRib(product, (rib, { theme, backbone }) => {
@@ -324,7 +336,7 @@ export function computeItemStats(ribItems: RibItem[], sizeMapping: SizeMapping[]
     const pts = getRibItemPoints(rib, sizeMapping);
     totalPoints += pts;
     completedPoints += pts * getRibItemPercentComplete(rib, sprints) / 100;
-    if (!rib.size) unsized++;
+    if (isRibUnsized(rib, sizeMapping)) unsized++;
   }
   const remainingPoints = round1(totalPoints - completedPoints);
   const percentComplete = totalPoints > 0 ? Math.round(completedPoints / totalPoints * 100) : 0;

@@ -475,8 +475,8 @@ export function unassignRibInProduct(
  *   2. Rib not found → prev (via didUpdate flag).
  *   3. Rib is locked → prev (mirrors the Sizing UI lock, CLAUDE.md #26).
  *   4. Rib already has a valid size → prev (additive; never overwrites).
- *      Form B: r.size && labelSet.has(r.size). Matches useSizingLayout.ts:118's definition
- *      of "unsized" (falsy OR not-in-mapping). Handles both null and the empty-string value
+ *      Form B: r.size && labelSet.has(r.size). The complement of isRibUnsized in
+ *      calculations.ts (falsy OR not-in-mapping). Handles both null and the empty-string value
  *      validateProduct writes for a label its size list does not hold.
  *
  * Does NOT update sizingCardOrder (matches allocateRibInProduct / addRibToRelease precedent).

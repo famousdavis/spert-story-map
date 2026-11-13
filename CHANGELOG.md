@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.54.4 (2026-11-12)
+
+### Fixed
+
+- **An item whose size is no longer in your size list now counts as unsized.** If you removed a size from T-Shirt Size Mapping in Settings, or changed its label, the items that had it already counted 0 points. The Sizing tab and the Insights tab's Sizing Distribution chart showed them as unsized, but the other counts did not. Now Needs Attention on the Insights tab, the Structure tab's header and its theme and backbone rows, the theme and backbone panels on the Map, and the project's card on the project list count them as unsized too.
+- **Each of these items still shows its old size on its own row and card, and in the Excel export.** Needs Attention names up to ten of them, and the Sizing tab shows them under Unsized.
+- ⚠️ **If one of these items has progress, its size is locked;** putting its size back in T-Shirt Size Mapping makes it count again.
+
 ## Version 0.54.3 (2026-11-12)
 
 ### Changed
