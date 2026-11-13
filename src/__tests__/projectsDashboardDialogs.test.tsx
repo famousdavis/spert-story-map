@@ -81,10 +81,12 @@ describe('New Project', () => {
   });
 
   it('creates the project, both fields trimmed, and lands on Structure (unchanged)', async () => {
-    await showProjects(['Alpha']);
+    // Waits, and matches, as both versions of the page render: this behaviour is unchanged.
+    seedLocal([makeProject({ id: 'p0', name: 'Alpha' })]);
+    renderPage();
+    await screen.findByText('Alpha');
     await userEvent.click(screen.getByRole('button', { name: 'New Project' }));
     await userEvent.type(screen.getByLabelText('Project Name'), '  Beta  ');
-    // Matched as both versions of the dialog spell it: this behaviour is unchanged.
     await userEvent.type(screen.getByLabelText(/^Description \(optional\)$/i), '  about beta  ');
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
     await screen.findByText('Structure page');
