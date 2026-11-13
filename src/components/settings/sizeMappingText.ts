@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
+import { round1 } from '../../lib/calculations';
 import { UNDO_HINT } from '../../lib/constants';
 import type { RemoveSizeDecision } from '../../lib/settingsMutations';
 
@@ -69,16 +70,20 @@ export function removeRefusal(label: string, decision: RemoveSizeDecision): stri
   return null;
 }
 
-/** The remove confirm's message, from the decision as it stands now. Null when it needs no confirm. */
+/**
+ * The remove confirm's message, from the decision as it stands now. Null when it needs no
+ * confirm. Points are shown to one decimal (`round1`), as everywhere else: 3 items at 0.1
+ * add up to 0.30000000000000004.
+ */
 export function removeConfirmMessage(label: string, decision: RemoveSizeDecision): string | null {
   if (decision.kind === 'confirmUnsized') {
     return `${count(decision.items, 'item')} ${agree(decision.items, 'uses', 'use')} ${quoted(label)} `
-      + `(${count(decision.points, 'point')}). Removing it leaves ${agree(decision.items, 'it', 'them')} unsized. ${UNDO_HINT}`;
+      + `(${count(round1(decision.points), 'point')}). Removing it leaves ${agree(decision.items, 'it', 'them')} unsized. ${UNDO_HINT}`;
   }
   if (decision.kind === 'confirmNext') {
     return `${count(decision.items, 'item')} ${agree(decision.items, 'uses', 'use')} ${quoted(label)} `
-      + `(${count(decision.points, 'point')}). ${agree(decision.items, 'It', 'They')} will count at the next `
-      + `${quoted(label)} row's points instead (${count(decision.nextPoints, 'point')}). ${UNDO_HINT}`;
+      + `(${count(round1(decision.points), 'point')}). ${agree(decision.items, 'It', 'They')} will count at the next `
+      + `${quoted(label)} row's points instead (${count(round1(decision.nextPoints), 'point')}). ${UNDO_HINT}`;
   }
   return null;
 }

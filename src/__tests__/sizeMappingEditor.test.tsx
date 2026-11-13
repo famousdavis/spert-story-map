@@ -195,6 +195,19 @@ describe('add and remove', () => {
     expect(stored(hosted.product)).toBe('XS:5 S:10 L:40 XL:100');
   });
 
+  it('shows the points in both confirms to one decimal', async () => {
+    const decimals = [free('a', 'XS'), free('b', 'XS'), free('c', 'XS')];
+    const { user } = mount(product('XS:0.1 S:10', decimals));
+    await user.click(removeAt(0));
+    expect(req(dialog(), 'dialog').textContent).toContain('3 items use “XS” (0.3 points). Removing it leaves them unsized.');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    cleanup();
+    mount(product([{ label: 'XS', points: 0.1 }, { label: 'XS', points: 0.1 + 0.2 }], decimals));
+    await userEvent.setup().click(removeAt(0));
+    expect(req(dialog(), 'dialog').textContent)
+      .toContain('3 items use “XS” (0.3 points). They will count at the next “XS” row\'s points instead (0.3 points).');
+  });
+
   it('focus after a remove goes to the next row\'s Remove, else the previous row\'s, else "+ Add Size"', async () => {
     const { user } = mount(product(STANDARD, [free('m1', 'M')]));
     await user.click(removeAt(2));
