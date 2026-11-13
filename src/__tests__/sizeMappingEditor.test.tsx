@@ -551,6 +551,18 @@ describe('13. a list changed elsewhere during an edit', () => {
     await waitFor(() => expect(announced()).toBe('“L” was changed elsewhere. Nothing was saved.'));
   });
 
+  it('says "changed elsewhere" once, under the list, not under whichever row now holds that index', async () => {
+    const { hosted, user } = mount(product(STANDARD, ribs()));
+    await user.clear(labelAt(3));
+    await user.type(labelAt(3), 'Large');
+    hosted.replace(dropXS);
+    await user.tab();
+    const text = '“L” was changed elsewhere. Nothing was saved.';
+    expect(onPage(text)).toHaveLength(1);
+    labels().forEach((_, i) => expect(within(rowAt(i)).queryByText(text)).toBeNull());
+    expect([...labels(), ...pointsInputs()].filter(el => el.getAttribute('aria-invalid') === 'true')).toHaveLength(0);
+  });
+
   it('points typed on L save nothing once XS is removed elsewhere', async () => {
     const { hosted, user } = mount(product(STANDARD, ribs()));
     await user.clear(pointsAt(3));
@@ -585,6 +597,48 @@ describe('13. a list changed elsewhere during an edit', () => {
     expect({ writes: hosted.writes - writes, m: ribOf(hosted.product, 'm2').size, rows: stored(hosted.product) })
       .toEqual({ writes: 0, m: 'M', rows: STANDARD });
     expect(onPage(/“M” can't be removed: 1 item with recorded progress uses it/)).toHaveLength(1);
+  });
+});
+
+// ─── What a write did, said once it has landed (review 11) ───────────
+
+describe('what a remove or a confirm did, decided by the list as it now is', () => {
+  /** Rib `id` moved to `size`, as another editor would. */
+  const resize = (ids: string[], size: string) => (p: Product): Product => ({
+    ...p,
+    themes: p.themes.map(t => ({ ...t, backboneItems: t.backboneItems.map(b => ({
+      ...b, ribItems: b.ribItems.map(r => (ids.includes(r.id) ? { ...r, size: size as Size } : r)),
+    })) })),
+  });
+
+  it('says "Removed" and moves focus only once the row is actually gone', async () => {
+    const { hosted, user } = mount(product(STANDARD, [free('s1', 'S'), locked('x1', 'XL')]));
+    await user.click(removeAt(0));
+    await waitFor(() => expect(announced()).toBe('Removed “XS”.'));
+    // Another editor moves a locked item onto M in the same event, ahead of the page's own
+    // write: the click checked M unused, and the write finds it locked and does nothing.
+    const button = screen.getByRole('button', { name: 'Remove “M”' });
+    button.addEventListener('click', () => hosted.replace(resize(['x1'], 'M')), { once: true });
+    act(() => labelAt(0).focus());
+    act(() => button.click());
+    expect({ rows: stored(hosted.product), x1: ribOf(hosted.product, 'x1').size }).toEqual({ rows: 'S:10 M:20 L:40 XL:100', x1: 'M' });
+    await act(() => new Promise(resolve => setTimeout(resolve, 20)));
+    expect(announced()).not.toBe('Removed “M”.');
+    expect(labelAt(0)).toHaveFocus();
+    // A later change to the length that remove would have left moves no focus either.
+    hosted.replace(p => ({ ...p, sizeMapping: p.sizeMapping.slice(0, -1) }));
+    expect(labelAt(0)).toHaveFocus();
+  });
+
+  it('closes an open confirm whose remove no longer needs one, and does not reopen it', async () => {
+    const { hosted, user } = mount(product('XS:5 M:20', [free('a', 'M'), free('b', 'M')]));
+    await user.click(removeAt(1));
+    expect(dialog()).not.toBeNull();
+    hosted.replace(resize(['a', 'b'], 'XS'));
+    expect(dialog()).toBeNull();
+    expect(hosted.writes).toBe(0);
+    hosted.replace(resize(['a', 'b'], 'M'));
+    expect(dialog()).toBeNull();
   });
 });
 

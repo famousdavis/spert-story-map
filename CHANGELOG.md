@@ -8,7 +8,7 @@
 - **Removing a size that items use now asks first.** The question says how many items use it and how many points they count. Removing it leaves those items unsized or, if another row holds the same label, counts them at that row's points. A size used by an item with recorded progress cannot be removed when that would change the points already recorded for past sprints; the row says how many such items there are. A size nothing uses is still removed at once.
 - **A size list you edit now keeps to what an import accepts.** A label must be 1 to 20 characters, different from every other size (capital letters do not count as a difference), and not "unsized". The list holds at most 20 sizes, and "+ Add Size" names new rows New, New 2 and so on. Points must be a number, 0 or more; decimals are kept. A label or number the list cannot take is not saved, and the row says why.
 - **Points now save when you leave the field or press Enter, not on every keystroke.** While you edit the points of a size that items with recorded progress use, a note under it says that changing them changes the points recorded for past sprints.
-- **If the size list changes while you are editing it** (someone else editing the same size list in cloud storage), your edit is not saved onto whichever size now sits in that row; the row says "was changed elsewhere. Nothing was saved."
+- **If the size list changes while you are editing it** (someone else editing the same size list in cloud storage), your edit is not saved onto whichever size now sits in that row, and a line under the list says "was changed elsewhere. Nothing was saved."
 
 ### Added
 

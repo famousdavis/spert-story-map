@@ -34,16 +34,25 @@ interface SizeMappingSectionProps {
  */
 interface Line { key: string; sig: string; reason?: { text: string; field: SizeRowField }; info?: string[] }
 
+/**
+ * The key of the one line that belongs to no row: "“L” was changed elsewhere." The row
+ * now at that index holds some other size, so the line goes under the list instead.
+ */
+const SECTION_LINE = '\u0000section';
+
 const rowKey = (rows: SizeMapping[], index: number) => {
   const label = rows[index]?.label;
   return `${label}\u0000${rows.slice(0, index).filter(r => r.label === label).length}`;
 };
 const signature = (rows: SizeMapping[]) => JSON.stringify(rows.map(r => [r.label, r.points]));
 
-type FocusIntent =
-  | { kind: 'remove'; index: number; length: number }
-  | { kind: 'label'; length: number }
-  | { kind: 'points'; length: number; label: string; items: number };
+/**
+ * What to do once the list is the one an action's write makes: focus, and what to say. It
+ * runs only when the list is exactly that, and is dropped in the render after the action
+ * whatever happened, so a write the updater refused leaves nothing for a later change to set
+ * off.
+ */
+type FollowUp = { after: string; run: (rows: SizeMapping[]) => void };
 
 export default function SizeMappingSection({ product, updateProduct }: SizeMappingSectionProps) {
   const rows = product.sizeMapping;
@@ -55,27 +64,23 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
   const { announcement, announce, announceLater, silence } = useAnnouncer();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const addRef = useRef<HTMLButtonElement | null>(null);
-  const focusIntent = useRef<FocusIntent | null>(null);
+  const followUp = useRef<FollowUp | null>(null);
+  // Bumped with every follow-up, so the render after the action checks it even when the
+  // write changed nothing.
+  const [actions, setActions] = useState(0);
   const sig = signature(rows);
 
-  // After a remove: the next row's Remove, else the previous row's, else "+ Add Size".
-  // After Add back: the new row's points, and what it brought back is said.
-  // After "+ Add Size": the new row's label, so focus is not left on a button that has
-  // just disabled itself (the 20th row).
   useEffect(() => {
-    const intent = focusIntent.current;
-    focusIntent.current = null;
-    if (!intent || rows.length !== intent.length) return;
-    const find = (selector: string) => rootRef.current?.querySelector<HTMLElement>(selector) ?? null;
-    if (intent.kind === 'points') {
-      find(`[data-size-points="${rows.length - 1}"]`)?.focus();
-      announceLater(addedBackLine(intent.label, intent.items));
-      return;
-    }
-    if (intent.kind === 'label') { find(`[data-size-label="${rows.length - 1}"]`)?.focus(); return; }
-    const at = Math.min(intent.index, rows.length - 1);
-    (at >= 0 ? find(`[data-size-remove="${at}"]`) : addRef.current)?.focus();
-  }, [rows, announceLater]);
+    const next = followUp.current;
+    followUp.current = null;
+    if (next && signature(rows) === next.after) next.run(rows);
+  }, [rows, actions]);
+
+  const find = (selector: string) => rootRef.current?.querySelector<HTMLElement>(selector) ?? null;
+  const once = (after: SizeMapping[], run: FollowUp['run']) => {
+    followUp.current = { after: signature(after), run };
+    setActions(n => n + 1);
+  };
 
   // A line belongs to the list it was made for. Once the list is anything else the line
   // goes for good, so a list that later returns to that state does not bring it back. A
@@ -91,12 +96,17 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     announce(text);
     if (rows[index]) putLine({ key: rowKey(rows, index), reason: { text, field } });
   };
+  /** The row this action started on no longer holds `label`: said once, under the list. */
+  const refuseStale = (label: string) => {
+    announce(staleLine(label));
+    putLine({ key: SECTION_LINE, info: [staleLine(label)] });
+  };
 
   const rename = (index: number, expected: string, text: string): boolean => {
     const row = rows[index];
     const label = text.trim();
     if (row?.label === label) return false;
-    if (!row || row.label !== expected) { refuse(index, 'label', staleLine(expected)); return false; }
+    if (!row || row.label !== expected) { refuseStale(expected); return false; }
     const problem = sizeLabelProblem(rows, index, label);
     if (problem) { refuse(index, 'label', problem); return false; }
     const revived = usage.get(label);
@@ -114,23 +124,30 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
     const row = rows[index];
     const points = parseSizePoints(text);
     if (row && points !== null && points === Number(row.points)) return false;
-    if (!row || row.label !== expected) { refuse(index, 'points', staleLine(expected)); return false; }
+    if (!row || row.label !== expected) { refuseStale(expected); return false; }
     if (points === null) { refuse(index, 'points', POINTS_PROBLEM); return false; }
     silence();
     updateProduct(prev => setSizePointsInProduct(prev, index, expected, points));
     return true;
   };
 
+  // Once the row is gone: say so, and focus the next row's Remove, else the previous
+  // row's, else "+ Add Size".
   const commitRemove = (index: number, label: string, confirmed: boolean) => {
-    announce(removedLine(label));
-    focusIntent.current = { kind: 'remove', index, length: rows.length - 1 };
+    silence();
+    once(rows.filter((_, i) => i !== index), now => {
+      announceLater(removedLine(label));
+      const at = Math.min(index, now.length - 1);
+      (at >= 0 ? find(`[data-size-remove="${at}"]`) : addRef.current)?.focus();
+    });
     updateProduct(prev => removeSizeFromProduct(prev, index, label, confirmed));
   };
   // The click and the confirm decide the same way, against the list as it is now.
   const remove = (index: number, label: string, confirmed: boolean) => {
     const decision = removeSizeDecision(product, index, label);
     const refusal = removeRefusal(label, decision);
-    if (refusal) refuse(index, 'remove', refusal);
+    if (decision.kind === 'stale') refuseStale(label);
+    else if (refusal) refuse(index, 'remove', refusal);
     else if (removeNeedsConfirm(decision) && !confirmed) setDialog({ index, label });
     else commitRemove(index, label, confirmed);
   };
@@ -138,18 +155,34 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
   const addBack = (label: string, items: number) => {
     silence();
     setAddedBack(prev => [...prev, label]);
-    focusIntent.current = { kind: 'points', length: rows.length + 1, label, items };
+    // Once the row is in: its points, and what it brought back is said.
+    once([...rows, { label, points: 0 }], now => {
+      find(`[data-size-points="${now.length - 1}"]`)?.focus();
+      announceLater(addedBackLine(label, items));
+    });
     updateProduct(prev => addBackSizeToProduct(prev, label));
   };
 
   const addSize = () => {
     silence();
-    focusIntent.current = { kind: 'label', length: rows.length + 1 };
+    // The new row's label, so focus is not left on a button that has just disabled itself
+    // (the 20th row).
+    once(addSizeToProduct(product).sizeMapping, now => find(`[data-size-label="${now.length - 1}"]`)?.focus());
     updateProduct(addSizeToProduct);
   };
 
   const shown = lines.filter(l => l.sig === sig);
+  const stale = shown.find(l => l.key === SECTION_LINE)?.info ?? [];
   const dialogDecision = dialog ? removeSizeDecision(product, dialog.index, dialog.label) : null;
+  // An open confirm whose remove no longer needs one (its items moved, or the next row now
+  // has the same points) closes, rather than showing an empty message. A refusal stays in
+  // it until Remove or Cancel, so the person sees why.
+  const dialogMoot = dialog !== null && dialogDecision !== null && !removeNeedsConfirm(dialogDecision)
+    && removeRefusal(dialog.label, dialogDecision) === null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (dialogMoot) setDialog(null);
+  }, [dialogMoot]);
 
   return (
     <Section title="T-Shirt Size Mapping">
@@ -171,6 +204,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
             />
           );
         })}
+        {stale.map(text => <p key={text} className="text-xs text-red-600 dark:text-red-400">{text}</p>)}
         <button
           ref={addRef}
           onClick={addSize}
@@ -184,7 +218,7 @@ export default function SizeMappingSection({ product, updateProduct }: SizeMappi
         <p aria-live="polite" className="sr-only">{announcement}</p>
       </div>
       <ConfirmDialog
-        open={dialog !== null}
+        open={dialog !== null && !dialogMoot}
         onClose={() => setDialog(null)}
         onConfirm={() => { if (dialog) remove(dialog.index, dialog.label, true); }}
         title={dialog ? `Remove ${quoted(dialog.label)}?` : ''}
