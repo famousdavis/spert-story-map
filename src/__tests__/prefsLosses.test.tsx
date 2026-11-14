@@ -152,10 +152,10 @@ describe('cloud: a first settings read made offline', () => {
     expect((stored('cloud').projectOrder as string[])[0]).toBe('p3');
   });
 
-  it('a keystroke then keeps the tile order', async () => {
+  it.each([false, true])('a keystroke then keeps the tile order (online control=%s)', async control => {
     seed('cloud');
     const A = await makeDriver('cloud');
-    h.fs.setOffline(true);
+    h.fs.setOffline(!control);
     const dialog = await openDialog(A);
     h.fs.setOffline(false);
     await dialog.type('Jane D');
