@@ -109,6 +109,13 @@ export function createFirestoreDriver(uid: string): StorageDriver {
   let prefsTimer: ReturnType<typeof setTimeout> | null = null;
   /** Settings entries not yet handed to a write (v0.55.14): see prefEntries.ts. */
   let prefsPending: PrefEntry[] = [];
+  /**
+   * Settings entries handed to a `setDoc` that has not settled. A read issued just before the
+   * hand-off can return just after it without them (the SDK computes the snapshot first and
+   * delivers it later), so a read overlays these as well. Removed when the write settles, whether
+   * it resolves or rejects.
+   */
+  const prefsInFlight = new Set<PrefEntry[]>();
 
   // Active onSnapshot unsubscribers (audit L3). Tracked centrally so
   // signOutCleanup can detach all listeners before credential revocation.
@@ -259,10 +266,14 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     }
   }
 
-  /** A read as this tab will see it once its pending entries are written (R-4). The SDK already returns entries handed to `setDoc`. */
+  /**
+   * A read as this tab will see it once its own entries are written (R-4): the entries in flight,
+   * oldest first, then the pending ones, taken when the read returns.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
   function withPendingPrefs(data: any) {
-    return prefsPending.length > 0 ? applyEntries(data, prefsPending) : data;
+    const own = [...[...prefsInFlight].flat(), ...prefsPending];
+    return own.length > 0 ? applyEntries(data, own) : data;
   }
 
   /**
@@ -271,12 +282,15 @@ export function createFirestoreDriver(uid: string): StorageDriver {
    * missing document; a `FieldPath` per entry, never a dotted string (a product id may hold a dot).
    */
   async function doSavePrefs(entries: PrefEntry[]): Promise<void> {
+    prefsInFlight.add(entries);
     try {
       const ref = doc(requireDb(), SETTINGS_COL, uid);
       const { data, fields } = buildMaskedWrite(entries, sanitizeForFirestore, deleteField, segs => new FieldPath(...segs));
       await setDoc(ref, data, { mergeFields: fields });
     } catch (e) {
       handleWriteError(e);
+    } finally {
+      prefsInFlight.delete(entries);
     }
   }
 

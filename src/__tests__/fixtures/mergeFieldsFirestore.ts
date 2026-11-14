@@ -7,6 +7,10 @@
 // (permission-denied, as the rules' `allow get` reads resource.data.members); the members query on projects; a read counter;
 // an offline switch (reads fail); `{ merge: true }` as a deep merge (the original treats it as a whole replace); and a mask
 // holding a parent and its child refused with invalid-argument, as the SDK refuses it.
+// Holds (Exec-RBP-2, review -01): `holdReads` makes a read take its snapshot when it is called and return only when
+// released, as the SDK computes a snapshot before a later setDoc is queued and delivers it afterwards; `holdWrites` makes
+// a write apply when it is called and settle only when released, as a write the SDK has been handed is visible to later
+// reads before the server acknowledges it.
 //
 // A test fake of the Firestore Web SDK's `setDoc(ref, data, { mergeFields })` (v0.50.0), built to
 // the behaviour the R2 plan reviews measured on the real SDK (firebase 12.12.1):
@@ -44,6 +48,23 @@ export function createMergeFieldsFirestore() {
   let refusal: ((path: string, data: unknown) => Error | null) | null = null
   let reads = 0
   let offline = false
+  const gate = () => {
+    let open = () => {}
+    const promise = new Promise<void>((r) => { open = r })
+    return { promise, open }
+  }
+  let readGate: ReturnType<typeof gate> | null = null
+  let writeGate: ReturnType<typeof gate> | null = null
+  const hold = (which: 'read' | 'write') => {
+    const g = gate()
+    if (which === 'read') readGate = g
+    else writeGate = g
+    return () => {
+      if (which === 'read' && readGate === g) readGate = null
+      if (which === 'write' && writeGate === g) writeGate = null
+      g.open()
+    }
+  }
   const perm = () => Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' })
 
   const deleteField = () => {
@@ -100,21 +121,16 @@ export function createMergeFieldsFirestore() {
     docs.set(path, cur)
   }
 
-  const setDoc = async (ref: { path: string }, data: Doc, options?: { mergeFields?: (string | FakeFieldPath)[]; merge?: boolean }) => {
-    const mask = options?.mergeFields?.map((f) => (typeof f === 'string' ? f.split('.') : f.segments)) ?? null
-    if (mask) refuseOverlap(mask)
-    if (!mask && options?.merge) return mergeWrite(ref.path, data)
-    writes.push({ path: ref.path, data, mask })
-    const refused = refusal?.(ref.path, data)
-    if (refused) throw refused
-    const current: Doc = structuredClone(docs.get(ref.path) ?? {})
+  /** A write applied to the stored document: whole without a mask, else only the masked fields. */
+  const apply = (path: string, data: Doc, mask: string[][] | null) => {
+    const current: Doc = structuredClone(docs.get(path) ?? {})
     if (!mask) {
-      docs.set(ref.path, structuredClone(data))
+      docs.set(path, structuredClone(data))
       return
     }
     if (MUTANT === 'ignore-mask') {
       deepMergeAll(current, data)
-      docs.set(ref.path, current)
+      docs.set(path, current)
       return
     }
     for (const segs of mask) {
@@ -125,14 +141,37 @@ export function createMergeFieldsFirestore() {
       if (isDelete(value)) remove(current, segs)
       else write(current, segs, value)
     }
-    docs.set(ref.path, current)
+    docs.set(path, current)
+  }
+
+  const setDoc = async (ref: { path: string }, data: Doc, options?: { mergeFields?: (string | FakeFieldPath)[]; merge?: boolean }) => {
+    const mask = options?.mergeFields?.map((f) => (typeof f === 'string' ? f.split('.') : f.segments)) ?? null
+    if (mask) refuseOverlap(mask)
+    if (!mask && options?.merge) return mergeWrite(ref.path, data)
+    writes.push({ path: ref.path, data, mask })
+    const held = writeGate
+    const refused = refusal?.(ref.path, data)
+    if (refused) {
+      if (held) await held.promise
+      throw refused
+    }
+    apply(ref.path, data, mask)
+    if (held) await held.promise
   }
 
   const getDoc = async (ref: { path: string }) => {
     reads++
-    if (offline) throw Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' })
-    if (ref.path.startsWith('spertstorymap_projects/') && !docs.has(ref.path)) throw perm()
-    return { exists: () => docs.has(ref.path), data: () => structuredClone(docs.get(ref.path)) }
+    const held = readGate
+    const answer = (() => {
+      if (offline) return Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' })
+      if (ref.path.startsWith('spertstorymap_projects/') && !docs.has(ref.path)) return perm()
+      const exists = docs.has(ref.path)
+      const data = structuredClone(docs.get(ref.path))
+      return { exists: () => exists, data: () => structuredClone(data) }
+    })()
+    if (held) await held.promise
+    if (answer instanceof Error) throw answer
+    return answer
   }
   /** The members query: query(collection(db, col), where(`members.${uid}`, 'in', roles)). */
   const collection = (_db: unknown, name: string) => ({ col: name })
@@ -169,6 +208,10 @@ export function createMergeFieldsFirestore() {
     refuseWhen(fn: ((path: string, data: unknown) => Error | null) | null) {
       refusal = fn
     },
+    /** Reads called from now take their snapshot at once and return when the returned function is called. */
+    holdReads: () => hold('read'),
+    /** Writes called from now apply at once and settle when the returned function is called. */
+    holdWrites: () => hold('write'),
     reset() {
       docs.clear()
       sentinels.clear()
@@ -176,6 +219,10 @@ export function createMergeFieldsFirestore() {
       refusal = null
       reads = 0
       offline = false
+      readGate?.open()
+      writeGate?.open()
+      readGate = null
+      writeGate = null
     },
   }
 }

@@ -171,6 +171,52 @@ describe('cloud driver', () => {
     expect(cloudDoc()).toMatchObject({ exportName: 'N', exportId: 'I' });
     expect(h.fs.reads - before).toBe(0);
   });
+
+  // Review -01: the SDK computes a read's snapshot before a setDoc it is handed later and delivers it
+  // after, so a read straddling the hand-off saw neither the pending entry nor the stored one.
+  it('a read issued before the hand-off and returned after it sees the entry', async () => {
+    seed('cloud');
+    const d = createFirestoreDriver('u');
+    await d.writePreferences([{ path: ['exportName'], value: 'typed' }]);
+    const releaseRead = h.fs.holdReads();
+    const read = d.loadPreferences();
+    const releaseWrite = h.fs.holdWrites();
+    d.flushPendingSaves(); // the hand-off: the entry leaves the pending list for setDoc
+    releaseRead();
+    expect(await read).toMatchObject({ exportName: 'typed', exportId: 'I' });
+    releaseWrite();
+    await new Promise(r => setTimeout(r, 0));
+    expect(await d.loadPreferences()).toMatchObject({ exportName: 'typed', exportId: 'I' });
+  });
+
+  it('entries in flight apply before the pending ones', async () => {
+    seed('cloud');
+    const d = createFirestoreDriver('u');
+    await d.writePreferences([{ path: ['exportName'], value: 'older' }, { path: ['exportId'], value: 'in flight' }]);
+    const releaseRead = h.fs.holdReads();
+    const read = d.loadPreferences();
+    const releaseWrite = h.fs.holdWrites();
+    d.flushPendingSaves();
+    await d.writePreferences([{ path: ['exportName'], value: 'newer' }]);
+    releaseRead();
+    expect(await read).toMatchObject({ exportName: 'newer', exportId: 'in flight' });
+    releaseWrite();
+  });
+
+  it('a write that fails leaves the in-flight list: a later read shows what is stored', async () => {
+    seed('cloud');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const d = createFirestoreDriver('u');
+    h.fs.refuseWhen(() => Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }));
+    await d.writePreferences([{ path: ['exportName'], value: 'refused' }]);
+    const releaseWrite = h.fs.holdWrites();
+    d.flushPendingSaves();
+    expect(await d.loadPreferences()).toMatchObject({ exportName: 'refused' }); // in flight: shown
+    releaseWrite();
+    await new Promise(r => setTimeout(r, 0));
+    expect(await d.loadPreferences()).toMatchObject({ exportName: 'E', exportId: 'I' });
+    expect(cloudDoc()).toEqual(SEED);
+  });
 });
 
 describe('local driver', () => {
