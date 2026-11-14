@@ -89,7 +89,8 @@ export default function ConnectPanel({
   };
 
   const codeReady = !!code && !codeLoading;
-  // Copy Code emits the canonical WORD-NNNN; the display uses an interpunct.
+  // Copy Code emits the canonical WORD-NNNNNNNNNN (a word and 10 digits); the display
+  // uses an interpunct.
   const displayCode = code ? code.replace('-', ' · ') : '';
 
   return (
@@ -111,22 +112,24 @@ export default function ConnectPanel({
               <button onClick={fetchCode} className="text-xs text-blue-600 hover:underline">Retry</button>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-lg tracking-wide text-gray-900 dark:text-gray-100">
-                {codeReady ? displayCode : '••••• · ••••'}
+            <div className="flex flex-col items-start gap-2">
+              <span className="font-mono text-lg tracking-wide whitespace-nowrap text-gray-900 dark:text-gray-100">
+                {codeReady ? displayCode : '••••• · ••••••••••'}
               </span>
-              <button
-                onClick={() => copy('code')} disabled={!codeReady}
-                className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 dark:bg-gray-800 dark:hover:bg-gray-700"
-              >
-                {copied === 'code' ? 'Copied!' : 'Copy Code'}
-              </button>
-              <button
-                onClick={() => copy('prompt')} disabled={!codeReady}
-                className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 dark:bg-gray-800 dark:hover:bg-gray-700"
-              >
-                {copied === 'prompt' ? 'Copied!' : 'Copy Prompt'}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => copy('code')} disabled={!codeReady}
+                  className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  {copied === 'code' ? 'Copied!' : 'Copy Code'}
+                </button>
+                <button
+                  onClick={() => copy('prompt')} disabled={!codeReady}
+                  className="px-2 py-1 text-xs rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  {copied === 'prompt' ? 'Copied!' : 'Copy Prompt'}
+                </button>
+              </div>
             </div>
           )}
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">

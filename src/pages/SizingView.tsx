@@ -12,6 +12,7 @@ import useSizingLayout from '../components/sizing/useSizingLayout';
 import { DEFAULT_SIZING_FILTER } from '../components/sizing/useSizingLayout';
 import type { SizingFilter } from '../components/sizing/useSizingLayout';
 import useSizingDrag from '../components/sizing/useSizingDrag';
+import { isMacPlatform, undoKeyAction } from '../lib/undoKeys';
 import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
 import SizingContent from '../components/sizing/SizingContent';
 import type { SizingCell } from '../components/sizing/SizingContent';
@@ -215,17 +216,11 @@ export default function SizingView() {
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (mod && e.key === 'z' && !e.shiftKey) {
+      const action = undoKeyAction(e, isMacPlatform(navigator.platform));
+      if (action) {
         e.preventDefault();
-        undo();
-      } else if (mod && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        redo();
-      } else if (mod && e.key === 'y') {
-        e.preventDefault();
-        redo();
+        if (action === 'undo') undo();
+        else redo();
       }
       if (e.key === 'Escape' && dragState?.isDragging) {
         cancelDrag();

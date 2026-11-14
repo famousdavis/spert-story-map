@@ -91,8 +91,9 @@ export async function callResendInvite(input: ResendInviteInput): Promise<Resend
 }
 
 /**
- * Mints a single-use WORD-NNNN pairing code for an AI session. `sessionId`
- * is the anonymous-session capability token created by useAiConnectivity.
+ * Mints a single-use WORD-NNNNNNNNNN pairing code (a word and 10 digits) for an
+ * AI session. `sessionId` is the anonymous-session capability token created by
+ * useAiConnectivity.
  */
 export async function callGeneratePairingCode(
   sessionId: string,

@@ -147,7 +147,7 @@ async function reopenPanel(container: HTMLElement) {
 const panelEl = () => [...document.querySelectorAll('div.fixed.inset-0')].find(d => d.querySelector('h2')?.textContent === 'AI session active') ?? null;
 const panelText = () => panelEl()?.textContent ?? null;
 const shownCode = () => panelEl()?.querySelector('.font-mono')?.textContent ?? '';
-const DOTS = '••••• · ••••';
+const DOTS = '••••• · ••••••••••';
 const THEME = { themeId: 'ai-theme-x', name: 'AI-built theme' };
 /** Hold every code request made from now until the returned function is called. */
 function holdCodes() {
