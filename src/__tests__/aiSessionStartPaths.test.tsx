@@ -91,6 +91,31 @@ describe('the failure paths', () => {
     expect([first, r2]).toEqual([true, false]);
     expect(sessionCreates()).toHaveLength(1);
   });
+
+  // Review -01: startSession returns early at S1 and S2 as well as in the create path,
+  // and the in-flight flag must be cleared on every one of them, or Connect AI refuses
+  // to start again until a reload.
+  it('after a start stopped by a failed read of its own session, the next start runs and resumes it', async () => {
+    server.seed('sA', { openProductId: 'A' });
+    setRecord('A', 'sA', 'Alpha');
+    server.failRead.add('sA');
+    const t = openTab({ A: mk('A', 'Alpha') }, 'A');
+    expect(await start(t, false)).toBe(false);
+    server.failRead.delete('sA');
+    expect(await start(t, false)).toBe(true);
+    expect(sid(t)).toBe('sA');
+  });
+
+  it('after a start stopped by a failed Read → off downgrade, the next start runs and resumes the same session', async () => {
+    const store = { A: mk('A', 'Alpha') };
+    const s = await sessionLeftInA(store, true);
+    server.failUpdate = 'unavailable';
+    const t = openTab(store, 'A');
+    expect(await start(t, false)).toBe(false);
+    server.failUpdate = null;
+    expect(await start(t, false)).toBe(true);
+    expect(sid(t)).toBe(s);
+  });
 });
 
 describe('the open product changes during an await', () => {
