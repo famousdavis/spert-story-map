@@ -40,7 +40,7 @@ MY PAIRING CODE IS: ${code}
 INSTRUCTIONS FOR YOU:
 Call resolve_session_code with my code, then call get_session_info to confirm which
 product is open.
-Call resolve_session_code exactly once — it is single-use and will fail if called again. The session remains active for the entire conversation after that first successful call. Do not call resolve_session_code again at any point.
+Call resolve_session_code once with my code; each code is single-use. If I later give you a new pairing code, call resolve_session_code once with it, then get_session_info and storymap_get_product: it may be a different product, so do not reuse ids from before.
 To build a new map from scratch: first ask me what product I am planning and which modeling
 approach fits best — do not write anything until I have answered. Then pick a build method:
 - FAST PATH (storymap_bulk_import): builds the entire map in one call, but is capped at

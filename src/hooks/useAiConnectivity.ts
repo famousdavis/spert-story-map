@@ -6,7 +6,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import {
   collection, doc, query, orderBy, where,
   onSnapshot, updateDoc, setDoc, deleteDoc,
-  serverTimestamp, getDoc, getDocs,
+  serverTimestamp, getDocs,
 } from 'firebase/firestore';
 import type { QuerySnapshot, DocumentData, DocumentSnapshot, FirestoreError } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -15,13 +15,19 @@ import { APP_VERSION } from '../lib/version';
 import type { Product, ProductUpdater } from '../types';
 import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
 import { selectSnapshotForWrite } from '../lib/aiSnapshot';
-import {
-  AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION,
-} from '../lib/aiConstants';
+import { AI_CONSENT_KEY, AI_CONSENT_VERSION } from '../lib/aiConstants';
 import { SESSIONS_COL } from '../lib/firestoreCollections';
 import {
   getLastSeq, setLastSeq, clearLastSeq, safeParseConsent, buildOpsQuery,
+  canResumeSession, isBoundProduct, isSessionDocLive, buildSwitchNotice,
 } from './aiConnectivityUtils';
+import {
+  readSessionRecord, writeSessionRecord, removeSessionRecord, anySessionRecorded, listRecordedSessions,
+} from '../lib/aiSessionRecords';
+import { holdSessionLock, queryLockedNames } from './aiSessionLock';
+import {
+  readSessionDoc, readOtherSessions, judgeOtherSessions, endOtherSessions, type OtherCandidate,
+} from './aiSessionSwitch';
 
 /** Firestore doc limit is 1 MB; 900 KB leaves headroom for metadata. */
 const SNAPSHOT_BYTE_LIMIT = 900_000;
@@ -32,12 +38,20 @@ export interface AiSessionState {
   aiConnected: boolean;
   consentRead: boolean;
   sessionId: string | null;
+  /**
+   * B15: the product `sessionId` belongs to (null with no session). The layout
+   * opens the Connect AI panel only while this is the open product.
+   */
+  boundProductId: string | null;
+  /** B15 R-4: the line naming an earlier session, shown until the panel closes or the session ends. */
+  notice: string | null;
 }
 export interface UseAiConnectivityResult {
   sessionState: AiSessionState;
   startSession: (consentRead: boolean) => Promise<boolean>;
   stopSession: () => Promise<void>;
   changePermissions: (consentRead: boolean) => Promise<boolean>;
+  dismissNotice: () => void;
 }
 
 // ── Hook ────────────────────────────────────────────────────────────────────
@@ -46,7 +60,7 @@ export function useAiConnectivity(
   updateProduct: (updater: ProductUpdater) => void,
 ): UseAiConnectivityResult {
   const [sessionState, setSessionState] = useState<AiSessionState>({
-    sessionActive: false, aiConnected: false, consentRead: false, sessionId: null,
+    sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, boundProductId: null, notice: null,
   });
   // ── Refs ──────────────────────────────────────────────────────────────────
   const productRef = useRef<Product | null>(product);
@@ -75,6 +89,10 @@ export function useAiConnectivity(
   const highestSeenSeqRef = useRef(0);
   const inNullWindowRef = useRef(false);
   const preNullWindowSeqRef = useRef(0);
+  // B15: the product the live session belongs to (set at go-live, cleared in
+  // localTeardown), and the release for this tab's Web Lock on the session.
+  const boundIdRef = useRef<string | null>(null);
+  const releaseLockRef = useRef<(() => void) | null>(null);
 
   useEffect(() => { productRef.current = product; }, [product]);
   useEffect(() => { consentReadRef.current = sessionState.consentRead; }, [sessionState.consentRead]);
@@ -88,6 +106,8 @@ export function useAiConnectivity(
     if (retryTimerOpsRef.current) { clearTimeout(retryTimerOpsRef.current); retryTimerOpsRef.current = null; }
     if (retryTimerSessionRef.current) { clearTimeout(retryTimerSessionRef.current); retryTimerSessionRef.current = null; }
     activeSessionIdRef.current = null;
+    boundIdRef.current = null;
+    releaseLockRef.current?.(); releaseLockRef.current = null;
     opRetryCountRef.current = 0;
     sessionRetryCountRef.current = 0;
     highestSeenSeqRef.current = 0;
@@ -101,6 +121,8 @@ export function useAiConnectivity(
     if (!consentReadRef.current) return; // single gate
     const sessionId = activeSessionIdRef.current;
     const p = productRef.current;
+    // B15 R-8: only the bound product's structure goes into its session.
+    if (!isBoundProduct(boundIdRef.current, p.id)) return;
     const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     // D8: degrade rather than skip. A skipped write leaves the PRIOR snapshot in
@@ -157,15 +179,25 @@ export function useAiConnectivity(
         }
         return;
       }
+      // B15 R-7: a batch applies only to the bound product, checked here and again
+      // inside the updater on the state actually being changed. The cursor moves
+      // inside the updater, and only when it applies the batch: the updater runs
+      // when React renders, so a cursor moved out here would skip a batch the
+      // updater then rejects, losing it for both products.
+      const bound = boundIdRef.current;
+      if (!isBoundProduct(bound, current.id)) return;
       const toProcess = candidates.filter(o => o.seq > getLastSeq(sessionId));
       if (!toProcess.length) return;
       const { safeOps, nextSeq } = computeSafePrefix(current, toProcess);
       if (!safeOps.length) return;
-      updateProduct((prev: Product) => safeOps.reduce((acc, opDoc) => {
-        try { return applyAiOp(acc, opDoc.op, opDoc.payload); }
-        catch { return acc; }
-      }, prev));
-      setLastSeq(sessionId, nextSeq);
+      updateProduct((prev: Product) => {
+        if (!isBoundProduct(bound, prev.id)) return prev;
+        setLastSeq(sessionId, nextSeq);
+        return safeOps.reduce((acc, opDoc) => {
+          try { return applyAiOp(acc, opDoc.op, opDoc.payload); }
+          catch { return acc; }
+        }, prev);
+      });
       scheduleSnapshot();
     };
     const onError = (err: FirestoreError) => {
@@ -191,8 +223,12 @@ export function useAiConnectivity(
   const makeSessionHandlers = useCallback((sessionId: string) => {
     const onNext = (snap: DocumentSnapshot) => {
       if (!snap.exists()) {
+        const bound = boundIdRef.current;
         localTeardown();
-        setSessionState({ sessionActive: false, aiConnected: false, consentRead: false, sessionId: null });
+        if (bound) removeSessionRecord(bound, sessionId);
+        setSessionState({
+          sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, boundProductId: null, notice: null,
+        });
         return;
       }
       sessionRetryCountRef.current = 0;
@@ -237,6 +273,21 @@ export function useAiConnectivity(
 
   useEffect(() => { resubscribeOpsRef.current = resubscribeOps; }, [resubscribeOps]);
   useEffect(() => { resubscribeSessionRef.current = resubscribeSession; }, [resubscribeSession]);
+
+  // ── B15 R-5: a product change under a live session ─────────────────────────
+  // A non-null id other than the bound one disconnects locally, as leaving the
+  // product pages does; the server session, its queue and its record stay with
+  // the bound product. A → null (a storage swap) is NOT a change: the D5 drain
+  // below must still apply the null window's ops when the bound product returns.
+  // Declared before the D5 effect so that effect then sees no live session.
+  useEffect(() => {
+    const id = product?.id;
+    if (!id || !activeSessionIdRef.current || !boundIdRef.current || id === boundIdRef.current) return;
+    localTeardown();
+    setSessionState(prev => ({
+      ...prev, sessionActive: false, aiConnected: false, sessionId: null, boundProductId: null, notice: null,
+    }));
+  }, [product?.id, localTeardown]);
 
   // ── Re-subscribe ops listener on product change (D5: null-window drain) ───
   useEffect(() => {
@@ -302,15 +353,19 @@ export function useAiConnectivity(
             payload: d.data().payload as unknown,
           }))
           .sort((a, b) => a.seq - b.seq);
-        if (drainOps.length && productRef.current) {
+        const bound = boundIdRef.current;
+        if (drainOps.length && productRef.current && isBoundProduct(bound, productRef.current.id)) {
           // nextSeq is product-state-independent for Phase-1 vocabulary (see
           // applyDrainOps JSDoc). Safe to compute against productRef.current
           // as a proxy for the functional update's seq value.
           const { nextSeq } = applyDrainOps(productRef.current, drainOps);
-          updateProduct(prev => applyDrainOps(prev, drainOps).product);
-          if (nextSeq > getLastSeq(sessionId)) {
-            setLastSeq(sessionId, nextSeq);
-          }
+          // B15 R-7: as in the listener, check again on the state being changed
+          // and move the cursor only when the drain applies.
+          updateProduct(prev => {
+            if (!isBoundProduct(bound, prev.id)) return prev;
+            if (nextSeq > getLastSeq(sessionId)) setLastSeq(sessionId, nextSeq);
+            return applyDrainOps(prev, drainOps).product;
+          });
         }
         resubscribeOps(sessionId);
       }).catch(() => {
@@ -338,7 +393,7 @@ export function useAiConnectivity(
           browserConnectedAt: serverTimestamp(),
           lastActiveAt: serverTimestamp(),
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          openProductId: productRef.current?.id ?? null,
+          openProductId: boundIdRef.current, // B15 R-6: the bound product, never the open one
         });
       } catch (err: unknown) {
         const code = (err as { code?: string })?.code;
@@ -358,7 +413,7 @@ export function useAiConnectivity(
     const onVisible = () => {
       if (!document.hidden && activeSessionIdRef.current && db) {
         updateDoc(doc(db, SESSIONS_COL, activeSessionIdRef.current), {
-          browserConnectedAt: serverTimestamp(), openProductId: productRef.current?.id ?? null,
+          browserConnectedAt: serverTimestamp(), openProductId: boundIdRef.current, // B15 R-6
         }).catch(() => {});
       }
     };
@@ -366,12 +421,16 @@ export function useAiConnectivity(
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
+  // B15: keep the bound product's recorded name current while its session is live.
   useEffect(() => {
-    if (!db || !activeSessionIdRef.current || !product?.id) return;
-    updateDoc(doc(db, SESSIONS_COL, activeSessionIdRef.current), {
-      openProductId: product.id, lastActiveAt: serverTimestamp(),
-    }).catch(() => {});
-  }, [product?.id]);
+    const bound = boundIdRef.current;
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionState.sessionActive || !bound || !sessionId || !product || product.id !== bound) return;
+    const rec = readSessionRecord(bound);
+    if (rec && rec.sessionId === sessionId && rec.productName !== product.name) {
+      writeSessionRecord(bound, { ...rec, productName: product.name });
+    }
+  }, [product, sessionState.sessionActive]);
 
   // ── Teardown (with server-side cleanup) ──────────────────────────────────────
   const teardown = useCallback(async (sessionId: string) => {
@@ -386,64 +445,66 @@ export function useAiConnectivity(
   }, [localTeardown]);
 
   // ── Start session ────────────────────────────────────────────────────────────
+  // B15: a session belongs to the product it was started in. Resume only that
+  // product's own recorded session (R-2); otherwise create one, and once it goes
+  // live end the other recorded sessions no other tab is using (R-3), naming the
+  // earlier product in one line (R-4). If the open product changes during any
+  // await, nothing goes live (R-9); a doc already created stays recorded.
   const startSession = useCallback(async (consentRead: boolean): Promise<boolean> => {
-    if (!db || !isFirebaseAvailable || !product) return false;
+    const database = db;
+    if (!database || !isFirebaseAvailable || !product) return false;
     if (startSessionInFlightRef.current) return false;
     startSessionInFlightRef.current = true;
+    const openId = product.id;
+    const openName = product.name;
+    const stillOpen = () => productRef.current?.id === openId;
+    // This tab's Web Lock on a new session, taken when its record is written and
+    // released in `finally` unless the session goes live.
+    let lockBeforeLive: (() => void) | null = null;
     try {
-      const storedId = localStorage.getItem(AI_SESSION_ID_KEY);
       const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      let sessionId: string;
+      const record = readSessionRecord(openId);
+      let sessionId: string = crypto.randomUUID();
       let prevConsentRead: boolean | null = null;
-      if (storedId) {
-        let snap: Awaited<ReturnType<typeof getDoc>>;
-        try { snap = await getDoc(doc(db, SESSIONS_COL, storedId)); }
+      let replaced: OtherCandidate | null = null;
+      if (record) {
+        let view: Awaited<ReturnType<typeof readSessionDoc>>;
+        try { view = await readSessionDoc(database, record.sessionId); }
         catch (err) { console.error('[AI] Session check failed:', err); return false; }
-        if (snap.exists()) {
-          const d = snap.data() as { expiresAt?: { toDate?: () => Date }; consentRead?: boolean } | undefined;
-          const storedExp = d?.expiresAt?.toDate?.();
-          if (!storedExp || storedExp >= new Date()) {
-            sessionId = storedId;
-            prevConsentRead = d?.consentRead ?? false;
-          } else {
-            clearLastSeq(storedId);
-            sessionId = crypto.randomUUID();
-          }
+        if (canResumeSession(true, view, openId, new Date())) {
+          sessionId = record.sessionId;
+          prevConsentRead = view.consentRead;
+        } else if (isSessionDocLive(view, new Date())) {
+          // Live but no longer naming this product: replace it, and end it below.
+          replaced = { sessionId: record.sessionId, productId: openId, productName: record.productName, startedAt: record.startedAt };
         } else {
-          clearLastSeq(storedId);
-          sessionId = crypto.randomUUID();
+          clearLastSeq(record.sessionId);
+          removeSessionRecord(openId, record.sessionId);
         }
-      } else {
-        sessionId = crypto.randomUUID();
+        if (!stillOpen()) return false;
       }
       // Write consent BEFORE the updateDoc so the intent is recorded locally.
       // On consent-downgrade abort below, we REVERT this write.
-      localStorage.setItem(AI_SESSION_ID_KEY, sessionId);
       localStorage.setItem(AI_CONSENT_KEY, JSON.stringify({
         version: AI_CONSENT_VERSION, date: new Date().toISOString(), write: true, read: consentRead,
       }));
-      activeSessionIdRef.current = sessionId;
-      const sessionRef = doc(db, SESSIONS_COL, sessionId);
+      const sessionRef = doc(database, SESSIONS_COL, sessionId);
       // ── Resume path ──────────────────────────────────────────────────────
       if (prevConsentRead !== null) {
         try {
           await updateDoc(sessionRef, {
-            consentRead, openProductId: product.id,
+            consentRead, openProductId: openId,
             lastActiveAt: serverTimestamp(), browserConnectedAt: serverTimestamp(), expiresAt: exp,
           });
           if (prevConsentRead && !consentRead) {
-            deleteDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
+            deleteDoc(doc(database, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
           }
         } catch (err: unknown) {
           const code = (err as { code?: string })?.code;
           if (code === 'not-found' || code === 'permission-denied') {
             clearLastSeq(sessionId);
+            removeSessionRecord(openId, sessionId);
             sessionId = crypto.randomUUID();
-            localStorage.setItem(AI_SESSION_ID_KEY, sessionId);
-            localStorage.setItem(AI_CONSENT_KEY, JSON.stringify({
-              version: AI_CONSENT_VERSION, date: new Date().toISOString(), write: true, read: consentRead,
-            }));
-            activeSessionIdRef.current = sessionId;
             prevConsentRead = null;
           } else if (prevConsentRead && !consentRead) {
             // Privilege downgrade (Read → off) failed transiently. Revert
@@ -451,29 +512,36 @@ export function useAiConnectivity(
             localStorage.setItem(AI_CONSENT_KEY, JSON.stringify({
               version: AI_CONSENT_VERSION, date: new Date().toISOString(), write: true, read: true,
             }));
-            if (db) {
-              deleteDoc(doc(db, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
-            }
+            deleteDoc(doc(database, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
             console.error('[AI] Consent downgrade write failed; aborting resume:', err);
-            activeSessionIdRef.current = null;
             return false;
           } else {
             console.error('[AI] Resume reconciliation failed; proceeding:', err);
           }
         }
+        if (!stillOpen()) return false;
       }
       // ── Fresh-create path ────────────────────────────────────────────────
-      if (prevConsentRead === null) {
+      const created = prevConsentRead === null;
+      let others: OtherCandidate[] = [];
+      let read: Awaited<ReturnType<typeof readOtherSessions>> = [];
+      if (created) {
+        // R-3: read every other recorded session BEFORE the create: all of them
+        // (sign-out uses the same list) except this product's own entry, which
+        // is in `replaced` when it is to be ended.
+        others = listRecordedSessions().filter(o => o.productId !== openId);
+        if (replaced) others.push(replaced);
+        read = await readOtherSessions(database, others);
+        if (!stillOpen()) return false;
         setLastSeq(sessionId, 0);
         // Reset D5 refs so a fresh session starts with no null-window state.
         highestSeenSeqRef.current = 0;
         inNullWindowRef.current = false;
         preNullWindowSeqRef.current = 0;
-        const freshRef = doc(db, SESSIONS_COL, sessionId);
         try {
-          await setDoc(freshRef, {
+          await setDoc(doc(database, SESSIONS_COL, sessionId), {
             createdAt: serverTimestamp(), lastActiveAt: serverTimestamp(), expiresAt: exp,
-            browserConnectedAt: serverTimestamp(), openProductId: product.id,
+            browserConnectedAt: serverTimestamp(), openProductId: openId,
             consentWrite: true, consentRead, lastSeq: 0, appVersion: APP_VERSION,
             appId: 'storymap',
             // aiLastSeenAt intentionally OMITTED: MCP-server-owned. Including
@@ -481,32 +549,60 @@ export function useAiConnectivity(
           });
         } catch (err) {
           console.error('[AI] Session creation failed:', err);
-          activeSessionIdRef.current = null;
           return false;
         }
+        writeSessionRecord(openId, { sessionId, productName: openName, startedAt: Date.now() });
+        if (!stillOpen()) return false;
+        // Review -07: hold the lock from the moment the record names this session,
+        // so another tab's R-3 that reads the record while this tab is still
+        // querying the locks finds the session in use and does not end it.
+        lockBeforeLive = holdSessionLock(sessionId);
       }
+      const lockedNames = created && read.length ? await queryLockedNames() : null;
+      if (!stillOpen()) return false;
+      // ── Go live ──────────────────────────────────────────────────────────
+      activeSessionIdRef.current = sessionId;
+      boundIdRef.current = openId;
+      releaseLockRef.current?.();
+      releaseLockRef.current = lockBeforeLive ?? holdSessionLock(sessionId);
+      lockBeforeLive = null;
+      const rec = readSessionRecord(openId);
+      if (rec?.sessionId === sessionId && rec.productName !== openName) writeSessionRecord(openId, { ...rec, productName: openName });
+      const judged = created ? judgeOtherSessions(read, lockedNames, new Date()) : [];
+      const notice = buildSwitchNotice(judged, openId, openName);
       resubscribeOps(sessionId);
       resubscribeSession(sessionId);
       startHeartbeat(sessionId);
-      setSessionState({ sessionActive: true, aiConnected: false, consentRead, sessionId });
+      setSessionState({ sessionActive: true, aiConnected: false, consentRead, sessionId, boundProductId: openId, notice });
       if (consentRead) scheduleSnapshot();
+      endOtherSessions(judged);
       return true;
     } finally {
+      lockBeforeLive?.(); // the session did not go live
       startSessionInFlightRef.current = false;
     }
   }, [product, resubscribeOps, resubscribeSession, startHeartbeat, scheduleSnapshot]);
 
-  // ── Stop session ─────────────────────────────────────────────────────────────
+  // ── Stop session (Disconnect) ─────────────────────────────────────────────────
+  // B15 R-11: ends this tab's live session only, never a stored one; consent is
+  // per browser and is removed only when no session is recorded any more.
   const stopSession = useCallback(async () => {
-    const sessionId = activeSessionIdRef.current ?? localStorage.getItem(AI_SESSION_ID_KEY);
+    const sessionId = activeSessionIdRef.current;
+    const bound = boundIdRef.current;
     if (sessionId) {
       clearLastSeq(sessionId);
+      if (bound) removeSessionRecord(bound, sessionId);
       await teardown(sessionId);
     }
-    localStorage.removeItem(AI_SESSION_ID_KEY);
-    localStorage.removeItem(AI_CONSENT_KEY);
-    setSessionState({ sessionActive: false, aiConnected: false, consentRead: false, sessionId: null });
+    if (!anySessionRecorded()) localStorage.removeItem(AI_CONSENT_KEY);
+    setSessionState({
+      sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, boundProductId: null, notice: null,
+    });
   }, [teardown]);
+
+  const dismissNotice = useCallback(() => {
+    setSessionState(prev => (prev.notice ? { ...prev, notice: null } : prev));
+  }, []);
 
   // ── Change permissions ───────────────────────────────────────────────────────
   const changePermissions = useCallback(async (consentRead: boolean): Promise<boolean> => {
@@ -535,5 +631,5 @@ export function useAiConnectivity(
 
   useEffect(() => { return () => localTeardown(); }, [localTeardown]);
 
-  return { sessionState, startSession, stopSession, changePermissions };
+  return { sessionState, startSession, stopSession, changePermissions, dismissNotice };
 }

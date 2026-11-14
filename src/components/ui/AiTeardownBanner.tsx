@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   getPendingAiTeardownSessionId,
+  getPendingSessionEnds,
   retryPendingAiTeardown,
   clearPendingAiTeardown,
   AI_TEARDOWN_CHANGED_EVENT,
@@ -20,6 +21,10 @@ import {
  * so in the common offline-then-online case it clears itself with no user
  * action. The message explains what the paired AI can still do and how to end
  * the session for sure.
+ *
+ * B15: the same retry also ends the sessions parked on the silent list (ended
+ * because another product's session started, server not reached). That list
+ * never shows the banner, which speaks about signing out.
  */
 export default function AiTeardownBanner() {
   const [pending, setPending] = useState<boolean>(
@@ -32,7 +37,7 @@ export default function AiTeardownBanner() {
   }, []);
 
   const retry = useCallback(async () => {
-    if (!getPendingAiTeardownSessionId()) { refresh(); return; }
+    if (!getPendingAiTeardownSessionId() && !getPendingSessionEnds().length) { refresh(); return; }
     setRetrying(true);
     try {
       await retryPendingAiTeardown();

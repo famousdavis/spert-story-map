@@ -83,8 +83,9 @@ describe('the Connect AI copy prompt (D13, R29, R47)', () => {
     expect(flat.startsWith(`I want to build a story map for a product using SPERT Story Map. ${definition} ${callIt}`)).toBe(true);
   });
 
-  it('names storymap_get_product 19 times and storymap_get_project never, and says "project" nowhere', () => {
-    expect(prompt.match(/storymap_get_product/g)).toHaveLength(19);
+  // 20 since v0.55.11: B15's R-10 sentence (a new pairing code may be another product) names it once more.
+  it('names storymap_get_product 20 times and storymap_get_project never, and says "project" nowhere', () => {
+    expect(prompt.match(/storymap_get_product/g)).toHaveLength(20);
     expect(prompt.match(/storymap_get_project/g)).toBeNull();
     expect(flat.match(/\bprojects?\b/gi)).toBeNull();
   });

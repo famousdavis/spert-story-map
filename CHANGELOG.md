@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 0.55.11 (2026-11-13)
+
+### Fixed
+
+- **Changes your AI sent for one product no longer land in another product.** A Connect AI session now stays with the product it was started in. Before this version, pressing Connect AI in a second product, or going back two pages in the browser's history to another product, could apply the AI's waiting changes to whichever product was open.
+- **Pressing Connect AI in one product when your session was started in another now starts a new session for the product you are in.** The panel names the earlier product in one line, and says when changes the AI sent for it were not applied. Story Map ends the earlier session unless another tab is still using it; then the line says it is still open in another tab. Changes waiting for the earlier product are applied only if you go back to it and press Connect AI there before pressing it in another product.
+- **Moving to another product in the same tab while a session is live disconnects it in that tab**, as leaving the product pages already did. The session and its waiting changes stay with the first product.
+- **Disconnect ends only this tab's session. Signing out ends the sessions this browser holds for all your products**, and one started before this version.
+
+### Changed
+
+- **A Connect AI session started before this version can't be continued.** The next time you press Connect AI, Story Map starts a new session, so your AI needs one new code, and changes it had waiting in the old session are not applied.
+- **Switching products in one AI conversation needs a new code each time.** The copy prompt now tells the AI that a new code may be for a different product, and to read the product again before going on.
+- **After you upload local products to cloud storage, pressing Connect AI in one of them starts a new session.**
+
 ## Version 0.55.10 (2026-11-13)
 
 ### Changed
