@@ -16,7 +16,8 @@ export const AI_TEARDOWN_PENDING_KEY = 'spert_ai_teardown_pending';
 // B15: one record per product, `spert_ai_session:{productId}` →
 // `{ sessionId, productName, startedAt }`. AI_SESSION_ID_KEY above is no longer
 // written; it is read only to find a session from before v0.55.11 (a "legacy"
-// session), which is never resumed and is ended when another session starts.
+// session), which is never resumed and is ended when another session starts,
+// unless it is in use.
 export const AI_SESSION_KEY_PREFIX = 'spert_ai_session:';
 // B15: sessions Story Map tried to end when another product's session started,
 // and could not reach the server for. A JSON list of ids, retried silently by

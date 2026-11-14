@@ -6,7 +6,7 @@
  * B15 R-3: a tab with a live Connect AI session holds a SHARED Web Lock named
  * for that session, from going live until its local teardown. Another tab asks
  * `navigator.locks.query()` whether anyone holds it. No clock: a closed tab
- * releases its locks, and a frozen one keeps them.
+ * releases its locks.
  */
 export const sessionLockName = (sessionId: string) => `spert-ai:${sessionId}`;
 
