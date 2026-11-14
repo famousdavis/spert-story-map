@@ -2,6 +2,8 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
+import type { PrefEntry } from '../lib/prefEntries';
+
 /**
  * Core domain types for SPERT Story Map.
  *
@@ -250,7 +252,11 @@ export interface StorageDriver {
   replaceProduct(product: Product): Promise<void>;
   deleteProduct(id: string): Promise<void>;
   loadPreferences(): Promise<UserSettings>;
-  savePreferences(prefs: UserSettings): Promise<void>;
+  /**
+   * Write settings field by field (v0.55.14): each entry is a field path and a value, a removal
+   * being `REMOVE` or `undefined` (`lib/prefEntries.ts`). Never a whole settings object.
+   */
+  writePreferences(entries: readonly PrefEntry[]): Promise<void>;
   getWorkspaceId(): string;
   /**
    * Subscribe to remote document changes for a single product.
@@ -327,7 +333,6 @@ export interface UserSettings {
   exportName?: string;
   exportId?: string;
   projectOrder?: string[];
-  _hasUploadedToCloud?: boolean;
   suppressLocalStorageWarning?: boolean;
   [key: string]: unknown;
 }

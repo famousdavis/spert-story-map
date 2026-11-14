@@ -45,7 +45,7 @@ function makeDriver(overrides: Partial<StorageDriver> = {}): StorageDriver {
     replaceProduct: vi.fn().mockResolvedValue(undefined),
     deleteProduct: vi.fn().mockResolvedValue(undefined),
     loadPreferences: vi.fn().mockResolvedValue({}),
-    savePreferences: vi.fn().mockResolvedValue(undefined),
+    writePreferences: vi.fn().mockResolvedValue(undefined),
     getWorkspaceId: vi.fn().mockReturnValue('ws-1'),
     onProductChange: vi.fn().mockReturnValue(() => {}),
     onProductSaved: vi.fn().mockReturnValue(() => {}),

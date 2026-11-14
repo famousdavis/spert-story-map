@@ -6,8 +6,8 @@
 
 /**
  * Reordering the Projects dashboard (v0.55.0, O15): a project dropped on a tile takes that tile's
- * place, in both directions, and the order is saved as before (`loadPreferences`, then
- * `savePreferences({ ...prefs, projectOrder })`). Through the real page on the real local driver.
+ * place, in both directions, and the order is saved (since v0.55.14 as the one field
+ * `projectOrder`, `writePreferences`). Through the real page on the real local driver.
  *
  * Until v0.55.0 a drop inserted BEFORE the hovered card: with a box drawn round a whole tile that
  * broke every downward drag by one place, a drop on the next tile did nothing, nothing could reach
@@ -112,6 +112,9 @@ describe('a dropped project takes the boxed tile\'s place, and the order is save
       for (let onto = 0; onto < 4; onto += 1) {
         if (from === onto) continue;
         cleanup();
+        // A page load starts with nothing pending; since v0.55.14 a read applies this tab's
+        // pending settings (R-4), so the previous round's order must land before the clear.
+        flushPendingSaves();
         localStorage.clear();
         await showFour();
         await dragOnto(NAMES[from]!, NAMES[onto]!);

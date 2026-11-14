@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
 import { migrateLocalToCloud, testCloudConnection } from '../../lib/migration';
-import { loadProductIndex, clearAllLocalProducts, loadPreferences, savePreferences } from '../../lib/storage';
+import { loadProductIndex, clearAllLocalProducts } from '../../lib/storage';
 import { exportAllProducts } from '../../lib/importExport';
 import { signOutCleanup } from '../../lib/signOutCleanup';
 import { Section } from '../ui/Section';
@@ -40,11 +40,6 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   // banner must reflect the anonymous-session cache, not the signed-in
   // user's per-uid local cache (which is empty for fresh sign-ins).
   const localCount = mode === 'local' ? loadProductIndex('local').length : 0;
-  // Preferences DO follow the active namespace — for a signed-in user this
-  // reads their per-uid prefs (which is where _hasUploadedToCloud is
-  // recorded after their first migration).
-  const prefs = loadPreferences();
-  const hasUploadedBefore = !!prefs._hasUploadedToCloud;
 
   const handleModeSwitch = async (newMode: StorageMode) => {
     if (newMode === mode) return;
@@ -76,9 +71,6 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
           return;
         }
         switchMode('cloud');
-        if (!hasUploadedBefore) {
-          savePreferences({ ...prefs, _hasUploadedToCloud: true });
-        }
       } finally {
         setMigrating(false);
       }
@@ -97,7 +89,6 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
     try {
       const result = await migrateLocalToCloud(user.uid);
       switchMode('cloud');
-      savePreferences({ ...loadPreferences(), _hasUploadedToCloud: true });
 
       const msg = `Uploaded ${result.uploaded} product${result.uploaded !== 1 ? 's' : ''} to cloud${result.skipped ? ` (${result.skipped} already in cloud)` : ''}.`;
       setMigrateResult(msg);
@@ -267,7 +258,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
         onClose={() => setShowUploadConfirm(false)}
         onConfirm={confirmUpload}
         title="Upload Local Products"
-        message={`You have ${localCount} local product${localCount !== 1 ? 's' : ''}. Upload them to cloud?${hasUploadedBefore ? ' Products already in cloud will be skipped.' : ''}`}
+        message={`You have ${localCount} local product${localCount !== 1 ? 's' : ''}. Upload them to cloud?`}
         confirmLabel="Upload"
         danger={false}
       />

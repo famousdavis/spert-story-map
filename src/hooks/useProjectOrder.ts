@@ -47,15 +47,11 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
     return sortByOrder(ids.map(id => ({ id })), orderRef.current).map(x => x.id);
   }, []);
 
-  /** Show and persist an order, as a drop always has: load the preferences, then save them. */
+  /** Show and persist an order. Writes `projectOrder` alone, with no read first (v0.55.14). */
   const saveOrder = useCallback((ids: string[]) => {
     orderRef.current = ids;
     setProjectOrder(ids);
-    if (driver) {
-      driver.loadPreferences().then(prefs => {
-        driver.savePreferences({ ...prefs, projectOrder: ids });
-      });
-    }
+    driver?.writePreferences([{ path: ['projectOrder'], value: ids }]);
   }, [driver]);
 
   /** A refresh is starting; returns its number, to hand back to `listed`. */

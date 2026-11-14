@@ -74,13 +74,22 @@ export function StorageProvider({ children }: { children: React.ReactNode }) {
   // driver reference) can fire cancelPendingSaves + tearDownListeners
   // before credential revocation, regardless of which sign-out path is
   // taken (UI button, ToS-stale, ToS-error).
+  //
+  // Leaving the page flushes pending writes wherever the app is (v0.55.14, O32): the Products
+  // page, where the settings writers run, had no flush. useProduct keeps its own (and its flush on
+  // a driver swap); a second flush finds nothing pending. A swap still CANCELS here.
   useEffect(() => {
     if (!driver) return;
     registerDriverCleanup(async () => {
       driver.cancelPendingSaves();
       driver.tearDownListeners();
     });
+    const flush = () => driver.flushPendingSaves();
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
     return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
       driver.cancelPendingSaves();
       driver.tearDownListeners();
       clearDriverCleanup();

@@ -63,6 +63,15 @@ vi.mock('firebase/firestore', () => ({
     }
     return { forEach: (fn: (d: (typeof docs)[number]) => void) => docs.forEach(fn), docs, empty: docs.length === 0 };
   }),
+  // v0.55.14: the upload reads the cloud settings and product list from the server first (R-6).
+  getDocFromServer: vi.fn(async (ref) => {
+    const data = mockDocs.get(ref._path);
+    return { exists: () => !!data, data: () => data || null, id: ref._path.split('/').pop() };
+  }),
+  getDocsFromServer: vi.fn(async () => ({ docs: [], forEach: () => {}, empty: true })),
+  FieldPath: class { segments: string[]; constructor(...s: string[]) { this.segments = s; } },
+  // the upload's settings write is built by buildMaskedWrite, which takes the removal sentinel
+  deleteField: vi.fn(() => ({ _deleteField: true })),
   collection: vi.fn((_db, name) => ({ _name: name })),
   query: vi.fn((...args) => args[0]),
   where: vi.fn(() => null),
@@ -207,8 +216,9 @@ describe('migrateLocalToCloud', () => {
 
     await migrateLocalToCloud('user-1');
 
+    // v0.55.14 (R-6, R64): one masked write, the tile order plus a name the cloud lacks.
     const prefsCall = findSetDocCall('spertstorymap_settings');
-    expect(prefsCall).toEqual({ exportName: 'Alice' });
+    expect(prefsCall).toEqual({ projectOrder: [], exportName: 'Alice' });
   });
 
   it('leaves local data in place as backup', async () => {

@@ -14,7 +14,7 @@ vi.mock('../lib/storage', () => ({
   saveProductImmediate: vi.fn(),
   deleteProduct: vi.fn(),
   loadPreferences: vi.fn(() => ({ exportName: 'Alice' })),
-  savePreferences: vi.fn(),
+  writePreferences: vi.fn(),
   getWorkspaceId: vi.fn(() => 'ws-uuid-123'),
   flushPendingSaves: vi.fn(),
   cancelPendingSaves: vi.fn(),
@@ -126,11 +126,11 @@ describe('createLocalStorageDriver', () => {
     expect(result).toEqual({ exportName: 'Alice' });
   });
 
-  it('savePreferences delegates', () => {
+  it('writePreferences delegates', () => {
     const driver = createLocalStorageDriver();
-    const prefs = { exportName: 'Bob' };
-    driver.savePreferences(prefs);
-    expect(storage.savePreferences).toHaveBeenCalledWith(prefs);
+    const entries = [{ path: ['exportName'], value: 'Bob' }];
+    driver.writePreferences(entries);
+    expect(storage.writePreferences).toHaveBeenCalledWith(entries);
   });
 
   it('getWorkspaceId delegates', () => {

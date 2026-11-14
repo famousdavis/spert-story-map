@@ -11,7 +11,7 @@
  */
 
 import {
-  doc, getDoc, setDoc,
+  doc, getDoc, setDoc, getDocFromServer, getDocsFromServer, FieldPath, deleteField,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Firestore } from 'firebase/firestore';
@@ -21,6 +21,10 @@ import {
 } from './storage';
 import { sanitizeForFirestore } from './firestoreUtils';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
+import { projectsMembersQuery } from './projectsMembersQuery';
+import { sortByOrder } from './sortByOrder';
+import { addEntry, buildMaskedWrite, type PrefEntry } from './prefEntries';
+import type { UserSettings } from '../types';
 
 /** Narrow the module-level `db` — see the identical helper in firestoreDriver. */
 function requireDb(): Firestore {
@@ -44,20 +48,32 @@ export async function testCloudConnection(uid: string): Promise<boolean> {
 /**
  * Upload all local products to Firestore.
  *
- * Collision handling:
- * - If a doc with the same ID exists AND user is a member → skip
- * - If a doc exists but user is NOT a member → generate new ID
- * - If doc doesn't exist → proceed
+ * Collision handling, by a get of the cloud document with the product's id:
+ * - a product the user is a member of → skipped;
+ * - anyone else's product → a new id;
+ * - no such document → the rules refuse a get of a missing document (`allow get` reads
+ *   `resource.data.members`), so it gets a new id too.
  *
  * Local data is left in place as a backup.
  *
  * @returns {{ uploaded: number, skipped: number }}
  */
 export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: number; skipped: number }> {
+  // v0.55.14 (R63): the cloud's tile order and settings, read BEFORE any product is written and
+  // from the server: offline the members query resolves empty from cache without throwing, which
+  // would put every uploaded product ahead of the cloud's. A failed read stops the upload here.
+  const settingsRef = doc(requireDb(), SETTINGS_COL, uid);
+  const settingsSnap = await getDocFromServer(settingsRef);
+  const cloudPrefs: UserSettings = settingsSnap.exists() ? settingsSnap.data() : {};
+  const cloudList = await getDocsFromServer(projectsMembersQuery(requireDb(), uid));
+  const cloudTiles = sortByOrder(cloudList.docs.map(d => ({ id: d.id })), cloudPrefs.projectOrder).map(t => t.id);
+
   // Explicit 'local' overrides — migration always reads from the anonymous-
   // session namespace. At sign-in the active namespace becomes the uid, but
   // the user's pre-sign-in projects live at rp:local:*, not rp:{uid}:*.
   const index = loadProductIndex('local');
+  const localPrefs = loadPreferences('local');
+  const targetIds = new Map<string, string>();
   let uploaded = 0;
   let skipped = 0;
 
@@ -106,16 +122,40 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
       updatedAt: new Date().toISOString(),
     });
 
+    targetIds.set(entry.id, id);
     uploaded++;
   }
 
-  // Migrate preferences — read from the anonymous-session namespace, since
-  // they were captured before the user signed in.
-  const prefs = loadPreferences('local');
-  if (prefs && Object.keys(prefs).length > 0) {
-    await setDoc(doc(requireDb(), SETTINGS_COL, uid), sanitizeForFirestore(prefs), { merge: true });
-  }
-
+  await setDoc(settingsRef, ...uploadedSettings(cloudPrefs, localPrefs, cloudTiles, sortByOrder(index, localPrefs.projectOrder), targetIds));
   return { uploaded, skipped };
+}
+
+const isBlank = (v: unknown) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
+
+/**
+ * The upload's one masked settings write (R63, R64). The tile order: the cloud's tiles as the
+ * dashboard shows them, then the uploaded products in this browser's tile order. The export name,
+ * identifier and caution switch: this browser's value only where the cloud has none, so the cloud
+ * keeps every value it has. Masked, so nothing else in the document changes. Built as entries
+ * through the drivers' own rules (`addEntry`, `buildMaskedWrite`), so one mask builder serves both.
+ */
+function uploadedSettings(
+  cloud: UserSettings, local: UserSettings, cloudTiles: string[],
+  localTiles: { id: string }[], targetIds: Map<string, string>,
+): [Record<string, unknown>, { mergeFields: FieldPath[] }] {
+  const order = [...cloudTiles];
+  for (const tile of localTiles) {
+    const id = targetIds.get(tile.id);
+    if (id !== undefined && !order.includes(id)) order.push(id);
+  }
+  let entries: PrefEntry[] = addEntry([], { path: ['projectOrder'], value: order });
+  for (const key of ['exportName', 'exportId'] as const) {
+    if (isBlank(cloud[key]) && !isBlank(local[key])) entries = addEntry(entries, { path: [key], value: local[key] });
+  }
+  if (cloud.suppressLocalStorageWarning === undefined && typeof local.suppressLocalStorageWarning === 'boolean') {
+    entries = addEntry(entries, { path: ['suppressLocalStorageWarning'], value: local.suppressLocalStorageWarning });
+  }
+  const { data, fields } = buildMaskedWrite(entries, sanitizeForFirestore, deleteField, segs => new FieldPath(...segs));
+  return [data, { mergeFields: fields }];
 }
 

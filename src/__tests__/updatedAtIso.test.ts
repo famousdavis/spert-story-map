@@ -41,6 +41,10 @@ vi.mock('firebase/firestore', () => ({
   where: (...args: unknown[]) => ({ args }),
   getDoc: (...a: unknown[]) => mockGetDoc(...a),
   getDocs: (...a: unknown[]) => mockGetDocs(...a),
+  // v0.55.14: the upload reads the cloud settings and product list from the server first (R-6).
+  getDocFromServer: async () => ({ exists: () => false, data: () => undefined }),
+  getDocsFromServer: async () => ({ docs: [] }),
+  FieldPath: class { segments: string[]; constructor(...s: string[]) { this.segments = s; } },
   setDoc: (...a: unknown[]) => mockSetDoc(...a),
   updateDoc: (...a: unknown[]) => mockUpdateDoc(...a),
   deleteDoc: vi.fn().mockResolvedValue(undefined),
