@@ -98,4 +98,20 @@ describe('the writes', () => {
     expect(record('A')?.sessionId).toBe(fresh);
     expect(consent()).toMatchObject({ read: false });
   });
+
+  // Review -02: a resume write the rules refuse is treated as a doc that went.
+  it('a session whose resume write is refused (permission-denied) is replaced by a new one, with the new consent', async () => {
+    const store = { A: mk('A', 'Alpha') };
+    const s = await sessionLeftInA(store, true);
+    localStorage.setItem(SEQ + s, '4');
+    server.failUpdate = 'permission-denied';
+    const t = openTab(store, 'A');
+    expect(await start(t, false)).toBe(true);
+    const fresh = sid(t)!;
+    expect(fresh).not.toBe(s);
+    expect(sessionCreates().map(c => c.segs[1])).toEqual([fresh]);
+    expect(localStorage.getItem(SEQ + s)).toBeNull();
+    expect(record('A')?.sessionId).toBe(fresh);
+    expect(consent()).toMatchObject({ read: false });
+  });
 });
