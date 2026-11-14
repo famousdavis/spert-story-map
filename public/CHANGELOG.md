@@ -12,7 +12,7 @@
 
 ### Changed
 
-- **The upload prompt no longer says that products already in the cloud will be skipped.** It was not true: every uploaded product is added as a new product.
+- **The upload prompt no longer says that products already in the cloud will be skipped.** It was true only of a product imported from a file exported from one of your cloud products, which keeps its id; a product uploaded before is added again as a new product.
 
 ## Version 0.55.13 (2026-11-14)
 
