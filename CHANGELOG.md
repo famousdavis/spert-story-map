@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.55.14 (2026-11-14)
+
+### Fixed
+
+- **Changes to two different settings no longer undo each other**, whether they are made close together or in two tabs: for example the export name and the order of the product tiles. Before this version, a settings dialog left open in one tab put the tile order back when you typed in it after reordering in another tab, and a reorder made just after typing a name could drop the name. Settings are now saved one at a time, so a save changes only the setting it is for.
+- **After a settings read made offline, a change no longer clears the other settings.** Before this version, reordering the product tiles after opening the Products page offline cleared the export name and identifier once the app was back online, and typing in the settings dialog opened offline cleared the tile order.
+- **Uploading local products to the cloud keeps the cloud's tile order and adds the uploaded products after it**, in the order this browser showed them. It also keeps an export name and identifier the cloud already has; a blank one is filled from this browser. Before this version the upload replaced the cloud's tile order with this browser's, which named none of the uploaded products, and replaced the cloud's export name and identifier. The upload now stops before writing anything if it cannot read the cloud's products and settings from the server.
+- **Leaving or closing the page from the Products page now writes a setting changed in the moment before**, as leaving a product's pages already did.
+- The same setting changed in two tabs (two reorders) still keeps the last change. A tab still open on an earlier version can still overwrite the settings until it is reloaded.
+
+### Changed
+
+- **The upload prompt no longer says that products already in the cloud will be skipped.** It was not true: every uploaded product is added as a new product.
+
 ## Version 0.55.13 (2026-11-14)
 
 ### Changed
