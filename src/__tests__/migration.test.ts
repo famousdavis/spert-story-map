@@ -70,6 +70,8 @@ vi.mock('firebase/firestore', () => ({
   }),
   getDocsFromServer: vi.fn(async () => ({ docs: [], forEach: () => {}, empty: true })),
   FieldPath: class { segments: string[]; constructor(...s: string[]) { this.segments = s; } },
+  // the upload's settings write is built by buildMaskedWrite, which takes the removal sentinel
+  deleteField: vi.fn(() => ({ _deleteField: true })),
   collection: vi.fn((_db, name) => ({ _name: name })),
   query: vi.fn((...args) => args[0]),
   where: vi.fn(() => null),

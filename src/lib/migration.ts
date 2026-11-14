@@ -11,7 +11,7 @@
  */
 
 import {
-  doc, getDoc, setDoc, getDocFromServer, getDocsFromServer, FieldPath,
+  doc, getDoc, setDoc, getDocFromServer, getDocsFromServer, FieldPath, deleteField,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Firestore } from 'firebase/firestore';
@@ -23,6 +23,7 @@ import { sanitizeForFirestore } from './firestoreUtils';
 import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 import { projectsMembersQuery } from './projectsMembersQuery';
 import { sortByOrder } from './sortByOrder';
+import { addEntry, buildMaskedWrite, type PrefEntry } from './prefEntries';
 import type { UserSettings } from '../types';
 
 /** Narrow the module-level `db` — see the identical helper in firestoreDriver. */
@@ -134,7 +135,8 @@ const isBlank = (v: unknown) => v === undefined || v === null || (typeof v === '
  * The upload's one masked settings write (R63, R64). The tile order: the cloud's tiles as the
  * dashboard shows them, then the uploaded products in this browser's tile order. The export name,
  * identifier and caution switch: this browser's value only where the cloud has none, so the cloud
- * keeps every value it has. Masked, so nothing else in the document changes.
+ * keeps every value it has. Masked, so nothing else in the document changes. Built as entries
+ * through the drivers' own rules (`addEntry`, `buildMaskedWrite`), so one mask builder serves both.
  */
 function uploadedSettings(
   cloud: UserSettings, local: UserSettings, cloudTiles: string[],
@@ -145,14 +147,14 @@ function uploadedSettings(
     const id = targetIds.get(tile.id);
     if (id !== undefined && !order.includes(id)) order.push(id);
   }
-  const data: Record<string, unknown> = { projectOrder: order };
+  let entries: PrefEntry[] = addEntry([], { path: ['projectOrder'], value: order });
   for (const key of ['exportName', 'exportId'] as const) {
-    if (isBlank(cloud[key]) && !isBlank(local[key])) data[key] = local[key];
+    if (isBlank(cloud[key]) && !isBlank(local[key])) entries = addEntry(entries, { path: [key], value: local[key] });
   }
   if (cloud.suppressLocalStorageWarning === undefined && typeof local.suppressLocalStorageWarning === 'boolean') {
-    data.suppressLocalStorageWarning = local.suppressLocalStorageWarning;
+    entries = addEntry(entries, { path: ['suppressLocalStorageWarning'], value: local.suppressLocalStorageWarning });
   }
-  const clean = sanitizeForFirestore(data);
-  return [clean, { mergeFields: Object.keys(clean).map(k => new FieldPath(k)) }];
+  const { data, fields } = buildMaskedWrite(entries, sanitizeForFirestore, deleteField, segs => new FieldPath(...segs));
+  return [data, { mergeFields: fields }];
 }
 
