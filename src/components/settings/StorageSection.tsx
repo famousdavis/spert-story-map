@@ -6,8 +6,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
-import { migrateLocalToCloud, testCloudConnection } from '../../lib/migration';
-import { loadProductIndex, clearAllLocalProducts } from '../../lib/storage';
+import { migrateLocalToCloud, testCloudConnection, type UploadOutcome } from '../../lib/migration';
+import { loadProductIndex, removeLocalProducts } from '../../lib/storage';
+import { uploadMessage, clearOfferMessage, UPLOAD_STOPPED, STATUS_CLASS, type StorageMessage } from './uploadMessage';
 import { exportAllProducts } from '../../lib/importExport';
 import { signOutCleanup } from '../../lib/signOutCleanup';
 import { Section } from '../ui/Section';
@@ -29,7 +30,8 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   const [showUploadConfirm, setShowUploadConfirm] = useState(false);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [migrating, setMigrating] = useState(false);
-  const [migrateResult, setMigrateResult] = useState<string | null>(null);
+  const [migrateResult, setMigrateResult] = useState<StorageMessage | null>(null);
+  const [lastUpload, setLastUpload] = useState<UploadOutcome | null>(null);
   const [exporting, setExporting] = useState(false);
   const tos = useSignInWithTosGate();
 
@@ -67,7 +69,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
       try {
         const reachable = await testCloudConnection(user.uid);
         if (!reachable) {
-          setMigrateResult('Could not connect to cloud storage. Please check your internet connection and try again.');
+          setMigrateResult({ status: 'error', text: 'Could not connect to cloud storage. Please check your internet connection and try again.' });
           return;
         }
         switchMode('cloud');
@@ -89,29 +91,25 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
     try {
       const result = await migrateLocalToCloud(user.uid);
       switchMode('cloud');
-
-      const msg = `Uploaded ${result.uploaded} product${result.uploaded !== 1 ? 's' : ''} to cloud${result.skipped ? ` (${result.skipped} already in cloud)` : ''}.`;
-      setMigrateResult(msg);
-
-      // Offer to clear local data after successful upload
-      if (result.uploaded > 0 || result.skipped > 0) {
-        setShowCleanupConfirm(true);
-      }
+      setMigrateResult(uploadMessage(result));
+      // R72: offered only when something was uploaded, and it removes only what was.
+      setLastUpload(result);
+      if (clearOfferMessage(result) !== null) setShowCleanupConfirm(true);
     } catch (e) {
       console.error('Migration failed:', e instanceof Error ? e.message : 'Unknown error');
-      setMigrateResult('Upload failed. Please try again.');
+      setMigrateResult(UPLOAD_STOPPED);
     } finally {
       setMigrating(false);
     }
   };
 
   const confirmCleanup = () => {
-    // Explicit 'local' override — confirmCleanup clears the anonymous-session
-    // cache that was just migrated to cloud, not the user's per-uid local
-    // namespace (which is unrelated and should not be touched).
-    clearAllLocalProducts('local');
+    // Explicit 'local' override — the upload read the anonymous-session store, not the user's
+    // per-uid local namespace (which is unrelated and should not be touched). Only the products
+    // this upload sent are removed (v0.55.15, R72); skipped and unreadable ones stay.
+    removeLocalProducts(lastUpload?.uploadedIds ?? [], 'local');
     setShowCleanupConfirm(false);
-    setMigrateResult(prev => prev + ' Local data cleared.');
+    setMigrateResult(prev => prev && { ...prev, text: `${prev.text} Copies of the uploaded products were cleared from this browser.` });
   };
 
   const handleDownloadAll = async () => {
@@ -119,10 +117,10 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
     setExporting(true);
     try {
       const result = await exportAllProducts(driver, user?.uid);
-      setMigrateResult(`Downloaded ${result.exported} product${result.exported !== 1 ? 's' : ''} as JSON.`);
+      setMigrateResult({ status: 'ok', text: `Downloaded ${result.exported} product${result.exported !== 1 ? 's' : ''} as JSON.` });
     } catch (e) {
       console.error('Export failed:', e instanceof Error ? e.message : 'Unknown error');
-      setMigrateResult('Export failed. Please try again.');
+      setMigrateResult({ status: 'error', text: 'Export failed. Please try again.' });
     } finally {
       setExporting(false);
     }
@@ -170,8 +168,8 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
 
       {/* Migration result */}
       {migrateResult && !migrating && (
-        <p className={`text-xs mb-3 ${migrateResult.includes('failed') ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-          {migrateResult}
+        <p className={`text-xs mb-3 ${STATUS_CLASS[migrateResult.status]}`}>
+          {migrateResult.text}
         </p>
       )}
 
@@ -269,7 +267,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
         onClose={() => setShowCleanupConfirm(false)}
         onConfirm={confirmCleanup}
         title="Clear Local Data"
-        message="Your products are now in the cloud. Clear local copies to prevent duplicates on future sign-ins?"
+        message={lastUpload ? clearOfferMessage(lastUpload) ?? '' : ''}
         confirmLabel="Clear Local Data"
         danger={true}
       />
