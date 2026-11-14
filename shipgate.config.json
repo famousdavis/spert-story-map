@@ -31,8 +31,8 @@
     {
       "name": "lint",
       "run": "npm run lint",
-      "expectProblems": 22,
-      "_note": "As of v0.51.0 `npm run lint` exits NON-ZERO by design: eslint-plugin-sonarjs contributes 22 cognitive-complexity findings at threshold 15, and this key holds that NUMBER steady instead of gating on the exit code. It is a two-way ratchet — new findings fail the gate (fix them, do not raise this), and resolved findings ALSO fail it (lower this, so the improvement is accounted for). Zero is not the target: 9 of the 22 are in files with no test coverage at all, where the correct response is to add tests, not to refactor. Rationale and the named list of those nine are in eslint.config.ts. IF THIS EVER REACHES TRUE ZERO, DELETE THIS KEY — ESLint prints no `✖ N problems` line when there is nothing to report, and the gate fails in scripts/shipgate.mjs's `expectProblems` branch, at its `count === null` guard, looking for one."
+      "expectProblems": 21,
+      "_note": "Since v0.51.0 `npm run lint` exits NON-ZERO by design: eslint-plugin-sonarjs reports cognitive-complexity findings at threshold 15 (22 at v0.51.0; 21 since v0.55.13, which split startSession in src/hooks/useAiConnectivity.ts), and this key holds that NUMBER steady instead of gating on the exit code. It is a two-way ratchet — new findings fail the gate (fix them, do not raise this), and resolved findings ALSO fail it (lower this, so the improvement is accounted for). Zero is not the target: at v0.51.0, 9 of the 22 were in files with no test coverage at all, where the correct response is to add tests, not to refactor (useAiConnectivity.ts was one of them; it had tests before v0.55.13 resolved its finding). Rationale and the named list of those nine, measured 2026-08-16, are in eslint.config.ts. IF THIS EVER REACHES TRUE ZERO, DELETE THIS KEY — ESLint prints no `✖ N problems` line when there is nothing to report, and the gate fails in scripts/shipgate.mjs's `expectProblems` branch, at its `count === null` guard, looking for one."
     },
     {
       "name": "typecheck",

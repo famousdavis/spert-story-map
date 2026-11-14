@@ -8,10 +8,9 @@ import {
   onSnapshot, updateDoc, setDoc, deleteDoc,
   serverTimestamp, getDocs,
 } from 'firebase/firestore';
-import type { QuerySnapshot, DocumentData, DocumentSnapshot, FirestoreError } from 'firebase/firestore';
+import type { QuerySnapshot, DocumentData, DocumentSnapshot, FirestoreError, Firestore } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functionsInstance, isFirebaseAvailable } from '../lib/firebase';
-import { APP_VERSION } from '../lib/version';
 import type { Product, ProductUpdater } from '../types';
 import { applyAiOp, applyDrainOps, computeSafePrefix, type AiOpDoc } from '../lib/aiOps';
 import { selectSnapshotForWrite } from '../lib/aiSnapshot';
@@ -19,15 +18,16 @@ import { AI_CONSENT_KEY, AI_CONSENT_VERSION } from '../lib/aiConstants';
 import { SESSIONS_COL } from '../lib/firestoreCollections';
 import {
   getLastSeq, setLastSeq, clearLastSeq, safeParseConsent, buildOpsQuery,
-  canResumeSession, isBoundProduct, isSessionDocLive, buildSwitchNotice,
+  isBoundProduct, buildSwitchNotice, type SessionDocView,
 } from './aiConnectivityUtils';
 import {
   readSessionRecord, writeSessionRecord, removeSessionRecord, anySessionRecorded, listRecordedSessions,
 } from '../lib/aiSessionRecords';
 import { holdSessionLock, queryLockedNames } from './aiSessionLock';
 import {
-  readSessionDoc, readOtherSessions, judgeOtherSessions, endOtherSessions, type OtherCandidate,
+  readSessionDoc, readOtherSessions, judgeOtherSessions, endOtherSessions,
 } from './aiSessionSwitch';
+import { classifyOwnRecord, resumeSessionDoc, createSessionDoc, type StartPlan } from './aiSessionStart';
 
 /** Firestore doc limit is 1 MB; 900 KB leaves headroom for metadata. */
 const SNAPSHOT_BYTE_LIMIT = 900_000;
@@ -444,6 +444,76 @@ export function useAiConnectivity(
     }
   }, [localTeardown]);
 
+  // ── Go live ──────────────────────────────────────────────────────────────────
+  // `lock` is the lock taken when the new session's record was written (null on
+  // a resume); `othersReadAndLocked` is what S3 read of the other recorded sessions
+  // and the lock names S5's query found (null on a resume, which does neither).
+  const goLive = useCallback((
+    sessionId: string, openId: string, openName: string, consentRead: boolean, lock: (() => void) | null,
+    othersReadAndLocked: { read: Awaited<ReturnType<typeof readOtherSessions>>; lockedNames: Set<string> | null } | null,
+  ) => {
+    activeSessionIdRef.current = sessionId;
+    boundIdRef.current = openId;
+    releaseLockRef.current?.();
+    releaseLockRef.current = lock ?? holdSessionLock(sessionId);
+    const rec = readSessionRecord(openId);
+    if (rec?.sessionId === sessionId && rec.productName !== openName) writeSessionRecord(openId, { ...rec, productName: openName });
+    const judged = othersReadAndLocked ? judgeOtherSessions(othersReadAndLocked.read, othersReadAndLocked.lockedNames, new Date()) : [];
+    const notice = buildSwitchNotice(judged, openId, openName);
+    resubscribeOps(sessionId);
+    resubscribeSession(sessionId);
+    startHeartbeat(sessionId);
+    setSessionState({ sessionActive: true, aiConnected: false, consentRead, sessionId, boundProductId: openId, notice });
+    if (consentRead) scheduleSnapshot();
+    endOtherSessions(judged);
+  }, [resubscribeOps, resubscribeSession, startHeartbeat, scheduleSnapshot]);
+
+  // ── Create (S3, S4) and go live (S5) ─────────────────────────────────────────
+  // It also runs on every resume, where it creates nothing: it skips S3 and S4,
+  // makes no lock query, checks `stillOpen()` once more and goes live.
+  const createAndGoLive = useCallback(async (
+    database: Firestore, plan: StartPlan, openId: string, openName: string,
+    consentRead: boolean, exp: Date, stillOpen: () => boolean,
+  ): Promise<boolean> => {
+    const { sessionId } = plan;
+    // This tab's Web Lock on a new session, taken when its record is written and
+    // released in `finally` unless the session goes live.
+    let lockBeforeLive: (() => void) | null = null;
+    try {
+      const created = plan.prevConsentRead === null;
+      let read: Awaited<ReturnType<typeof readOtherSessions>> = [];
+      if (created) {
+        // R-3: read every other recorded session BEFORE the create: all of them
+        // (sign-out uses the same list) except this product's own entry, which
+        // is in `replaced` when it is to be ended.
+        const others = listRecordedSessions().filter(o => o.productId !== openId);
+        if (plan.replaced) others.push(plan.replaced);
+        read = await readOtherSessions(database, others);
+        if (!stillOpen()) return false;
+        setLastSeq(sessionId, 0);
+        // Reset D5 refs so a fresh session starts with no null-window state.
+        highestSeenSeqRef.current = 0;
+        inNullWindowRef.current = false;
+        preNullWindowSeqRef.current = 0;
+        if (!(await createSessionDoc(database, sessionId, openId, consentRead, exp))) return false;
+        writeSessionRecord(openId, { sessionId, productName: openName, startedAt: Date.now() });
+        if (!stillOpen()) return false;
+        // Review -07: hold the lock from the moment the record names this session,
+        // so another tab's R-3 that reads the record while this tab is still
+        // querying the locks finds the session in use and does not end it.
+        lockBeforeLive = holdSessionLock(sessionId);
+      }
+      const lockedNames = created && read.length ? await queryLockedNames() : null;
+      if (!stillOpen()) return false;
+      const lock = lockBeforeLive;
+      lockBeforeLive = null;
+      goLive(sessionId, openId, openName, consentRead, lock, created ? { read, lockedNames } : null);
+      return true;
+    } finally {
+      lockBeforeLive?.(); // the session did not go live
+    }
+  }, [goLive]);
+
   // ── Start session ────────────────────────────────────────────────────────────
   // B15: a session belongs to the product it was started in. Resume only that
   // product's own recorded session (R-2); otherwise create one, and once it goes
@@ -458,130 +528,34 @@ export function useAiConnectivity(
     const openId = product.id;
     const openName = product.name;
     const stillOpen = () => productRef.current?.id === openId;
-    // This tab's Web Lock on a new session, taken when its record is written and
-    // released in `finally` unless the session goes live.
-    let lockBeforeLive: (() => void) | null = null;
     try {
       const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const record = readSessionRecord(openId);
-      let sessionId: string = crypto.randomUUID();
-      let prevConsentRead: boolean | null = null;
-      let replaced: OtherCandidate | null = null;
+      let plan: StartPlan = { sessionId: crypto.randomUUID(), prevConsentRead: null, replaced: null };
       if (record) {
-        let view: Awaited<ReturnType<typeof readSessionDoc>>;
+        let view: SessionDocView;
         try { view = await readSessionDoc(database, record.sessionId); }
         catch (err) { console.error('[AI] Session check failed:', err); return false; }
-        if (canResumeSession(true, view, openId, new Date())) {
-          sessionId = record.sessionId;
-          prevConsentRead = view.consentRead;
-        } else if (isSessionDocLive(view, new Date())) {
-          // Live but no longer naming this product: replace it, and end it below.
-          replaced = { sessionId: record.sessionId, productId: openId, productName: record.productName, startedAt: record.startedAt };
-        } else {
-          clearLastSeq(record.sessionId);
-          removeSessionRecord(openId, record.sessionId);
-        }
+        plan = classifyOwnRecord(plan, record, view, openId);
         if (!stillOpen()) return false;
       }
       // Write consent BEFORE the updateDoc so the intent is recorded locally.
-      // On consent-downgrade abort below, we REVERT this write.
+      // On consent-downgrade abort in resumeSessionDoc, that write is REVERTED.
       localStorage.setItem(AI_CONSENT_KEY, JSON.stringify({
         version: AI_CONSENT_VERSION, date: new Date().toISOString(), write: true, read: consentRead,
       }));
-      const sessionRef = doc(database, SESSIONS_COL, sessionId);
       // ── Resume path ──────────────────────────────────────────────────────
-      if (prevConsentRead !== null) {
-        try {
-          await updateDoc(sessionRef, {
-            consentRead, openProductId: openId,
-            lastActiveAt: serverTimestamp(), browserConnectedAt: serverTimestamp(), expiresAt: exp,
-          });
-          if (prevConsentRead && !consentRead) {
-            deleteDoc(doc(database, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
-          }
-        } catch (err: unknown) {
-          const code = (err as { code?: string })?.code;
-          if (code === 'not-found' || code === 'permission-denied') {
-            clearLastSeq(sessionId);
-            removeSessionRecord(openId, sessionId);
-            sessionId = crypto.randomUUID();
-            prevConsentRead = null;
-          } else if (prevConsentRead && !consentRead) {
-            // Privilege downgrade (Read → off) failed transiently. Revert
-            // localStorage to the server's actual state (still consentRead:true).
-            localStorage.setItem(AI_CONSENT_KEY, JSON.stringify({
-              version: AI_CONSENT_VERSION, date: new Date().toISOString(), write: true, read: true,
-            }));
-            deleteDoc(doc(database, SESSIONS_COL, sessionId, 'snapshot', 'current')).catch(() => {});
-            console.error('[AI] Consent downgrade write failed; aborting resume:', err);
-            return false;
-          } else {
-            console.error('[AI] Resume reconciliation failed; proceeding:', err);
-          }
-        }
+      if (plan.prevConsentRead !== null) {
+        const next = await resumeSessionDoc(database, plan, openId, consentRead, exp);
+        if (!next) return false;
+        plan = next;
         if (!stillOpen()) return false;
       }
-      // ── Fresh-create path ────────────────────────────────────────────────
-      const created = prevConsentRead === null;
-      let others: OtherCandidate[] = [];
-      let read: Awaited<ReturnType<typeof readOtherSessions>> = [];
-      if (created) {
-        // R-3: read every other recorded session BEFORE the create: all of them
-        // (sign-out uses the same list) except this product's own entry, which
-        // is in `replaced` when it is to be ended.
-        others = listRecordedSessions().filter(o => o.productId !== openId);
-        if (replaced) others.push(replaced);
-        read = await readOtherSessions(database, others);
-        if (!stillOpen()) return false;
-        setLastSeq(sessionId, 0);
-        // Reset D5 refs so a fresh session starts with no null-window state.
-        highestSeenSeqRef.current = 0;
-        inNullWindowRef.current = false;
-        preNullWindowSeqRef.current = 0;
-        try {
-          await setDoc(doc(database, SESSIONS_COL, sessionId), {
-            createdAt: serverTimestamp(), lastActiveAt: serverTimestamp(), expiresAt: exp,
-            browserConnectedAt: serverTimestamp(), openProductId: openId,
-            consentWrite: true, consentRead, lastSeq: 0, appVersion: APP_VERSION,
-            appId: 'storymap',
-            // aiLastSeenAt intentionally OMITTED: MCP-server-owned. Including
-            // it fails the Firestore create rule's hasOnly check.
-          });
-        } catch (err) {
-          console.error('[AI] Session creation failed:', err);
-          return false;
-        }
-        writeSessionRecord(openId, { sessionId, productName: openName, startedAt: Date.now() });
-        if (!stillOpen()) return false;
-        // Review -07: hold the lock from the moment the record names this session,
-        // so another tab's R-3 that reads the record while this tab is still
-        // querying the locks finds the session in use and does not end it.
-        lockBeforeLive = holdSessionLock(sessionId);
-      }
-      const lockedNames = created && read.length ? await queryLockedNames() : null;
-      if (!stillOpen()) return false;
-      // ── Go live ──────────────────────────────────────────────────────────
-      activeSessionIdRef.current = sessionId;
-      boundIdRef.current = openId;
-      releaseLockRef.current?.();
-      releaseLockRef.current = lockBeforeLive ?? holdSessionLock(sessionId);
-      lockBeforeLive = null;
-      const rec = readSessionRecord(openId);
-      if (rec?.sessionId === sessionId && rec.productName !== openName) writeSessionRecord(openId, { ...rec, productName: openName });
-      const judged = created ? judgeOtherSessions(read, lockedNames, new Date()) : [];
-      const notice = buildSwitchNotice(judged, openId, openName);
-      resubscribeOps(sessionId);
-      resubscribeSession(sessionId);
-      startHeartbeat(sessionId);
-      setSessionState({ sessionActive: true, aiConnected: false, consentRead, sessionId, boundProductId: openId, notice });
-      if (consentRead) scheduleSnapshot();
-      endOtherSessions(judged);
-      return true;
+      return await createAndGoLive(database, plan, openId, openName, consentRead, exp, stillOpen);
     } finally {
-      lockBeforeLive?.(); // the session did not go live
       startSessionInFlightRef.current = false;
     }
-  }, [product, resubscribeOps, resubscribeSession, startHeartbeat, scheduleSnapshot]);
+  }, [product, createAndGoLive]);
 
   // ── Stop session (Disconnect) ─────────────────────────────────────────────────
   // B15 R-11: ends this tab's live session only, never a stored one; consent is
