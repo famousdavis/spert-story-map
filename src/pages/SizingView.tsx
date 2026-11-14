@@ -12,7 +12,7 @@ import useSizingLayout from '../components/sizing/useSizingLayout';
 import { DEFAULT_SIZING_FILTER } from '../components/sizing/useSizingLayout';
 import type { SizingFilter } from '../components/sizing/useSizingLayout';
 import useSizingDrag from '../components/sizing/useSizingDrag';
-import { undoKeyAction } from '../lib/undoKeys';
+import { isMacPlatform, undoKeyAction } from '../lib/undoKeys';
 import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
 import SizingContent from '../components/sizing/SizingContent';
 import type { SizingCell } from '../components/sizing/SizingContent';
@@ -216,7 +216,7 @@ export default function SizingView() {
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
-      const action = undoKeyAction(e, navigator.platform.toUpperCase().includes('MAC'));
+      const action = undoKeyAction(e, isMacPlatform(navigator.platform));
       if (action) {
         e.preventDefault();
         if (action === 'undo') undo();

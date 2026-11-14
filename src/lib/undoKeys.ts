@@ -2,6 +2,11 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
+/** True on a Mac: `navigator.platform` holds "MAC" in any case ("MacIntel" counts). */
+export function isMacPlatform(platform: string): boolean {
+  return platform.toUpperCase().includes('MAC');
+}
+
 /** What an undo key asks for. */
 export type UndoKeyAction = 'undo' | 'redo';
 
@@ -24,8 +29,8 @@ export interface UndoKeyEvent {
  * did before this rule, and "Y" without Shift (Caps Lock) redoes. A key that is missing or not
  * text is no action, so a bare `keydown` cannot throw.
  *
- * `isMac` comes from the caller (`navigator.platform.toUpperCase().includes('MAC')`, where
- * "MacIntel" counts); this function reads nothing global.
+ * `isMac` comes from the caller, as `isMacPlatform(navigator.platform)`; this function reads
+ * nothing global.
  */
 export function undoKeyAction(e: UndoKeyEvent, isMac: boolean): UndoKeyAction | null {
   const modifierHeld = isMac ? e.metaKey : e.ctrlKey;

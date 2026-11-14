@@ -7,7 +7,7 @@
 // The key is read case-insensitively: z undoes, Shift+z redoes. y redoes unless it is a capital "Y"
 // with Shift held (ruling R57): a lowercase "y" with Shift still redoes, as before this rule.
 import { describe, expect, it } from 'vitest';
-import { undoKeyAction } from '../lib/undoKeys';
+import { isMacPlatform, undoKeyAction } from '../lib/undoKeys';
 
 const NO_KEY = undefined;
 
@@ -136,5 +136,15 @@ describe('undoKeyAction', () => {
   it('returns nothing for a bare keydown event, which has no key and no modifiers', () => {
     expect(undoKeyAction(new Event('keydown') as unknown as KeyboardEvent, false)).toBeNull();
     expect(undoKeyAction(new Event('keydown') as unknown as KeyboardEvent, true)).toBeNull();
+  });
+});
+
+describe('isMacPlatform', () => {
+  it.each([
+    ['MacIntel', true],
+    ['Win32', false],
+    ['', false],
+  ] as const)('navigator.platform %j -> %s', (platform, expected) => {
+    expect(isMacPlatform(platform)).toBe(expected);
   });
 });
