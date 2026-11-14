@@ -12,7 +12,7 @@ import {
 } from '../hooks/aiConnectivityUtils';
 import {
   readSessionRecord, writeSessionRecord, removeSessionRecord, listSessionRecords, anySessionRecorded,
-  removeLegacySessionId,
+  removeLegacySessionId, listRecordedSessions,
 } from '../lib/aiSessionRecords';
 
 const NOW = new Date('2026-11-14T12:00:00Z');
@@ -129,4 +129,25 @@ describe('R-1 records: one key per product, compare-and-remove', () => {
     removeLegacySessionId('L1');
     expect(anySessionRecorded()).toBe(false);
   });
+});
+
+describe('R-3/R-11 listRecordedSessions: the one list startSession and sign-out both use', () => {
+  beforeEach(() => { localStorage.clear(); });
+  const bySession = (a: { sessionId: string }, b: { sessionId: string }) => a.sessionId.localeCompare(b.sessionId);
+  it('lists every product entry and the legacy session, each once', () => {
+    writeSessionRecord('A', { sessionId: 's1', productName: 'Alpha', startedAt: 2 });
+    writeSessionRecord('B', { sessionId: 's2', productName: 'Bravo', startedAt: 1 });
+    localStorage.setItem('spert_ai_session_id', 'sL');
+    expect(listRecordedSessions().sort(bySession)).toEqual([
+      { sessionId: 's1', productId: 'A', productName: 'Alpha', startedAt: 2 },
+      { sessionId: 's2', productId: 'B', productName: 'Bravo', startedAt: 1 },
+      { sessionId: 'sL', productId: null, productName: '', startedAt: 0 },
+    ]);
+  });
+  it('a legacy id that an entry already names is listed once, as that entry', () => {
+    writeSessionRecord('A', { sessionId: 's1', productName: 'Alpha', startedAt: 2 });
+    localStorage.setItem('spert_ai_session_id', 's1');
+    expect(listRecordedSessions()).toEqual([{ sessionId: 's1', productId: 'A', productName: 'Alpha', startedAt: 2 }]);
+  });
+  it('nothing recorded: an empty list', () => { expect(listRecordedSessions()).toEqual([]); });
 });

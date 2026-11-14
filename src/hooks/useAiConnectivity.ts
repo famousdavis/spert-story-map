@@ -22,8 +22,7 @@ import {
   canResumeSession, isBoundProduct, isSessionDocLive, buildSwitchNotice,
 } from './aiConnectivityUtils';
 import {
-  readSessionRecord, writeSessionRecord, removeSessionRecord, anySessionRecorded,
-  listSessionRecords, readLegacySessionId,
+  readSessionRecord, writeSessionRecord, removeSessionRecord, anySessionRecorded, listRecordedSessions,
 } from '../lib/aiSessionRecords';
 import { holdSessionLock, queryLockedNames } from './aiSessionLock';
 import {
@@ -527,15 +526,11 @@ export function useAiConnectivity(
       let others: OtherCandidate[] = [];
       let read: Awaited<ReturnType<typeof readOtherSessions>> = [];
       if (created) {
-        // R-3: read every other recorded session BEFORE the create.
-        others = listSessionRecords()
-          .filter(r => r.productId !== openId)
-          .map(r => ({ sessionId: r.sessionId, productId: r.productId, productName: r.productName, startedAt: r.startedAt }));
+        // R-3: read every other recorded session BEFORE the create: all of them
+        // (sign-out uses the same list) except this product's own entry, which
+        // is in `replaced` when it is to be ended.
+        others = listRecordedSessions().filter(o => o.productId !== openId);
         if (replaced) others.push(replaced);
-        const legacy = readLegacySessionId();
-        if (legacy && !others.some(o => o.sessionId === legacy)) {
-          others.push({ sessionId: legacy, productId: null, productName: '', startedAt: 0 });
-        }
         read = await readOtherSessions(database, others);
         if (!stillOpen()) return false;
         setLastSeq(sessionId, 0);

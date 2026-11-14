@@ -9,7 +9,7 @@ import {
   getLastSeq, clearLastSeq, isSessionDocLive, isSessionInUse, changesWaiting,
   type OtherSession, type SessionDocView,
 } from './aiConnectivityUtils';
-import { removeSessionRecord, removeLegacySessionId } from '../lib/aiSessionRecords';
+import { removeSessionRecord, removeLegacySessionId, type KnownSession } from '../lib/aiSessionRecords';
 import { endSessionInBackground } from '../lib/aiSessionTeardown';
 import { sessionLockName } from './aiSessionLock';
 
@@ -41,13 +41,8 @@ export async function readSessionDoc(database: Firestore, sessionId: string): Pr
   };
 }
 
-export interface OtherCandidate {
-  sessionId: string;
-  /** null for a legacy session. */
-  productId: string | null;
-  productName: string;
-  startedAt: number;
-}
+/** Another recorded session, as `listRecordedSessions` gives it. */
+export type OtherCandidate = KnownSession;
 
 /** Read every candidate's doc in parallel; a failed read gives `doc: null` (unknown). */
 export async function readOtherSessions(

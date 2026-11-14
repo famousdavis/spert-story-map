@@ -10,7 +10,7 @@ import {
   AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_TEARDOWN_PENDING_KEY, AI_END_PENDING_KEY, AI_SESSION_KEY_PREFIX,
 } from './aiConstants';
 import { clearLastSeq } from '../hooks/aiConnectivityUtils';
-import { listSessionRecords, readLegacySessionId } from './aiSessionRecords';
+import { listSessionRecords, listRecordedSessions } from './aiSessionRecords';
 
 /**
  * B-04 — end a Connect AI session at sign-out, OUTSIDE React.
@@ -92,13 +92,10 @@ export function clearPendingAiTeardown(): void {
 
 /**
  * Every session this browser records (B15): one per product entry, plus a
- * legacy one from before v0.55.11. Deduplicated, in a stable order.
+ * legacy one from before v0.55.11, each once. The same list startSession judges.
  */
 function recordedSessionIds(): string[] {
-  const ids = listSessionRecords().map(r => r.sessionId);
-  const legacy = readLegacySessionId();
-  if (legacy) ids.push(legacy);
-  return [...new Set(ids)];
+  return listRecordedSessions().map(s => s.sessionId);
 }
 
 function clearLocalAiKeys(sessionIds: string[]): void {

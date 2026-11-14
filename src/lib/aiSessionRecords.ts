@@ -78,6 +78,31 @@ export function removeLegacySessionId(sessionId: string): void {
   try { localStorage.removeItem(AI_SESSION_ID_KEY); } catch { /* unavailable */ }
 }
 
+/** A session this browser records: a product's entry, or the legacy one. */
+export interface KnownSession {
+  sessionId: string;
+  /** null for the legacy session (from before v0.55.11: no product recorded). */
+  productId: string | null;
+  productName: string;
+  startedAt: number;
+}
+
+/**
+ * Every session this browser records, each once: the product entries, then the
+ * legacy session unless an entry already names it. The one list behind both
+ * startSession's R-3 (the sessions to judge) and sign-out (the sessions to end).
+ */
+export function listRecordedSessions(): KnownSession[] {
+  const out: KnownSession[] = [];
+  const add = (s: KnownSession) => { if (!out.some(o => o.sessionId === s.sessionId)) out.push(s); };
+  for (const r of listSessionRecords()) {
+    add({ sessionId: r.sessionId, productId: r.productId, productName: r.productName, startedAt: r.startedAt });
+  }
+  const legacy = readLegacySessionId();
+  if (legacy) add({ sessionId: legacy, productId: null, productName: '', startedAt: 0 });
+  return out;
+}
+
 /** True when any session is recorded: a product entry or a legacy session. */
 export function anySessionRecorded(): boolean {
   return listSessionRecords().length > 0 || readLegacySessionId() !== null;
