@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.55.10 (2026-11-13)
+
+### Changed
+
+- **Connect AI's copy prompt names the AI read tool by its new name, `storymap_get_product`.** SPERT's AI service renamed it from `storymap_get_project`. The prompt no longer explains what the older word "project" meant in the tools.
+- **An AI app connected before this release needs its connector refreshed or re-added** to see the new tool name.
+
 ## Version 0.55.9 (2026-11-13)
 
 ### Changed

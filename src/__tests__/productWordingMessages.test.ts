@@ -70,26 +70,28 @@ describe('sending an invitation: the Share panel\'s errors (D3)', () => {
   });
 });
 
-describe('the Connect AI copy prompt (D13, R29)', () => {
+// v0.55.10 (R47): SPERT's AI service renamed the read tool to storymap_get_product, so nothing the AI
+// reads says "project" and the prompt no longer explains the word.
+describe('the Connect AI copy prompt (D13, R29, R47)', () => {
   const prompt = buildCopyPrompt('CODE');
   const flat = prompt.replace(/\s+/g, ' ');
   // R31's words, written out here rather than imported: a typo in the shared constant must fail.
   const definition = 'A product can be an application, a service, an internal capability or any other initiative.';
-  const bridge = 'Some tool names, descriptions and replies still say "project"; wherever they do, it means the product open in SPERT Story Map. When you talk to me, call it a product.';
+  const callIt = 'When you talk to me, call it a product.';
 
-  it('opens with what a product is, and what "project" means in the tools', () => {
-    expect(flat.startsWith(`I want to build a story map for a product using SPERT Story Map. ${definition} ${bridge}`)).toBe(true);
+  it('opens with what a product is, then asks the AI to call it a product', () => {
+    expect(flat.startsWith(`I want to build a story map for a product using SPERT Story Map. ${definition} ${callIt}`)).toBe(true);
   });
 
-  it('names storymap_get_project 19 times, and says "project" nowhere else', () => {
-    expect(prompt.match(/storymap_get_project/g)).toHaveLength(19);
-    expect(flat.split(bridge)).toHaveLength(2);
-    expect(flat.replace(bridge, '').match(/\bprojects?\b/gi)).toBeNull();
+  it('names storymap_get_product 19 times and storymap_get_project never, and says "project" nowhere', () => {
+    expect(prompt.match(/storymap_get_product/g)).toHaveLength(19);
+    expect(prompt.match(/storymap_get_project/g)).toBeNull();
+    expect(flat.match(/\bprojects?\b/gi)).toBeNull();
   });
 
   it('the five tiled-work rows now say product', () => {
     expect(flat).toContain('call get_session_info to confirm which product is open.');
-    expect(flat).toContain("Call storymap_get_project before any sizing. You need the product's sizeMapping");
+    expect(flat).toContain("Call storymap_get_product before any sizing. You need the product's sizeMapping");
     expect(flat).toContain("appear in the product's sizeMapping.");
     expect(flat).toContain('this product may use entirely different labels.');
     expect(flat).toContain('invalid sizes for products with custom size labels.');

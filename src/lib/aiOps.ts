@@ -295,7 +295,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     }
     case 'bulk_allocate': {
       // Payload: { allocations: Array<{ ribId: string, releaseId: string }> }
-      // Read Mode required — AI reads ribIds from storymap_get_project.
+      // Read Mode required — AI reads ribIds from storymap_get_product.
       // Inherits all 4 allocateRibInProduct guards.
       // @no-throw — safe in drain path.
       if (!Array.isArray(p.allocations) || p.allocations.length === 0) return prev;
@@ -317,7 +317,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     }
     case 'bulk_size': {
       // Payload: { sizes: Array<{ ribId: string, size: string }> }
-      // Read Mode required — AI reads ribIds and sizeMapping from storymap_get_project.
+      // Read Mode required — AI reads ribIds and sizeMapping from storymap_get_product.
       // sizeRibInProduct Guard 1 (label membership) is the real size validator.
       // Inherits all 4 sizeRibInProduct guards.
       // @no-throw — safe in drain path.
@@ -341,7 +341,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     // ── Phase 5 — bulk unassign ──────────────────────────────────────────────
     case 'bulk_unassign': {
       // Payload: { ribIds: string[] }
-      // Read Mode required — AI reads ribIds (+ locked state) from storymap_get_project.
+      // Read Mode required — AI reads ribIds (+ locked state) from storymap_get_product.
       // Loops unassignRibInProduct per entry. Inherits all 3 guards:
       //   1. rib not found → prev ref-equal
       //   2. rib is locked → prev ref-equal
@@ -366,7 +366,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     // ── Phase 6 — bulk text-field update ────────────────────────────────────
     case 'bulk_update_ribs': {
       // Payload: { updates: Array<{ ribId, description?, category?, notes? }> }
-      // Read Mode required — AI reads ribIds from storymap_get_project.
+      // Read Mode required — AI reads ribIds from storymap_get_product.
       // Text fields REPLACE when present (incl. ''); undefined = skip field.
       // No name, no size (excluded by contract).
       // No locked-rib guard on text fields — only size is lock-gated (update_rib).
@@ -462,7 +462,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     case 'bulk_move_ribs': {
       // Payload: { moves: Array<{ ribId, targetBackboneId?, targetReleaseId? }> }
       // Read Mode required — AI reads ribIds/backboneIds/releaseIds/locked/partial
-      // from storymap_get_project. Delegation loop over moveRibInProduct; inherits
+      // from storymap_get_product. Delegation loop over moveRibInProduct; inherits
       // every CALL-*/BB-*/REL-* guard per entry.
       // Replay note: BB-2/REL-5 make an already-applied move ref-equal, so drain
       // re-application is idempotent — but like bulk_update_ribs, a replay can
@@ -537,7 +537,7 @@ export function applyAiOp(prev: Product, op: string, payload: unknown): Product 
     case 'bulk_update_backbones': {
       // Payload: { updates: Array<{ backboneId: string, description: string }> }
       // Read Mode required -- the AI reads backboneIds, and the descriptions when
-      // themeBackboneDescriptionsIncluded is true, from storymap_get_project.
+      // themeBackboneDescriptionsIncluded is true, from storymap_get_product.
       // No name (contract). description REPLACES; '' clears. Addressed by
       // backboneId ALONE, across every theme: EVERY backbone holding the id is
       // updated (Connect AI can create the same id in two themes).

@@ -11,8 +11,7 @@ import { PRODUCT_DEFINITION } from '../../lib/constants';
  */
 export function buildCopyPrompt(code: string): string {
   return `I want to build a story map for a product using SPERT Story Map. ${PRODUCT_DEFINITION}
-Some tool names, descriptions and replies still say "project"; wherever they do, it means the product
-open in SPERT Story Map. When you talk to me, call it a product.
+When you talk to me, call it a product.
 
 WHAT IS A STORY MAP?
 A story map captures the breadth and depth of what a product team wants to build.
@@ -61,7 +60,7 @@ If the map we designed exceeds bulk_import's caps (5 themes / 10 backbones per t
 10 ribs per backbone), either ask me to shrink it to fit or use the fine-grained tools
 instead — never silently drop themes, backbones, or ribs to make it fit.
 The finished map is identical whichever path you use; only the speed differs.
-To add to or edit an existing map: call storymap_get_project first to see the current
+To add to or edit an existing map: call storymap_get_product first to see the current
 structure and entity IDs. This requires Read Mode — if I have not enabled it, ask me
 to turn it on in the Connect AI panel. Then use the fine-grained tools for targeted
 changes: storymap_create_theme, storymap_create_backbone, storymap_create_rib for
@@ -84,10 +83,10 @@ clicking a theme or backbone name on the Map.
   existing one, use storymap_update_theme (name and/or description),
   storymap_update_backbone (name and/or description), or storymap_bulk_update_backbones
   (many backbones' descriptions in one call, up to 100 per call; it never renames).
-- Those updates REPLACE the description. Descriptions are mine: call storymap_get_project
+- Those updates REPLACE the description. Descriptions are mine: call storymap_get_product
   first (Read Mode), and do not overwrite a non-empty description unless I asked you to.
   An empty string "" clears one. There is no append tool for descriptions.
-- storymap_get_project returns themeBackboneDescriptionsIncluded:
+- storymap_get_product returns themeBackboneDescriptionsIncluded:
   - true: every theme and backbone in the result carries its description.
   - false: descriptions exist but were left out because the map is very large. This is NOT
     an outdated tab. Do not write a theme or backbone description unless I explicitly asked
@@ -100,7 +99,7 @@ clicking a theme or backbone name on the Map.
   since you last read the map.
 - Without Read Mode you cannot read descriptions or check the marker. Write descriptions
   then only for themes and backbones you are creating, or ones I told you to change.
-- Descriptions take room in what storymap_get_project returns, so on a very large map rib
+- Descriptions take room in what storymap_get_product returns, so on a very large map rib
   notes may be left out sooner than before (notesIncluded: false).
 
 RELEASE PLANNING (separate step — only when the user explicitly asks):
@@ -122,9 +121,9 @@ READ MODE:
   name and a UUID; you don't need to read the current map state).
 - storymap_append_rib_note and storymap_bulk_append_rib_notes apply WITHOUT Read Mode,
   but you cannot obtain rib IDs, verify a write, or recover a skipped append without it —
-  so call storymap_get_project first anyway.
+  so call storymap_get_product first anyway.
 - storymap_allocate_rib, storymap_unassign_rib, and storymap_move_rib REQUIRE Read Mode.
-  Call storymap_get_project first to obtain rib IDs and each rib's releaseIds, locked, and
+  Call storymap_get_product first to obtain rib IDs and each rib's releaseIds, locked, and
   partial state. If Read Mode is off, ask the user to enable it in the Connect AI panel
   before proceeding.
 
@@ -151,17 +150,17 @@ the other. The target backbone may belong to ANY theme, not just the rib's curre
 - Locked ribs (in progress): only the release change is blocked; the backbone change
   still applies.
 - Split or partial allocations: if a rib's releaseIds has more than one entry (a split),
-  or partial is true in storymap_get_project (a single allocation under 100%), the
+  or partial is true in storymap_get_product (a single allocation under 100%), the
   release change is skipped rather than overwritten. To actually reassign such a rib's
   release, call storymap_unassign_rib first, then storymap_move_rib.
-- Check locked, releaseIds, and partial in storymap_get_project BEFORE calling to know
+- Check locked, releaseIds, and partial in storymap_get_product BEFORE calling to know
   whether the release change will apply.
 - A moved rib lands at the END of its destination backbone; position cannot be specified.
 - Moving a rib between backbones may also drop it to the bottom of its release's column
   on the Release Planning board, even though its release did not change — a known,
   accepted cosmetic side effect, not a bug. Explain this if the user asks why their
   board reordered.
-- After moving a rib, call storymap_get_project again before calling storymap_update_rib
+- After moving a rib, call storymap_get_product again before calling storymap_update_rib
   on it — update_rib addresses a rib through its backbone, and the pre-move location
   will no longer match, causing a silent no-op.
 
@@ -170,7 +169,7 @@ CONSTRAINTS:
   If the user wants a split, direct them to the Release Planning board in the app.
 - Locked ribs (in progress) cannot be allocated or unassigned, and storymap_move_rib
   skips their release change (their backbone CAN still be changed). If a rib has
-  locked: true in storymap_get_project, tell the user — its release assignment must be
+  locked: true in storymap_get_product, tell the user — its release assignment must be
   changed manually.
 - Moving a rib back to a release can restore progress recorded there, as dragging it in the
   app does, and the rib then becomes locked.
@@ -207,19 +206,19 @@ WHEN TO USE BULK:
 BULK RELEASE PLANNING (two calls total):
 1. storymap_bulk_create_releases — Does NOT require Read Mode. Provide an array of
    {releaseId, name} objects; generate a fresh UUID per releaseId. Await the result.
-2. storymap_bulk_allocate — Requires Read Mode (call storymap_get_project first for
+2. storymap_bulk_allocate — Requires Read Mode (call storymap_get_product first for
    ribIds, releaseIds, and locked state). Provide an array of {ribId, releaseId} objects.
 Same ordering rule as the individual tools: releases must exist before you allocate.
 An allocation silently skips if its target release does not yet exist.
 
 BULK SIZING:
-storymap_bulk_size — Requires Read Mode (call storymap_get_project first for ribIds,
+storymap_bulk_size — Requires Read Mode (call storymap_get_product first for ribIds,
 current size, locked state, and sizeMapping). Provide {ribId, size} objects; use only
 labels from sizeMapping.
 
 READ MODE SUMMARY:
 - storymap_bulk_create_releases and storymap_bulk_append_rib_notes: do NOT require Read
-  Mode (but call storymap_get_project first anyway — you need it for ribIds and to verify).
+  Mode (but call storymap_get_product first anyway — you need it for ribIds and to verify).
 - storymap_bulk_allocate / storymap_bulk_size / storymap_bulk_unassign
   / storymap_bulk_update_ribs / storymap_bulk_move_ribs / storymap_bulk_update_backbones:
   REQUIRE Read Mode.
@@ -252,8 +251,8 @@ Re-running these four is safe and ref-equal: storymap_bulk_create_releases,
 storymap_bulk_allocate, storymap_bulk_size, storymap_bulk_unassign. The other four are
 NOT safe to re-run blindly — storymap_bulk_update_ribs, storymap_bulk_move_ribs and
 storymap_bulk_update_backbones re-write their values (and can overwrite a manual change),
-and storymap_bulk_append_rib_notes appends again. Verify results by calling storymap_get_project after — the response confirms
-the call was queued, not which entries applied. storymap_get_project now returns each rib's
+and storymap_bulk_append_rib_notes appends again. Verify results by calling storymap_get_product after — the response confirms
+the call was queued, not which entries applied. storymap_get_product now returns each rib's
 notes (when notesIncluded is true), so description, category, AND notes are all verifiable.
 
 CHUNKING:
@@ -265,7 +264,7 @@ CHUNKING:
 - More than 50 releases to create → split into calls of ≤50 each.
 
 BULK CONTENT UPDATES (description, category, notes):
-storymap_bulk_update_ribs — Requires Read Mode (call storymap_get_project first for
+storymap_bulk_update_ribs — Requires Read Mode (call storymap_get_product first for
 ribIds). Provide an array of {ribId, description?, category?, notes?} objects. Only
 the fields you include are updated; omitted fields are left exactly as they are. An
 empty string "" clears a field. No size or name field — use storymap_bulk_size for
@@ -288,7 +287,7 @@ user's work.
 When in doubt, append: an extra paragraph is recoverable, an overwrite is not.
 Notes cap at 2000 chars/rib, counting existing + new. An append that would exceed it is
 SKIPPED for that rib; the rest of a bulk call still applies. Append bulk cap is 100 per
-call. storymap_get_project returns each rib's notes when notesIncluded is true — check
+call. storymap_get_product returns each rib's notes when notesIncluded is true — check
 length before long appends, and verify after. If notesIncluded is false or absent, notes
 are NOT in the snapshot: do not use replace-tools on notes, and you cannot length-check or
 verify appends — keep them short and tell the user.
@@ -297,7 +296,7 @@ SIZING (separate step — only when the user explicitly asks):
 Sizing assigns a t-shirt size to each rib item. Build and confirm the map structure first.
 Only proceed with sizing after the user explicitly asks you to.
 
-READ MODE REQUIRED: Call storymap_get_project before any sizing. You need the product's
+READ MODE REQUIRED: Call storymap_get_product before any sizing. You need the product's
 sizeMapping (valid labels and point values), each rib's id and current size, and each rib's
 locked state. If Read Mode is off, ask the user to enable it in the Connect AI panel.
 
@@ -330,7 +329,7 @@ and neither can the Sizing board — both are blocked to protect historical prog
 To resize a locked rib, its sprint progress must be cleared first, then sized in the app.
 
 NO NEW UUIDs: Unlike create_* operations, storymap_size_rib targets existing ribs. Use ribIds
-from storymap_get_project — do not generate new UUIDs for sizing calls.
+from storymap_get_product — do not generate new UUIDs for sizing calls.
 
 If throttled (rate limit), pause briefly before retrying — same rule as fine-grained map-building.`;
 }
