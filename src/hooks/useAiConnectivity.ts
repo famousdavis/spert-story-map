@@ -39,6 +39,11 @@ export interface AiSessionState {
   aiConnected: boolean;
   consentRead: boolean;
   sessionId: string | null;
+  /**
+   * B15: the product `sessionId` belongs to (null with no session). The layout
+   * opens the Connect AI panel only while this is the open product.
+   */
+  boundProductId: string | null;
   /** B15 R-4: the line naming an earlier session, shown until the panel closes or the session ends. */
   notice: string | null;
 }
@@ -56,7 +61,7 @@ export function useAiConnectivity(
   updateProduct: (updater: ProductUpdater) => void,
 ): UseAiConnectivityResult {
   const [sessionState, setSessionState] = useState<AiSessionState>({
-    sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, notice: null,
+    sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, boundProductId: null, notice: null,
   });
   // ── Refs ──────────────────────────────────────────────────────────────────
   const productRef = useRef<Product | null>(product);
@@ -222,7 +227,9 @@ export function useAiConnectivity(
         const bound = boundIdRef.current;
         localTeardown();
         if (bound) removeSessionRecord(bound, sessionId);
-        setSessionState({ sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, notice: null });
+        setSessionState({
+          sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, boundProductId: null, notice: null,
+        });
         return;
       }
       sessionRetryCountRef.current = 0;
@@ -278,7 +285,9 @@ export function useAiConnectivity(
     const id = product?.id;
     if (!id || !activeSessionIdRef.current || !boundIdRef.current || id === boundIdRef.current) return;
     localTeardown();
-    setSessionState(prev => ({ ...prev, sessionActive: false, aiConnected: false, sessionId: null, notice: null }));
+    setSessionState(prev => ({
+      ...prev, sessionActive: false, aiConnected: false, sessionId: null, boundProductId: null, notice: null,
+    }));
   }, [product?.id, localTeardown]);
 
   // ── Re-subscribe ops listener on product change (D5: null-window drain) ───
@@ -561,7 +570,7 @@ export function useAiConnectivity(
       resubscribeOps(sessionId);
       resubscribeSession(sessionId);
       startHeartbeat(sessionId);
-      setSessionState({ sessionActive: true, aiConnected: false, consentRead, sessionId, notice });
+      setSessionState({ sessionActive: true, aiConnected: false, consentRead, sessionId, boundProductId: openId, notice });
       if (consentRead) scheduleSnapshot();
       endOtherSessions(judged);
       return true;
@@ -582,7 +591,9 @@ export function useAiConnectivity(
       await teardown(sessionId);
     }
     if (!anySessionRecorded()) localStorage.removeItem(AI_CONSENT_KEY);
-    setSessionState({ sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, notice: null });
+    setSessionState({
+      sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, boundProductId: null, notice: null,
+    });
   }, [teardown]);
 
   const dismissNotice = useCallback(() => {

@@ -29,19 +29,23 @@ export default function ConnectPanel({
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sessionId = sessionState.sessionId;
+  // The session the panel shows now, read when a code request returns.
+  const sessionIdRef = useRef(sessionId);
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
 
   const fetchCode = useCallback(async () => {
     if (!functionsInstance || !sessionId) { setCodeError(true); return; }
     setCodeLoading(true);
     setCodeError(false);
+    let c: string | null = null;
     try {
-      const { code: c } = await callGeneratePairingCode(sessionId);
-      setCode(c);
-    } catch {
-      setCodeError(true);
-    } finally {
-      setCodeLoading(false);
-    }
+      ({ code: c } = await callGeneratePairingCode(sessionId));
+    } catch { /* c stays null */ }
+    // B15: a code that returns after the session changed is for a session this
+    // panel no longer shows. Drop it; the request for the current one sets the state.
+    if (sessionIdRef.current !== sessionId) return;
+    if (c === null) setCodeError(true); else setCode(c);
+    setCodeLoading(false);
   }, [sessionId]);
 
   // Fetch a fresh code when the panel opens with an active session.
@@ -89,8 +93,9 @@ export default function ConnectPanel({
   const displayCode = code ? code.replace('-', ' · ') : '';
 
   return (
-    // B15 R-5: no session, no panel (a product change disconnects while the panel
-    // is unmounted by "Loading...", and `open` alone would bring it back on B).
+    // B15 R-5: no session, no panel. The layout also passes `open` only while the
+    // session belongs to the open product: after a history jump the panel's first
+    // render on the new product still carries the old session.
     <Modal open={open && !!sessionId} onClose={onClose} title="AI session active">
       <div className="space-y-4 text-sm">
         {sessionState.notice && (

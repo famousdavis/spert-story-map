@@ -236,8 +236,10 @@ export default function ProductLayout() {
         onClose={() => setShowAiConsent(false)}
         onConnect={handleConsentConnect}
       />
+      {/* B15 R-5: only while the session belongs to this product. After a history
+          jump the first render on another product still holds the old session. */}
       <ConnectPanel
-        open={showAiPanel}
+        open={showAiPanel && sessionState.boundProductId === product.id}
         onClose={() => { setShowAiPanel(false); dismissNotice(); }}
         sessionState={sessionState}
         onChangePermissions={changePermissions}

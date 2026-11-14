@@ -483,7 +483,7 @@ describe('R-5/R-9', () => {
     expect(sid(t.result)).toBe(sA);
   });
   it('the panel does not show without a session, and shows the line with one', () => {
-    const base = { sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, notice: null };
+    const base = { sessionActive: false, aiConnected: false, consentRead: false, sessionId: null, boundProductId: null, notice: null };
     const props = { open: true, onClose: () => {}, onChangePermissions: async () => true, onDisconnect: async () => {} };
     const { unmount } = render(<ConnectPanel {...props} sessionState={base} />);
     expect(screen.queryByText('AI session active')).toBeNull();
