@@ -19,11 +19,18 @@ vi.mock('../lib/firebase', () => ({
 import { APP_VERSION } from '../lib/version';
 import { server } from './fixtures/aiSessionFake';
 import {
-  SEQ, DAY, mk, openTab, start, startBehind, sid, consent, record, sessionCreates, resumeWrites, snapshotDeletes,
-  sessionLeftInA, setUpEachTest,
+  SEQ, DAY, mk, openTab, start, startBehind, sid, consent, record, setRecord, sessionCreates, resumeWrites,
+  snapshotDeletes, sessionLeftInA, setUpEachTest,
 } from './fixtures/aiSessionStartHarness';
 
 setUpEachTest();
+const T0 = Date.UTC(2026, 10, 14, 12);
+const HOUR = 3_600_000;
+/** The timers setUpEachTest fakes, plus Date, frozen at T0 until a test moves it. */
+const freezeClockAtT0 = () => {
+  vi.useRealTimers();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'], now: T0 });
+};
 
 describe('the writes', () => {
   it('a new session is created with exactly the ten keys, and its cursor is stored as 0', async () => {
@@ -113,5 +120,38 @@ describe('the writes', () => {
     expect(localStorage.getItem(SEQ + s)).toBeNull();
     expect(record('A')?.sessionId).toBe(fresh);
     expect(consent()).toMatchObject({ read: false });
+  });
+
+  // Review -05: the cursor is set before the create, so a failed create leaves it at 0.
+  it('a create that fails leaves the attempted session\'s cursor at 0 (it is set before the create)', async () => {
+    server.failCreate = true;
+    const t = openTab({ A: mk('A', 'Alpha') }, 'A');
+    expect(await start(t, false)).toBe(false);
+    const attempted = sessionCreates()[0]?.segs[1];
+    expect(Object.keys(localStorage).filter(k => k.startsWith(SEQ))).toEqual([SEQ + attempted]);
+    expect(localStorage.getItem(SEQ + attempted)).toBe('0');
+  });
+
+  // Review -05: expiresAt is computed once, before the own-session read (S1), and both
+  // writes use it. The clock moves by an hour while S1's read is held.
+  it('a new session\'s expiresAt is 7 days from when the start began, though the clock moves during S1', async () => {
+    freezeClockAtT0();
+    setRecord('A', 'old', 'Alpha');
+    const t = openTab({ A: mk('A', 'Alpha') }, 'A');
+    const ok = await startBehind(t, false, g => { server.readGate = g; }, () => { vi.setSystemTime(T0 + HOUR); });
+    expect(ok).toBe(true);
+    expect(Date.now()).toBe(T0 + HOUR);
+    expect((sessionCreates()[0]?.data?.expiresAt as Date | undefined)?.getTime()).toBe(T0 + 7 * DAY);
+  });
+
+  it('a resume write\'s expiresAt is 7 days from when the start began, though the clock moves during S1', async () => {
+    freezeClockAtT0();
+    const store = { A: mk('A', 'Alpha') };
+    await sessionLeftInA(store, false);
+    const t = openTab(store, 'A');
+    const ok = await startBehind(t, false, g => { server.readGate = g; }, () => { vi.setSystemTime(T0 + HOUR); });
+    expect(ok).toBe(true);
+    expect(Date.now()).toBe(T0 + HOUR);
+    expect((resumeWrites()[0]?.data?.expiresAt as Date | undefined)?.getTime()).toBe(T0 + 7 * DAY);
   });
 });
