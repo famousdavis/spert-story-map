@@ -9,7 +9,7 @@
  * The real `migrateLocalToCloud` over the masked-write stand-in, whose get of a missing project is
  * refused as the rules refuse it, so every uploaded product gets a new id (as in production).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
   fs: null as unknown as ReturnType<typeof import('./fixtures/mergeFieldsFirestore').createMergeFieldsFirestore>,
@@ -61,6 +61,13 @@ const UPLOADED_IN_LOCAL_TILE_ORDER = ['Local 3', 'Local 1', 'Local 2'];
 beforeEach(() => { h.fs.reset(); localStorage.clear(); });
 
 describe('the upload keeps the cloud tile order and adds the uploaded products after it', () => {
+  // The new ids are fixed and DEcreasing per call, so the uploaded products' ids sort Local 3, Local 2,
+  // Local 1: never the local tile order the test expects. With random ids an upload that lost that
+  // order (stored local ids, which no tile has) passed whenever the ids happened to sort right.
+  let n = 0;
+  beforeEach(() => { n = 0; vi.spyOn(crypto, 'randomUUID').mockImplementation(() => `00000000-0000-4000-8000-${String(999999999999 - n++).padStart(12, '0')}`); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
   it.each([
     ['a cloud order that leaves products unlisted', { projectOrder: ['c2', 'gone'] }],
     ['no projectOrder in the cloud', { exportName: 'Alice' }],
