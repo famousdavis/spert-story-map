@@ -149,6 +149,19 @@ describe.each(['cloud', 'local'] as const)('%s driver', kind => {
     expect(s.stored()).toMatchObject({ exportName: 'N' });
   });
 
+  // Review -04: the test above ends with flush(), which writes nothing once the timer is gone, so a
+  // cancel that kept its entries passed it.
+  it('after a cancel, a read lacks the cancelled entry and a later write and flush do not carry it', async () => {
+    seed(kind);
+    const s = side();
+    s.write([{ path: ['exportName'], value: 'cancelled' }]);
+    s.cancel();
+    expect(await s.read()).toMatchObject({ exportName: 'E' });
+    s.write([{ path: ['exportId'], value: 'later' }]);
+    s.flush();
+    expect(s.stored()).toMatchObject({ exportName: 'E', exportId: 'later' });
+  });
+
   it('a read sees this tab\'s entries before they are written', async () => {
     seed(kind);
     const s = side();
