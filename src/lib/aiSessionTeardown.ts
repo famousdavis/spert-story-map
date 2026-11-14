@@ -7,9 +7,10 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functionsInstance } from './firebase';
 import { SESSIONS_COL } from './firestoreCollections';
 import {
-  AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_TEARDOWN_PENDING_KEY,
+  AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_TEARDOWN_PENDING_KEY, AI_END_PENDING_KEY, AI_SESSION_KEY_PREFIX,
 } from './aiConstants';
 import { clearLastSeq } from '../hooks/aiConnectivityUtils';
+import { listSessionRecords, readLegacySessionId } from './aiSessionRecords';
 
 /**
  * B-04 — end a Connect AI session at sign-out, OUTSIDE React.
@@ -86,12 +87,59 @@ export function clearPendingAiTeardown(): void {
 
 // ── Internals ──────────────────────────────────────────────────────────────────
 
-function clearLocalAiKeys(sessionId: string | null): void {
+/**
+ * Every session this browser records (B15): one per product entry, plus a
+ * legacy one from before v0.55.11. Deduplicated, in a stable order.
+ */
+function recordedSessionIds(): string[] {
+  const ids = listSessionRecords().map(r => r.sessionId);
+  const legacy = readLegacySessionId();
+  if (legacy) ids.push(legacy);
+  return [...new Set(ids)];
+}
+
+function clearLocalAiKeys(sessionIds: string[]): void {
   try {
-    if (sessionId) clearLastSeq(sessionId);
+    for (const id of sessionIds) clearLastSeq(id);
+    for (const r of listSessionRecords()) localStorage.removeItem(AI_SESSION_KEY_PREFIX + r.productId);
     localStorage.removeItem(AI_SESSION_ID_KEY);
     localStorage.removeItem(AI_CONSENT_KEY);
   } catch { /* localStorage unavailable (private mode / blocked) */ }
+}
+
+// ── B15: sessions ended because another product's session started ────────────
+
+function readPendingSessionEnds(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(AI_END_PENDING_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!x) : [];
+  } catch { return []; }
+}
+
+function writePendingSessionEnds(ids: string[]): void {
+  try {
+    if (ids.length) localStorage.setItem(AI_END_PENDING_KEY, JSON.stringify(ids));
+    else localStorage.removeItem(AI_END_PENDING_KEY);
+  } catch { /* no localStorage */ }
+}
+
+/** Sessions parked for a silent retry (no banner). */
+export function getPendingSessionEnds(): string[] { return readPendingSessionEnds(); }
+
+function parkSessionEnd(sessionId: string): void {
+  const ids = readPendingSessionEnds();
+  if (!ids.includes(sessionId)) writePendingSessionEnds([...ids, sessionId]);
+}
+
+/**
+ * End a session on the server only (the snapshot delete and `teardownAiSession`),
+ * never touching this tab's live session. A failure is parked on
+ * AI_END_PENDING_KEY and retried silently by retryPendingAiTeardown.
+ */
+export async function endSessionInBackground(sessionId: string): Promise<boolean> {
+  const ok = await runServerTeardown(sessionId);
+  if (!ok) parkSessionEnd(sessionId);
+  return ok;
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -137,7 +185,7 @@ async function runServerTeardown(sessionId: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error(
-      '[AI] Sign-out could not reach the server to end the AI session; it may ' +
+      '[AI] Could not reach the server to end the AI session; it may ' +
       'stay live until it TTL-expires in 7 days unless retried:', err,
     );
     return false;
@@ -153,12 +201,12 @@ async function runServerTeardown(sessionId: string): Promise<boolean> {
  * result reports `serverOk: false` so the UI can tell the user.
  */
 export async function endAiSessionForSignOut(): Promise<AiSignOutTeardownResult> {
-  let sessionId: string | null = null;
-  try { sessionId = localStorage.getItem(AI_SESSION_ID_KEY); } catch { /* no localStorage */ }
+  // B15: every session this browser records, one per product plus a legacy one.
+  const sessionIds = recordedSessionIds();
 
   // Local teardown ALWAYS — the browser forgets the session whether or not the
   // server call succeeds, so no next user on this browser can resume it.
-  clearLocalAiKeys(sessionId);
+  clearLocalAiKeys(sessionIds);
 
   // Nothing stored, or no Firebase (so no relay session could ever have been
   // created): nothing to revoke. MUST leave any parked marker ALONE. A failed
@@ -169,20 +217,23 @@ export async function endAiSessionForSignOut(): Promise<AiSignOutTeardownResult>
   // failure would go silent, which is exactly what this change prevents. Only a
   // successful teardown/retry (below, or retryPendingAiTeardown) or the user's
   // Dismiss clears the marker.
-  if (!sessionId || !db || !functionsInstance) {
+  if (!sessionIds.length || !db || !functionsInstance) {
     return { attempted: false, serverOk: true };
   }
 
-  const serverOk = await runServerTeardown(sessionId);
-  if (serverOk) {
-    // Clear only a marker that belongs to the session we actually ended, so a
-    // successful teardown of one session cannot drop another session's pending
-    // retry.
-    if (getPendingAiTeardownSessionId() === sessionId) clearPendingAiTeardown();
-  } else {
-    setPendingAiTeardown(sessionId);
-  }
-  return { attempted: true, serverOk };
+  const results = await Promise.all(sessionIds.map(id => runServerTeardown(id)));
+  const failed = sessionIds.filter((_, i) => !results[i]);
+  // Clear only a marker that belongs to a session we actually ended, so a
+  // successful teardown of one session cannot drop another session's pending
+  // retry.
+  const marker = getPendingAiTeardownSessionId();
+  if (marker && sessionIds.includes(marker) && !failed.includes(marker)) clearPendingAiTeardown();
+  // The marker (and its banner) holds one id; any further failure is parked on
+  // the silent list, which the same retry drains.
+  const [first, ...rest] = failed;
+  if (first) setPendingAiTeardown(first);
+  for (const id of rest) parkSessionEnd(id);
+  return { attempted: true, serverOk: failed.length === 0 };
 }
 
 /**
@@ -191,6 +242,7 @@ export async function endAiSessionForSignOut(): Promise<AiSignOutTeardownResult>
  * there was nothing to do); false when a retry was attempted and still failed.
  */
 export async function retryPendingAiTeardown(): Promise<boolean> {
+  await retryPendingSessionEnds();
   const sessionId = getPendingAiTeardownSessionId();
   if (!sessionId) return true;
   if (!db || !functionsInstance) return false;
@@ -198,4 +250,14 @@ export async function retryPendingAiTeardown(): Promise<boolean> {
   const ok = await runServerTeardown(sessionId);
   if (ok) clearPendingAiTeardown();
   return ok;
+}
+
+/** Retry the silent list (B15). Each id leaves the list once its end succeeds. */
+async function retryPendingSessionEnds(): Promise<void> {
+  const ids = readPendingSessionEnds();
+  if (!ids.length || !db || !functionsInstance) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  const results = await Promise.all(ids.map(id => runServerTeardown(id)));
+  const ended = ids.filter((_, i) => results[i]);
+  writePendingSessionEnds(readPendingSessionEnds().filter(id => !ended.includes(id)));
 }

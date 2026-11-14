@@ -89,8 +89,15 @@ export default function ConnectPanel({
   const displayCode = code ? code.replace('-', ' · ') : '';
 
   return (
-    <Modal open={open} onClose={onClose} title="AI session active">
+    // B15 R-5: no session, no panel (a product change disconnects while the panel
+    // is unmounted by "Loading...", and `open` alone would bring it back on B).
+    <Modal open={open && !!sessionId} onClose={onClose} title="AI session active">
       <div className="space-y-4 text-sm">
+        {sessionState.notice && (
+          <p className="text-gray-700 dark:text-gray-200 bg-blue-50 dark:bg-blue-900/30 rounded-md px-3 py-2">
+            {sessionState.notice}
+          </p>
+        )}
         <div>
           <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Session code</p>
           {codeError ? (

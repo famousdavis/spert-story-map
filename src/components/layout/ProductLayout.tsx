@@ -17,7 +17,8 @@ import ErrorBoundary from '../ui/ErrorBoundary';
 import { Footer } from '../../pages/ChangelogView';
 import { useAiConnectivity } from '../../hooks/useAiConnectivity';
 import { isFirebaseAvailable } from '../../lib/firebase';
-import { AI_SESSION_ID_KEY, AI_CONSENT_KEY, AI_CONSENT_VERSION } from '../../lib/aiConstants';
+import { AI_CONSENT_KEY, AI_CONSENT_VERSION } from '../../lib/aiConstants';
+import { anySessionRecorded } from '../../lib/aiSessionRecords';
 import ConsentModal from '../ConnectAI/ConsentModal';
 import ConnectPanel from '../ConnectAI/ConnectPanel';
 
@@ -44,22 +45,21 @@ export default function ProductLayout() {
 
   // Called before the null-check early returns below so the Rules of Hooks
   // hold (product may be null during initial load).
-  const { sessionState, startSession, stopSession, changePermissions } =
+  const { sessionState, startSession, stopSession, changePermissions, dismissNotice } =
     useAiConnectivity(product, updateProduct);
   const [showAiConsent, setShowAiConsent] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
 
   // Active session → open the panel. Otherwise: if consent is current and a
-  // session id is stored, resume silently and open the panel; a first-time
-  // user gets the consent modal.
+  // session is recorded (B15: for any product, or from before v0.55.11), start
+  // silently and open the panel; a first-time user gets the consent modal.
   const handleConnectAiClick = useCallback(() => {
     if (sessionState.sessionActive) { setShowAiPanel(true); return; }
     const stored = (() => {
       try { return JSON.parse(localStorage.getItem(AI_CONSENT_KEY) ?? 'null') as { version?: number; read?: boolean } | null; }
       catch { return null; }
     })();
-    const sessionId = localStorage.getItem(AI_SESSION_ID_KEY);
-    if (stored?.version === AI_CONSENT_VERSION && sessionId) {
+    if (stored?.version === AI_CONSENT_VERSION && anySessionRecorded()) {
       startSession((stored.read as boolean) ?? false)
         .then(ok => { if (ok) setShowAiPanel(true); })
         .catch(console.error);
@@ -238,7 +238,7 @@ export default function ProductLayout() {
       />
       <ConnectPanel
         open={showAiPanel}
-        onClose={() => setShowAiPanel(false)}
+        onClose={() => { setShowAiPanel(false); dismissNotice(); }}
         sessionState={sessionState}
         onChangePermissions={changePermissions}
         onDisconnect={stopSession}
