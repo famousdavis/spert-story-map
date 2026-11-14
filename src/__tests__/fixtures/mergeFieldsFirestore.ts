@@ -11,6 +11,11 @@
 // released, as the SDK computes a snapshot before a later setDoc is queued and delivers it afterwards; `holdWrites` makes
 // a write apply when it is called and settle only when released, as a write the SDK has been handed is visible to later
 // reads before the server acknowledges it.
+// Offline as the SDK measured it (Exec-RBP-2, review -03; Opus-PR242-1 E and F on the emulator, memoryLocalCache): a
+// document this client has read is served from its cache (`metadata.fromCache: true`), one it never read throws, the
+// members query resolves with no documents, and the `…FromServer` reads throw. A write by this client updates its cached
+// copy, as the SDK applies a local write to its cache; the stand-in is one client, whichever driver writes.
+// `setOfflineAfterReads(n)` drops the connection after the next n reads (a network lost in the middle of an upload).
 //
 // A test fake of the Firestore Web SDK's `setDoc(ref, data, { mergeFields })` (v0.50.0), built to
 // the behaviour the R2 plan reviews measured on the real SDK (firebase 12.12.1):
@@ -48,6 +53,21 @@ export function createMergeFieldsFirestore() {
   let refusal: ((path: string, data: unknown) => Error | null) | null = null
   let reads = 0
   let offline = false
+  /** What this client last read or wrote at each path (null: read, and missing): the SDK's memory cache. */
+  const cache = new Map<string, Doc | null>()
+  let offlineAfter: number | null = null
+  const countRead = () => {
+    reads++
+    if (offlineAfter !== null && --offlineAfter <= 0) {
+      offline = true
+      offlineAfter = null
+    }
+  }
+  /** Every write to the stored document goes through here, so a cached copy follows this client's writes. */
+  const store = (path: string, value: Doc) => {
+    docs.set(path, value)
+    if (cache.has(path)) cache.set(path, structuredClone(value))
+  }
   const gate = () => {
     let open = () => {}
     const promise = new Promise<void>((r) => { open = r })
@@ -118,19 +138,19 @@ export function createMergeFieldsFirestore() {
     writes.push({ path, data, mask: null })
     const cur: Doc = structuredClone(docs.get(path) ?? {})
     deepMergeAll(cur, data)
-    docs.set(path, cur)
+    store(path, cur)
   }
 
   /** A write applied to the stored document: whole without a mask, else only the masked fields. */
   const apply = (path: string, data: Doc, mask: string[][] | null) => {
     const current: Doc = structuredClone(docs.get(path) ?? {})
     if (!mask) {
-      docs.set(path, structuredClone(data))
+      store(path, structuredClone(data))
       return
     }
     if (MUTANT === 'ignore-mask') {
       deepMergeAll(current, data)
-      docs.set(path, current)
+      store(path, current)
       return
     }
     for (const segs of mask) {
@@ -141,7 +161,7 @@ export function createMergeFieldsFirestore() {
       if (isDelete(value)) remove(current, segs)
       else write(current, segs, value)
     }
-    docs.set(path, current)
+    store(path, current)
   }
 
   const setDoc = async (ref: { path: string }, data: Doc, options?: { mergeFields?: (string | FakeFieldPath)[]; merge?: boolean }) => {
@@ -159,16 +179,24 @@ export function createMergeFieldsFirestore() {
     if (held) await held.promise
   }
 
+  const snapshot = (data: Doc | null, fromCache: boolean) => ({
+    exists: () => data !== null,
+    data: () => (data === null ? undefined : structuredClone(data)),
+    metadata: { fromCache },
+  })
   const getDoc = async (ref: { path: string }) => {
-    reads++
     const held = readGate
     const answer = (() => {
-      if (offline) return Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' })
+      if (offline) {
+        if (!cache.has(ref.path)) return Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' })
+        return snapshot(cache.get(ref.path) ?? null, true)
+      }
       if (ref.path.startsWith('spertstorymap_projects/') && !docs.has(ref.path)) return perm()
-      const exists = docs.has(ref.path)
-      const data = structuredClone(docs.get(ref.path))
-      return { exists: () => exists, data: () => structuredClone(data) }
+      const data = docs.has(ref.path) ? structuredClone(docs.get(ref.path)!) : null
+      cache.set(ref.path, data === null ? null : structuredClone(data))
+      return snapshot(data, false)
     })()
+    countRead()
     if (held) await held.promise
     if (answer instanceof Error) throw answer
     return answer
@@ -178,20 +206,22 @@ export function createMergeFieldsFirestore() {
   const where = (field: string, op: string, value: unknown) => ({ field, op, value })
   const query = (c: { col: string }, w: { field: string; op: string; value: unknown }) => ({ ...c, w })
   const getDocs = async (q: { col: string; w: { field: string; op: string; value: string[] } }) => {
-    reads++
+    const wasOffline = offline
+    countRead()
     const uid = q.w.field.replace(/^members\./, '')
     const out = [...docs.entries()].filter(([p, d]) => p.startsWith(q.col + '/') && q.w.value.includes((d.members as Record<string, string> | undefined)?.[uid] ?? ''))
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([p, d]) => ({ id: p.split('/').pop()!, data: () => structuredClone(d) }))
-    if (offline) {
+    if (wasOffline) {
       // the SDK resolves a query offline from its cache, without throwing (Exec-RBP-1 pre-flight, emulator)
       return { docs: [], size: 0, empty: true, forEach: () => {}, metadata: { fromCache: true } }
     }
+    for (const o of out) cache.set(`${q.col}/${o.id}`, o.data()) // a query's documents enter the cache, as in the SDK
     return { docs: out, size: out.length, empty: out.length === 0, forEach: (f: (x: (typeof out)[number]) => void) => out.forEach(f), metadata: { fromCache: false } }
   }
   const unavailable = () => Object.assign(new Error('Failed to get documents from server.'), { code: 'unavailable' })
-  const getDocFromServer = async (ref: { path: string }) => { if (offline) { reads++; throw unavailable() } return getDoc(ref) }
-  const getDocsFromServer = async (q: Parameters<typeof getDocs>[0]) => { if (offline) { reads++; throw unavailable() } return getDocs(q) }
+  const getDocFromServer = async (ref: { path: string }) => { if (offline) { countRead(); throw unavailable() } return getDoc(ref) }
+  const getDocsFromServer = async (q: Parameters<typeof getDocs>[0]) => { if (offline) { countRead(); throw unavailable() } return getDocs(q) }
 
   return {
     docs,
@@ -202,6 +232,8 @@ export function createMergeFieldsFirestore() {
     getDocs, getDocFromServer, getDocsFromServer, collection, where, query,
     get reads() { return reads },
     setOffline(v: boolean) { offline = v },
+    /** The connection drops after the next `n` reads (online until then). */
+    setOfflineAfterReads(n: number) { offlineAfter = n },
     FieldPath: FakeFieldPath,
     doc: (_db: unknown, collection: string, id: string) => ({ path: `${collection}/${id}` }),
     /** Makes setDoc reject (the write is still recorded) while `fn` returns an error. */
@@ -219,6 +251,8 @@ export function createMergeFieldsFirestore() {
       refusal = null
       reads = 0
       offline = false
+      cache.clear()
+      offlineAfter = null
       readGate?.open()
       writeGate?.open()
       readGate = null

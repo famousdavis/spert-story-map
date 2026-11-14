@@ -119,4 +119,44 @@ describe('reads that fail stop the upload before any product is written', () => 
     expect(h.fs.writes).toHaveLength(0);
     expect(h.fs.docs.get(SETTINGS)).toEqual({ projectOrder: ['c2'] });
   });
+
+  // Review -03: offline the SDK serves a settings document already read from its cache, so only a
+  // read from the server stops the upload here.
+  it('offline after the settings document was read online: nothing is written', async () => {
+    seedCloud({ projectOrder: ['c2'] });
+    seedLocal(LOCAL_PREFS);
+    await h.fs.getDoc(h.fs.doc(null, 'spertstorymap_settings', 'u')); // as a tab in cloud mode has read it
+    h.fs.setOffline(true);
+    await expect(migrateLocalToCloud('u')).rejects.toThrow();
+    expect(h.fs.writes).toHaveLength(0);
+    expect(h.fs.docs.get(SETTINGS)).toEqual({ projectOrder: ['c2'] });
+  });
+
+  it('the connection lost after the settings read: nothing is written', async () => {
+    seedCloud({ projectOrder: ['c2'] });
+    seedLocal(LOCAL_PREFS);
+    h.fs.setOfflineAfterReads(1);
+    await expect(migrateLocalToCloud('u')).rejects.toThrow();
+    expect(h.fs.writes).toHaveLength(0);
+    expect(h.fs.docs.get(SETTINGS)).toEqual({ projectOrder: ['c2'] });
+  });
+});
+
+describe('the stand-in offline, as the SDK measured (Opus-PR242-1 E and F, emulator)', () => {
+  const members = () => h.fs.query(h.fs.collection(null, 'spertstorymap_projects'), h.fs.where('members.u', 'in', ['owner', 'editor', 'viewer'])) as Parameters<typeof h.fs.getDocs>[0];
+  it('serves a document already read from its cache, throws for one never read; server reads throw; the query is empty', async () => {
+    seedCloud({ exportName: 'Alice' });
+    const ref = h.fs.doc(null, 'spertstorymap_settings', 'u');
+    expect((await h.fs.getDoc(ref)).metadata.fromCache).toBe(false);
+    h.fs.setOffline(true);
+    const cached = await h.fs.getDoc(ref);
+    expect(cached.metadata.fromCache).toBe(true);
+    expect(cached.data()).toEqual({ exportName: 'Alice' });
+    await expect(h.fs.getDoc(h.fs.doc(null, 'spertstorymap_settings', 'never-read'))).rejects.toThrow('offline');
+    await expect(h.fs.getDocFromServer(ref)).rejects.toThrow();
+    await expect(h.fs.getDocsFromServer(members())).rejects.toThrow();
+    const list = await h.fs.getDocs(members());
+    expect(list.docs).toHaveLength(0);
+    expect(list.metadata.fromCache).toBe(true);
+  });
 });
