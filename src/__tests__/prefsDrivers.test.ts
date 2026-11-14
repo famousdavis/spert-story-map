@@ -26,7 +26,7 @@ vi.mock('firebase/firestore', async () => {
 
 import { createFirestoreDriver } from '../lib/firestoreDriver';
 import * as storage from '../lib/storage';
-import { REMOVE, applyEntries, type PrefEntry } from '../lib/prefEntries';
+import { REMOVE, applyEntries, isRemoval, type PrefEntry } from '../lib/prefEntries';
 
 const SEED = { exportName: 'E', exportId: 'I', projectOrder: ['a'], projectPrefs: { 'a.b': { color: 'blue', archived: true }, p2: { archived: true }, s: 'str' } };
 const cloudDoc = (uid = 'u') => h.fs.docs.get(`spertstorymap_settings/${uid}`);
@@ -242,5 +242,19 @@ describe('the own-property walk (a defence: the refused segments never reach it)
     const out = applyEntries({} as Record<string, unknown>, [{ path: ['__proto__', 'color'], value: 'x' }]);
     expect(({} as Record<string, unknown>).color).toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(out, '__proto__')).toBe(true);
+  });
+});
+
+describe('the removal marker across module graphs (review -08)', () => {
+  it('a REMOVE from a second module graph is a removal to the first', async () => {
+    seed('cloud');
+    vi.resetModules();
+    const second = await import('../lib/prefEntries');
+    expect(isRemoval(second.REMOVE)).toBe(true);
+    const d = createFirestoreDriver('u');
+    await d.writePreferences([{ path: ['exportId'], value: second.REMOVE }]);
+    d.flushPendingSaves();
+    expect('exportId' in (cloudDoc() ?? {})).toBe(false);
+    expect(cloudDoc()).toMatchObject({ exportName: 'E' });
   });
 });

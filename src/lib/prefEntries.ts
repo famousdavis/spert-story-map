@@ -20,8 +20,11 @@
  *   every later call (firebase 12.12, measured 5/5).
  */
 
-/** The removal marker. An entry whose value is `undefined` is a removal too. */
-export const REMOVE: unique symbol = Symbol('remove setting');
+/**
+ * The removal marker. An entry whose value is `undefined` is a removal too. A registered symbol, so
+ * a marker from another copy of this module (a test that resets modules) is still a removal here.
+ */
+export const REMOVE: unique symbol = Symbol.for('spert-story-map.settings.remove');
 
 export interface PrefEntry {
   path: readonly string[];
