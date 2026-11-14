@@ -4,9 +4,9 @@
 
 // The decisions useAiConnectivity's startSession makes about the open product's
 // own session, with explicit parameters (no refs, no React): what S1's read means,
-// what follows the resume write (S2), and the create write (S4). startSession
-// keeps each await's `stillOpen()` check; aiSessionSwitch.ts handles the OTHER
-// sessions.
+// what follows the resume write (S2), and the create write (S4). The hook keeps
+// each await's `stillOpen()` check (S1 and S2 in startSession, S3 to S5 in
+// createAndGoLive); aiSessionSwitch.ts handles the OTHER sessions.
 import { doc, updateDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import type { Firestore } from 'firebase/firestore';
 import { APP_VERSION } from '../lib/version';

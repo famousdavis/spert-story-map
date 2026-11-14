@@ -446,10 +446,11 @@ export function useAiConnectivity(
 
   // ── Go live ──────────────────────────────────────────────────────────────────
   // `lock` is the lock taken when the new session's record was written (null on
-  // a resume); `others` is what S3 and S5 read (null on a resume).
+  // a resume); `othersReadAndLocked` is what S3 read of the other recorded sessions
+  // and the lock names S5's query found (null on a resume, which does neither).
   const goLive = useCallback((
     sessionId: string, openId: string, openName: string, consentRead: boolean, lock: (() => void) | null,
-    others: { read: Awaited<ReturnType<typeof readOtherSessions>>; lockedNames: Set<string> | null } | null,
+    othersReadAndLocked: { read: Awaited<ReturnType<typeof readOtherSessions>>; lockedNames: Set<string> | null } | null,
   ) => {
     activeSessionIdRef.current = sessionId;
     boundIdRef.current = openId;
@@ -457,7 +458,7 @@ export function useAiConnectivity(
     releaseLockRef.current = lock ?? holdSessionLock(sessionId);
     const rec = readSessionRecord(openId);
     if (rec?.sessionId === sessionId && rec.productName !== openName) writeSessionRecord(openId, { ...rec, productName: openName });
-    const judged = others ? judgeOtherSessions(others.read, others.lockedNames, new Date()) : [];
+    const judged = othersReadAndLocked ? judgeOtherSessions(othersReadAndLocked.read, othersReadAndLocked.lockedNames, new Date()) : [];
     const notice = buildSwitchNotice(judged, openId, openName);
     resubscribeOps(sessionId);
     resubscribeSession(sessionId);
@@ -468,6 +469,8 @@ export function useAiConnectivity(
   }, [resubscribeOps, resubscribeSession, startHeartbeat, scheduleSnapshot]);
 
   // ── Create (S3, S4) and go live (S5) ─────────────────────────────────────────
+  // It also runs on every resume, where it creates nothing: it skips S3 and S4,
+  // makes no lock query, checks `stillOpen()` once more and goes live.
   const createAndGoLive = useCallback(async (
     database: Firestore, plan: StartPlan, openId: string, openName: string,
     consentRead: boolean, exp: Date, stillOpen: () => boolean,
