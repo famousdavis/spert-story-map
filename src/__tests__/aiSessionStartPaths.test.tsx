@@ -193,11 +193,14 @@ describe('go live', () => {
     expect(record('A')?.productName).toBe('Alpha');
   });
 
-  it('a second start releases the previous lock, so Disconnect leaves none', async () => {
+  // Review -04: without the count, this passed when no lock was ever taken.
+  it('a second start holds exactly one lock for the session (the previous one released), so Disconnect leaves none', async () => {
     const t = openTab({ A: mk('A', 'Alpha') }, 'A');
     await start(t, false);
     const s = sid(t)!;
     expect(await start(t, false)).toBe(true);
+    expect(locks.names().filter(n => n === 'spert-ai:' + s)).toEqual(['spert-ai:' + s]);
+    expect(locks.held.map(h => h.name)).toContain('spert-ai:' + s);
     await act(async () => { await t.result.current.ai.stopSession(); });
     await flush();
     expect(locks.names().filter(n => n === 'spert-ai:' + s)).toEqual([]);
