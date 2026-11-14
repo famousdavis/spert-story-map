@@ -39,6 +39,8 @@ src/
 │   ├── sortByOrder.ts                # Pure sort utility for persisted order arrays
 │   ├── cloneName.ts                  # A copy's name (Clone, Import as copy): import's (Copy) numbering, never longer than 1000 characters
 │   ├── gestureGuard.ts               # Swallows the rest of a double-click after a tile opens its project
+│   ├── undoKeys.ts                   # The one rule for the undo keys on the Map and Sizing tabs (Ctrl/Cmd+Z, Shift+Z, Y) and the Mac check
+│   ├── aiSessionRecords.ts           # Which Connect AI session this browser holds for each product (one localStorage key per product)
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
 │   ├── sampleData.ts                 # Sample "Billing System v2" product factory
 │   ├── progressRule.ts              # The one rule for what counts: sprint order, effective entries, share, completion, lock, a row's records
@@ -62,6 +64,8 @@ src/
 │   ├── useProduct.ts                 # Load/save product state with debounced persistence
 │   ├── useProductMutations.ts        # Reusable CRUD hook (pure transforms live in lib/productTransforms.ts)
 │   ├── aiConnectivityUtils.ts        # Pure helpers for useAiConnectivity (seq cursor, consent parse, ops query)
+│   ├── aiSessionLock.ts              # A shared Web Lock per live Connect AI session, so another tab can see it is in use
+│   ├── aiSessionSwitch.ts            # Starting a session: read, judge and end the other sessions this browser holds
 │   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag) + pure applyCardDrop
 │   ├── useImportState.ts             # State machine for multi-project import (idle/preview/applying/done/error)
 │   ├── useProjectOrder.ts            # Projects page order: saved order, drops, and where a clone goes
