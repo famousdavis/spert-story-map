@@ -16,13 +16,15 @@ import type { Product, ChangeLogEntry, StorageDriver } from '../types';
 import {
   doc, getDoc, setDoc, deleteDoc, getDocs, updateDoc,
   collection, query, where,
-  onSnapshot,
+  onSnapshot, FieldPath,
   deleteField, runTransaction, arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Firestore } from 'firebase/firestore';
 import { migrateToV2 } from './storage';
 import { sanitizeForFirestore } from './firestoreUtils';
+import { projectsMembersQuery } from './projectsMembersQuery';
+import { addEntry, applyEntries, buildMaskedWrite, type PrefEntry } from './prefEntries';
 import { callRevokeInvite, callResendInvite } from './callables';
 
 /**
@@ -105,8 +107,8 @@ export function createFirestoreDriver(uid: string): StorageDriver {
   let productTimer: ReturnType<typeof setTimeout> | null = null;
   let productPending: Product | null = null;
   let prefsTimer: ReturnType<typeof setTimeout> | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
-  let prefsPending: any = null;
+  /** Settings entries not yet handed to a write (v0.55.14): see prefEntries.ts. */
+  let prefsPending: PrefEntry[] = [];
 
   // Active onSnapshot unsubscribers (audit L3). Tracked centrally so
   // signOutCleanup can detach all listeners before credential revocation.
@@ -257,11 +259,22 @@ export function createFirestoreDriver(uid: string): StorageDriver {
     }
   }
 
+  /** A read as this tab will see it once its pending entries are written (R-4). The SDK already returns entries handed to `setDoc`. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
-  async function doSavePrefs(prefs: any): Promise<void> {
+  function withPendingPrefs(data: any) {
+    return prefsPending.length > 0 ? applyEntries(data, prefsPending) : data;
+  }
+
+  /**
+   * ONE masked write of the accumulated entries: only the named fields change, so a setting written
+   * elsewhere since this tab read is kept. No read first. `setDoc` with `mergeFields` creates a
+   * missing document; a `FieldPath` per entry, never a dotted string (a product id may hold a dot).
+   */
+  async function doSavePrefs(entries: PrefEntry[]): Promise<void> {
     try {
       const ref = doc(requireDb(), SETTINGS_COL, uid);
-      await setDoc(ref, sanitizeForFirestore(prefs));
+      const { data, fields } = buildMaskedWrite(entries, sanitizeForFirestore, deleteField, segs => new FieldPath(...segs));
+      await setDoc(ref, data, { mergeFields: fields });
     } catch (e) {
       handleWriteError(e);
     }
@@ -277,23 +290,9 @@ export function createFirestoreDriver(uid: string): StorageDriver {
      * Returns full product data with _owner/_members metadata attached.
      */
     async loadProductIndex() {
-      // ⚠️ This filter's SHAPE is a security boundary, not a convenience.
-      // firestore.rules constrains `list` on this collection to
-      // members[request.auth.uid] in ['owner', 'editor', 'viewer'], and Firestore
-      // permits a list query ONLY when its filter PROVES that constraint. Drop or
-      // change this filter and you do not get more rows — you get
-      // PERMISSION_DENIED, and no project loads at all.
-      // Until 2026-08-19 the rule was `allow list: if isAuth()`, which let any
-      // signed-in SPERT user read every project in this collection.
-      // ⚠️ The rule and this query are pinned together by
-      // rules-tests/project-collections-list.test.ts in the spert-landing-page
-      // repo (`npm run test:rules`). That test encodes this query AS WRITTEN and
-      // lives in a DIFFERENT repository, so it will NOT fail when you edit this
-      // line. Change one, change the other.
-      const q = query(
-        collection(requireDb(), PROJECTS_COL),
-        where(`members.${uid}`, 'in', ['owner', 'editor', 'viewer']),
-      );
+      // ⚠️ The members query is a security boundary pinned by landing's rules tests: see
+      // projectsMembersQuery.ts before changing it.
+      const q = projectsMembersQuery(requireDb(), uid);
       const snap = await getDocs(q);
       const products: Product[] = [];
       snap.forEach(docSnap => {
@@ -566,24 +565,26 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       try {
         const ref = doc(requireDb(), SETTINGS_COL, uid);
         const snap = await getDoc(ref);
-        return snap.exists() ? snap.data() : {};
+        return withPendingPrefs(snap.exists() ? snap.data() : {});
       } catch (e) {
         console.error('Failed to load cloud preferences:', e instanceof Error ? e.message : 'Unknown error');
-        return {};
+        return withPendingPrefs({});
       }
     },
 
     /** Debounced save (200ms). */
     // async so the returned value matches StorageDriver's Promise<void>; the
     // write itself stays debounced and fire-and-forget, as before.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firestore document data is heterogeneous; strict typing would be false safety
-    async savePreferences(prefs: any) {
-      prefsPending = prefs;
+    async writePreferences(entries: readonly PrefEntry[]) {
+      let next = prefsPending;
+      for (const entry of entries) next = addEntry(next, entry);
+      if (next.length === 0) return;
+      prefsPending = next;
       if (prefsTimer) clearTimeout(prefsTimer);
       prefsTimer = setTimeout(() => {
         prefsTimer = null;
         const p = prefsPending;
-        prefsPending = null;
+        prefsPending = [];
         doSavePrefs(p);
       }, 200);
     },
@@ -606,11 +607,11 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         productPending = null;
         doSaveProduct(p);
       }
-      if (prefsTimer && prefsPending) {
+      if (prefsTimer && prefsPending.length > 0) {
         clearTimeout(prefsTimer);
         prefsTimer = null;
         const p = prefsPending;
-        prefsPending = null;
+        prefsPending = [];
         doSavePrefs(p);
       }
     },
@@ -632,7 +633,7 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         clearTimeout(prefsTimer);
         prefsTimer = null;
       }
-      prefsPending = null;
+      prefsPending = [];
     },
 
     /**

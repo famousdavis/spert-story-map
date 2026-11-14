@@ -8,6 +8,7 @@ import { runObserver } from './validatorObserverRegistry';
 import { needsV2Migration } from './schemaVersion';
 import { guardCloudProduct } from './cloudLoadGuard';
 import { reportGuardedLoad } from './cloudLoadNotices';
+import { addEntry, applyEntries, type PrefEntry } from './prefEntries';
 
 // ── localStorage namespace ──────────────────────────────────────────
 //
@@ -89,6 +90,7 @@ export function flushPendingSaves(): void {
   }
   saveTimers = {};
   pendingSaves = {};
+  for (const key of Object.keys(pendingPrefs)) writePendingPrefs(key);
 }
 
 /**
@@ -102,6 +104,30 @@ export function cancelPendingSaves(): void {
   }
   saveTimers = {};
   pendingSaves = {};
+  for (const key of Object.keys(prefsTimers)) clearTimeout(prefsTimers[key]);
+  prefsTimers = {};
+  pendingPrefs = {};
+}
+
+// Settings entries (v0.55.14), per preferences key (= per namespace), under the same 200 ms
+// debounce. The write reads the stored object WHEN IT FIRES and applies the entries to it, so a
+// setting another tab wrote in the meantime is kept.
+let prefsTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+let pendingPrefs: Record<string, PrefEntry[]> = {};
+
+function writePendingPrefs(key: string): void {
+  const entries = pendingPrefs[key];
+  if (prefsTimers[key]) clearTimeout(prefsTimers[key]);
+  delete prefsTimers[key];
+  delete pendingPrefs[key];
+  if (!entries || entries.length === 0) return;
+  try {
+    const stored = immediatelyLoad(key);
+    const base = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+    localStorage.setItem(key, JSON.stringify(applyEntries(base, entries)));
+  } catch (e) {
+    handleSaveError(e);
+  }
 }
 
 function immediatelyLoad(key: string): unknown {
@@ -328,13 +354,23 @@ export function clearAllLocalProducts(ns?: string): void {
 }
 
 // Preferences
+/** The stored settings with this tab's entries not yet written applied on top. */
 export function loadPreferences(ns?: string): UserSettings {
   const key = preferencesKeyFor(ns ?? activeNamespace);
-  return (immediatelyLoad(key) as UserSettings | null) || {};
+  const stored = (immediatelyLoad(key) as UserSettings | null) || {};
+  const pending = pendingPrefs[key];
+  return pending && pending.length > 0 ? applyEntries(stored, pending) : stored;
 }
 
-export function savePreferences(prefs: UserSettings, ns?: string): void {
-  debouncedSave(preferencesKeyFor(ns ?? activeNamespace), prefs, 200);
+/** Queue settings entries (see `prefEntries.ts`); written 200 ms after the last call. */
+export function writePreferences(entries: readonly PrefEntry[], ns?: string): void {
+  const key = preferencesKeyFor(ns ?? activeNamespace);
+  let pending = pendingPrefs[key] ?? [];
+  for (const entry of entries) pending = addEntry(pending, entry);
+  if (pending.length === 0) return;
+  pendingPrefs[key] = pending;
+  if (prefsTimers[key]) clearTimeout(prefsTimers[key]);
+  prefsTimers[key] = setTimeout(() => writePendingPrefs(key), 200);
 }
 
 // Workspace identity — generated once per browser, persists across sessions

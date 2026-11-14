@@ -25,11 +25,11 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
   }, [driver, open]);
 
   const updatePref = (key: string, value: unknown) => {
-    const next = { ...prefs, [key]: value };
-    setPrefs(next);
-    // Local state still updates without a driver; there is simply nothing to
-    // persist to. Previously this threw rather than no-op'd.
-    driver?.savePreferences(next);
+    setPrefs(prev => ({ ...prev, [key]: value }));
+    // Writes this one setting only (v0.55.14): the copy read when the dialog opened is for
+    // display, and writing it whole would undo a setting changed since (the tile order).
+    // Local state still updates without a driver; there is simply nothing to persist to.
+    driver?.writePreferences([{ path: [key], value }]);
   };
 
   return (

@@ -23,7 +23,7 @@ import {
   saveProductImmediateOrThrow as _saveProductImmediateOrThrow,
   deleteProduct as _deleteProduct,
   loadPreferences as _loadPreferences,
-  savePreferences as _savePreferences,
+  writePreferences as _writePreferences,
   getWorkspaceId as _getWorkspaceId,
   flushPendingSaves as _flushPendingSaves,
   cancelPendingSaves as _cancelPendingSaves,
@@ -114,8 +114,8 @@ export function createLocalStorageDriver(): StorageDriver {
       return Promise.resolve(_loadPreferences());
     },
 
-    savePreferences(prefs) {
-      _savePreferences(prefs);
+    writePreferences(entries) {
+      _writePreferences(entries);
       return Promise.resolve();
     },
 
