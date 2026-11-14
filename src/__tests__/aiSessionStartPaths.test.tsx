@@ -53,6 +53,16 @@ describe('the failure paths', () => {
     expect(errorMessages()).not.toContain('[AI] Consent downgrade write failed; aborting resume:');
   });
 
+  // Review -03: only a failed Read → off downgrade reverts the stored consent.
+  it('a resume write that fails for another reason keeps the requested consent (no revert to Read)', async () => {
+    const store = { A: mk('A', 'Alpha') };
+    await sessionLeftInA(store, false);
+    server.failUpdate = 'unavailable';
+    const t = openTab(store, 'A');
+    expect(await start(t, false)).toBe(true);
+    expect(consent()).toMatchObject({ version: 1, write: true, read: false });
+  });
+
   it('a failed read of the open product\'s own session is logged and stops; record, cursor and doc stay; nothing is written', async () => {
     server.seed('sA', { openProductId: 'A', lastSeq: 4 });
     setRecord('A', 'sA', 'Alpha');
