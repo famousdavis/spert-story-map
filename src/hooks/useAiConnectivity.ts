@@ -459,6 +459,9 @@ export function useAiConnectivity(
     const openId = product.id;
     const openName = product.name;
     const stillOpen = () => productRef.current?.id === openId;
+    // This tab's Web Lock on a new session, taken when its record is written and
+    // released in `finally` unless the session goes live.
+    let lockBeforeLive: (() => void) | null = null;
     try {
       const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const record = readSessionRecord(openId);
@@ -555,6 +558,10 @@ export function useAiConnectivity(
         }
         writeSessionRecord(openId, { sessionId, productName: openName, startedAt: Date.now() });
         if (!stillOpen()) return false;
+        // Review -07: hold the lock from the moment the record names this session,
+        // so another tab's R-3 that reads the record while this tab is still
+        // querying the locks finds the session in use and does not end it.
+        lockBeforeLive = holdSessionLock(sessionId);
       }
       const lockedNames = created && read.length ? await queryLockedNames() : null;
       if (!stillOpen()) return false;
@@ -562,7 +569,8 @@ export function useAiConnectivity(
       activeSessionIdRef.current = sessionId;
       boundIdRef.current = openId;
       releaseLockRef.current?.();
-      releaseLockRef.current = holdSessionLock(sessionId);
+      releaseLockRef.current = lockBeforeLive ?? holdSessionLock(sessionId);
+      lockBeforeLive = null;
       const rec = readSessionRecord(openId);
       if (rec?.sessionId === sessionId && rec.productName !== openName) writeSessionRecord(openId, { ...rec, productName: openName });
       const judged = created ? judgeOtherSessions(read, lockedNames, new Date()) : [];
@@ -575,6 +583,7 @@ export function useAiConnectivity(
       endOtherSessions(judged);
       return true;
     } finally {
+      lockBeforeLive?.(); // the session did not go live
       startSessionInFlightRef.current = false;
     }
   }, [product, resubscribeOps, resubscribeSession, startHeartbeat, scheduleSnapshot]);

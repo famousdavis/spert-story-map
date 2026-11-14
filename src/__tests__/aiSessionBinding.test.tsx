@@ -639,3 +639,39 @@ describe('records and R-3 on the paths no other test reached', () => {
     expect(record('A')?.productName).toBe('Alpha Renamed');
   });
 });
+
+// ─── Review note 07: the lock window ─────────────────────────────────────────
+describe('the Web Lock is taken when the new session\'s record is written', () => {
+  it('another tab\'s R-3, run while this tab is still querying the locks, finds the new session in use and leaves it', async () => {
+    seedC();                                           // tab 1 has a session to judge, so it queries the locks
+    const t1 = openTab(store2(), 'A', 'tab1');
+    let release: () => void = () => {};
+    locks.gateNextQuery(new Promise<void>(r => { release = r; }));
+    let pending: Promise<boolean> = Promise.resolve(false);
+    act(() => { pending = t1.result.current.ai.startSession(false); });
+    await flush();                                     // tab 1: created, recorded, waiting in its lock query
+    const sA = record('A')!.sessionId;
+    expect(locks.names()).toContain(`spert-ai:${sA}`);
+    const t2 = openTab(store2(), 'B', 'tab2');
+    await press(t2.result);                            // tab 2 reads A's record and the locks now
+    release();
+    let ok = false;
+    await act(async () => { ok = await pending; });
+    await flush();
+    expect(server.teardownCalls).not.toContain(sA);
+    expect(ok).toBe(true);
+    expect(sid(t1.result)).toBe(sA);
+    expect(t2.result.current.ai.sessionState.notice).toBe(
+      'Your Connect AI session for “Alpha” is still open in another tab, so this is a new session for “Bravo”. Give your AI the new code.');
+  });
+  it('a jump during the create takes no lock at all', async () => {
+    seedC();
+    const t = openTab(store2(), 'A');
+    const ok = await pressAndJump(t.result, g => { server.createGate = g; });
+    server.createGate = null;
+    expect(ok).toBe(false);
+    const sA = record('A')?.sessionId;
+    expect(sA).toBeTruthy();                           // R-9: the created session stays recorded for A
+    expect(locks.requests).not.toContain(`spert-ai:${sA}`);
+  });
+});
