@@ -9,6 +9,7 @@
  * masked-write stand-in; the local driver over jsdom's localStorage.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { isDeepStrictEqual } from 'node:util';
 
 const h = vi.hoisted(() => ({
   fs: null as unknown as ReturnType<typeof import('./fixtures/mergeFieldsFirestore').createMergeFieldsFirestore>,
@@ -46,15 +47,21 @@ function seed(kind: 'cloud' | 'local', key = kind === 'cloud' ? 'u' : 'local') {
   else localStorage.setItem(`rp:${key}:preferences`, JSON.stringify(SEED));
 }
 
-/** Maps left empty compare equal to absent ones (see the test of the one difference). */
-function pruneEmpty(v: unknown): unknown {
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) return v;
-  const out: Record<string, unknown> = {};
-  for (const [k, x] of Object.entries(v)) {
-    const p = pruneEmpty(x);
-    if (!(typeof p === 'object' && p !== null && !Array.isArray(p) && Object.keys(p).length === 0)) out[k] = p;
+const isMapValue = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isEmptyMap = (v: unknown): boolean => isMapValue(v) && Object.values(v).every(isEmptyMap);
+/**
+ * The paths where the accumulated write and the entries written one by one differ OTHER than the two
+ * known kinds (see the test of both): one by one left an empty map, and the accumulated write left
+ * what was stored, which was absent or not a map. So the accumulated write never writes more.
+ */
+function unexplainedDifferences(acc: unknown, one: unknown, seeded: unknown, at: string[] = []): string[] {
+  if (isDeepStrictEqual(acc, one)) return [];
+  if (isEmptyMap(one) && !isMapValue(seeded) && isDeepStrictEqual(acc, seeded)) return [];
+  if (isMapValue(acc) && isMapValue(one)) {
+    const keys = new Set([...Object.keys(acc), ...Object.keys(one)]);
+    return [...keys].flatMap(k => unexplainedDifferences(acc[k], one[k], isMapValue(seeded) ? seeded[k] : undefined, [...at, k]));
   }
-  return out;
+  return [at.join(' > ') || '(document)'];
 }
 
 beforeEach(() => { h.fs?.reset(); storage.cancelPendingSaves(); localStorage.clear(); vi.restoreAllMocks(); });
@@ -103,9 +110,10 @@ describe.each(['cloud', 'local'] as const)('%s driver', kind => {
     expect((s.stored() as { projectPrefs: unknown }).projectPrefs).toEqual({ p2: { color: 'teal' }, s: 'str' });
   });
 
-  it('accumulated entries write the same document as the entries written one by one (seeded random)', () => {
+  it('accumulated entries write what the entries written one by one do, but for the two kinds of difference (seeded random)', () => {
+    // projectPrefs.s is stored as a string, so ['projectPrefs', 's', 'k'] is a path under a stored non-map
     const PATHS = [['exportName'], ['projectOrder'], ['projectPrefs'], ['projectPrefs', 'a.b'], ['projectPrefs', 'a.b', 'color'],
-      ['projectPrefs', 'a.b', 'archived'], ['projectPrefs', 'p2', 'color'], ['projectPrefs', 'new', 'archived']];
+      ['projectPrefs', 'a.b', 'archived'], ['projectPrefs', 'p2', 'color'], ['projectPrefs', 'new', 'archived'], ['projectPrefs', 's', 'k']];
     const VALUES: unknown[] = ['v1', 'v2', true, { color: 'teal' }, ['x', 'y'], REMOVE, undefined];
     let state = 20261114;
     const rnd = () => ((state = (state * 1664525 + 1013904223) >>> 0) / 2 ** 32);
@@ -118,21 +126,25 @@ describe.each(['cloud', 'local'] as const)('%s driver', kind => {
       for (const e of seq) acc.write([e]);
       acc.flush();
       for (const e of seq) { one.write([e]); one.flush(); }
-      expect(pruneEmpty(acc.stored()), JSON.stringify(seq)).toEqual(pruneEmpty(one.stored()));
+      expect(unexplainedDifferences(acc.stored(), one.stored(), SEED), JSON.stringify(seq)).toEqual([]);
     }
   });
 
-  it('the one difference: a set then its own removal leaves an empty map one by one, nothing accumulated', () => {
+  it.each([
+    ['a set then its own removal: one by one leaves an empty map where nothing was stored', 'new', undefined],
+    ['a set then a removal under a stored non-map: one by one leaves an empty map, accumulated the stored value', 's', 'str'],
+  ])('the two kinds of difference: %s', (_name, key, accumulated) => {
     seed(kind, kind === 'cloud' ? 'ua' : 'na');
     seed(kind, kind === 'cloud' ? 'ub' : 'nb');
     const acc = kind === 'cloud' ? cloudSide('ua') : localSide('na');
     const one = kind === 'cloud' ? cloudSide('ub') : localSide('nb');
-    const seq: PrefEntry[] = [{ path: ['projectPrefs', 'new', 'color'], value: 'x' }, { path: ['projectPrefs', 'new', 'color'], value: REMOVE }];
+    const seq: PrefEntry[] = [{ path: ['projectPrefs', key, 'color'], value: 'x' }, { path: ['projectPrefs', key, 'color'], value: REMOVE }];
     for (const e of seq) acc.write([e]);
     acc.flush();
     for (const e of seq) { one.write([e]); one.flush(); }
-    expect((one.stored() as { projectPrefs: Record<string, unknown> }).projectPrefs.new).toEqual({});
-    expect('new' in (acc.stored() as { projectPrefs: Record<string, unknown> }).projectPrefs).toBe(false);
+    expect((one.stored() as { projectPrefs: Record<string, unknown> }).projectPrefs[key]).toEqual({});
+    expect((acc.stored() as { projectPrefs: Record<string, unknown> }).projectPrefs[key]).toEqual(accumulated);
+    expect(key in (acc.stored() as { projectPrefs: Record<string, unknown> }).projectPrefs).toBe(accumulated !== undefined);
   });
 
   it('flush writes every accumulated entry at once; cancel drops them', () => {

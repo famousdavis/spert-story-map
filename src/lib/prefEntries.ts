@@ -11,8 +11,13 @@
  * - `addEntry` keeps the pending entries free of a parent and its child: a new entry replaces every
  *   pending entry at or below its path; a child arriving after a pending parent folds into the
  *   parent's value; a child removal below a pending removal or a non-map value does nothing. One
- *   accumulated write then leaves the document as the same entries written one by one would
- *   (Exec-RBP-1 pre-flight: 0 mismatches in 57 random sequences on the emulator).
+ *   accumulated write then leaves the document as the same entries written one by one would, with
+ *   two kinds of difference, in each of which one by one leaves an empty map where the accumulated
+ *   write leaves what was stored: a set then its own removal (one by one creates the parent map and
+ *   then empties it), and a set then a removal under a stored value that is not a map (one by one
+ *   replaces that value with a map and then empties it). The accumulated write never writes more
+ *   than one by one (Opus-PR242-1 p3 on the emulator: of 300 random sequences, 291 equal, 1 equal
+ *   once empty maps are pruned, 8 of the second kind).
  * - `applyEntries` applies entries to a plain object through own properties only.
  * - A path is refused when a segment is empty, has the form `__x__`, or names an `Object.prototype`
  *   member (O33). The SDK refuses the first two; a `deleteField()` at a present `constructor`,
