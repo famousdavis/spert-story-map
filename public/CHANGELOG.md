@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.55.13 (2026-11-14)
+
+### Changed
+
+- **The code that starts a Connect AI session is split into smaller parts, and nothing changes in how Connect AI works.** 17 new tests, added and run against version 0.55.12 before the split, check what starting a session writes, in what order, and what it does when a step fails. They pass before and after the split.
+
 ## Version 0.55.12 (2026-11-13)
 
 ### Fixed
