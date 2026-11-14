@@ -64,6 +64,7 @@ function seedProducts(...ps: Array<[string, string]>) {
   localStorage.setItem('rp:local:products_index', JSON.stringify(ps.map(([id, name]) => ({ id, name }))));
 }
 const record = (id: string) => JSON.parse(localStorage.getItem(REC + id) ?? 'null') as { sessionId: string } | null;
+const stored = (id: string) => JSON.parse(localStorage.getItem(`rp:local:product_${id}`) ?? 'null') as Product | null;
 
 const nav: Record<string, (to: string) => void> = {};
 const rename: Record<string, (name: string) => void> = {};
@@ -237,5 +238,33 @@ describe('ConnectPanel: a code that returns after the session changed', () => {
     releaseNew();
     await settle();
     expect(shownCode()).toBe('WORD2 · new2');
+  });
+});
+
+// ─── R-7 / PF-01: the cursor (review finding 03) ─────────────────────────────
+describe('W3b the cursor moves when an op applies', () => {
+  it('an op applied live on A is not applied again after a reload resumes A', async () => {
+    seedProducts(['A', 'Alpha']);
+    const pa = makeProduct('A', 'Alpha') as unknown as Record<string, unknown>;
+    pa.themes = [{ id: 't1', name: 'T', order: 1, backboneItems: [{ id: 'b1', name: 'B', order: 1, ribItems: [
+      { id: 'r1', name: 'R', description: '', order: 1, size: null, category: 'core', releaseAllocations: [], progressHistory: [], notes: '' }] }] }];
+    localStorage.setItem('rp:local:product_A', JSON.stringify(pa));
+    const t1 = renderTab('/product/A/structure');
+    await screen.findByTestId('page-tab1');
+    await connectFirstTime(t1.container);
+    const sA = record('A')!.sessionId;
+    server.aiWrite(sA, 'append_rib_note', { ribId: 'r1', text: 'once' });   // not idempotent: a replay appends again
+    await settle();
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });   // the driver's save debounce
+    flushPendingSaves();
+    t1.unmount();                                                               // the reload
+    const t2 = renderTab('/product/A/structure');
+    await screen.findByTestId('page-tab1');
+    await pressConnect(t2.container);
+    expect(record('A')!.sessionId).toBe(sA);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    flushPendingSaves();
+    const rib = stored('A')!.themes[0]!.backboneItems[0]!.ribItems[0]!;
+    expect(rib.notes).toBe('once');
   });
 });
