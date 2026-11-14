@@ -353,6 +353,34 @@ export function clearAllLocalProducts(ns?: string): void {
   localStorage.removeItem(indexKeyFor(namespace));
 }
 
+/** Drop a debounced write that has not run yet, so it cannot bring back what was removed. */
+function dropPendingSave(key: string): void {
+  if (saveTimers[key]) { clearTimeout(saveTimers[key]); delete saveTimers[key]; delete pendingSaves[key]; }
+}
+
+/**
+ * Remove these products from a namespace and its index; every other product, and the order of the
+ * index, stay (v0.55.15, R72: the clear after an upload removes only what that upload sent). A
+ * pending index write is the newest index, so it is the one filtered.
+ */
+export function removeLocalProducts(ids: readonly string[], ns: string): void {
+  const drop = new Set(ids);
+  for (const id of drop) {
+    const key = productKeyFor(id, ns);
+    dropPendingSave(key);
+    localStorage.removeItem(key);
+  }
+  const indexKey = indexKeyFor(ns);
+  const pending = pendingSaves[indexKey];
+  const index = (Array.isArray(pending) ? pending as { id: string }[] : loadProductIndex(ns)).filter(p => !drop.has(p.id));
+  dropPendingSave(indexKey);
+  try {
+    localStorage.setItem(indexKey, JSON.stringify(index));
+  } catch (e) {
+    handleSaveError(e);
+  }
+}
+
 // Preferences
 /** The stored settings with this tab's entries not yet written applied on top. */
 export function loadPreferences(ns?: string): UserSettings {

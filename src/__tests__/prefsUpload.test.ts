@@ -78,7 +78,7 @@ describe('the upload keeps the cloud tile order and adds the uploaded products a
     const before = tiles();
     const r = await migrateLocalToCloud('u');
     const after = tiles();
-    expect(r.uploaded).toBe(3);
+    expect(r.uploadedIds).toHaveLength(3); // v0.55.15: the outcome lists the uploaded local ids
     expect(after.slice(0, 4)).toEqual(before);
     expect(after.slice(4)).toEqual(UPLOADED_IN_LOCAL_TILE_ORDER);
     // every uploaded product gets a new id (the get of a missing project is refused)

@@ -5,7 +5,7 @@
 /**
  * Data migration between localStorage and Firestore.
  *
- * migrateLocalToCloud(uid) — uploads local products to Firestore.
+ * migrateLocalToCloud(uid) — uploads local products to Firestore, skipping any an earlier upload put there.
  * Cloud-to-local migration was removed in v0.15.0 (cloud is source of truth).
  * Use "Download All as JSON" for data portability instead.
  */
@@ -25,6 +25,7 @@ import { projectsMembersQuery } from './projectsMembersQuery';
 import { sortByOrder } from './sortByOrder';
 import { addEntry, buildMaskedWrite, type PrefEntry } from './prefEntries';
 import type { UserSettings } from '../types';
+import { indexCloud, findEarlierUpload, sharedOriginKeys, type CloudRow } from './uploadRecognition';
 
 /** Narrow the module-level `db` — see the identical helper in firestoreDriver. */
 function requireDb(): Firestore {
@@ -45,20 +46,23 @@ export async function testCloudConnection(uid: string): Promise<boolean> {
   }
 }
 
+/** A local product the upload left in this browser because the cloud already holds it. */
+export interface UploadSkip { localId: string; name: string; cloudName: string }
+/** What one upload did: the local ids it uploaded, what it skipped, and how many it could not read. */
+export interface UploadOutcome { uploadedIds: string[]; skipped: UploadSkip[]; unreadable: number }
+
 /**
- * Upload all local products to Firestore.
+ * Upload the local products to Firestore, each under a new id.
  *
- * Collision handling, by a get of the cloud document with the product's id:
- * - a product the user is a member of → skipped;
- * - anyone else's product → a new id;
- * - no such document → the rules refuse a get of a missing document (`allow get` reads
- *   `resource.data.members`), so it gets a new id too.
+ * A product an earlier upload already put in the cloud is skipped (v0.55.15, R67): decided from the
+ * server list in `uploadRecognition.ts`, which replaced a per-product get of the product's own id
+ * (that get answered only for a product the user is a member of, which the list holds anyway). Every
+ * upload's `cloud-migration` entry names the local id it came from (`source`), which is what lets a
+ * later upload recognise it.
  *
  * Local data is left in place as a backup.
- *
- * @returns {{ uploaded: number, skipped: number }}
  */
-export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: number; skipped: number }> {
+export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   // v0.55.14 (R63): the cloud's tile order and settings, read BEFORE any product is written and
   // from the server: offline the members query resolves empty from cache without throwing, which
   // would put every uploaded product ahead of the cloud's. A failed read stops the upload here.
@@ -67,54 +71,32 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
   const cloudPrefs: UserSettings = settingsSnap.exists() ? settingsSnap.data() : {};
   const cloudList = await getDocsFromServer(projectsMembersQuery(requireDb(), uid));
   const cloudTiles = sortByOrder(cloudList.docs.map(d => ({ id: d.id })), cloudPrefs.projectOrder).map(t => t.id);
+  const cloud = indexCloud(cloudList.docs.map((d): CloudRow => ({ id: d.id, data: d.data() })), uid);
 
   // Explicit 'local' overrides — migration always reads from the anonymous-
   // session namespace. At sign-in the active namespace becomes the uid, but
   // the user's pre-sign-in projects live at rp:local:*, not rp:{uid}:*.
   const index = loadProductIndex('local');
   const localPrefs = loadPreferences('local');
+  const loaded = index.map(entry => ({ entry, product: loadProduct(entry.id, 'local', false) }));
+  const shared = sharedOriginKeys(loaded.map(l => l.product));
   const targetIds = new Map<string, string>();
-  let uploaded = 0;
-  let skipped = 0;
+  const outcome: UploadOutcome = { uploadedIds: [], skipped: [], unreadable: 0 };
 
-  for (const entry of index) {
-    const product = loadProduct(entry.id, 'local', false);
+  for (const { entry, product } of loaded) {
     if (!product) {
-      skipped++;
+      outcome.unreadable++;
+      continue;
+    }
+    const earlier = findEarlierUpload(product, cloud, shared);
+    if (earlier) {
+      outcome.skipped.push({ localId: product.id, name: product.name, cloudName: earlier.cloudName });
       continue;
     }
 
-    let targetId = product.id;
-
-    // Collision check: try to read the doc to see if it already exists.
-    // Firestore `get` rules reference `resource.data.members`, which fails
-    // with PERMISSION_DENIED for both non-existent docs (resource.data is
-    // null) and docs the user isn't a member of. We treat PERMISSION_DENIED
-    // as "safe to create with a new ID" to handle both cases.
-    try {
-      const existing = await getDoc(doc(requireDb(), PROJECTS_COL, targetId));
-      if (existing.exists()) {
-        const data = existing.data();
-        if (data.members && data.members[uid]) {
-          // User already has this project in cloud — skip
-          skipped++;
-          continue;
-        }
-        // Belongs to someone else — generate new ID
-        targetId = crypto.randomUUID();
-      }
-    } catch {
-      // PERMISSION_DENIED means doc exists but user isn't a member,
-      // or doc doesn't exist (rule can't evaluate resource.data).
-      // Generate a new ID to avoid collision.
-      targetId = crypto.randomUUID();
-    }
-
-    // Append migration event to changelog
-    const updatedProduct = { ...product, id: targetId };
-    updatedProduct._changeLog = appendChangeLogEntry(updatedProduct, { op: 'cloud-migration', uid });
-
-    const { id, ...rest } = updatedProduct;
+    // R-2: the entry names the local id it came from; nothing else about the product changes.
+    const uploaded = { ...product, id: crypto.randomUUID(), _changeLog: appendChangeLogEntry(product, { op: 'cloud-migration', uid, source: product.id }) };
+    const { id, ...rest } = uploaded;
     await setDoc(doc(requireDb(), PROJECTS_COL, id), {
       ...sanitizeForFirestore(rest),
       owner: uid,
@@ -123,11 +105,11 @@ export async function migrateLocalToCloud(uid: string): Promise<{ uploaded: numb
     });
 
     targetIds.set(entry.id, id);
-    uploaded++;
+    outcome.uploadedIds.push(entry.id);
   }
 
   await setDoc(settingsRef, ...uploadedSettings(cloudPrefs, localPrefs, cloudTiles, sortByOrder(index, localPrefs.projectOrder), targetIds));
-  return { uploaded, skipped };
+  return outcome;
 }
 
 const isBlank = (v: unknown) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
