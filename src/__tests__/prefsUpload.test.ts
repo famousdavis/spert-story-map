@@ -80,6 +80,13 @@ describe('the upload keeps the cloud tile order and adds the uploaded products a
 });
 
 describe('R64: the cloud keeps the settings it has', () => {
+  it('a cloud name and identifier are kept over this browser\'s', async () => {
+    seedCloud({ exportName: 'Alice Smith', exportId: 'UF-1111' });
+    seedLocal(LOCAL_PREFS);
+    await migrateLocalToCloud('u');
+    expect(h.fs.docs.get(SETTINGS)).toMatchObject({ exportName: 'Alice Smith', exportId: 'UF-1111' });
+  });
+
   it('a cloud name and identifier are kept; a blank one is filled from this browser; a local blank never overwrites', async () => {
     seedCloud({ exportName: 'Alice Smith', exportId: '   ', suppressLocalStorageWarning: false });
     seedLocal({ ...LOCAL_PREFS, exportName: '' });

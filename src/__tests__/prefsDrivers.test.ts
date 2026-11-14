@@ -191,4 +191,10 @@ describe('the own-property walk (a defence: the refused segments never reach it)
     expect(JSON.parse(JSON.stringify(out))).toEqual({ projectPrefs: { constructor: { color: 'x' } } });
     expect((Object as unknown as Record<string, unknown>).color).toBeUndefined();
   });
+
+  it('applyEntries never walks into Object.prototype through a __proto__ segment', () => {
+    const out = applyEntries({} as Record<string, unknown>, [{ path: ['__proto__', 'color'], value: 'x' }]);
+    expect(({} as Record<string, unknown>).color).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(out, '__proto__')).toBe(true);
+  });
 });
