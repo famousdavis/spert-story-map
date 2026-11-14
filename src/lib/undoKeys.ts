@@ -17,11 +17,12 @@ export interface UndoKeyEvent {
  * The one rule for the undo keys on the Map and Sizing tabs.
  *
  * The platform's modifier must be held: Cmd on a Mac, Ctrl elsewhere. The other modifier is
- * ignored. The key is then read without regard to case, because with Shift held a browser
- * reports "Z", not "z": z undoes and Shift+z redoes. y redoes unless the key is a capital "Y"
- * with Shift held (ruling R57): a lowercase "y" redoes with or without Shift, as it did before
- * this rule, and "Y" without Shift (Caps Lock) redoes. A key that is missing or not text is no
- * action, so a bare `keydown` cannot throw.
+ * ignored. The key is then read without regard to case, because with Shift held a browser may
+ * report "Z" rather than "z" (Chromium does, by its source; some Mac browsers report "z"; not
+ * measured with real OS key events): z undoes and Shift+z redoes. y redoes unless the key is a
+ * capital "Y" with Shift held (ruling R57): a lowercase "y" redoes with or without Shift, as it
+ * did before this rule, and "Y" without Shift (Caps Lock) redoes. A key that is missing or not
+ * text is no action, so a bare `keydown` cannot throw.
  *
  * `isMac` comes from the caller (`navigator.platform.toUpperCase().includes('MAC')`, where
  * "MacIntel" counts); this function reads nothing global.

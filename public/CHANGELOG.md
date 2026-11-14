@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **Ctrl+Shift+Z (Cmd+Shift+Z on a Mac) now redoes on the Map and Sizing tabs**, as Ctrl+Y (Cmd+Y) already did. Before this version it did nothing there.
+- **Ctrl+Shift+Z (Cmd+Shift+Z on a Mac) now redoes on the Map and Sizing tabs**, as Ctrl+Y (Cmd+Y) already did.
 - **The Connect AI panel shows the session code on one line, with Copy Code and Copy Prompt together on the line below it.** Before this version a code with a longer word could break onto two lines and squeeze both buttons.
 - **The placeholder the Connect AI panel shows while it makes a code is now as long as a real code**, a word and 10 digits. It had 4 dots where the digits go.
 
