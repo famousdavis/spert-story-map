@@ -162,6 +162,18 @@ describe.each(['cloud', 'local'] as const)('%s driver', kind => {
     expect(s.stored()).toMatchObject({ exportName: 'E', exportId: 'later' });
   });
 
+  it('a value the caller changes after writing it is not what is written', () => {
+    seed(kind);
+    const s = side();
+    const order = ['b', 'a'];
+    const prefs = { color: 'teal' };
+    s.write([{ path: ['projectOrder'], value: order }, { path: ['projectPrefs', 'n1'], value: prefs }]);
+    order.push('changed after');
+    prefs.color = 'changed after';
+    s.flush();
+    expect(s.stored()).toMatchObject({ projectOrder: ['b', 'a'], projectPrefs: { n1: { color: 'teal' } } });
+  });
+
   it('a read sees this tab\'s entries before they are written', async () => {
     seed(kind);
     const s = side();
