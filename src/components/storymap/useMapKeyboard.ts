@@ -4,6 +4,7 @@
 
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
+import { undoKeyAction } from '../../lib/undoKeys';
 
 /**
  * Keyboard shortcuts for the story map.
@@ -35,17 +36,11 @@ export default function useMapKeyboard({ undo, redo, dragPointerRef, cancelDrag,
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (mod && e.key === 'z' && !e.shiftKey) {
+      const action = undoKeyAction(e, navigator.platform.toUpperCase().includes('MAC'));
+      if (action) {
         e.preventDefault();
-        undo();
-      } else if (mod && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        redo();
-      } else if (mod && e.key === 'y') {
-        e.preventDefault();
-        redo();
+        if (action === 'undo') undo();
+        else redo();
       }
       if (e.key === 'Escape') {
         if (dragPointerRef.current) {

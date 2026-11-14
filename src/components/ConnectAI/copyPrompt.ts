@@ -6,8 +6,9 @@ import { PRODUCT_DEFINITION } from '../../lib/constants';
 
 /**
  * The "Copy Prompt" payload the user pastes into their AI chatbot. The
- * canonical WORD-NNNN pairing code is interpolated in. Keep the modeling
- * guidance in sync with the MCP tool descriptions in the Landing Page repo.
+ * canonical WORD-NNNNNNNNNN pairing code (a word and 10 digits) is interpolated
+ * in. Keep the modeling guidance in sync with the MCP tool descriptions in the
+ * Landing Page repo.
  */
 export function buildCopyPrompt(code: string): string {
   return `I want to build a story map for a product using SPERT Story Map. ${PRODUCT_DEFINITION}
