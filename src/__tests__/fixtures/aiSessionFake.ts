@@ -37,12 +37,19 @@ export const server = {
   failCreate: false,
   /** When set, a session create waits for it (a slow network). */
   createGate: null as Promise<void> | null,
+  /** When set, every session doc read (getDoc) waits for it. */
+  readGate: null as Promise<void> | null,
+  /** When set, every session doc update (updateDoc) waits for it. */
+  updateGate: null as Promise<void> | null,
+  /** When set, updateDoc throws with this code (e.g. the doc went between a read and the write). */
+  failUpdate: null as string | null,
   failRead: new Set<string>(),
   listeners: [] as Listener[],
   currentTab: 'tab1',
   reset() {
     this.sessions.clear(); this.ops.clear(); this.snapshotWrites = []; this.openProductIdWrites = [];
     this.teardownCalls = []; this.failTeardown = false; this.failCreate = false; this.createGate = null; this.failRead.clear();
+    this.readGate = null; this.updateGate = null; this.failUpdate = null;
     this.listeners = []; this.currentTab = 'tab1';
   },
   activeOpsListeners(sessionId: string) {
@@ -92,6 +99,7 @@ export const firestoreMock = {
   query: (col: Ref, ...constraints: Query['constraints']): Query => ({ kind: 'query', col, constraints }),
   serverTimestamp: () => ST,
   getDoc: async (ref: Ref) => {
+    if (server.readGate) await server.readGate;
     if (server.failRead.has(sessionIdOf(ref))) throw Object.assign(new Error('unavailable'), { code: 'unavailable' });
     const s = server.sessions.get(sessionIdOf(ref));
     return { exists: () => !!s, data: () => (s ? { ...s } : undefined) };
@@ -107,6 +115,8 @@ export const firestoreMock = {
     server.openProductIdWrites.push({ sessionId: sessionIdOf(ref), value: data.openProductId });
   },
   updateDoc: async (ref: Ref, patch: Record<string, unknown>) => {
+    if (server.updateGate) await server.updateGate;
+    if (server.failUpdate) throw Object.assign(new Error(server.failUpdate), { code: server.failUpdate });
     const s = server.sessions.get(sessionIdOf(ref));
     if (!s) throw Object.assign(new Error('not-found'), { code: 'not-found' });
     Object.assign(s, stampAll(patch));
@@ -156,8 +166,12 @@ export const functionsMock = {
 export function installFakeLocks() {
   const held: Array<{ name: string; mode: LockMode }> = [];
   const pending: Array<{ name: string; mode: LockMode }> = [];
+  /** Every name requested, in order. */
+  const requests: string[] = [];
+  let nextQueryGate: Promise<void> | null = null;
   const fake = {
     request(name: string, opts: LockOptions, cb: (l: unknown) => Promise<unknown>) {
+      requests.push(name);
       const h = { name, mode: opts.mode ?? 'exclusive' as LockMode };
       if (opts.signal?.aborted) return Promise.reject(new DOMException('aborted', 'AbortError'));
       pending.push(h);
@@ -174,11 +188,20 @@ export function installFakeLocks() {
         });
       });
     },
-    async query() { return { held: held.map(h => ({ ...h })), pending: pending.map(h => ({ ...h })) }; },
+    async query() {
+      const gate = nextQueryGate;
+      nextQueryGate = null;
+      if (gate) await gate;
+      return { held: held.map(h => ({ ...h })), pending: pending.map(h => ({ ...h })) };
+    },
   };
   Object.defineProperty(navigator, 'locks', { value: fake, configurable: true });
   return {
-    held, pending,
+    held, pending, requests,
+    /** The next query() waits for `gate`, then reads the locks as they are then. */
+    gateNextQuery: (gate: Promise<void>) => { nextQueryGate = gate; },
+    /** Names held or pending now. */
+    names: () => [...held, ...pending].map(h => h.name),
     remove: () => { delete (navigator as unknown as Record<string, unknown>).locks; },
   };
 }

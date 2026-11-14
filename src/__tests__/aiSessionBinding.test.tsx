@@ -492,3 +492,150 @@ describe('R-5/R-9', () => {
     expect(screen.getByText('The line.')).toBeTruthy();
   });
 });
+
+// ─── Review finding 04: guards no test saw ───────────────────────────────────
+/** Press Connect AI on A and jump to B while `hold` keeps the press waiting at one await. */
+async function pressAndJump(tab: Tab, hold: (gate: Promise<void>) => void) {
+  let release: () => void = () => {};
+  hold(new Promise<void>(r => { release = r; }));
+  let pending: Promise<boolean> = Promise.resolve(true);
+  act(() => { pending = tab.current.ai.startSession(false); });
+  await flush();
+  act(() => tab.current.open('B'));
+  await flush();
+  release();
+  let ok: boolean | null = null;
+  await act(async () => { ok = await pending; });
+  await flush();
+  return ok;
+}
+/** A session recorded for A by an earlier tab that has since reloaded. */
+async function recordedOnA(store: Store) {
+  const t1 = openTab(store, 'A');
+  await press(t1.result);
+  const sA = sid(t1.result)!;
+  t1.unmount();
+  return sA;
+}
+const seedC = () => {
+  server.seed('sC', { openProductId: 'C' });
+  localStorage.setItem(REC + 'C', JSON.stringify({ sessionId: 'sC', productName: 'Charlie', startedAt: 1 }));
+};
+
+describe('R-9 a history jump during each await of startSession', () => {
+  it('during the read of the open product\'s own session: nothing more is written, nothing goes live', async () => {
+    const store = store2();
+    const sA = await recordedOnA(store);
+    const t = openTab(store, 'A');
+    const writesBefore = server.openProductIdWrites.length;
+    const ok = await pressAndJump(t.result, g => { server.readGate = g; });
+    server.readGate = null;
+    expect(ok).toBe(false);
+    expect(t.result.current.ai.sessionState.sessionActive).toBe(false);
+    expect(server.openProductIdWrites.length).toBe(writesBefore);   // no resume write to A's session
+    expect(server.listeners.filter(l => l.active)).toEqual([]);
+    expect(record('A')?.sessionId).toBe(sA);
+  });
+  it('during the resume write: nothing goes live, no lock is held', async () => {
+    const store = store2();
+    const sA = await recordedOnA(store);
+    const t = openTab(store, 'A');
+    const ok = await pressAndJump(t.result, g => { server.updateGate = g; });
+    server.updateGate = null;
+    expect(ok).toBe(false);
+    expect(t.result.current.ai.sessionState.sessionActive).toBe(false);
+    expect(server.listeners.filter(l => l.active)).toEqual([]);
+    expect(locks.names()).not.toContain(`spert-ai:${sA}`);
+  });
+  it('during the reads of the other sessions: no session is created and nothing is recorded', async () => {
+    seedC();
+    const t = openTab(store2(), 'A');
+    const ok = await pressAndJump(t.result, g => { server.readGate = g; });
+    server.readGate = null;
+    expect(ok).toBe(false);
+    expect([...server.sessions.keys()]).toEqual(['sC']);
+    expect(record('A')).toBeNull();
+    expect(server.teardownCalls).toEqual([]);
+  });
+  it('during the lock query: nothing goes live and no lock is left; the created session stays recorded for A', async () => {
+    seedC();                                           // something to judge, so the press queries the locks
+    const store = store2();
+    const t = openTab(store, 'A');
+    const ok = await pressAndJump(t.result, g => { locks.gateNextQuery(g); });
+    expect(ok).toBe(false);
+    expect(t.result.current.ai.sessionState.sessionActive).toBe(false);
+    expect(server.listeners.filter(l => l.active)).toEqual([]);
+    expect(server.teardownCalls).toEqual([]);
+    const sA = record('A')?.sessionId;
+    expect(sA).toBeTruthy();
+    expect(locks.names()).not.toContain(`spert-ai:${sA}`);
+    act(() => t.result.current.open('A'));
+    await flush();
+    await press(t.result);
+    expect(sid(t.result)).toBe(sA);
+  });
+});
+
+describe('records and R-3 on the paths no other test reached', () => {
+  it('a session ended elsewhere (its doc gone): the tab disconnects and its record goes', async () => {
+    const t = openTab(store2(), 'A');
+    await press(t.result);
+    const sA = sid(t.result)!;
+    act(() => { server.teardown(sA); });
+    await flush();
+    expect(t.result.current.ai.sessionState).toMatchObject({ sessionActive: false, sessionId: null });
+    expect(record('A')).toBeNull();
+  });
+  it('a resume whose session is gone at the write, then a failed create: no record is left for the gone session', async () => {
+    const store = store2();
+    await recordedOnA(store);
+    server.failUpdate = 'not-found';                  // read live, gone when the resume writes it
+    server.failCreate = true;
+    const t = openTab(store, 'A');
+    expect(await press(t.result)).toBe(false);
+    expect(record('A')).toBeNull();
+  });
+  it('control: the same with a create that succeeds records the new session', async () => {
+    const store = store2();
+    const sA = await recordedOnA(store);
+    server.failUpdate = 'not-found';
+    const t = openTab(store, 'A');
+    expect(await press(t.result)).toBe(true);
+    expect(record('A')?.sessionId).toBe(sid(t.result));
+    expect(sid(t.result)).not.toBe(sA);
+  });
+  it('a resume ends nothing: another product\'s session that no tab uses is left, with no line', async () => {
+    const store = store2();
+    const sA = await recordedOnA(store);
+    seedC();
+    const t = openTab(store, 'A');
+    await press(t.result);
+    expect(sid(t.result)).toBe(sA);
+    expect(server.teardownCalls).toEqual([]);
+    expect(record('C')?.sessionId).toBe('sC');
+    expect(t.result.current.ai.sessionState.notice).toBeNull();
+  });
+  it('R-6: with no product open (a storage swap), the heartbeat and the visibility handler still write the bound product', async () => {
+    const t = openTab(store2(), 'A');
+    await press(t.result);
+    const sA = sid(t.result)!;
+    act(() => t.result.current.open(null));
+    await flush();
+    const before = server.openProductIdWrites.length;
+    act(() => { vi.advanceTimersByTime(31_000); });  // one heartbeat
+    await flush();
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(server.openProductIdWrites.slice(before)).toEqual([
+      { sessionId: sA, value: 'A' }, { sessionId: sA, value: 'A' },
+    ]);
+  });
+  it('a product renamed while its session was not live is named by its new name once that session resumes', async () => {
+    const store = store2();
+    await recordedOnA(store);
+    store.A = { ...store.A!, name: 'Alpha Renamed' };
+    const t = openTab(store, 'A');
+    await press(t.result);
+    expect(record('A')?.productName).toBe('Alpha Renamed');
+  });
+});
