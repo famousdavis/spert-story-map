@@ -27,6 +27,7 @@ src/
 │   ├── constants.ts                  # Storage keys, schema version, size defaults
 │   ├── version.ts                    # APP_VERSION constant (single source of truth)
 │   ├── storage.ts                    # localStorage CRUD with debouncing, workspace identity
+│   ├── prefEntries.ts                # Settings written field by field: entries, the overlap rule, refused paths, the one masked-write builder
 │   ├── importExport.ts               # Export product JSON, bundled export, legacy single-file import helper
 │   ├── import-utils.ts               # Multi-project import: parse, conflict detection, applyImport (Layer 2 drift re-validation)
 │   ├── validateProduct.ts            # Comprehensive schema validation for imported products
@@ -53,6 +54,7 @@ src/
 │   ├── ribHelpers.ts                # forEachRib / reduceRibs / isRibLocked / transferAllocation / computeRibSiblingName
 │   ├── productTransforms.ts         # Pure (prev:Product)=>Product transforms shared by useProductMutations + aiOps
 │   ├── firestoreCollections.ts      # Centralized Firestore collection-name constants (PROJECTS/PROFILES/SETTINGS/SESSIONS)
+│   ├── projectsMembersQuery.ts      # The one members query on projects (the dashboard list and the upload), pinned by landing's rules tests
 │   ├── themeColors.ts               # Centralized 8-color palette for themes (solid, light, dot, swatch)
 │   ├── exportForForecaster.ts       # Pure transformation: Story Map → SPERT Release Forecaster import format
 │   ├── sendToForecaster.ts          # Direct handover to a Forecaster tab (postMessage); returns reasons, never throws

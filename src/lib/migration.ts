@@ -48,10 +48,11 @@ export async function testCloudConnection(uid: string): Promise<boolean> {
 /**
  * Upload all local products to Firestore.
  *
- * Collision handling:
- * - If a doc with the same ID exists AND user is a member → skip
- * - If a doc exists but user is NOT a member → generate new ID
- * - If doc doesn't exist → proceed
+ * Collision handling, by a get of the cloud document with the product's id:
+ * - a product the user is a member of → skipped;
+ * - anyone else's product → a new id;
+ * - no such document → the rules refuse a get of a missing document (`allow get` reads
+ *   `resource.data.members`), so it gets a new id too.
  *
  * Local data is left in place as a backup.
  *
