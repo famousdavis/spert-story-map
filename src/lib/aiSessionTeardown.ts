@@ -27,6 +27,9 @@ import { listSessionRecords, readLegacySessionId } from './aiSessionRecords';
  * Cloud Function (delete the relay session + its snapshot), following
  * Forecaster's sign-out wiring.
  *
+ * B15 (v0.55.11): a browser can hold one session per product, so sign-out ends
+ * every recorded session plus a legacy one from before v0.55.11.
+ *
  * Idempotent: with no stored session id it is a no-op. Safe to call more than
  * once per sign-out (e.g. `signOutCleanup` then the auth-change handler) — the
  * second call finds the keys already gone and does nothing.

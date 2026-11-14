@@ -1,7 +1,8 @@
-// @vitest-environment jsdom
 // Copyright (C) 2026 William W. Davis, MSPM, PMP. All rights reserved.
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
+
+// @vitest-environment jsdom
 
 // B15: the pure rules behind binding a Connect AI session to its product.
 import { describe, it, expect, beforeEach } from 'vitest';
