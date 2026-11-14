@@ -185,6 +185,26 @@ describe('cloud driver', () => {
     expect(h.fs.reads - before).toBe(0);
   });
 
+  // Review -05: R-4 takes this tab's entries when the read RETURNS, and on the offline path too.
+  it('a write made while a read is outstanding is seen by that read when it returns', async () => {
+    seed('cloud');
+    const d = createFirestoreDriver('u');
+    const releaseRead = h.fs.holdReads();
+    const read = d.loadPreferences();
+    await d.writePreferences([{ path: ['exportName'], value: 'typed while reading' }]);
+    releaseRead();
+    expect(await read).toMatchObject({ exportName: 'typed while reading', exportId: 'I' });
+  });
+
+  it('a read that fails offline still sees this tab\'s pending entries', async () => {
+    seed('cloud');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const d = createFirestoreDriver('u');
+    h.fs.setOffline(true); // never read by this client, so the read throws
+    await d.writePreferences([{ path: ['exportName'], value: 'typed offline' }, { path: ['projectOrder'], value: ['b', 'a'] }]);
+    expect(await d.loadPreferences()).toEqual({ exportName: 'typed offline', projectOrder: ['b', 'a'] });
+  });
+
   // Review -01: the SDK computes a read's snapshot before a setDoc it is handed later and delivers it
   // after, so a read straddling the hand-off saw neither the pending entry nor the stored one.
   it('a read issued before the hand-off and returned after it sees the entry', async () => {
