@@ -4,7 +4,8 @@
 
 // B14 R-1: the one rule for the undo keys, as a table written out row by row.
 // Mac: Cmd is the modifier and Ctrl is ignored. Elsewhere: Ctrl is the modifier and Cmd is ignored.
-// The key is read case-insensitively: z undoes, Shift+z redoes, y without Shift redoes.
+// The key is read case-insensitively: z undoes, Shift+z redoes. y redoes unless it is a capital "Y"
+// with Shift held (ruling R57): a lowercase "y" with Shift still redoes, as before this rule.
 import { describe, expect, it } from 'vitest';
 import { undoKeyAction } from '../lib/undoKeys';
 
@@ -31,7 +32,7 @@ const ROWS: [boolean, boolean, boolean, string | undefined, boolean, 'undo' | 'r
   [false, false, true , 'Z'   , false, 'undo'],
   [false, false, true , 'Z'   , true , 'redo'],
   [false, false, true , 'y'   , false, 'redo'],
-  [false, false, true , 'y'   , true , null],
+  [false, false, true , 'y'   , true , 'redo'],
   [false, false, true , 'Y'   , false, 'redo'],
   [false, false, true , 'Y'   , true , null],
   [false, false, true , 'x'   , false, null],
@@ -44,7 +45,7 @@ const ROWS: [boolean, boolean, boolean, string | undefined, boolean, 'undo' | 'r
   [false, true , true , 'Z'   , false, 'undo'],
   [false, true , true , 'Z'   , true , 'redo'],
   [false, true , true , 'y'   , false, 'redo'],
-  [false, true , true , 'y'   , true , null],
+  [false, true , true , 'y'   , true , 'redo'],
   [false, true , true , 'Y'   , false, 'redo'],
   [false, true , true , 'Y'   , true , null],
   [false, true , true , 'x'   , false, null],
@@ -70,7 +71,7 @@ const ROWS: [boolean, boolean, boolean, string | undefined, boolean, 'undo' | 'r
   [true , true , false, 'Z'   , false, 'undo'],
   [true , true , false, 'Z'   , true , 'redo'],
   [true , true , false, 'y'   , false, 'redo'],
-  [true , true , false, 'y'   , true , null],
+  [true , true , false, 'y'   , true , 'redo'],
   [true , true , false, 'Y'   , false, 'redo'],
   [true , true , false, 'Y'   , true , null],
   [true , true , false, 'x'   , false, null],
@@ -96,7 +97,7 @@ const ROWS: [boolean, boolean, boolean, string | undefined, boolean, 'undo' | 'r
   [true , true , true , 'Z'   , false, 'undo'],
   [true , true , true , 'Z'   , true , 'redo'],
   [true , true , true , 'y'   , false, 'redo'],
-  [true , true , true , 'y'   , true , null],
+  [true , true , true , 'y'   , true , 'redo'],
   [true , true , true , 'Y'   , false, 'redo'],
   [true , true , true , 'Y'   , true , null],
   [true , true , true , 'x'   , false, null],

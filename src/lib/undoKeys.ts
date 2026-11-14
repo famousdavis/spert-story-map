@@ -18,8 +18,10 @@ export interface UndoKeyEvent {
  *
  * The platform's modifier must be held: Cmd on a Mac, Ctrl elsewhere. The other modifier is
  * ignored. The key is then read without regard to case, because with Shift held a browser
- * reports "Z", not "z": z undoes, Shift+z redoes, and y without Shift redoes. Shift+y stays
- * unbound. A key that is missing or not text is no action, so a bare `keydown` cannot throw.
+ * reports "Z", not "z": z undoes and Shift+z redoes. y redoes unless the key is a capital "Y"
+ * with Shift held (ruling R57): a lowercase "y" redoes with or without Shift, as it did before
+ * this rule, and "Y" without Shift (Caps Lock) redoes. A key that is missing or not text is no
+ * action, so a bare `keydown` cannot throw.
  *
  * `isMac` comes from the caller (`navigator.platform.toUpperCase().includes('MAC')`, where
  * "MacIntel" counts); this function reads nothing global.
@@ -30,6 +32,6 @@ export function undoKeyAction(e: UndoKeyEvent, isMac: boolean): UndoKeyAction | 
   if (typeof e.key !== 'string') return null;
   const key = e.key.toLowerCase();
   if (key === 'z') return e.shiftKey ? 'redo' : 'undo';
-  if (key === 'y' && !e.shiftKey) return 'redo';
+  if (key === 'y') return e.key === 'Y' && e.shiftKey ? null : 'redo';
   return null;
 }

@@ -80,6 +80,22 @@ describe.each([['Map', StoryMapView], ['Sizing', SizingView]] as const)('%s tab 
     expect(name()).toBe('Edited');
   });
 
+  it('Ctrl+Shift with a lowercase key "y" redoes an undone edit, as before (R57)', async () => {
+    const before = await edited();
+    key({ key: 'z', ctrlKey: true });
+    expect(name()).toBe(before);
+    key({ key: 'y', ctrlKey: true, shiftKey: true });
+    expect(name()).toBe('Edited');
+  });
+
+  it('Ctrl+Shift+Y sent as key "Y" does nothing, as before (R57)', async () => {
+    const before = await edited();
+    key({ key: 'z', ctrlKey: true });
+    expect(name()).toBe(before);
+    key({ key: 'Y', ctrlKey: true, shiftKey: true });
+    expect(name()).toBe(before);
+  });
+
   it('Ctrl+Z (key "z", no Shift) undoes', async () => {
     const before = await edited();
     key({ key: 'z', ctrlKey: true });
