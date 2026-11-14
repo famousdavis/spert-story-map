@@ -137,4 +137,19 @@ describe.each([['Map', StoryMapView], ['Sizing', SizingView]] as const)('%s tab 
     expect(errors).toEqual([]);
     expect(name()).toBe('Edited');
   });
+
+  it('prevents the browser default for the undo and redo keys only', async () => {
+    await edited();
+    // fireEvent returns false when a listener called preventDefault.
+    const notPrevented = (init: KeyboardEventInit) => {
+      let result = true;
+      act(() => { result = fireEvent.keyDown(document.body, init); });
+      return result;
+    };
+    expect(notPrevented({ key: 'z', ctrlKey: true })).toBe(false);
+    expect(notPrevented({ key: 'Z', ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(notPrevented({ key: 'y', ctrlKey: true })).toBe(false);
+    expect(notPrevented({ key: 'x', ctrlKey: true })).toBe(true);
+    expect(notPrevented({ key: 'Tab' })).toBe(true);
+  });
 });
