@@ -40,6 +40,8 @@ export const TILE_HOVER =
   'hover:border-[#93c5fd] hover:shadow-[0_2px_10px_rgba(15,23,42,0.10)] dark:hover:border-[#3b82f6] dark:hover:shadow-[0_2px_10px_rgba(0,0,0,0.35)]';
 /** The drop box on the hovered tile: the only border colour while it shows, in both themes. */
 export const TILE_DROP = 'border-[#0070f3]';
+/** An archived tile's border at rest (v0.56.0, Forecaster's): dashed. Swapped out whole for TILE_DROP, like TILE_BORDER. */
+export const TILE_ARCHIVED_BORDER = 'border-dashed border-[#ddd] dark:border-[#4a5568]';
 
 export const NAME_ROW = 'flex items-start gap-1.5';
 /** The drag grip, lifted above the open button's `::after`: under it, no drag can start. */
@@ -47,6 +49,8 @@ export const GRIP = 'relative z-[1] flex-none inline-flex mt-[5px] cursor-grab';
 export const NAME =
   'flex-auto min-w-0 m-0 pt-px text-[1.05rem] font-semibold leading-[1.35] [overflow-wrap:anywhere]';
 export const NAME_COLOR = 'text-[#333] dark:text-[#e2e8f0]';
+/** An archived tile's name takes the meta colour instead (v0.56.0). */
+export const NAME_ARCHIVED = 'text-[#666] dark:text-[#a0aec0]';
 /**
  * The open button. Its `::after` covers the whole tile, so a click anywhere on the tile away from
  * a control opens the project. `outline-hidden`, not `outline-none`: forced colours drop the
@@ -67,9 +71,25 @@ export const META = `${META_BASE} text-[#666] dark:text-[#a0aec0]`;
 /** The warning line: GanttApp's warn colours (`src/features/projects/projectsTabPalette.ts:64` and `:94` at aa43ae7). */
 export const META_WARN = `${META_BASE} text-[#b45309] dark:text-[#fbbf24]`;
 export const ACTIONS = 'flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 mt-auto pt-1.5 pl-2.5';
-/** The revealed row: hidden at rest, shown on tile hover, on focus inside the tile, and always where there is no hover. */
+/**
+ * The revealed row: hidden at rest, shown on tile hover, on focus inside the tile, while the tile's
+ * colour popover is open (`data-popopen="true"` on the tile root, v0.56.0), and always where there
+ * is no hover.
+ */
 export const REVEAL =
-  'flex flex-wrap items-center gap-0.5 opacity-0 transition-opacity duration-[120ms] ease-in-out group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 [@media(hover:none)]:opacity-100';
+  'flex flex-wrap items-center gap-0.5 opacity-0 transition-opacity duration-[120ms] ease-in-out group-hover/tile:opacity-100 group-focus-within/tile:opacity-100 group-data-[popopen=true]/tile:opacity-100 [@media(hover:none)]:opacity-100';
+/** An archived tile's Unarchive group: always shown (v0.56.0). Carries ABOVE_OPEN where it is used. */
+export const STAY = 'flex flex-wrap items-center gap-0.5';
+
+// ── "Show archived (N)" and the lines beside the grid (v0.56.0, Forecaster's; GanttApp's look) ──
+/** The box's label (GanttApp's `.pt-check`). */
+export const CHECK = 'inline-flex items-center gap-2 text-[0.9rem] leading-[normal] cursor-pointer text-[#666] dark:text-[#a0aec0]';
+/** Forecaster's `accent-spert-blue`, which produces no CSS here: its value. */
+export const CHECKBOX = 'size-4 m-0 accent-[#0070f3]';
+/** "All products are archived…" (GanttApp's `.pt-empty`): the meta colour, italic. */
+export const ALL_ARCHIVED = 'leading-[normal] text-[#666] dark:text-[#a0aec0] italic';
+/** A one-line note above the grid (Forecaster's NOTE, whose `text-spert-text-secondary` produces no CSS here: its light value, #555). */
+export const NOTE = 'mb-4 text-sm text-[#555] dark:text-gray-300';
 
 // ── The project dialog (New Product / Edit Product) ──
 export const OVERLAY = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50';

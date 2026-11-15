@@ -8,6 +8,8 @@ import { downloadForecasterExport } from '../../lib/exportForForecaster';
 import { sendToForecaster } from '../../lib/sendToForecaster';
 import { downloadExcelExport } from '../../lib/exportForExcel';
 import { parseImportFile } from '../../lib/import-utils';
+import { isArchived, sanitizeProjectPrefs } from '../../lib/projectPrefs';
+import { dataImportArchivedLine } from '../product/archive-text';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
 import type { Product, StorageDriver, ProductUpdater } from '../../types';
@@ -23,6 +25,8 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importConfirm, setImportConfirm] = useState<Product | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  // R84 (v0.56.0): after a replace, says so when this person has archived the product.
+  const [archivedLine, setArchivedLine] = useState<string | null>(null);
   const [forecasterIssues, setForecasterIssues] = useState<string[] | null>(null);
   // A separate channel from `forecasterIssues` on purpose. The two buttons fail in different
   // vocabularies — the export path can only refuse the data, while the send path can also
@@ -120,6 +124,13 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
       });
 
       setImportConfirm(null);
+      setArchivedLine(null);
+      try {
+        const prefs = await driver.loadPreferences();
+        if (isArchived(sanitizeProjectPrefs(prefs?.projectPrefs), product.id)) setArchivedLine(dataImportArchivedLine(merged.name));
+      } catch {
+        // The settings could not be read: the replace stands, and nothing more is said.
+      }
     } catch (err) {
       setImportError(`Import failed: ${(err as Error).message}`);
       setImportConfirm(null);
@@ -243,6 +254,9 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
           <button onClick={handleImport} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">Import Product from JSON</button>
           <button onClick={handleDownloadTemplate} className="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700">Download Template</button>
         </div>
+        {archivedLine && (
+          <p role="status" className="text-sm text-gray-700 dark:text-gray-300 mt-3 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">{archivedLine}</p>
+        )}
         {importError && (
           <p className="text-sm text-red-600 dark:text-red-400 mt-3 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{importError}</p>
         )}

@@ -575,13 +575,16 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       }
     },
 
-    async loadPreferences() {
+    async loadPreferences(options?: { throwOnError?: boolean }) {
       try {
         const ref = doc(requireDb(), SETTINGS_COL, uid);
         const snap = await getDoc(ref);
         return withPendingPrefs(snap.exists() ? snap.data() : {});
       } catch (e) {
         console.error('Failed to load cloud preferences:', e instanceof Error ? e.message : 'Unknown error');
+        // v0.56.0 (R-6, R88): the Products page's order writers must tell a failure from an empty
+        // document. Every other caller keeps the empty answer.
+        if (options?.throwOnError) throw e;
         return withPendingPrefs({});
       }
     },

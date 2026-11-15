@@ -149,7 +149,9 @@ describe('cloud: a first settings read made offline', () => {
     await wait(300);
     h.fs.setOffline(false);
     expect(stored('cloud')).toMatchObject({ exportName: 'Jane', exportId: 'J1' });
-    expect((stored('cloud').projectOrder as string[])[0]).toBe('p3');
+    // v0.56.0 (R88): a tab whose first read failed never read the order, so its drop writes none
+    // (before, it wrote the list's own sequence with the move, which matched the stored order here).
+    expect((stored('cloud').projectOrder as string[])[0]).toBe(control ? 'p3' : 'p1');
   });
 
   it.each([false, true])('a keystroke then keeps the tile order (online control=%s)', async control => {

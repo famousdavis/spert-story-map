@@ -56,6 +56,8 @@ export function createMergeFieldsFirestore() {
   /** What this client last read or wrote at each path (null: read, and missing): the SDK's memory cache. */
   const cache = new Map<string, Doc | null>()
   let offlineAfter: number | null = null
+  /** v0.56.0: while set, every getDoc rejects with it (a failed read of a document read before). */
+  let readFailure: Error | null = null
   const countRead = () => {
     reads++
     if (offlineAfter !== null && --offlineAfter <= 0) {
@@ -187,6 +189,7 @@ export function createMergeFieldsFirestore() {
   const getDoc = async (ref: { path: string }) => {
     const held = readGate
     const answer = (() => {
+      if (readFailure) return readFailure
       if (offline) {
         if (!cache.has(ref.path)) return Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' })
         return snapshot(cache.get(ref.path) ?? null, true)
@@ -232,6 +235,8 @@ export function createMergeFieldsFirestore() {
     getDocs, getDocFromServer, getDocsFromServer, collection, where, query,
     get reads() { return reads },
     setOffline(v: boolean) { offline = v },
+    /** Every getDoc rejects with `e` until called with null (v0.56.0, R-6 and R88). */
+    failReads(e: Error | null) { readFailure = e },
     /** The connection drops after the next `n` reads (online until then). */
     setOfflineAfterReads(n: number) { offlineAfter = n },
     FieldPath: FakeFieldPath,
@@ -253,6 +258,7 @@ export function createMergeFieldsFirestore() {
       offline = false
       cache.clear()
       offlineAfter = null
+      readFailure = null
       readGate?.open()
       writeGate?.open()
       readGate = null

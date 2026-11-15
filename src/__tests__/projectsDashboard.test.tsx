@@ -265,6 +265,9 @@ describe('names and titles (O14)', () => {
       ['Export Alpha', 'Export product'],
       ['Edit Alpha', 'Edit product'],
       ['Clone Alpha', 'Clone product'],
+      // v0.56.0: Archive and Tile color, on every tile for every role.
+      ['Archive Alpha', 'Archive product'],
+      ['Tile color for Alpha: No color', 'Tile color'],
     ]);
   });
 
