@@ -98,6 +98,15 @@ describe('a second upload adds nothing already uploaded', () => {
     expect(r.owned()).toHaveLength(1);
   });
 
+  it.each(['viewer', 'editor'])("a product shared with the user (%s), its cloud export imported here with new work, is skipped by id and adds nothing", async (role) => {
+    r.put('tmpl', { name: 'Template', owner: O, members: { [O]: 'owner', [U]: role }, createdAt: '2026-01-01T00:00:00.000Z', _originRef: 'ws-o', schemaVersion: 2, themes: [], releases: [], sprints: [], sizeMapping: [], _changeLog: [{ t: 1, op: 'create', entity: 'product' }] });
+    await r.importFile(r.cloudExport('tmpl'));
+    r.addWork('tmpl');
+    const out = await r.upload();
+    expect(out).toEqual({ uploadedIds: [], skipped: [{ localId: 'tmpl', name: 'Template', cloudName: 'Template' }], unreadable: 0 });
+    expect(r.owned()).toHaveLength(0);
+  });
+
   it('its own cloud export, re-imported after the cloud document is gone, is uploaded', async () => {
     await r.create('A');
     await r.upload();
