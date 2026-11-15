@@ -111,8 +111,10 @@ describe('one Local store per browser', { timeout: 20_000 }, () => {
 
     const stored = JSON.parse(localStorage.getItem(`rp:local:product_${p.id}`) ?? 'null') as Product | null;
     expect(stored?.description).toBe('typed just before Sign out');
-    // Read from storage itself, not through loadPreferences(), which lays pending entries on top.
+    // Read from storage itself, not only through loadPreferences(), which lays pending entries on top.
     expect(prefsOf('u2')).toEqual({ projectOrder: ['x'], suppressLocalStorageWarning: true });
+    const { loadPreferences } = await import('../lib/storage');
+    expect(loadPreferences('u2')).toEqual({ projectOrder: ['x'], suppressLocalStorageWarning: true });
     expect(prefsOf('local')).toEqual({ exportName: 'Signed-out Ana', exportId: 'A-1' });
     expect(localStorage.getItem(`rp:u-other:product_${other.id}`)).not.toBeNull();
   });
@@ -171,6 +173,24 @@ describe('one Local store per browser', { timeout: 20_000 }, () => {
     await load(S, `/product/${p.id}`);
     await act(async () => { await new Promise(r => setTimeout(r, 300)); });
     expect(screen.queryByText('Stay Here')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export all products as JSON' })).toBeNull();
+  });
+
+  it('PF-08 in the steady state, for a product the app made while signed in: reloading its page while the Terms check waits keeps it open', async () => {
+    fresh('local', TOS_VERSION);
+    S.record = TOS_VERSION;
+    S.current = user('u8');
+    const first = await load(S);
+    await settle(S);
+    const { createNewProduct } = await import('../lib/storage');
+    const p = createNewProduct('Made Here');
+    await first.driver()?.createProduct(p);
+
+    vi.resetModules(); // a reload: the same browser storage, a fresh page
+    S.profileGate = new Promise<void>(() => {}); // the check never finishes here
+    await load(S, `/product/${p.id}`);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(screen.queryByText('Made Here')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Export all products as JSON' })).toBeNull();
   });
 

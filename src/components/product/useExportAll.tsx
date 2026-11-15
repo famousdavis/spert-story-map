@@ -8,10 +8,14 @@ import { useState } from 'react';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import type { StorageDriver, UserSettings } from '../../types';
 
-/** The confirm's words: how many products, and what each will be stamped with. */
+/**
+ * The confirm's words: how many products, and what each will be stamped with. The name and identifier
+ * are tested exactly as `exportAllProductsBundled` tests them (any non-empty value is stamped), so the
+ * confirm never says "no export name" for a value the file will carry.
+ */
 export function exportAllMessage(count: number, prefs: UserSettings): string {
-  const name = typeof prefs.exportName === 'string' && prefs.exportName.trim() ? `the export name “${prefs.exportName}”` : 'no export name';
-  const id = typeof prefs.exportId === 'string' && prefs.exportId.trim() ? `the identifier “${prefs.exportId}”` : 'no identifier';
+  const name = prefs.exportName ? `the export name “${prefs.exportName}”` : 'no export name';
+  const id = prefs.exportId ? `the identifier “${prefs.exportId}”` : 'no identifier';
   const products = count === 1 ? 'the 1 product' : `all ${count} products`;
   return `The file will hold ${products} stored in this browser, including any made by other people who use it. Each will be stamped with ${name} and ${id}.`;
 }

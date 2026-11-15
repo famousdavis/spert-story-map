@@ -21,7 +21,7 @@ import { initValidatorObserver } from './lib/validatorObserver'
 await runLegacyMigration();
 
 // Brief 10 §3f: read the observer flag ONCE, here, before React mounts. It must be
-// read before StorageProvider's effect binds the uid namespace (StorageProvider.tsx:59),
+// read before StorageProvider's effect binds the uid namespace (StorageProvider.tsx:60),
 // because the key is a bare literal and is never namespaced. Off by default; a
 // no-op registration slot means the read seams cost nothing unless it is on.
 initValidatorObserver();

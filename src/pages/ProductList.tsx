@@ -132,11 +132,9 @@ export default function ProductList() {
       listed(detailed, gen);
       setProducts(detailed);
       if (mode === 'cloud') setCloudDataLoaded(true);
-      // In cloud mode, detect local projects that weren't migrated. Explicit
-      // 'local' override — the active namespace is the cloud user's uid here,
-      // so the default-namespace read would return that user's local-mode
-      // cache (signed-in users can technically have a per-uid local cache),
-      // not the anonymous-session orphans we want to surface a banner for.
+      // In cloud mode, detect local projects that weren't migrated: rp:local, this browser's
+      // one product store since v0.56.1 (R71), which is also the default; 'local' is kept
+      // explicit so the read cannot follow any future namespace binding.
       if (mode === 'cloud' && detailed.length === 0) {
         setLocalOrphanCount(loadLocalIndex('local').length);
       } else {

@@ -57,30 +57,67 @@ describe('the fold', () => {
     });
   }
 
-  it('two folds started together run one after the other under the lock: no copy', async () => {
-    let chain = Promise.resolve();
-    let inside = 0;
-    let overlap = false;
+  // Two tabs folding at once, modelled by starting the second fold from inside the first, at the
+  // moment the first writes its copy. The fold is synchronous, so two calls made one after the other
+  // in one tab never overlap whatever the lock does. Without the lock the second fold finds the
+  // source still there and mints a second copy.
+  async function secondFoldStartedInsideFirst(): Promise<void> {
+    const p = made('Lab 3');
+    keep('local', { ...p, description: 'someone else’s copy' });
+    keep(U, p);
+    let second: Promise<unknown> | null = null;
+    const setItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      setItem.call(this, k, v);
+      if (!second && k.startsWith('rp:local:product_') && k !== `rp:local:product_${p.id}`) second = foldLocalStore(U);
+    });
+    const first = await foldLocalStore(U);
+    const other = await second;
+    expect({ first, other }).toEqual({ first: { moved: 1, copies: 1, unreadable: 0, stopped: false }, other: { moved: 0, copies: 0, unreadable: 0, stopped: false } });
+    expect({ listed: listed(), local: keys('local'), uid: keys(U) }).toEqual({ listed: ['Lab 3', 'Lab 3 (Copy)'], local: 2, uid: 0 });
+  }
+
+  it('a second fold started while the first runs waits for the Web Lock: one copy, not two', async () => {
+    let chain: Promise<unknown> = Promise.resolve();
     vi.stubGlobal('navigator', {
       ...navigator,
       locks: {
+        // Exclusive: each callback starts only after the one before it has finished.
         request: (_name: string, cb: () => unknown) => {
-          const run = chain.then(async () => {
-            inside++; if (inside > 1) overlap = true;
-            try { await cb(); } finally { inside--; }
-          });
+          const run = chain.then(() => cb());
           chain = run.catch(() => {});
           return run;
         },
       },
     });
-    keep(U, made('Lab 3'));
-    keep(U, made('Lab 4'));
-    const [a, b] = await Promise.all([foldLocalStore(U), foldLocalStore(U)]);
-    expect(overlap).toBe(false);
-    expect(a.moved + b.moved).toBe(2);
-    expect({ listed: listed(), local: keys('local'), uid: keys(U) }).toEqual({ listed: ['Lab 3', 'Lab 4'], local: 2, uid: 0 });
+    await secondFoldStartedInsideFirst();
   });
+
+  it('without Web Locks, a second fold started while the first runs waits for the timestamp lock: one copy, not two', async () => {
+    expect((navigator as Navigator & { locks?: unknown }).locks).toBeUndefined(); // jsdom has none: the fallback runs
+    await secondFoldStartedInsideFirst();
+    expect(localStorage.getItem('_rp:local-fold-in-progress')).toBeNull();
+  });
+
+  // The copy branch's writes: #1 the copy, #2 its index entry, #3 removing the source key, #4 removing
+  // the source's index entry. #3 is not modelled: removeItem never fails for a full store.
+  for (const at of [1, 2, 4]) {
+    it(`a fold interrupted at the copy branch’s write #${at}, then run again: one copy, listed once`, () => {
+      const p = made('Lab 3');
+      keep('local', { ...p, description: 'someone else’s copy' });
+      keep(U, p);
+      let n = 0;
+      const setItem = Storage.prototype.setItem;
+      const removeItem = Storage.prototype.removeItem;
+      const fail = () => { if (++n === at) throw new DOMException('full', 'QuotaExceededError'); };
+      const s = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) { fail(); setItem.call(this, k, v); });
+      const r = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, k: string) { fail(); removeItem.call(this, k); });
+      expect(foldOwnProducts(U).stopped).toBe(true);
+      s.mockRestore(); r.mockRestore();
+      foldOwnProducts(U);
+      expect({ listed: listed(), local: keys('local'), uid: keys(U) }).toEqual({ listed: ['Lab 3', 'Lab 3 (Copy)'], local: 2, uid: 0 });
+    });
+  }
 
   it('an index write this tab has pending when the fold runs cannot drop the folded entry', () => {
     vi.useFakeTimers();

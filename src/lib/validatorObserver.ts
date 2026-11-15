@@ -29,7 +29,7 @@ import type { Product } from '../types';
 
 /**
  * Bare literal, read directly — NEVER through the uid-namespace helpers.
- * `setStorageNamespace` is bound at `StorageProvider.tsx:59`, inside an effect that
+ * `setStorageNamespace` is bound at `StorageProvider.tsx:60`, inside an effect that
  * runs after `createRoot(...).render(...)` (`main.tsx:22`), so a namespaced key is
  * unreadable at the bootstrap read point. `rp_workspace_id` (`constants.ts:12`) is
  * the standing precedent for a never-namespaced key.
