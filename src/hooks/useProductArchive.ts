@@ -122,12 +122,15 @@ export function useProductArchive<P extends { id: string; name: string }>(
     if (color) write(toId, { color });
   }, [prefs, write]);
 
-  /** R-5: a deleted product's entry goes, once the list no longer holds it (the caller checks). */
+  /**
+   * R-5: a deleted product's entry goes, once the list no longer holds it (the caller checks). Written
+   * even when this tab holds no entry for it: with no listener, another tab may have set one since.
+   */
   const dropEntry = useCallback((id: string) => {
-    if (!driver || !canHoldPref(id) || prefEntries(id, prefOf(prefs, id), {}).length === 0) return;
+    if (!driver || !canHoldPref(id)) return;
     setHeld(h => ({ base: h.base, prefs: withPref(h.prefs, id, {}) }));
     driver.writePreferences([{ path: ['projectPrefs', id], value: REMOVE }]);
-  }, [driver, prefs]);
+  }, [driver]);
 
   /** By id, for the grid; a tile that has gone does nothing. */
   const archiveId = useCallback((id: string) => { const p = shown.find(x => x.id === id); if (p) archive(p); }, [shown, archive]);
