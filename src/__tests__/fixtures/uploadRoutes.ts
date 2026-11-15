@@ -11,7 +11,7 @@
 import { vi } from 'vitest';
 import type { createMergeFieldsFirestore } from './mergeFieldsFirestore';
 import {
-  createNewProduct, duplicateProduct, appendChangeLogEntry, loadProduct, saveProductImmediate, clearAllLocalProducts,
+  createNewProduct, duplicateProduct, appendChangeLogEntry, loadProduct, saveProductImmediate,
 } from '../../lib/storage';
 import { createLocalStorageDriver } from '../../lib/storageDriver';
 import { parseImportFile, detectConflicts, buildDefaultDecisions, applyImport } from '../../lib/import-utils';
@@ -84,7 +84,12 @@ export function uploadRoutes(fs: Fs) {
       const decisions = buildDefaultDecisions(detectConflicts(parsed.products, existing)).map(d => (action ? { ...d, action } : d));
       return applyImport(drv(), { products: parsed.products, fileName: 'f.json' }, decisions);
     },
-    clear: () => clearAllLocalProducts('local'),
+    /** Empty this browser's Local products (clearAllLocalProducts, its old implementation, was removed in v0.56.1). */
+    clear: () => {
+      const index = JSON.parse(localStorage.getItem('rp:local:products_index') ?? '[]') as { id: string }[];
+      for (const e of index) localStorage.removeItem(`rp:local:product_${e.id}`);
+      localStorage.removeItem('rp:local:products_index');
+    },
     /** What the cloud `replaceProduct` stores (measured on the emulator): the file's content and log, the stored owner,
      *  members, `createdAt` and `_originRef`. */
     replaceOnto(cid: string, text: string) {

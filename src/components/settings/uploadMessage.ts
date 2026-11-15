@@ -14,7 +14,7 @@ import { MAX_PROJECT_PREFS } from '../../lib/projectPrefs';
 export type StorageStatus = 'ok' | 'notice' | 'error';
 export interface StorageMessage { status: StorageStatus; text: string }
 
-/** At most this many skipped products are named; the rest are counted. */
+/** At most this many products are named in one list (skipped, not ticked, or to be cleared); the rest are counted. */
 const MAX_NAMED = 10;
 
 export const STATUS_CLASS: Record<StorageStatus, string> = {

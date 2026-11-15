@@ -351,16 +351,6 @@ export function deleteProduct(id: string): void {
   }
 }
 
-/** Remove all local products in a namespace and clear that namespace's index. */
-export function clearAllLocalProducts(ns?: string): void {
-  const namespace = ns ?? PRODUCT_NS;
-  const index = loadProductIndex(namespace);
-  for (const entry of index) {
-    localStorage.removeItem(productKeyFor(entry.id, namespace));
-  }
-  localStorage.removeItem(indexKeyFor(namespace));
-}
-
 /**
  * Remove these products from a namespace and its index; every other product, and the order of the
  * index, stay (v0.55.15, R72: the clear after an upload removes only what that upload sent). A

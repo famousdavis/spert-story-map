@@ -82,6 +82,17 @@ function parseProduct(raw: string): Record<string, unknown> | null {
 
 const textOf = (v: unknown) => (typeof v === 'string' ? v : '');
 
+/** A person's stored settings as an object, or null when absent or not an object. */
+function parsePrefs(raw: string | null): Record<string, unknown> | null {
+  if (raw === null) return null;
+  try {
+    const v: unknown = JSON.parse(raw);
+    return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Add or replace this product's entry in the `rp:local` index. Throws if the write fails. */
 function listInLocal(entry: IndexEntry): void {
   const index = readIndex(PRODUCT_NS);
@@ -148,7 +159,7 @@ function foldOne(uid: string, id: string, copies: Moved[]): 'moved' | 'copied' |
 /** The person's tile order, colour and archive follow each copy to its fresh id: a direct, synchronous write. */
 function followPrefs(uid: string, copies: Moved[]): void {
   const key = `rp:${uid}:preferences`;
-  const prefs = parseProduct(localStorage.getItem(key) ?? 'null');
+  const prefs = parsePrefs(localStorage.getItem(key));
   if (!prefs) return;
   const to = new Map(copies.map(c => [c.from, c.to]));
   if (Array.isArray(prefs.projectOrder)) prefs.projectOrder = prefs.projectOrder.map(id => to.get(id) ?? id);
