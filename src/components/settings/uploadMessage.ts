@@ -5,9 +5,11 @@
 /**
  * What the Storage section says (v0.55.15, R-3, R68, R72). The status is decided here, with the
  * words, and never read back out of them: ok (everything uploaded), notice (anything skipped or
- * unreadable, including nothing uploaded), error (the upload, or another storage action, stopped).
+ * unreadable, including nothing uploaded, or a colour and archive the cap kept out, v0.56.0), error
+ * (the upload, or another storage action, stopped).
  */
 import type { UploadOutcome } from '../../lib/migration';
+import { MAX_PROJECT_PREFS } from '../../lib/projectPrefs';
 
 export type StorageStatus = 'ok' | 'notice' | 'error';
 export interface StorageMessage { status: StorageStatus; text: string }
@@ -45,7 +47,10 @@ export function uploadMessage(outcome: UploadOutcome): StorageMessage {
   if (outcome.unreadable > 0) {
     lines.push(`${products(outcome.unreadable)} could not be read and ${outcome.unreadable === 1 ? 'was' : 'were'} not uploaded.`);
   }
-  const allSent = outcome.skipped.length === 0 && outcome.unreadable === 0;
+  if (outcome.prefsNotCopied > 0) {
+    lines.push(`Tile colors and archive were not copied for ${products(outcome.prefsNotCopied)}: they can be kept for at most ${MAX_PROJECT_PREFS} products.`);
+  }
+  const allSent = outcome.skipped.length === 0 && outcome.unreadable === 0 && outcome.prefsNotCopied === 0;
   return { status: allSent ? 'ok' : 'notice', text: lines.join(' ') };
 }
 

@@ -49,8 +49,12 @@ export async function testCloudConnection(uid: string): Promise<boolean> {
 
 /** A local product the upload left in this browser because the cloud already holds it. */
 export interface UploadSkip { localId: string; name: string; cloudName: string }
-/** What one upload did: the local ids it uploaded, what it skipped, and how many it could not read. */
-export interface UploadOutcome { uploadedIds: string[]; skipped: UploadSkip[]; unreadable: number }
+/**
+ * What one upload did: the local ids it uploaded, what it skipped, how many it could not read, and
+ * for how many products the cap (`MAX_PROJECT_PREFS`) kept out a colour and archive it would have
+ * copied (v0.56.0, R-1: never silently).
+ */
+export interface UploadOutcome { uploadedIds: string[]; skipped: UploadSkip[]; unreadable: number; prefsNotCopied: number }
 
 /**
  * Upload the local products to Firestore, each under a new id.
@@ -83,7 +87,7 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   const targetIds = new Map<string, string>();
   /** A skipped product's local id to its earlier upload's cloud id (v0.56.0, R-7). */
   const skippedIds = new Map<string, string>();
-  const outcome: UploadOutcome = { uploadedIds: [], skipped: [], unreadable: 0 };
+  const outcome: UploadOutcome = { uploadedIds: [], skipped: [], unreadable: 0, prefsNotCopied: 0 };
 
   for (const { entry, product } of loaded) {
     if (!product) {
@@ -124,7 +128,11 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   // R89: every id the stored order holds keeps its slot, listed or not (a product made on another
   // device since the list was read, or a deleted one), then the listed products it lacks.
   const tiles = withStoredSlots(latest.projectOrder, cloudList.docs.map(d => d.id));
-  await setDoc(settingsRef, ...uploadedSettings(latest, localPrefs, tiles, sortByOrder(index, localPrefs.projectOrder), { targetIds, skippedIds }));
+  const localTiles = sortByOrder(index, localPrefs.projectOrder);
+  const ids = { targetIds, skippedIds };
+  const copies = prefCopies(latest, localPrefs, localTiles, ids);
+  await setDoc(settingsRef, ...uploadedSettings(latest, localPrefs, tiles, localTiles, ids, copies.entries));
+  outcome.prefsNotCopied = copies.overCap;
   return outcome;
 }
 
@@ -139,12 +147,15 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
  * Read through the normaliser, the next upload copied the local archive or colour back (PR #245
  * review -01).
  */
-function prefCopies(cloud: UserSettings, local: UserSettings, localTiles: { id: string }[], ids: UploadIds): PrefEntry[] {
+function prefCopies(
+  cloud: UserSettings, local: UserSettings, localTiles: { id: string }[], ids: UploadIds,
+): { entries: PrefEntry[]; overCap: number } {
   const cloudMap = sanitizeProjectPrefs(cloud.projectPrefs);
   const rawCloud: unknown = cloud.projectPrefs;
   const stored = rawCloud && typeof rawCloud === 'object' && !Array.isArray(rawCloud) ? rawCloud : {};
   const localMap = sanitizeProjectPrefs(local.projectPrefs);
   let size = Object.keys(cloudMap).length;
+  let overCap = 0;
   const entries: PrefEntry[] = [];
   for (const { id: localId } of localTiles) {
     const uploaded = ids.targetIds.get(localId);
@@ -152,11 +163,14 @@ function prefCopies(cloud: UserSettings, local: UserSettings, localTiles: { id: 
     const pref = prefOf(localMap, localId);
     if (cloudId === undefined || (!pref.color && !pref.archived)) continue;
     if (uploaded === undefined && Object.prototype.hasOwnProperty.call(stored, cloudId)) continue;
-    if (size >= MAX_PROJECT_PREFS) break;
+    if (size >= MAX_PROJECT_PREFS) {
+      overCap++;
+      continue;
+    }
     size++;
     entries.push(...prefEntries(cloudId, {}, pref));
   }
-  return entries;
+  return { entries, overCap };
 }
 
 interface UploadIds { targetIds: Map<string, string>; skippedIds: Map<string, string> }
@@ -175,7 +189,7 @@ const isBlank = (v: unknown) => v === undefined || v === null || (typeof v === '
  */
 function uploadedSettings(
   cloud: UserSettings, local: UserSettings, cloudTiles: string[],
-  localTiles: { id: string }[], ids: UploadIds,
+  localTiles: { id: string }[], ids: UploadIds, copies: PrefEntry[],
 ): [Record<string, unknown>, { mergeFields: FieldPath[] }] {
   const held = new Set(Array.isArray(cloud.projectOrder) ? cloud.projectOrder : []);
   const placedHere = new Set([...ids.skippedIds.values()].filter(id => !held.has(id)));
@@ -185,7 +199,7 @@ function uploadedSettings(
     if (id !== undefined && !order.includes(id)) order.push(id);
   }
   let entries: PrefEntry[] = addEntry([], { path: ['projectOrder'], value: order });
-  for (const entry of prefCopies(cloud, local, localTiles, ids)) entries = addEntry(entries, entry);
+  for (const entry of copies) entries = addEntry(entries, entry);
   for (const key of ['exportName', 'exportId'] as const) {
     if (isBlank(cloud[key]) && !isBlank(local[key])) entries = addEntry(entries, { path: [key], value: local[key] });
   }

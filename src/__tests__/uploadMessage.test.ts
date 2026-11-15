@@ -6,10 +6,11 @@
 import { describe, it, expect } from 'vitest';
 import { uploadMessage, clearOfferMessage, UPLOAD_STOPPED } from '../components/settings/uploadMessage';
 
-const outcome = (uploaded: number, skipped: { name: string; cloudName?: string }[] = [], unreadable = 0) => ({
+const outcome = (uploaded: number, skipped: { name: string; cloudName?: string }[] = [], unreadable = 0, prefsNotCopied = 0) => ({
   uploadedIds: Array.from({ length: uploaded }, (_, i) => `id${i}`),
   skipped: skipped.map((s, i) => ({ localId: `s${i}`, name: s.name, cloudName: s.cloudName ?? s.name })),
   unreadable,
+  prefsNotCopied,
 });
 const KEPT = 'This browser still has its own copy of each, which may differ from the cloud version.';
 
@@ -48,6 +49,18 @@ describe('uploadMessage', () => {
     const names = Array.from({ length: 11 }, (_, i) => ({ name: `P${i + 1}` }));
     const listed = names.slice(0, 10).map(n => `“${n.name}”`).join(', ');
     expect(uploadMessage(outcome(0, names)).text).toBe(`No new products to upload. Already in the cloud, so not uploaded again: ${listed} and 1 more. ${KEPT}`);
+  });
+
+  // v0.56.0 (PR #245 review -05): copies the cap kept out are said, in one line, never silently.
+  it('colours and archive the cap kept out: one line, and a notice', () => {
+    const CAP = 'they can be kept for at most 1000 products.';
+    expect(uploadMessage(outcome(3, [], 0, 2))).toEqual({
+      status: 'notice',
+      text: `Uploaded 3 products to the cloud. Tile colors and archive were not copied for 2 products: ${CAP}`,
+    });
+    expect(uploadMessage(outcome(0, [{ name: 'A' }], 0, 1)).text).toBe(
+      `No new products to upload. Already in the cloud, so not uploaded again: “A”. ${KEPT} Tile colors and archive were not copied for 1 product: ${CAP}`,
+    );
   });
 
   it('unreadable: one, several, and alone', () => {

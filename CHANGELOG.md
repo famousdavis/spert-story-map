@@ -9,7 +9,7 @@
 - **Opening an archived product from its tile unarchives it**; the open button says so ("Unarchive and open Structure for …"). There is no way to look at an archived product from the Products page without unarchiving it.
 - Cloning a product copies its tile colour, not its archive. Deleting a product removes its colour and archive. Exports and imports carry neither. An import of a product you have archived keeps it archived and says so, on the Products page and on Settings → Data.
 - **Uploading local products to the cloud copies their colours and archive.** For a product an earlier upload already sent, they are copied only if no colour or archive has ever been set for it in the cloud, by that upload or since: so a colour set in the cloud since, or an archive or colour removed there, is kept, and an upload run again after one that stopped part way copies them. This browser keeps its own.
-- At most 1000 products can have a colour or archive; past that, the page says the change was not saved.
+- At most 1000 products can have a colour or archive; past that, the page says the change was not saved, and an upload says for how many products it could not copy them.
 - If the cloud settings cannot be read when the Products page opens, all tiles show, with a line saying that tile colors, archive and order could not be loaded; Tile color, Archive and reordering are turned off until a later read succeeds. A clone made meanwhile is still made and shown, but its place in the order is not saved.
 
 ### Fixed

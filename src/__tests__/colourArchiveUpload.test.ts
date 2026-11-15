@@ -79,6 +79,7 @@ describe('R-7: the upload copies each uploaded product\'s colour and archive to 
     seedLocal(local);
     const r = await migrateLocalToCloud('u');
     expect(r.uploadedIds).toHaveLength(3);
+    expect(r.prefsNotCopied).toBe(0);
     expect(cloudPrefs()).toEqual({
       c1: { color: 'blue' },
       [cloudId('Local 1')]: { color: 'teal' },
@@ -90,12 +91,13 @@ describe('R-7: the upload copies each uploaded product\'s colour and archive to 
     expect(write.mask).toContainEqual(['projectPrefs', cloudId('Local 2'), 'archived']);
   });
 
-  it('within the cap: at 1000 entries a product with none gains none', async () => {
+  it('within the cap: at 1000 entries a product with none gains none, and the outcome counts it', async () => {
     const full: Prefs = {};
     for (let i = 0; i < 999; i++) full[`x${i}`] = { archived: true };
     seedCloud({ projectOrder: ['c1', 'c2'], projectPrefs: full });
     seedLocal({ l1: { color: 'teal' }, l2: { color: 'pink' } });
-    await migrateLocalToCloud('u');
+    const r = await migrateLocalToCloud('u');
+    expect(r.prefsNotCopied, 'Local 2, kept out by the cap (review -05)').toBe(1);
     const after = cloudPrefs();
     expect(Object.keys(after)).toHaveLength(1000);
     expect(after[cloudId('Local 1')], 'Local 1 comes first in this browser\'s order').toEqual({ color: 'teal' });
