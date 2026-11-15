@@ -26,6 +26,7 @@ import { TOS_VERSION } from '../lib/tosConstants';
 
 const MOVED_ONE = 'One product you made while signed in was moved into this browser’s Local storage. Anyone who uses this browser can now see it.';
 const STOPPED = 'Some products could not be moved because this browser’s storage is full. They are kept, but not shown, until there is room: export or delete products you no longer need, then reload the page.';
+const UNREADABLE_ONE = 'One product could not be read, so it was set aside in this browser’s storage, unchanged, and is not shown.';
 const LOCAL_LINE = 'Products on this page are kept in this browser, not in your cloud account. Anyone who uses this browser can see them.';
 
 beforeAll(warmUp, 60_000);
@@ -145,6 +146,24 @@ describe('one Local store per browser', { timeout: 20_000 }, () => {
     expect(localStorage.getItem(`rp:local:product_${kept.id}`)).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText(MOVED_ONE)).toBeNull();
+  });
+
+  it('a product the fold cannot read is reported once: after Dismiss and a reload the notice does not come back', async () => {
+    fresh('local', TOS_VERSION);
+    localStorage.setItem('rp:u10:product_bad', '{not json');
+    S.record = TOS_VERSION;
+    S.current = user('u10');
+    await load(S);
+    await settle(S);
+    await until(() => screen.queryByText(UNREADABLE_ONE) !== null, 'the notice');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    vi.resetModules(); // a reload
+    await load(S);
+    await settle(S);
+    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    expect(screen.queryByText(UNREADABLE_ONE)).toBeNull();
+    expect(localStorage.getItem('rp:u10:unreadable_product_bad')).toBe('{not json');
   });
 
   it('a fold whose write fails: the app still renders, the notice says so, and the product stays in rp:{uid}', async () => {

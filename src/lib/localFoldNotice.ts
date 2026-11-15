@@ -28,7 +28,7 @@ export function foldNoticeLines(o: FoldOutcome): string[] | null {
   }
   if (o.unreadable > 0) {
     const one = o.unreadable === 1;
-    out.push(`${productsWord(o.unreadable)} could not be read and ${one ? 'was' : 'were'} not moved.`);
+    out.push(`${productsWord(o.unreadable)} could not be read, so ${one ? 'it was' : 'they were'} set aside in this browser’s storage, unchanged, and ${one ? 'is' : 'are'} not shown.`);
   }
   if (o.stopped) {
     out.push('Some products could not be moved because this browser’s storage is full. They are kept, but not shown, until there is room: export or delete products you no longer need, then reload the page.');

@@ -17,7 +17,9 @@
  * `cloneName` name, its `_originRef`, `createdAt` and `_changeLog` unchanged. The person's tile order,
  * colour and archive follow the fresh id, and a Connect AI record keyed by the old id is ended.
  *
- * It never throws: a product it cannot read is skipped and left; the first failed write stops it.
+ * It never throws. A product it cannot read is set aside once, under `rp:{uid}:unreadable_product_{id}`:
+ * kept as it was, never moved or deleted, and not read again by a later fold. The first failed write
+ * stops it.
  * It runs under an exclusive lock, so two tabs never fold at once.
  */
 import { cloneName } from './cloneName';
@@ -147,6 +149,29 @@ function followPrefs(uid: string, copies: Moved[]): void {
   localStorage.setItem(key, JSON.stringify(prefs));
 }
 
+/** Where an unreadable product is set aside: the first free key, so nothing set aside earlier is overwritten. */
+function asideKey(uid: string, id: string, raw: string): string {
+  for (let n = 1; ; n++) {
+    const key = `rp:${uid}:unreadable_product_${id}${n > 1 ? `~${n}` : ''}`;
+    const there = localStorage.getItem(key);
+    if (there === null || there === raw) return key;
+  }
+}
+
+/**
+ * Set a product the fold cannot read aside (v0.56.1, review -02): its text moves, unchanged, to a key
+ * no fold scans, so it is reported once and does not count as something to fold. Throws if a write fails.
+ */
+function setAsideIfUnreadable(uid: string, id: string): 'readable' | 'unreadable' | 'gone' {
+  const raw = localStorage.getItem(productKey(uid, id));
+  if (raw === null) return 'gone';
+  if (parseProduct(raw)) return 'readable';
+  localStorage.setItem(asideKey(uid, id, raw), raw);
+  localStorage.removeItem(productKey(uid, id));
+  dropSourceEntry(uid, id);
+  return 'unreadable';
+}
+
 /** A Connect AI record keyed by an old id is ended, not moved, as sign-out ends one. */
 function endAiRecords(copies: Moved[]): void {
   for (const { from } of copies) {
@@ -163,14 +188,18 @@ export function foldOwnProducts(uid: string): FoldOutcome {
   if (!uid || uid === PRODUCT_NS) return out;
   const copies: Moved[] = [];
   try {
-    const ids = sourceIds(uid);
-    if (ids.length === 0) return out;
+    const readable: string[] = [];
+    for (const id of sourceIds(uid)) {
+      const step = setAsideIfUnreadable(uid, id);
+      if (step === 'unreadable') out.unreadable++;
+      if (step === 'readable') readable.push(id);
+    }
+    if (readable.length === 0) return out;
     // First: a debounced index write captured before the fold must not land after it. Only when
     // there is something to move, so a driver swap with nothing to fold still cancels (v0.55.14).
     flushPendingSaves();
-    for (const id of ids) {
+    for (const id of readable) {
       const step = foldOne(uid, id, copies);
-      if (step === 'unreadable') out.unreadable++;
       if (step === 'moved' || step === 'copied') out.moved++;
       if (step === 'copied') out.copies++;
     }

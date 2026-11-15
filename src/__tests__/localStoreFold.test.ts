@@ -157,12 +157,33 @@ describe('the fold', () => {
     expect((storage.loadProduct(p.id) as Product).name).toBe('Lab 3 (renamed here)');
   });
 
-  it('a product it cannot read is skipped and left in rp:{uid}; the rest move', () => {
+  it('a product it cannot read is set aside unchanged, reported once, never moved; the rest move', () => {
     localStorage.setItem(`rp:${U}:product_bad`, '{not json');
     keep(U, made('Good'));
     expect(foldOwnProducts(U)).toEqual({ moved: 1, copies: 0, unreadable: 1, stopped: false });
-    expect(localStorage.getItem(`rp:${U}:product_bad`)).toBe('{not json');
+    expect(localStorage.getItem(`rp:${U}:unreadable_product_bad`)).toBe('{not json');
+    expect(localStorage.getItem(`rp:${U}:product_bad`)).toBeNull();
     expect(listed()).toEqual(['Good']);
+    expect(foldOwnProducts(U)).toEqual({ moved: 0, copies: 0, unreadable: 0, stopped: false });
+    expect(localStorage.getItem(`rp:${U}:unreadable_product_bad`)).toBe('{not json');
+  });
+
+  it('a second unreadable product with the same id is set aside beside the first, not over it', () => {
+    localStorage.setItem(`rp:${U}:product_bad`, '{first');
+    foldOwnProducts(U);
+    localStorage.setItem(`rp:${U}:product_bad`, '{second');
+    expect(foldOwnProducts(U).unreadable).toBe(1);
+    expect([localStorage.getItem(`rp:${U}:unreadable_product_bad`), localStorage.getItem(`rp:${U}:unreadable_product_bad~2`)]).toEqual(['{first', '{second']);
+  });
+
+  it('with only a set-aside product, a fold writes no pending save: a setting typed before a driver swap is still cancelled', () => {
+    vi.useFakeTimers();
+    localStorage.setItem(`rp:${U}:product_bad`, '{not json');
+    foldOwnProducts(U); // sets it aside
+    storage.writePreferences([{ path: ['exportName'], value: 'typed' }], 'local');
+    foldOwnProducts(U);
+    expect(JSON.parse(localStorage.getItem('rp:local:preferences') ?? '{}').exportName).toBeUndefined();
+    storage.cancelPendingSaves();
   });
 
   it('a write that fails stops the fold without throwing, and leaves the rest in rp:{uid}', async () => {
