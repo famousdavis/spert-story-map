@@ -326,14 +326,19 @@ export function saveProductImmediateOrThrow(product: Product): Product {
   return updated;
 }
 
+/** Drop a debounced write that has not run yet, so it cannot bring back what was removed. */
+function dropPendingSave(key: string): void {
+  if (saveTimers[key]) { clearTimeout(saveTimers[key]); delete saveTimers[key]; delete pendingSaves[key]; }
+}
+
 export function deleteProduct(id: string): void {
   // Drop any pending debounced writes for this product and the index — a
   // trailing save would resurrect the deleted product or write a stale
   // index entry referencing it.
   const productKey = productKeyFor(id, activeNamespace);
   const indexKey = indexKeyFor(activeNamespace);
-  if (saveTimers[productKey]) { clearTimeout(saveTimers[productKey]); delete saveTimers[productKey]; delete pendingSaves[productKey]; }
-  if (saveTimers[indexKey])   { clearTimeout(saveTimers[indexKey]);   delete saveTimers[indexKey];   delete pendingSaves[indexKey]; }
+  dropPendingSave(productKey);
+  dropPendingSave(indexKey);
   try {
     localStorage.removeItem(productKey);
     const index = loadProductIndex().filter(p => p.id !== id);
@@ -351,6 +356,29 @@ export function clearAllLocalProducts(ns?: string): void {
     localStorage.removeItem(productKeyFor(entry.id, namespace));
   }
   localStorage.removeItem(indexKeyFor(namespace));
+}
+
+/**
+ * Remove these products from a namespace and its index; every other product, and the order of the
+ * index, stay (v0.55.15, R72: the clear after an upload removes only what that upload sent). A
+ * pending index write is the newest index, so it is the one filtered.
+ */
+export function removeLocalProducts(ids: readonly string[], ns: string): void {
+  const drop = new Set(ids);
+  for (const id of drop) {
+    const key = productKeyFor(id, ns);
+    dropPendingSave(key);
+    localStorage.removeItem(key);
+  }
+  const indexKey = indexKeyFor(ns);
+  const pending = pendingSaves[indexKey];
+  const index = (Array.isArray(pending) ? pending as { id: string }[] : loadProductIndex(ns)).filter(p => !drop.has(p.id));
+  dropPendingSave(indexKey);
+  try {
+    localStorage.setItem(indexKey, JSON.stringify(index));
+  } catch (e) {
+    handleSaveError(e);
+  }
 }
 
 // Preferences

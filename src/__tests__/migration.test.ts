@@ -2,92 +2,36 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
+// @vitest-environment jsdom
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock crypto.randomUUID
-let uuidCounter = 0;
-vi.stubGlobal('crypto', {
-  randomUUID: () => `uuid-${++uuidCounter}`,
+// v0.55.15 (R67): ported to the masked-write stand-in. The previous mocks answered a get of a missing
+// project with "missing" (the rules refuse it) and always listed no cloud products, so they could not
+// show what the upload decides from the server list.
+const h = vi.hoisted(() => ({
+  fs: null as unknown as ReturnType<typeof import('./fixtures/mergeFieldsFirestore').createMergeFieldsFirestore>,
+}));
+vi.mock('../lib/firebase', () => ({ db: {}, auth: null, functionsInstance: null, isFirebaseAvailable: true }));
+vi.mock('firebase/firestore', async () => {
+  const { createMergeFieldsFirestore } = await import('./fixtures/mergeFieldsFirestore');
+  h.fs ??= createMergeFieldsFirestore();
+  const f = h.fs;
+  return {
+    doc: f.doc, getDoc: f.getDoc, setDoc: f.setDoc, deleteField: f.deleteField, FieldPath: f.FieldPath,
+    getDocs: f.getDocs, getDocFromServer: f.getDocFromServer, getDocsFromServer: f.getDocsFromServer,
+    collection: f.collection, query: f.query, where: f.where,
+  };
 });
-
-// Mock localStorage
-const store: Record<string, string> = {};
-vi.stubGlobal('localStorage', {
-  getItem: (key: string) => store[key] ?? null,
-  setItem: (key: string, value: unknown) => { store[key] = String(value); },
-  removeItem: (key: string) => { delete store[key]; },
-  clear: () => { for (const key of Object.keys(store)) delete store[key]; },
-});
-
-// Mock firebase.ts
-vi.mock('../lib/firebase', () => ({
-  db: { type: 'mock-firestore' },
-  auth: null,
-  isFirebaseAvailable: true,
-  functionsInstance: null,
-}));
-
-// Mock callables.ts (Lesson 61: centralized requireFunctions wrappers)
-vi.mock('../lib/callables', () => ({
-  callSendInvitationEmail: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
-  callClaimPendingInvitations: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
-  callRevokeInvite: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
-  callResendInvite: vi.fn(() => Promise.reject(new Error('Firebase Functions not initialized.'))),
-}));
-
-// Mock firebase/firestore
-const mockDocs = new Map();
-
-vi.mock('firebase/firestore', () => ({
-  doc: vi.fn((_db, collection, id) => ({ _path: `${collection}/${id}` })),
-  getDoc: vi.fn(async (ref) => {
-    const data = mockDocs.get(ref._path);
-    return {
-      exists: () => !!data,
-      data: () => data || null,
-      id: ref._path.split('/').pop(),
-    };
-  }),
-  setDoc: vi.fn(async (ref, data) => {
-    mockDocs.set(ref._path, data);
-  }),
-  getDocs: vi.fn(async () => {
-    const docs: Array<{ id: string | undefined; data: () => unknown }> = [];
-    for (const [path, data] of mockDocs) {
-      if (path.startsWith('spertstorymap_projects/')) {
-        docs.push({
-          id: path.split('/').pop(),
-          data: () => data,
-        });
-      }
-    }
-    return { forEach: (fn: (d: (typeof docs)[number]) => void) => docs.forEach(fn), docs, empty: docs.length === 0 };
-  }),
-  // v0.55.14: the upload reads the cloud settings and product list from the server first (R-6).
-  getDocFromServer: vi.fn(async (ref) => {
-    const data = mockDocs.get(ref._path);
-    return { exists: () => !!data, data: () => data || null, id: ref._path.split('/').pop() };
-  }),
-  getDocsFromServer: vi.fn(async () => ({ docs: [], forEach: () => {}, empty: true })),
-  FieldPath: class { segments: string[]; constructor(...s: string[]) { this.segments = s; } },
-  // the upload's settings write is built by buildMaskedWrite, which takes the removal sentinel
-  deleteField: vi.fn(() => ({ _deleteField: true })),
-  collection: vi.fn((_db, name) => ({ _name: name })),
-  query: vi.fn((...args) => args[0]),
-  where: vi.fn(() => null),
-  serverTimestamp: vi.fn(() => 'SERVER_TS'),
-}));
 
 import { migrateLocalToCloud } from '../lib/migration';
 import { isGuardedLoad } from '../lib/cloudLoadNotices';
-import { setDoc } from 'firebase/firestore';
 import type { ChangeLogEntry, Product } from '../types';
 
+const P = 'spertstorymap_projects/';
 beforeEach(() => {
-  uuidCounter = 0;
+  h.fs.reset();
   localStorage.clear();
-  mockDocs.clear();
-  vi.clearAllMocks();
 });
 
 function createLocalProduct(id: string, name: string): Product {
@@ -119,30 +63,28 @@ function seedLocalStorage(products: Array<{ id: string; name: string }>) {
 
 // ── migrateLocalToCloud ─────────────────────────────────────────
 
-/**
- * The setDoc mock's argument tuple, read back for assertions. `doc()` is mocked
- * to return `{ _path }`, so the call shape is narrower than the real overloads —
- * hence the cast, in one place rather than at every call site.
- */
-function findSetDocCall(pathFragment: string): Record<string, unknown> {
-  const calls = vi.mocked(setDoc).mock.calls as unknown as Array<[{ _path: string }, Record<string, unknown>]>;
-  const call = calls.find(c => c[0]._path.includes(pathFragment));
-  if (!call) throw new Error(`no setDoc call for "${pathFragment}"`);
-  return call[1];
+/** The uploaded documents: every project document the stand-in holds that the seed did not. */
+function written(seeded: string[] = []): Record<string, unknown>[] {
+  return [...h.fs.docs.entries()].filter(([p]) => p.startsWith(P) && !seeded.includes(p.slice(P.length))).map(([, d]) => d);
+}
+function writtenNamed(name: string): Record<string, unknown> {
+  const d = written().find(x => x.name === name);
+  if (!d) throw new Error(`no uploaded document named "${name}"`);
+  return d;
 }
 
 describe('migrateLocalToCloud', () => {
-  it('uploads local products to Firestore', async () => {
+  it('uploads local products to Firestore, under a new id', async () => {
     const product = createLocalProduct('proj-1', 'My Project');
     seedLocalStorage([product]);
 
     const result = await migrateLocalToCloud('user-1');
 
-    expect(result.uploaded).toBe(1);
-    expect(result.skipped).toBe(0);
-    expect(setDoc).toHaveBeenCalled();
+    expect(result.uploadedIds).toEqual(['proj-1']);
+    expect(result.skipped).toEqual([]);
+    expect(h.fs.docs.has(`${P}proj-1`)).toBe(false);
     // Verify owner and members are set
-    const call = findSetDocCall('proj-1');
+    const call = writtenNamed('My Project');
     expect(call.owner).toBe('user-1');
     expect(call.members).toEqual({ 'user-1': 'owner' });
   });
@@ -153,8 +95,8 @@ describe('migrateLocalToCloud', () => {
 
     const result = await migrateLocalToCloud('user-1');
 
-    expect(result.uploaded).toBe(2);
-    expect(findSetDocCall('proj-1').sprints).toEqual([]);
+    expect(result.uploadedIds).toHaveLength(2);
+    expect(writtenNamed('Bad').sprints).toEqual([]);
     // "Local data is left in place as a backup": the upload wrote nothing back.
     expect(JSON.parse(localStorage.getItem('rp:local:product_proj-1')!).sprints).toEqual({});
     expect(isGuardedLoad('proj-1')).toBe(false);
@@ -164,49 +106,43 @@ describe('migrateLocalToCloud', () => {
     const product = createLocalProduct('proj-1', 'My Project');
     seedLocalStorage([product]);
     // Pre-populate Firestore with existing doc
-    mockDocs.set('spertstorymap_projects/proj-1', {
-      ...product,
-      owner: 'user-1',
-      members: { 'user-1': 'owner' },
-    });
+    h.fs.docs.set(`${P}proj-1`, { ...product, owner: 'user-1', members: { 'user-1': 'owner' } });
 
     const result = await migrateLocalToCloud('user-1');
 
-    expect(result.uploaded).toBe(0);
-    expect(result.skipped).toBe(1);
+    expect(result.uploadedIds).toEqual([]);
+    expect(result.skipped).toEqual([{ localId: 'proj-1', name: 'My Project', cloudName: 'My Project' }]);
+    expect(written(['proj-1'])).toHaveLength(0);
   });
 
   it('generates new ID if doc exists but user is not a member', async () => {
     const product = createLocalProduct('proj-1', 'My Project');
     seedLocalStorage([product]);
     // Pre-populate with someone else's project
-    mockDocs.set('spertstorymap_projects/proj-1', {
-      ...product,
-      owner: 'other-user',
-      members: { 'other-user': 'owner' },
-    });
+    h.fs.docs.set(`${P}proj-1`, { ...product, owner: 'other-user', members: { 'other-user': 'owner' } });
 
     const result = await migrateLocalToCloud('user-1');
 
-    expect(result.uploaded).toBe(1);
-    expect(result.skipped).toBe(0);
-    // Should have used a new ID (uuid-1)
-    const call = findSetDocCall('uuid-');
-    expect(call).toBeTruthy();
+    expect(result.uploadedIds).toEqual(['proj-1']);
+    expect(result.skipped).toEqual([]);
+    // Someone else's document is untouched; the upload is a new document.
+    expect(h.fs.docs.get(`${P}proj-1`)!.owner).toBe('other-user');
+    expect(written(['proj-1'])).toHaveLength(1);
   });
 
-  it('appends cloud-migration to changelog', async () => {
+  it('appends cloud-migration to changelog, with the local id as its source', async () => {
     const product = createLocalProduct('proj-1', 'My Project');
     product._changeLog = [{ t: 1000, op: 'create', entity: 'product' }] as ChangeLogEntry[];
     seedLocalStorage([product]);
 
     await migrateLocalToCloud('user-1');
 
-    const call = findSetDocCall('proj-1');
-    const log = call._changeLog as ChangeLogEntry[];
+    const log = writtenNamed('My Project')._changeLog as ChangeLogEntry[];
     expect(log.length).toBe(2);
     expect(log[1]?.op).toBe('cloud-migration');
     expect(log[1]?.uid).toBe('user-1');
+    expect(log[1]?.source).toBe('proj-1');
+    expect(Object.keys(log[1] ?? {}).sort()).toEqual(['op', 'seq', 'source', 't', 'uid']);
   });
 
   it('migrates preferences', async () => {
@@ -217,8 +153,7 @@ describe('migrateLocalToCloud', () => {
     await migrateLocalToCloud('user-1');
 
     // v0.55.14 (R-6, R64): one masked write, the tile order plus a name the cloud lacks.
-    const prefsCall = findSetDocCall('spertstorymap_settings');
-    expect(prefsCall).toEqual({ projectOrder: [], exportName: 'Alice' });
+    expect(h.fs.docs.get('spertstorymap_settings/user-1')).toEqual({ projectOrder: [], exportName: 'Alice' });
   });
 
   it('leaves local data in place as backup', async () => {
