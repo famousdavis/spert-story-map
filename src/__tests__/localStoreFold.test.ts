@@ -116,6 +116,8 @@ describe('the fold', () => {
       const s = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) { fail(); setItem.call(this, k, v); });
       const r = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, k: string) { fail(); removeItem.call(this, k); });
       expect(foldOwnProducts(U).stopped).toBe(true);
+      // Stopped at #1 or #2, no copy is left in rp:local that the index does not list: in a full store it takes room.
+      expect(keys('local')).toBe(at <= 2 ? 1 : 2);
       s.mockRestore(); r.mockRestore();
       foldOwnProducts(U);
       expect({ listed: listed(), local: keys('local'), uid: keys(U) }).toEqual({ listed: ['Lab 3', 'Lab 3 (Copy)'], local: 2, uid: 0 });
@@ -178,6 +180,15 @@ describe('the fold', () => {
     foldOwnProducts(U);
     expect(listed()).toEqual(['Good']);
     expect(localStorage.getItem('rp:local:product_bad')).toBe('{not json');
+  });
+
+  it('the identical branch writes the product’s own rp:local index entry even where the index already lists the id (R-3: in every branch)', () => {
+    const p = made('Lab 3');
+    keep(U, p);
+    keep('local', p, false);
+    localStorage.setItem('rp:local:products_index', JSON.stringify([{ id: p.id, name: 'An older name', updatedAt: '2026-01-01T00:00:00.000Z' }]));
+    foldOwnProducts(U);
+    expect(JSON.parse(localStorage.getItem('rp:local:products_index') ?? '[]')).toEqual([{ id: p.id, name: 'Lab 3', updatedAt: p.updatedAt }]);
   });
 
   it('an identical copy already in rp:local (moved, never listed) is listed and the source removed, with no copy', () => {
