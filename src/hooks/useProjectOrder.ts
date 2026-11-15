@@ -10,6 +10,9 @@ import type { StorageDriver, UserSettings } from '../types';
 /** A clone created but not yet listed by a refresh: its name is taken and its place is held. */
 interface InFlight { name: string; settledAt?: number }
 
+/** A drop, as a function of the full order: the order after it, or null when it changes nothing. */
+type Move = (full: string[]) => string[] | null;
+
 /**
  * The first settings read on a driver (v0.56.0): `loading` until it answers; `failed` when a cloud
  * read failed (R88), until a later read succeeds. `prefs` is the tile colours and archive it read.
@@ -36,7 +39,8 @@ const EMPTY: ProjectPrefs = {};
  * unseen.
  *
  * `projectOrder` (state) is what the list is sorted by. `orderRef` is the latest order this tab
- * holds. A clone in flight also holds its name until a refresh lists it, so a double-click on Clone
+ * holds; the screen shows it with every drop not yet written applied on top (`pendingRef`), so a
+ * second quick drop never shows the first undone (PR #245 review -06). A clone in flight also holds its name until a refresh lists it, so a double-click on Clone
  * gives "(Copy)" and "(Copy 2)", as import's running list of names does (`import-utils.ts`).
  */
 export function useProjectOrder<P extends { id: string; name: string }>(driver: StorageDriver | null, products: P[]) {
@@ -50,6 +54,8 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
   const refreshGenRef = useRef(0);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const retryingRef = useRef(false);
+  /** The drops queued and not yet written, in the order they were made. */
+  const pendingRef = useRef<Move[]>([]);
   /** The first read's state, for `listed`, which must stay stable: `refresh` depends on it. */
   const failedForRef = useRef<StorageDriver | null>(null);
 
@@ -109,6 +115,12 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
     }
   }, [driver, took]);
 
+  /** `base` with every drop not yet written applied, in order. */
+  const withPending = useCallback(
+    (base: string[]): string[] => pendingRef.current.reduce((full, move) => move(full) ?? full, base),
+    [],
+  );
+
   /** One order write at a time: each reads what the one before it wrote. */
   const enqueue = useCallback((task: () => Promise<void>): Promise<void> => {
     const run = queueRef.current.then(task, task);
@@ -116,12 +128,12 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
     return run;
   }, []);
 
-  /** Show and persist an order. Writes `projectOrder` alone (v0.55.14). */
+  /** Persist an order and show it, with the drops not yet written on top. Writes `projectOrder` alone (v0.55.14). */
   const saveOrder = useCallback((ids: string[]) => {
     orderRef.current = ids;
-    setProjectOrder(ids);
+    setProjectOrder(withPending(ids));
     driver?.writePreferences([{ path: ['projectOrder'], value: ids }]);
-  }, [driver]);
+  }, [driver, withPending]);
 
   /** A refresh is starting; returns its number, to hand back to `listed`. */
   const refreshStarted = useCallback(() => ++refreshGenRef.current, []);
@@ -173,9 +185,9 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
   /**
    * Dropping one product on another's tile puts it in that tile's place, in both directions.
    * `hidden` are the tiles the grid leaves out: each keeps its slot (Forecaster's slot rule), as does
-   * every stored id this tab does not list (R89). The move shows at once from the order this tab
-   * holds; the write then builds from a fresh read and shows what it wrote, which differs only when
-   * another tab's reorder was read.
+   * every stored id this tab does not list (R89). The move shows at once, on top of the latest order
+   * this tab has written or is writing; the write then builds from a fresh read and shows what it
+   * wrote, which differs only when another tab's reorder was read.
    */
   const moveOnto = useCallback((draggedId: string, targetId: string, hidden: ReadonlySet<string> = new Set()) => {
     const place = (full: string[]): string[] | null => {
@@ -188,16 +200,18 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
       shown.splice(to, 0, draggedId);
       return reorderShown(full, shown);
     };
-    const now = place(orderFrom(orderRef.current));
+    const now = place(withPending(orderFrom(orderRef.current)));
     if (!now) return Promise.resolve();
+    pendingRef.current = [...pendingRef.current, place];
     setProjectOrder(now);
     return enqueue(async () => {
       const fresh = await freshOrder();
+      pendingRef.current = pendingRef.current.filter(move => move !== place);
       const ids = fresh ? place(orderFrom(fresh.order)) : null;
       if (ids) saveOrder(ids);
-      else setProjectOrder(fresh ? orderFrom(fresh.order) : orderRef.current);
+      else setProjectOrder(withPending(orderFrom(fresh ? fresh.order : orderRef.current)));
     });
-  }, [enqueue, freshOrder, knownIds, orderFrom, saveOrder]);
+  }, [enqueue, freshOrder, knownIds, orderFrom, saveOrder, withPending]);
 
   return { sorted, settings, refreshStarted, listed, takenNames, placeClone, moveOnto };
 }

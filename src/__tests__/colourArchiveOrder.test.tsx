@@ -104,6 +104,33 @@ describe.each<Kind>(['cloud', 'local'])('%s: an order write reads the stored ord
     expect(stored(kind).projectOrder).toEqual(['p4', 'p3', 'p1', 'p2']);
   });
 
+  // PR #245 review -06 (B2): the second drop's display used to start from the order last read, so
+  // until the writes landed it showed the first drop undone.
+  it('two quick drops: the second shows on top of the first, never the first undone', async () => {
+    seed(kind, ['p1', 'p2', 'p3', 'p4']);
+    const A = await openOrder(await makeDriver(kind));
+    const release = kind === 'cloud' ? h.fs.holdReads() : null;
+    const move = (from: string, to: string) => (A.result.current.moveOnto as (a: string, b: string) => unknown)(from, to);
+    act(() => { void move('p4', 'p1'); });
+    expect(shown(A)).toEqual(['p4', 'p1', 'p2', 'p3']);
+    act(() => { void move('p3', 'p1'); });
+    expect(shown(A)).toEqual(['p4', 'p3', 'p1', 'p2']);
+    if (release) {
+      // The first write lands while the second's read is held: the screen keeps the second drop.
+      await wait(0); // the first drop's read is now called, and held on the first gate
+      const reads = h.fs.reads;
+      const releaseSecond = h.fs.holdReads();
+      release();
+      await wait(50);
+      expect(h.fs.reads - reads, 'the second drop\'s read has started, so the first write is done').toBe(1);
+      expect(shown(A)).toEqual(['p4', 'p3', 'p1', 'p2']);
+      releaseSecond();
+    }
+    await wait(300);
+    expect(shown(A)).toEqual(['p4', 'p3', 'p1', 'p2']);
+    expect(stored(kind).projectOrder).toEqual(['p4', 'p3', 'p1', 'p2']);
+  });
+
   it('a drop shows at once, from the order the tab holds, before the read returns', async () => {
     seed(kind, ['p1', 'p2', 'p3', 'p4']);
     const A = await openOrder(await makeDriver(kind));

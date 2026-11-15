@@ -14,7 +14,7 @@
 
 ### Fixed
 
-- **Reordering or cloning in a tab opened before a reorder made in another tab no longer undoes that reorder.** Each reorder, each clone and each upload now reads the stored order just before it writes it. A product the tab does not list, made or moved on another device since it opened, keeps its place. A reorder can still be undone by a reorder made in another tab less than about a fifth of a second later: measured up to 0.19 seconds apart in this browser's storage, and up to 0.2 seconds apart against a test cloud server on the same computer, to which the real cloud adds the time a save takes to arrive. A tab that is offline reorders from the order it last read.
+- **Reordering or cloning in a tab opened before a reorder made in another tab no longer undoes that reorder.** Each reorder, each clone and each upload now reads the stored order just before it writes it. A product the tab does not list, made or moved on another device since it opened, keeps its place. A reorder made in another tab within about a quarter of a second can still undo it. In two sets of measurements on one computer, a reorder was lost when the two were up to about 0.2 seconds apart in this browser's storage, and up to about 0.21 to 0.23 seconds apart against a test cloud server, and kept from about 0.25 seconds; the real cloud adds the time a save takes to arrive. A tab that is offline reorders from the order it last read.
 - The Products page now waits for your settings before showing the tiles, so an archived tile does not appear and then disappear.
 
 ### Not changed
