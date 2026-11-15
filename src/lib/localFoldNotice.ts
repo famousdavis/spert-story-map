@@ -13,25 +13,38 @@ let lines: string[] | null = null;
 const listeners = new Set<() => void>();
 
 const changed = () => { for (const listener of listeners) listener(); };
-const productsWord = (n: number) => (n === 1 ? 'One product' : `${n} products`);
+const STOPPED_LINE = 'Some products could not be moved because this browser’s storage is full. They are kept, but not shown, until there is room: export or delete products you no longer need, then reload the page.';
+
+/** Singular or plural words for a count. */
+function forms(n: number) {
+  const one = n === 1;
+  return {
+    products: one ? 'One product' : `${n} products`,
+    was: one ? 'was' : 'were',
+    is: one ? 'is' : 'are',
+    it: one ? 'it' : 'them',
+    itWas: one ? 'it was' : 'they were',
+    separate: one ? 'a separate product' : 'separate products',
+  };
+}
 
 /** The notice's sentences for an outcome, or null when there is nothing to say. */
 export function foldNoticeLines(o: FoldOutcome): string[] | null {
   const out: string[] = [];
   if (o.moved > 0) {
-    const one = o.moved === 1;
-    out.push(`${productsWord(o.moved)} you made while signed in ${one ? 'was' : 'were'} moved into this browser’s Local storage. Anyone who uses this browser can now see ${one ? 'it' : 'them'}.`);
+    const w = forms(o.moved);
+    out.push(`${w.products} you made while signed in ${w.was} moved into this browser’s Local storage. Anyone who uses this browser can now see ${w.it}.`);
   }
   if (o.copies > 0) {
-    const one = o.copies === 1;
-    out.push(`${productsWord(o.copies)} had the same ID as a product already here but different contents, so ${one ? 'it was' : 'they were'} kept as ${one ? 'a separate product' : 'separate products'} with “(Copy)” added to the name.`);
+    const w = forms(o.copies);
+    out.push(`${w.products} had the same ID as a product already here but different contents, so ${w.itWas} kept as ${w.separate} with “(Copy)” added to the name.`);
   }
   if (o.unreadable > 0) {
-    const one = o.unreadable === 1;
-    out.push(`${productsWord(o.unreadable)} could not be read, so ${one ? 'it was' : 'they were'} set aside in this browser’s storage, unchanged, and ${one ? 'is' : 'are'} not shown.`);
+    const w = forms(o.unreadable);
+    out.push(`${w.products} could not be read, so ${w.itWas} set aside in this browser’s storage, unchanged, and ${w.is} not shown.`);
   }
   if (o.stopped) {
-    out.push('Some products could not be moved because this browser’s storage is full. They are kept, but not shown, until there is room: export or delete products you no longer need, then reload the page.');
+    out.push(STOPPED_LINE);
   }
   return out.length > 0 ? out : null;
 }
