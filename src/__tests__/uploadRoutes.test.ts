@@ -324,6 +324,14 @@ describe('what a skip is called', () => {
     expect(out.skipped).toEqual([{ localId: id, name: 'A', cloudName: 'A' }]);
     expect(uploadMessage(out).text).toBe('No new products to upload. Already in the cloud, so not uploaded again: “A”. This browser still has its own copy of each, which may differ from the cloud version.');
   });
+
+  it("a skip's local id is the index's, as an upload's is, when the stored product holds another id", async () => {
+    const id = await r.create('A');
+    localStorage.setItem(`rp:local:product_${id}`, JSON.stringify({ ...r.local(id), id: 'other' }));
+    r.put('other', { name: 'A', owner: U, members: { [U]: 'owner' }, _changeLog: [] });
+    const out = await r.upload();
+    expect(out.skipped).toEqual([{ localId: id, name: 'A', cloudName: 'A' }]);
+  });
 });
 
 describe('the server list is read defensively', () => {

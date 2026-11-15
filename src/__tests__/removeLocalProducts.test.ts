@@ -4,9 +4,12 @@
 
 // @vitest-environment jsdom
 
-/** v0.55.15 (R72): the clear after an upload removes only the products that upload sent. */
+/**
+ * v0.55.15 (R72): the clear after an upload removes only the products that upload sent. It shares
+ * `dropPendingSave` with `deleteProduct`, so both are held to dropping a write not yet made.
+ */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { removeLocalProducts, saveProductIndex, saveProduct } from '../lib/storage';
+import { removeLocalProducts, saveProductIndex, saveProduct, deleteProduct } from '../lib/storage';
 
 const index = (ns: string) => JSON.parse(localStorage.getItem(`rp:${ns}:products_index`) ?? '[]').map((e: { id: string }) => e.id);
 const seed = (ns: string, ids: string[]) => {
@@ -35,5 +38,17 @@ describe('removeLocalProducts', () => {
     vi.runAllTimers();
     expect(localStorage.getItem('rp:local:product_b')).toBeNull();
     expect(JSON.parse(localStorage.getItem('rp:local:products_index')!)).toEqual([{ id: 'a', name: 'a renamed' }]);
+  });
+});
+
+describe('deleteProduct', () => {
+  it('a product write and an index write not yet made cannot bring a deleted product back', () => {
+    vi.useFakeTimers();
+    seed('local', ['a', 'b']);
+    saveProduct({ id: 'b', name: 'b edited' } as never);
+    deleteProduct('b');
+    vi.runAllTimers();
+    expect(localStorage.getItem('rp:local:product_b')).toBeNull();
+    expect(index('local')).toEqual(['a']);
   });
 });

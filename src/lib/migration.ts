@@ -90,7 +90,7 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
     }
     const earlier = findEarlierUpload(product, cloud, shared);
     if (earlier) {
-      outcome.skipped.push({ localId: product.id, name: product.name, cloudName: earlier.cloudName });
+      outcome.skipped.push({ localId: entry.id, name: product.name, cloudName: earlier.cloudName });
       continue;
     }
 

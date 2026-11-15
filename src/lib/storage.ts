@@ -326,14 +326,19 @@ export function saveProductImmediateOrThrow(product: Product): Product {
   return updated;
 }
 
+/** Drop a debounced write that has not run yet, so it cannot bring back what was removed. */
+function dropPendingSave(key: string): void {
+  if (saveTimers[key]) { clearTimeout(saveTimers[key]); delete saveTimers[key]; delete pendingSaves[key]; }
+}
+
 export function deleteProduct(id: string): void {
   // Drop any pending debounced writes for this product and the index — a
   // trailing save would resurrect the deleted product or write a stale
   // index entry referencing it.
   const productKey = productKeyFor(id, activeNamespace);
   const indexKey = indexKeyFor(activeNamespace);
-  if (saveTimers[productKey]) { clearTimeout(saveTimers[productKey]); delete saveTimers[productKey]; delete pendingSaves[productKey]; }
-  if (saveTimers[indexKey])   { clearTimeout(saveTimers[indexKey]);   delete saveTimers[indexKey];   delete pendingSaves[indexKey]; }
+  dropPendingSave(productKey);
+  dropPendingSave(indexKey);
   try {
     localStorage.removeItem(productKey);
     const index = loadProductIndex().filter(p => p.id !== id);
@@ -351,11 +356,6 @@ export function clearAllLocalProducts(ns?: string): void {
     localStorage.removeItem(productKeyFor(entry.id, namespace));
   }
   localStorage.removeItem(indexKeyFor(namespace));
-}
-
-/** Drop a debounced write that has not run yet, so it cannot bring back what was removed. */
-function dropPendingSave(key: string): void {
-  if (saveTimers[key]) { clearTimeout(saveTimers[key]); delete saveTimers[key]; delete pendingSaves[key]; }
 }
 
 /**
