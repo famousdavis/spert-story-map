@@ -108,11 +108,12 @@ describe('R84 on the Products page', () => {
 });
 
 describe('R84 on Settings → Data', () => {
-  async function replaceOpen(prefs: Prefs, fileId?: string) {
+  async function replaceOpen(prefs: Prefs, fileId?: string, beforeUpload: () => void = () => {}) {
     seedLocal([makeProject({ id: 'p-A', name: 'Alpha' })]);
     setPrefs(prefs);
     const product = req(await driver.loadProduct('p-A'), 'product');
     render(<DataSection product={product} driver={driver} updateProduct={() => {}} />);
+    beforeUpload();
     await userEvent.upload(fileInput(), fileOf({ ...product, id: fileId ?? product.id, name: 'Alpha 2' }));
     await userEvent.click(await screen.findByRole('button', { name: /replace all data/i }));
     await waitFor(() => expect(screen.queryByRole('button', { name: /replace all data/i })).toBeNull());
@@ -123,6 +124,17 @@ describe('R84 on Settings → Data', () => {
     await replaceOpen({ 'p-A': { archived: true } });
     expect(screen.getByRole('status').textContent).toBe('“Alpha 2” is archived: Show archived on the Products page lists it.');
     expect(storedPrefs()).toEqual({ 'p-A': { archived: true } });
+  });
+
+  // PR #245 review -07: a live region inserted already holding its text may not be announced.
+  it('the line\'s live region is on the page, empty, before its text arrives', async () => {
+    let region: HTMLElement | null = null;
+    await replaceOpen({ 'p-A': { archived: true } }, undefined, () => {
+      region = screen.getByRole('status');
+      expect(region.textContent).toBe('');
+    });
+    expect(screen.getByRole('status')).toBe(region);
+    expect(req(region as HTMLElement | null, 'region').textContent).toBe('“Alpha 2” is archived: Show archived on the Products page lists it.');
   });
 
   it('control: not archived, no line', async () => {
