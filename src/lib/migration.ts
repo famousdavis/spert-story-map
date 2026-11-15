@@ -84,6 +84,8 @@ export async function migrateLocalToCloud(uid: string, selected?: ReadonlySet<st
   // copied into this person's cloud.
   const index = loadProductIndex('local');
   const localPrefs = loadPreferences(uid);
+  // R95: tile colours, archive and order fall back, per product, to this browser's signed-out settings.
+  const tilePrefs = withSignedOutTiles(localPrefs, loadPreferences('local'));
   const loaded = index.map(entry => ({ entry, product: loadProduct(entry.id, 'local', false) }));
   // R67's recognition counts EVERY local product (the shared-origin rung included), ticked or not.
   const shared = sharedOriginKeys(loaded.map(l => l.product));
@@ -133,9 +135,9 @@ export async function migrateLocalToCloud(uid: string, selected?: ReadonlySet<st
   // R89: every id the stored order holds keeps its slot, listed or not (a product made on another
   // device since the list was read, or a deleted one), then the listed products it lacks.
   const tiles = withStoredSlots(latest.projectOrder, cloudList.docs.map(d => d.id));
-  const localTiles = sortByOrder(index, localPrefs.projectOrder);
+  const localTiles = sortByOrder(index, tilePrefs.projectOrder);
   const ids = { targetIds, skippedIds };
-  const copies = prefCopies(latest, localPrefs, localTiles, ids);
+  const copies = prefCopies(latest, tilePrefs, localTiles, ids);
   await setDoc(settingsRef, ...uploadedSettings(latest, localPrefs, tiles, localTiles, ids, copies.entries));
   outcome.prefsNotCopied = copies.overCap;
   return outcome;
@@ -176,6 +178,21 @@ function prefCopies(
     entries.push(...prefEntries(cloudId, {}, pref));
   }
   return { entries, overCap };
+}
+
+/**
+ * The settings the upload reads tile colours, archive and order from (v0.56.1, R95): the signed-in
+ * person's own, and, for a product their own hold nothing for, this browser's signed-out settings.
+ * The order is theirs, then the signed-out order for the products theirs does not hold. The export
+ * name, identifier and caution switch are never read from here: they stay the person's own (R94).
+ */
+function withSignedOutTiles(own: UserSettings, signedOut: UserSettings): UserSettings {
+  const ownOrder = Array.isArray(own.projectOrder) ? own.projectOrder : [];
+  const outOrder = Array.isArray(signedOut.projectOrder) ? signedOut.projectOrder : [];
+  const held = new Set(ownOrder);
+  const ownMap = sanitizeProjectPrefs(own.projectPrefs);
+  const projectPrefs = { ...sanitizeProjectPrefs(signedOut.projectPrefs), ...ownMap };
+  return { projectOrder: [...ownOrder, ...outOrder.filter(id => !held.has(id))], projectPrefs };
 }
 
 interface UploadIds { targetIds: Map<string, string>; skippedIds: Map<string, string> }

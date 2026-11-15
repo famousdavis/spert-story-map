@@ -99,6 +99,25 @@ describe('the upload list (R-4)', () => {
     expect(result('Uploaded 1 product').textContent).toBe('Uploaded 1 product to the cloud. Not ticked, so kept in this browser only: “Template (classmate)”.');
   });
 
+  it('R95: tile colour, archive and order fall back per product to this browser’s signed-out settings; the export name does not', async () => {
+    const a = await r.create('A');
+    const b = await r.create('B');
+    const c = await r.create('C');
+    localStorage.setItem('rp:u:preferences', JSON.stringify({ projectOrder: [a], projectPrefs: { [a]: { color: 'teal' } } }));
+    localStorage.setItem('rp:local:preferences', JSON.stringify({
+      exportName: 'Signed-out Ana', exportId: 'A-1', projectOrder: [c, b, a],
+      projectPrefs: { [a]: { color: 'pink' }, [b]: { color: 'pink', archived: true } },
+    }));
+    const dialog = openList();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Select all' }));
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Upload 3 products' })); });
+    const cloudIdOf = (name: string) => r.owned().find(d => d.name === name)?.id ?? `missing ${name}`;
+    const doc = h.fs.docs.get(SETTINGS) as { projectOrder?: string[]; projectPrefs?: Record<string, unknown>; exportName?: string; exportId?: string };
+    expect(doc.projectOrder).toEqual([cloudIdOf('A'), cloudIdOf('C'), cloudIdOf('B')]);
+    expect(doc.projectPrefs).toEqual({ [cloudIdOf('A')]: { color: 'teal' }, [cloudIdOf('B')]: { color: 'pink', archived: true } });
+    expect({ n: doc.exportName, i: doc.exportId }).toEqual({ n: undefined, i: undefined });
+  });
+
   it('the export name, identifier and caution switch come from the signed-in person’s own settings, never this browser’s signed-out ones', async () => {
     await r.create('A');
     localStorage.setItem('rp:local:preferences', JSON.stringify({ exportName: 'Signed-out Ana', exportId: 'A-1', suppressLocalStorageWarning: true }));
