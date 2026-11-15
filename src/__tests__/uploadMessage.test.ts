@@ -38,6 +38,18 @@ describe('uploadMessage', () => {
     expect(uploadMessage(outcome(0, names)).text).toBe(`No new products to upload. Already in the cloud, so not uploaded again: ${listed} and 2 more. ${KEPT}`);
   });
 
+  it('exactly ten: all named, with no "and"', () => {
+    const names = Array.from({ length: 10 }, (_, i) => ({ name: `P${i + 1}` }));
+    const listed = names.map(n => `“${n.name}”`).join(', ');
+    expect(uploadMessage(outcome(0, names)).text).toBe(`No new products to upload. Already in the cloud, so not uploaded again: ${listed}. ${KEPT}`);
+  });
+
+  it('eleven: ten named, then "and 1 more"', () => {
+    const names = Array.from({ length: 11 }, (_, i) => ({ name: `P${i + 1}` }));
+    const listed = names.slice(0, 10).map(n => `“${n.name}”`).join(', ');
+    expect(uploadMessage(outcome(0, names)).text).toBe(`No new products to upload. Already in the cloud, so not uploaded again: ${listed} and 1 more. ${KEPT}`);
+  });
+
   it('unreadable: one, several, and alone', () => {
     expect(uploadMessage(outcome(2, [], 1))).toEqual({ status: 'notice', text: 'Uploaded 2 products to the cloud. 1 product could not be read and was not uploaded.' });
     expect(uploadMessage(outcome(0, [{ name: 'A' }], 3)).text).toBe(`No new products to upload. Already in the cloud, so not uploaded again: “A”. ${KEPT} 3 products could not be read and were not uploaded.`);
