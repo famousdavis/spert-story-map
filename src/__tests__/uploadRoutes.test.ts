@@ -258,6 +258,35 @@ describe('routes skipped on purpose', () => {
     expect(loadProductIndex('local').map(e => e.id)).toEqual([id]);
     expect(r.local(id).description).toBe('+');
   });
+
+  it('after the uploaded document is replaced with the template file, a fresh import of the template with new work is skipped by its creation time and origin (R18)', async () => {
+    const tid = await r.create('Template');
+    const t = r.localExport(tid);
+    r.clear();
+    await r.importFile(t); r.addWork(tid);
+    await r.upload();
+    r.replaceOnto(lastOwnedId(), t);
+    r.clear();
+    await r.importFile(t); r.addWork(tid);
+    const out = await r.upload();
+    expect(out.skipped).toEqual([{ localId: tid, name: 'Template', cloudName: 'Template' }]);
+    expect(r.owned()).toHaveLength(1);
+  });
+
+  it('after a replace by name with unrelated content, the original local product is skipped (Z5)', async () => {
+    const id = await r.create('A');
+    await r.upload();
+    const cid = lastOwnedId();
+    r.put('x', { name: 'A', owner: O, members: { [O]: 'owner' }, createdAt: '2025-05-05T00:00:00.000Z', _originRef: 'ws-o', schemaVersion: 2, themes: [], releases: [], sprints: [], sizeMapping: [], _changeLog: [{ t: 1, op: 'create', entity: 'product', seq: 'zz' }] });
+    r.replaceOnto(cid, r.cloudExport('x'));
+    r.remove('x');
+    // The document now holds the other product's history (and the import's entry), not this one's.
+    expect((r.doc(cid)._changeLog as { op: string; seq?: string }[]).map(e => e.seq === 'zz' ? 'zz' : e.op)).toEqual(['zz', 'import']);
+    r.addWork(id);
+    const out = await r.upload();
+    expect(out.skipped).toEqual([{ localId: id, name: 'A', cloudName: 'A' }]);
+    expect(r.owned()).toHaveLength(1);
+  });
 });
 
 describe('the server list is read defensively', () => {
