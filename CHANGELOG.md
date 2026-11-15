@@ -6,7 +6,7 @@
 
 - **Uploading local products to the cloud again no longer adds the products already uploaded.** They are skipped and named, and this browser keeps its own copy of each. Before this version a second upload added them to the cloud again as new products; only a product imported from a file exported from one of your cloud products, or one shared with you, was skipped.
 - **An upload that stopped part way, run again, does not add a second time the products it had already uploaded.**
-- **Clearing local copies after an upload now removes only the products that upload sent.** Before this version it removed all of this browser's local products, including ones that were not uploaded, so changes made in this browser to a product already in the cloud were lost.
+- **Clearing local copies after an upload now removes only the products that upload sent.** Before this version it removed all of this browser's local products, including any the upload had skipped or could not read, so changes made in this browser to those products were lost.
 - Products an earlier version already added to the cloud twice are left as they are. A product uploaded before this version is recognised by its history, or by its creation time and origin when no other product in this browser shares them.
 
 ### Changed
