@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { foldOwnProducts, foldLocalStore } from '../lib/localStoreFold';
+import { foldCopyId } from '../lib/foldCopyId';
 import * as storage from '../lib/storage';
 import { AI_SESSION_KEY_PREFIX } from '../lib/aiConstants';
 import { getPendingSessionEnds } from '../lib/aiSessionTeardown';
@@ -100,8 +101,9 @@ describe('the fold', () => {
   });
 
   // The copy branch's writes: #1 the copy, #2 its index entry, #3 removing the source key, #4 removing
-  // the source's index entry. #3 is not modelled: removeItem never fails for a full store.
-  for (const at of [1, 2, 4]) {
+  // the source's index entry. #3 models a stop between listing the copy and removing its source (a
+  // full store cannot cause it: removeItem never fails for space; a tab closed there can).
+  for (const at of [1, 2, 3, 4]) {
     it(`a fold interrupted at the copy branch’s write #${at}, then run again: one copy, listed once`, () => {
       const p = made('Lab 3');
       keep('local', { ...p, description: 'someone else’s copy' });
@@ -118,6 +120,33 @@ describe('the fold', () => {
       expect({ listed: listed(), local: keys('local'), uid: keys(U) }).toEqual({ listed: ['Lab 3', 'Lab 3 (Copy)'], local: 2, uid: 0 });
     });
   }
+
+  it('a copy edited in rp:local after a fold stopped before removing its source: the next fold keeps both, under another id', () => {
+    const p = made('Lab 3');
+    keep('local', { ...p, description: 'someone else’s copy' });
+    keep(U, p);
+    let n = 0;
+    const removeItem = Storage.prototype.removeItem;
+    const r = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, k: string) {
+      if (k === `rp:${U}:product_${p.id}` && ++n === 1) throw new DOMException('stop', 'QuotaExceededError');
+      removeItem.call(this, k);
+    });
+    expect(foldOwnProducts(U).stopped).toBe(true);
+    r.mockRestore();
+    const copyId = (JSON.parse(localStorage.getItem('rp:local:products_index') ?? '[]') as { id: string; name: string }[]).find(e => e.name === 'Lab 3 (Copy)')?.id ?? '';
+    const copy = storage.loadProduct(copyId) as Product;
+    storage.saveProductImmediate({ ...copy, description: 'edited here' });
+    foldOwnProducts(U);
+    expect({ listed: listed(), local: keys('local'), uid: keys(U) }).toEqual({ listed: ['Lab 3', 'Lab 3 (Copy 2)', 'Lab 3 (Copy)'], local: 3, uid: 0 });
+    expect((storage.loadProduct(copyId) as Product).description).toBe('edited here');
+  });
+
+  it('the copy id is derived from the uid, the source id and the source text, and reads as a UUID', () => {
+    const a = foldCopyId(U, 'p1', '{"x":1}');
+    expect(a).toBe(foldCopyId(U, 'p1', '{"x":1}'));
+    expect(new Set([a, foldCopyId('uB', 'p1', '{"x":1}'), foldCopyId(U, 'p2', '{"x":1}'), foldCopyId(U, 'p1', '{"x":2}')]).size).toBe(4);
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
 
   it('an index write this tab has pending when the fold runs cannot drop the folded entry', () => {
     vi.useFakeTimers();

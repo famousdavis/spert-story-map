@@ -10,7 +10,8 @@
  * Per product, in this order: write it to `rp:local` (unless an identical copy is there), write its
  * `rp:local` index entry (every branch; a failure stops the fold), remove the source key, remove the
  * source index entry. So an interrupted fold re-runs to the same result, and a product is never
- * removed from `rp:{uid}` before `rp:local` lists it.
+ * removed from `rp:{uid}` before `rp:local` lists it. A copy's id is derived from the source (see
+ * `keepAsCopy`), so this holds for the copy branch too, unless the copy was edited in between.
  *
  * An id `rp:local` already holds: byte-identical means it was already moved; ANY difference keeps
  * both (O45: no "ancestor" rule, so no edit is lost), the moved one under a fresh id and a
@@ -25,6 +26,7 @@
 import { cloneName } from './cloneName';
 import { flushPendingSaves, PRODUCT_NS } from './storage';
 import { readSessionRecord, removeSessionRecord } from './aiSessionRecords';
+import { foldCopyId } from './foldCopyId';
 import { endSessionInBackground } from './aiSessionTeardown';
 
 export interface FoldOutcome {
@@ -95,9 +97,23 @@ function dropSourceEntry(uid: string, id: string): void {
   else localStorage.setItem(indexKey(uid), JSON.stringify(rest));
 }
 
-/** The moved product under a fresh id, written and listed; its key is removed again if listing fails. */
-function keepAsCopy(product: Record<string, unknown>): IndexEntry {
-  const to = crypto.randomUUID();
+/**
+ * The moved product under a fresh id, written and listed; its key is removed again if listing fails.
+ * The id is derived from (uid, source id, source text) (review -03): when an earlier fold wrote and
+ * listed this copy and then stopped before removing the source, the copy is found byte-identical
+ * (under its own name) and is listed again, not made twice. If the derived id holds something else
+ * (the copy was edited since), a random id is used.
+ */
+function keepAsCopy(uid: string, id: string, raw: string, product: Record<string, unknown>): IndexEntry {
+  const derived = foldCopyId(uid, id, raw);
+  const there = localStorage.getItem(productKey(PRODUCT_NS, derived));
+  const was = there === null ? null : parseProduct(there);
+  if (was && there === JSON.stringify({ ...product, id: derived, name: was.name })) {
+    const again = { id: derived, name: textOf(was.name), updatedAt: textOf(product.updatedAt) };
+    listInLocal(again);
+    return again;
+  }
+  const to = there === null ? derived : crypto.randomUUID();
   const name = cloneName(textOf(product.name), readIndex(PRODUCT_NS).map(e => textOf(e.name)));
   localStorage.setItem(productKey(PRODUCT_NS, to), JSON.stringify({ ...product, id: to, name }));
   const entry = { id: to, name, updatedAt: textOf(product.updatedAt) };
@@ -122,7 +138,7 @@ function foldOne(uid: string, id: string, copies: Moved[]): 'moved' | 'copied' |
     if (here === null) localStorage.setItem(productKey(PRODUCT_NS, id), raw);
     listInLocal({ id, name: textOf(product.name), updatedAt: textOf(product.updatedAt) });
   } else {
-    copies.push({ from: id, to: keepAsCopy(product).id });
+    copies.push({ from: id, to: keepAsCopy(uid, id, raw, product).id });
     result = 'copied';
   }
   localStorage.removeItem(productKey(uid, id));
