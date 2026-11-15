@@ -28,6 +28,7 @@ vi.mock('firebase/firestore', async () => {
 });
 
 import { uploadRoutes, U, O } from './fixtures/uploadRoutes';
+import { removeLocalProducts, loadProductIndex } from '../lib/storage';
 
 const r = uploadRoutes(h.fs);
 beforeEach(() => { h.fs.reset(); localStorage.clear(); r.start(); vi.spyOn(console, 'error').mockImplementation(() => {}); });
@@ -233,6 +234,29 @@ describe('what recognition does not accept', () => {
     r.put('theirs', { name: 'T', owner: O, members: { [O]: 'owner', [U]: 'viewer' }, createdAt: 'x', _originRef: 'x', _changeLog: [...p._changeLog!, { op: 'cloud-migration', uid: U, source: id, t: 2, seq: 'q1' }] });
     await r.upload();
     expect(r.owned()).toHaveLength(1);
+  });
+});
+
+/**
+ * Routes recognition skips although the local copy holds work the cloud does not: named residuals,
+ * pinned so a change to them is a decision (O39: a re-imported export of an uploaded product is the
+ * same product, skipped and named, R68). The message says the local copy may differ, and it stays.
+ */
+describe('routes skipped on purpose', () => {
+  it('its own local export, taken after its last edit and re-imported after the clear with new work, is skipped and named, and the clear keeps it (R17)', async () => {
+    const id = await r.create('A');
+    const t = r.localExport(id);
+    await r.upload();
+    r.clear();
+    await r.importFile(t); r.addWork(id);
+    const b = await r.create('B');
+    const out = await r.upload();
+    expect(out.skipped).toEqual([{ localId: id, name: 'A', cloudName: 'A' }]);
+    expect(out.uploadedIds).toEqual([b]);
+    expect(r.owned().map(d => d.name).sort()).toEqual(['A', 'B']);
+    removeLocalProducts(out.uploadedIds, 'local');
+    expect(loadProductIndex('local').map(e => e.id)).toEqual([id]);
+    expect(r.local(id).description).toBe('+');
   });
 });
 
