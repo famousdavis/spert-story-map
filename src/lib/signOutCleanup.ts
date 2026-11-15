@@ -4,7 +4,7 @@
 
 import { signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from './firebase';
-import { clearAllLocalProducts, getActiveNamespace } from './storage';
+import { clearAllLocalProducts, flushPendingSaves, getActiveNamespace } from './storage';
 import { runDriverCleanup } from './driverCleanupRegistry';
 import { clearTosAcceptance } from './tosHelpers';
 import { endAiSessionForSignOut } from './aiSessionTeardown';
@@ -20,12 +20,15 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
  * Single source of truth for sign-out cleanup.
  *
  * Sequence (enforced ordering):
+ *   0. When the active namespace is 'local', write any pending local save
+ *      first (v0.55.16): those are this browser's own writes, made while
+ *      signed out, and step 1 would cancel them.
  *   1. Run driver teardown via the registry (cancelPendingSaves +
  *      tearDownListeners). The registry decouples this from React
  *      context — StorageProvider registers the teardown on every
  *      driver swap, so AuthProvider's ToS-failure branches can fire
  *      it without holding a driver reference.
- *   2. Clear every product key in the active namespace.
+ *   2. Clear every product key in the active namespace, unless it is 'local'.
  *   3. Clear the namespaced products index (covered by step 2 in
  *      practice; explicit here for the edge case of an orphaned index).
  *   4. Clear the namespaced preferences key (contains Export Attribution PII).
@@ -43,11 +46,17 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
  * races revocation may commit stale state to the user's cloud doc
  * after they believed they signed out.
  *
+ * Steps 2-4 run only for a uid namespace (v0.55.16, Scheduler's WI-118 guard).
+ * The Sign out button runs with the signed-in person's uid active. The Terms
+ * sign-outs in AuthProvider run before setUser, while the active namespace is
+ * still 'local' (this browser's signed-out store): until v0.55.16 they deleted
+ * the products, export name and identifier kept there. Now they clear neither
+ * store; the person's own rp:{uid} is kept too.
+ *
  * Preserved (must NOT be cleared):
  *   - rp_workspace_id (per-browser academic integrity token)
  *   - spert-theme, spert_firstRun_seen, spert_map_hint_dismissed (UI prefs)
- *   - rp:local:* keys (anonymous-session data — signed-out user's other
- *     local-mode workspace stays intact)
+ *   - rp:local:* keys (this browser's signed-out store), on every path
  *
  * Cleared (B-10): spert_tos_accepted_version, via clearTosAcceptance. Keeping
  * it across sign-out let the next person on a shared browser be treated as
@@ -66,18 +75,25 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
 export async function signOutCleanup(
   switchMode?: ((mode: StorageMode) => void) | null,
 ): Promise<void> {
+  // 0. A Terms sign-out ('local' active): write this browser's pending saves
+  //    rather than let step 1 cancel them. Local writes only, so nothing
+  //    reaches the cloud after the sign-out.
+  const ns = getActiveNamespace();
+  if (ns === 'local') flushPendingSaves();
+
   // 1. Driver teardown via registry — cancels pending writes + detaches
   //    onSnapshot listeners. The registry is a leaf module (no imports of
   //    its own), so static import is cycle-safe.
   await runDriverCleanup();
 
   // 2-4. Clear the signed-in user's namespaced state. getActiveNamespace
-  //      returns the uid when signed in; anonymous sign-outs (rare) fall
-  //      through to 'local', which clears anonymous data.
-  const ns = getActiveNamespace();
-  clearAllLocalProducts(ns);
-  localStorage.removeItem(`rp:${ns}:products_index`);
-  localStorage.removeItem(`rp:${ns}:preferences`);
+  //      returns the uid when signed in; 'local' is this browser's
+  //      signed-out store and is never cleared (v0.55.16).
+  if (ns !== 'local') {
+    clearAllLocalProducts(ns);
+    localStorage.removeItem(`rp:${ns}:products_index`);
+    localStorage.removeItem(`rp:${ns}:preferences`);
+  }
 
   // 4b. Reset Terms acceptance (B-10) so the next person to sign in is shown
   //     the Terms. See the header note for why this is cleared here.
