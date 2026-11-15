@@ -159,6 +159,26 @@ describe('the fold', () => {
     expect(listed()).toEqual(['Folded', 'Signed-out work']);
   });
 
+  it('another tab’s index write, read before the fold and landing after it, does not hide a moved product: the next fold lists it', () => {
+    keep('local', made('Signed-out work'));
+    const stale = localStorage.getItem('rp:local:products_index') ?? '[]';
+    const p = made('Made signed in');
+    keep(U, p);
+    foldOwnProducts(U);
+    localStorage.setItem('rp:local:products_index', stale); // the other tab's debounced index write lands
+    expect(listed()).toEqual(['Signed-out work']);
+    foldOwnProducts(U);
+    expect({ listed: listed(), local: keys('local'), uid: keys(U) }).toEqual({ listed: ['Made signed in', 'Signed-out work'], local: 2, uid: 0 });
+  });
+
+  it('an unlisted rp:local key that cannot be read is left unlisted', () => {
+    localStorage.setItem('rp:local:product_bad', '{not json');
+    keep(U, made('Good'));
+    foldOwnProducts(U);
+    expect(listed()).toEqual(['Good']);
+    expect(localStorage.getItem('rp:local:product_bad')).toBe('{not json');
+  });
+
   it('an identical copy already in rp:local (moved, never listed) is listed and the source removed, with no copy', () => {
     const p = made('Lab 3');
     keep(U, p);

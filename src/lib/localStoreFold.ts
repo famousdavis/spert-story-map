@@ -27,6 +27,7 @@ import { cloneName } from './cloneName';
 import { flushPendingSaves, PRODUCT_NS } from './storage';
 import { readSessionRecord, removeSessionRecord } from './aiSessionRecords';
 import { foldCopyId } from './foldCopyId';
+import { withFallbackLock } from './foldFallbackLock';
 import { endSessionInBackground } from './aiSessionTeardown';
 
 export interface FoldOutcome {
@@ -44,8 +45,6 @@ interface IndexEntry { id: string; name: string; updatedAt?: string }
 interface Moved { from: string; to: string }
 
 const LOCK_NAME = 'spert-storymap:local-fold';
-const FALLBACK_LOCK_KEY = '_rp:local-fold-in-progress';
-const LOCK_TIMEOUT_MS = 30_000;
 
 const productKey = (ns: string, id: string) => `rp:${ns}:product_${id}`;
 const indexKey = (ns: string) => `rp:${ns}:products_index`;
@@ -198,22 +197,53 @@ function endAiRecords(copies: Moved[]): void {
   }
 }
 
+/** `rp:local` product keys the `rp:local` index does not list. */
+function unlistedIds(): string[] {
+  const listed = new Set(readIndex(PRODUCT_NS).map(e => e.id));
+  const prefix = productKey(PRODUCT_NS, '');
+  const out: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(prefix) && !listed.has(k.slice(prefix.length))) out.push(k.slice(prefix.length));
+  }
+  return out;
+}
+
+/**
+ * List every readable `rp:local` product the index lacks (review -04): another tab's debounced index
+ * write, read before a fold and landing after it, would otherwise hide a moved product for good. Also
+ * lists a product deleted in one tab while another tab's save of it was pending (accepted, O47).
+ */
+function listUnlisted(): void {
+  for (const id of unlistedIds()) {
+    const product = parseProduct(localStorage.getItem(productKey(PRODUCT_NS, id)) ?? '');
+    if (product) listInLocal({ id, name: textOf(product.name), updatedAt: textOf(product.updatedAt) });
+  }
+}
+
+/** Set aside the unreadable sources (counted in `out`); the readable ones' ids. */
+function readableSources(uid: string, out: FoldOutcome): string[] {
+  const readable: string[] = [];
+  for (const id of sourceIds(uid)) {
+    const step = setAsideIfUnreadable(uid, id);
+    if (step === 'unreadable') out.unreadable++;
+    if (step === 'readable') readable.push(id);
+  }
+  return readable;
+}
+
 /** The fold itself, synchronous; call it under the lock (`foldLocalStore`). Never throws. */
 export function foldOwnProducts(uid: string): FoldOutcome {
   const out = none();
   if (!uid || uid === PRODUCT_NS) return out;
   const copies: Moved[] = [];
   try {
-    const readable: string[] = [];
-    for (const id of sourceIds(uid)) {
-      const step = setAsideIfUnreadable(uid, id);
-      if (step === 'unreadable') out.unreadable++;
-      if (step === 'readable') readable.push(id);
-    }
-    if (readable.length === 0) return out;
+    const readable = readableSources(uid, out);
+    if (readable.length === 0 && unlistedIds().length === 0) return out;
     // First: a debounced index write captured before the fold must not land after it. Only when
-    // there is something to move, so a driver swap with nothing to fold still cancels (v0.55.14).
+    // there is something to move or list, so a driver swap with nothing to do still cancels (v0.55.14).
     flushPendingSaves();
+    listUnlisted();
     for (const id of readable) {
       const step = foldOne(uid, id, copies);
       if (step === 'moved' || step === 'copied') out.moved++;
@@ -230,30 +260,6 @@ export function foldOwnProducts(uid: string): FoldOutcome {
 }
 
 interface LocksLike { request: (name: string, cb: () => unknown) => Promise<unknown> }
-
-function readFallbackLock(): number | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(FALLBACK_LOCK_KEY) ?? 'null') as { ts?: unknown } | null;
-    return typeof v?.ts === 'number' ? v.ts : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Without navigator.locks: wait while another tab's lock is fresh (as `migrateLegacyKeys` does). */
-async function withFallbackLock(run: () => FoldOutcome): Promise<FoldOutcome> {
-  while (true) {
-    const ts = readFallbackLock();
-    if (ts === null || Date.now() - ts >= LOCK_TIMEOUT_MS) break;
-    await new Promise(r => setTimeout(r, 200));
-  }
-  try { localStorage.setItem(FALLBACK_LOCK_KEY, JSON.stringify({ ts: Date.now() })); } catch { /* full: fold anyway */ }
-  try {
-    return run();
-  } finally {
-    try { localStorage.removeItem(FALLBACK_LOCK_KEY); } catch { /* nothing to do */ }
-  }
-}
 
 /** The fold under an exclusive lock across tabs. Never throws. */
 export async function foldLocalStore(uid: string): Promise<FoldOutcome> {
