@@ -101,9 +101,13 @@ function findByOrigin(local: Product, index: CloudIndex, shared: ReadonlySet<str
   return index.owned.find(o => o.origin === key && undecided(o));
 }
 
-/** The cloud product an earlier upload made of `local`, or null when it must be uploaded. */
+/**
+ * The cloud product an earlier upload made of `local`, or null when it must be uploaded. A cloud
+ * name that is empty or not text is reported as the local name, so the message never names a
+ * product `“”` (review -07).
+ */
 export function findEarlierUpload(local: Product, index: CloudIndex, shared: ReadonlySet<string>): UploadMatch | null {
   const row = index.byId.get(local.id) ?? (findByHistory(local, index) ?? findByOrigin(local, index, shared))?.row;
   if (!row) return null;
-  return { cloudId: row.id, cloudName: isEntry(row.data) && typeof row.data.name === 'string' ? row.data.name : '' };
+  return { cloudId: row.id, cloudName: isEntry(row.data) && isText(row.data.name) ? row.data.name : local.name };
 }

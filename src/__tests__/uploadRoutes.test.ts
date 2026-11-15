@@ -29,6 +29,7 @@ vi.mock('firebase/firestore', async () => {
 
 import { uploadRoutes, U, O } from './fixtures/uploadRoutes';
 import { removeLocalProducts, loadProductIndex } from '../lib/storage';
+import { uploadMessage } from '../components/settings/uploadMessage';
 
 const r = uploadRoutes(h.fs);
 beforeEach(() => { h.fs.reset(); localStorage.clear(); r.start(); vi.spyOn(console, 'error').mockImplementation(() => {}); });
@@ -308,6 +309,20 @@ describe('routes skipped on purpose', () => {
     const out = await r.upload();
     expect(out.skipped).toEqual([{ localId: id, name: 'A', cloudName: 'A' }]);
     expect(r.owned()).toHaveLength(1);
+  });
+});
+
+describe('what a skip is called', () => {
+  it.each([
+    ['no name', {}],
+    ['an empty name', { name: '' }],
+    ['a name that is not text', { name: 5 }],
+  ])('a cloud product with %s is named by the local name, with no "in the cloud as"', async (_label, fields) => {
+    const id = await r.create('A');
+    r.put(id, { owner: U, members: { [U]: 'owner' }, _changeLog: [], ...fields });
+    const out = await r.upload();
+    expect(out.skipped).toEqual([{ localId: id, name: 'A', cloudName: 'A' }]);
+    expect(uploadMessage(out).text).toBe('No new products to upload. Already in the cloud, so not uploaded again: “A”. This browser still has its own copy of each, which may differ from the cloud version.');
   });
 });
 
