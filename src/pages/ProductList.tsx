@@ -28,6 +28,7 @@ import ProjectsHeader from '../components/product/ProjectsHeader';
 import ProjectsToolbar from '../components/product/ProjectsToolbar';
 import { type GridProject } from '../components/product/ProjectGrid';
 import ProductsBody from '../components/product/ProductsBody';
+import { ShowArchivedFilter } from '../components/product/ArchiveControls';
 import ProjectDialog, { type ProjectEdits } from '../components/product/ProjectDialog';
 import DeleteProjectDialog from '../components/product/DeleteProjectDialog';
 import { findTile, findTileControl } from '../components/product/tile-focus';
@@ -438,6 +439,7 @@ export default function ProductList() {
             onLoadSample={() => handleLoadSample(false)}
             onNewProject={openNew}
           />
+          {!loading && archive.archivedCount > 0 && <ShowArchivedFilter count={archive.archivedCount} checked={archive.showArchived} onChange={archive.setShowArchived} />}
 
           <ImportPreviewSection
             phase={importPhase}
@@ -466,8 +468,6 @@ export default function ProductList() {
             settingsUnread={order.settings.status === 'failed'}
             listedCount={products.length}
             archivedCount={archive.archivedCount}
-            showArchived={archive.showArchived}
-            onShowArchived={archive.setShowArchived}
             notice={archive.notice}
             onCreateNew={openNew}
             onLoadSample={() => handleLoadSample(true)}

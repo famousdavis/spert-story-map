@@ -6,19 +6,22 @@
 // Forecaster's `ArchiveControls.tsx` at 09c4cda, which are GanttApp's. Archive and Unarchive speak
 // through ProductList's own live region, not one of their own (R-3).
 
+import { useId } from 'react';
 import { ALL_ARCHIVED, CHECK, CHECKBOX, NOTE } from './dashboard-styles';
 import { allArchivedLine } from './archive-text';
 
 /**
- * Under the heading row, 12 px below it (`-mt-1` against the row's `mb-4`) and 16 px above the
- * grid (GanttApp's `.pt-filter`). The caller renders it only while a listed product is archived.
+ * Directly under the heading row, above the import banner and every note, as Forecaster's
+ * ProjectsTab places it: 12 px below the row (`-mt-1` against the row's `mb-4`) and 16 px above
+ * what follows (GanttApp's `.pt-filter`). The caller renders it only while a listed product is
+ * archived.
  */
-export function ShowArchivedFilter({ id, count, checked, onChange }: {
-  id: string;
+export function ShowArchivedFilter({ count, checked, onChange }: {
   count: number;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const id = useId();
   return (
     <div className="-mt-1 mb-4 leading-[normal]">
       <label className={CHECK} htmlFor={id}>

@@ -107,6 +107,24 @@ describe('R84 on the Products page', () => {
   });
 });
 
+// F3 (Exec-CA-2's takeover): Forecaster's ProjectsTab puts its filter straight under the heading
+// row, above its import banner; here it was below the import banner and the orphan warning.
+describe('"Show archived (N)" on the Products page', () => {
+  it('sits directly under the heading row, above the import preview', async () => {
+    seedLocal([makeProject({ id: 'p-A', name: 'Alpha' }), makeProject({ id: 'p-B', name: 'B' })]);
+    setPrefs({ 'p-A': { archived: true } });
+    renderPage();
+    await screen.findByText('Products');
+    await settle();
+    await userEvent.upload(fileInput(), fileOf(makeProject({ id: 'p-C', name: 'C' })));
+    const confirm = await screen.findByRole('button', { name: 'Confirm Import' });
+    const box = req(screen.queryByRole('checkbox', { name: /^Show archived/ }), 'box');
+    const before = req(box.closest('div')?.previousElementSibling, 'the element before the box');
+    expect(before.querySelector('h2')?.textContent).toBe('Products');
+    expect(box.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
 describe('R84 on Settings → Data', () => {
   async function replaceOpen(prefs: Prefs, fileId?: string, beforeUpload: () => void = () => {}) {
     seedLocal([makeProject({ id: 'p-A', name: 'Alpha' })]);
