@@ -1,6 +1,6 @@
 # Changelog
 
-## Version 0.56.0 (2026-11-14)
+## Version 0.56.0 (2026-11-15)
 
 ### Added
 
