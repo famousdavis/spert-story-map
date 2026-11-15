@@ -212,8 +212,11 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
       const fresh = await freshOrder();
       pendingRef.current = pendingRef.current.filter(move => move !== place);
       const ids = fresh ? place(orderFrom(fresh.order)) : null;
-      if (ids) saveOrder(ids);
-      else setProjectOrder(withPending(orderFrom(fresh ? fresh.order : orderRef.current)));
+      if (ids) return saveOrder(ids);
+      // Nothing to write (F2): the fresh order becomes the one this tab holds, so the next drop's
+      // display starts from it, not from the copy held before.
+      if (fresh) orderRef.current = orderFrom(fresh.order);
+      setProjectOrder(withPending(orderFrom(orderRef.current)));
     });
   }, [enqueue, freshOrder, knownIds, orderFrom, saveOrder, withPending]);
 

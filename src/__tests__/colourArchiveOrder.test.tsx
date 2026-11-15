@@ -131,6 +131,24 @@ describe.each<Kind>(['cloud', 'local'])('%s: an order write reads the stored ord
     expect(stored(kind).projectOrder).toEqual(['p4', 'p3', 'p1', 'p2']);
   });
 
+  // F2 (Exec-CA-2's takeover): a drop whose write finds nothing to do (here its target left the
+  // list) showed the fresh order but kept holding the old one, so the next drop's display started
+  // from the old order.
+  it('F2: when the fresh read leaves a drop nothing to write, the tab holds the fresh order', async () => {
+    seed(kind, ['p1', 'p2', 'p3', 'p4']);
+    const A = await openOrder(await makeDriver(kind));
+    const move = (from: string, to: string) => (A.result.current.moveOnto as (a: string, b: string) => unknown)(from, to);
+    act(() => { void move('p4', 'p3'); });
+    // Before its write reads: another tab deletes p3 and reorders, and this tab's list loses p3.
+    seed(kind, ['p2', 'p1', 'p4', 'p3']);
+    act(() => { A.result.current.listed(P.filter(p => p.id !== 'p3'), A.result.current.refreshStarted()); });
+    await wait(300);
+    expect(stored(kind).projectOrder, 'the drop wrote nothing').toEqual(['p2', 'p1', 'p4', 'p3']);
+    expect(shown(A)).toEqual(['p2', 'p1', 'p4', 'p3']);
+    act(() => { void move('p4', 'p1'); });
+    expect(shown(A)).toEqual(['p2', 'p4', 'p1', 'p3']);
+  });
+
   it('a drop shows at once, from the order the tab holds, before the read returns', async () => {
     seed(kind, ['p1', 'p2', 'p3', 'p4']);
     const A = await openOrder(await makeDriver(kind));
