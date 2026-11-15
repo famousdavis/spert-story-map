@@ -23,7 +23,7 @@ vi.mock('../lib/callables', async () => (await import('./fixtures/termsSignOutFi
 
 import { resetStub } from './fixtures/termsSignOutFirebase';
 import {
-  OLD_EDITION, TOS_KEY, exportName, load, names, productName, seed, settle, until, user, warmUp,
+  NOTICE, OLD_EDITION, TOS_KEY, exportName, load, names, productName, seed, settle, until, user, warmUp,
 } from './fixtures/termsSignOutPage';
 import { TOS_VERSION } from '../lib/tosConstants';
 
@@ -85,7 +85,7 @@ describe('a Terms sign-out keeps what this browser keeps', { timeout: 20_000 }, 
     expect(failedCheckLogged()).toBe(false);
   });
 
-  it('an accepted read whose caching throws (the catch branch): signed out, both stores kept, the failure logged', async () => {
+  it('an accepted read whose caching throws (the catch branch): signed out, both stores kept, the failure logged, the notice shown', async () => {
     await seed('u3', 'local', null);
     S.record = TOS_VERSION;
     S.current = user('u3');
@@ -101,6 +101,9 @@ describe('a Terms sign-out keeps what this browser keeps', { timeout: 20_000 }, 
     expect(S.current).toBeNull();
     expectBothStoresKept('u3');
     expect(failedCheckLogged()).toBe(true);
+    // The catch branch sets the notice itself. No other test reaches this branch alone: the
+    // "sign-out itself fails" notice test passes the else branch first, which has set it already.
+    expect(screen.queryByText(NOTICE)).not.toBeNull();
   });
 
   it('the Sign out button still clears the signed-in store and keeps the signed-out one', async () => {
