@@ -131,9 +131,16 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
  * each skipped product's to its earlier upload's id, only where the cloud has no entry at all for
  * it (so a colour set in the cloud since is kept, and a retry after an upload that stopped carries
  * the first try's). Local entries stay. Within the cap, as one entry per field.
+ *
+ * "No entry at all" is read on the RAW stored map: an unarchive or No color made in the cloud
+ * removes one field, and the emptied entry `{}` stays stored, which the normaliser reads as none.
+ * Read through the normaliser, the next upload copied the local archive or colour back (PR #245
+ * review -01).
  */
 function prefCopies(cloud: UserSettings, local: UserSettings, localTiles: { id: string }[], ids: UploadIds): PrefEntry[] {
   const cloudMap = sanitizeProjectPrefs(cloud.projectPrefs);
+  const rawCloud: unknown = cloud.projectPrefs;
+  const stored = rawCloud && typeof rawCloud === 'object' && !Array.isArray(rawCloud) ? rawCloud : {};
   const localMap = sanitizeProjectPrefs(local.projectPrefs);
   let size = Object.keys(cloudMap).length;
   const entries: PrefEntry[] = [];
@@ -142,7 +149,7 @@ function prefCopies(cloud: UserSettings, local: UserSettings, localTiles: { id: 
     const cloudId = uploaded ?? ids.skippedIds.get(localId);
     const pref = prefOf(localMap, localId);
     if (cloudId === undefined || (!pref.color && !pref.archived)) continue;
-    if (uploaded === undefined && Object.prototype.hasOwnProperty.call(cloudMap, cloudId)) continue;
+    if (uploaded === undefined && Object.prototype.hasOwnProperty.call(stored, cloudId)) continue;
     if (size >= MAX_PROJECT_PREFS) break;
     size++;
     entries.push(...prefEntries(cloudId, {}, pref));

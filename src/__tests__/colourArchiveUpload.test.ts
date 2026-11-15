@@ -27,6 +27,8 @@ vi.mock('firebase/firestore', async () => {
 });
 
 import { migrateLocalToCloud } from '../lib/migration';
+import { createFirestoreDriver } from '../lib/firestoreDriver';
+import { REMOVE } from '../lib/prefEntries';
 import { sortByOrder } from '../lib/sortByOrder';
 import { req } from './testHelpers';
 
@@ -144,6 +146,23 @@ describe('R-7: a retry after an upload that stopped before its settings write', 
       h.fs.docs.set(SETTINGS, { projectOrder: [cloudId('Local 2'), 'c1', 'c2'] });
     });
     expect(tiles()).toEqual(['Local 2', 'Cloud c1', 'Cloud c2', 'Local 3', 'Local 1']);
+  });
+});
+
+describe('R-7: the next upload, after a removal in the cloud', () => {
+  // PR #245 review -01: Unarchive and No color each remove one field, and the emptied entry `{}`
+  // stays stored. It is an entry: the next upload must not copy the local archive or colour back.
+  it.each(['archived', 'color'] as const)('an %s removed in the cloud since leaves an empty entry, which blocks the copy', async field => {
+    seedCloud({ projectOrder: ['c1', 'c2'] });
+    seedLocal({ l1: field === 'archived' ? { archived: true } : { color: 'teal' } });
+    expect((await migrateLocalToCloud('u')).uploadedIds).toHaveLength(3);
+    const id = cloudId('Local 1');
+    createFirestoreDriver('u').writePreferences([{ path: ['projectPrefs', id, field], value: REMOVE }]);
+    await new Promise(r => setTimeout(r, 300));
+    expect(cloudPrefs()[id], 'the removal leaves an empty entry').toEqual({});
+    const again = await migrateLocalToCloud('u');
+    expect(again.skipped.map(s => s.localId).sort()).toEqual(['l1', 'l2', 'l3']);
+    expect(cloudPrefs()[id]).toEqual({});
   });
 });
 
