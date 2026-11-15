@@ -28,6 +28,7 @@ src/
 │   ├── version.ts                    # APP_VERSION constant (single source of truth)
 │   ├── storage.ts                    # localStorage CRUD with debouncing, workspace identity
 │   ├── prefEntries.ts                # Settings written field by field: entries, the overlap rule, refused paths, the one masked-write builder
+│   ├── projectPrefs.ts               # Tile colours and archive (per person, in settings): the normaliser, the 1000-entry cap, entries, the hidden-tile slot rule
 │   ├── importExport.ts               # Export product JSON, bundled export, legacy single-file import helper
 │   ├── import-utils.ts               # Multi-project import: parse, conflict detection, applyImport (Layer 2 drift re-validation)
 │   ├── validateProduct.ts            # Comprehensive schema validation for imported products
@@ -73,7 +74,8 @@ src/
 │   ├── aiSessionSwitch.ts            # Starting a session: read, judge and end the other sessions this browser holds
 │   ├── useReleaseDrag.ts             # DnD hook for release planning (card + column drag) + pure applyCardDrop
 │   ├── useImportState.ts             # State machine for multi-project import (idle/preview/applying/done/error)
-│   ├── useProjectOrder.ts            # Projects page order: saved order, drops, and where a clone goes
+│   ├── useProjectOrder.ts            # Projects page order: saved order, drops, and where a clone goes; each order write reads the stored order first; the first settings read
+│   ├── useProductArchive.ts          # Products page tile colour, Archive, Show archived (N), their focus and messages, a delete's entry removal
 │   └── useDarkMode.ts                # Theme toggle hook (localStorage + system preference)
 │
 ├── components/
@@ -104,9 +106,14 @@ src/
 │   │   ├── ProjectsHeader.tsx        # Projects page header: suite title and tagline, gear, theme, About, storage pill
 │   │   ├── ProjectsToolbar.tsx       # "Projects" heading row: Export All · Import · Load Sample · New Project
 │   │   ├── ProjectGrid.tsx           # Grid of tiles (1/2/3 columns by container width); grip drag, drop takes the target's place
-│   │   ├── ProjectTile.tsx           # One project's tile: grip, open button over the whole tile, lines, Delete, revealed Share · Export · Edit · Clone
+│   │   ├── ProjectTile.tsx           # One project's tile: grip, open button over the whole tile, lines, Delete, revealed Share · Export · Edit · Clone · Archive · Tile color; the archived look
 │   │   ├── tile-meta.ts              # A tile's lines: items/points/% complete, releases/sprints, unsized and progress not counting
 │   │   ├── tile-focus.ts             # Finds a tile's controls by project id and name, never by a selector built from them
+│   │   ├── ProductsBody.tsx          # Under the toolbar: the notes, Show archived (N), Loading, the welcome panel, the all-archived line or the grid
+│   │   ├── ArchiveControls.tsx       # Show archived (N), the all-archived line and the one-line notes above the grid
+│   │   ├── ProjectColorControl.tsx   # A tile's Tile color button and its popover (radio swatches; Escape stops there)
+│   │   ├── tile-color-styles.ts      # Tile tints (and the archived half tint), swatches and the colour popover's class strings
+│   │   ├── archive-text.ts           # Every sentence tile colour and archive add to the screens
 │   │   ├── IconButtons.tsx           # The tile's icon buttons and six-dot grip
 │   │   ├── ProjectsEmptyState.tsx    # Welcome panel with Create New Project and Load Sample Project
 │   │   ├── DialogShell.tsx           # The page's own dialog shell: portal, inert page, Tab wrap, capture-phase Escape and Ctrl/Cmd+S

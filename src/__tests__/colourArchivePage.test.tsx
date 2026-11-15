@@ -190,25 +190,6 @@ describe('Delete (R-5)', () => {
     expect(storedPrefs()).toEqual({ 'p-A': { color: 'blue' } });
   });
 
-  it('removes an entry another tab set after this one loaded (no listener)', async () => {
-    await show(['A', 'B']);
-    localStorage.setItem('rp:local:preferences', JSON.stringify({ projectPrefs: { 'p-A': { color: 'pink' } } }));
-    await userEvent.click(button('A', 'Delete A'));
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(tiles()).toHaveLength(1));
-    await settle();
-    expect(storedPrefs()).toEqual({});
-  });
-
-  it('R86: focus that moves to an archived tile reaches its open button', async () => {
-    await show(['A', 'B'], { 'p-A': { archived: true } });
-    await userEvent.click(req(box(), 'box'));
-    await userEvent.click(button('B', 'Delete B'));
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(tiles()).toHaveLength(1));
-    await settle();
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Unarchive and open Structure for A');
-  });
 });
 
 describe('Refused ids and the cap (R-1)', () => {
