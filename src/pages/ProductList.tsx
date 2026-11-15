@@ -33,7 +33,7 @@ import ProjectDialog, { type ProjectEdits } from '../components/product/ProjectD
 import DeleteProjectDialog from '../components/product/DeleteProjectDialog';
 import { findTile, findTileControl } from '../components/product/tile-focus';
 import ShareDialog from '../components/product/ShareDialog';
-import { LocalSignedInLine } from '../components/product/LocalStoreNotes';
+import { LocalSignedInLine, LocalOrphanNote } from '../components/product/LocalStoreNotes';
 import { useExportAll } from '../components/product/useExportAll';
 import { Footer } from './ChangelogView';
 import type { MemberRole, Product, StorageDriver } from '../types';
@@ -459,14 +459,7 @@ export default function ProductList() {
           {exportAll.dialog}
 
           {/* Cloud orphan warning */}
-          {localOrphanCount > 0 && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg px-4 py-3 mb-6">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
-                Your cloud account has no products, but you have {localOrphanCount} product{localOrphanCount !== 1 ? 's' : ''} stored locally.
-                Go to App Settings → Storage to upload them, or switch back to Local mode.
-              </p>
-            </div>
-          )}
+          <LocalOrphanNote count={localOrphanCount} />
 
           <ProductsBody
             loading={loading}

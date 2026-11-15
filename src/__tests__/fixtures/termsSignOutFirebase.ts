@@ -27,6 +27,8 @@ export interface FirebaseStub {
   signOutRejects: number;
   /** Firebase calls in order: `signOut`, `setDoc <path>`, `read <path>`. */
   log: string[];
+  /** The product documents the members query returns (Cloud storage), each with its `id` (v0.56.1). */
+  cloud: Record<string, unknown>[];
 }
 
 export function resetStub(s: FirebaseStub): void {
@@ -40,6 +42,7 @@ export function resetStub(s: FirebaseStub): void {
     profileGate: null,
     signOutRejects: 0,
     log: [],
+    cloud: [],
   });
 }
 
@@ -92,6 +95,14 @@ export function firestoreModule(s: FirebaseStub) {
       if (/profiles\//.test(ref.path) && s.profileGate) await s.profileGate;
     },
     serverTimestamp: () => ({ __ts: true }),
+    // The members query, enough for Cloud storage's Products page (v0.56.1): every document in `cloud`.
+    collection: (_db: unknown, ...segs: string[]) => ({ path: segs.join('/') }),
+    query: (ref: { path: string }) => ref,
+    where: () => null,
+    getDocs: async () => {
+      const docs = s.cloud.map(({ id, ...data }) => ({ id: String(id), data: () => ({ ...data }) }));
+      return { docs, empty: docs.length === 0, size: docs.length, forEach: (cb: (d: unknown) => void) => docs.forEach(cb) };
+    },
   };
 }
 

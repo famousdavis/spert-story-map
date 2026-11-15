@@ -21,7 +21,7 @@ vi.mock('../lib/firebase', async () => (await import('./fixtures/termsSignOutFir
 vi.mock('../lib/callables', async () => (await import('./fixtures/termsSignOutFirebase')).callablesModule);
 
 import { resetStub, emit } from './fixtures/termsSignOutFirebase';
-import { MODE_KEY, OLD_EDITION, TOS_KEY, load, names, settle, until, user, warmUp } from './fixtures/termsSignOutPage';
+import { OLD_EDITION, fresh, keepIn, load, names, settle, until, user, warmUp } from './fixtures/termsSignOutPage';
 import { TOS_VERSION } from '../lib/tosConstants';
 
 const MOVED_ONE = 'One product you made while signed in was moved into this browser’s Local storage. Anyone who uses this browser can now see it.';
@@ -37,23 +37,6 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-
-function fresh(mode: 'local' | 'cloud', tos: string | null): void {
-  localStorage.clear();
-  localStorage.setItem(MODE_KEY, mode);
-  localStorage.setItem('spert_firstRun_seen', '1');
-  if (tos) localStorage.setItem(TOS_KEY, tos);
-}
-
-/** A product kept in rp:{ns} the way an earlier version wrote it (raw: the app now writes products to rp:local only). */
-async function keepIn(ns: string, name: string): Promise<Product> {
-  const { createNewProduct } = await import('../lib/storage');
-  const p = createNewProduct(name);
-  localStorage.setItem(`rp:${ns}:product_${p.id}`, JSON.stringify(p));
-  const idx = JSON.parse(localStorage.getItem(`rp:${ns}:products_index`) ?? '[]') as unknown[];
-  localStorage.setItem(`rp:${ns}:products_index`, JSON.stringify([...idx, { id: p.id, name, updatedAt: p.updatedAt }]));
-  return p;
-}
 
 async function listed(page: { driver: () => StorageDriver | null }): Promise<string[]> {
   const d = page.driver();

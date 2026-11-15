@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 import { vi } from 'vitest';
 import type { FirebaseStub } from './termsSignOutFirebase';
-import type { StorageDriver } from '../../types';
+import type { Product, StorageDriver } from '../../types';
 
 /** The edition an out-of-date acceptance names. Written out: the current one is read from tosConstants. */
 export const OLD_EDITION = '10-05-2026';
@@ -49,6 +49,24 @@ export async function seed(uid: string, mode: 'local' | 'cloud', tosKey: string 
   localStorage.setItem('spert_firstRun_seen', '1');
   if (tosKey) localStorage.setItem(TOS_KEY, tosKey);
   return { uid, localId: a.id, uidId: u.id };
+}
+
+/** A fresh browser: empty storage, the stored mode, the welcome banner seen, and the Terms cache. */
+export function fresh(mode: 'local' | 'cloud', tos: string | null): void {
+  localStorage.clear();
+  localStorage.setItem(MODE_KEY, mode);
+  localStorage.setItem('spert_firstRun_seen', '1');
+  if (tos) localStorage.setItem(TOS_KEY, tos);
+}
+
+/** A product kept in rp:{ns} the way an earlier version wrote it (raw: the app now writes products to rp:local only). */
+export async function keepIn(ns: string, name: string): Promise<Product> {
+  const { createNewProduct } = await import('../../lib/storage');
+  const p = createNewProduct(name);
+  localStorage.setItem(`rp:${ns}:product_${p.id}`, JSON.stringify(p));
+  const idx = JSON.parse(localStorage.getItem(`rp:${ns}:products_index`) ?? '[]') as unknown[];
+  localStorage.setItem(`rp:${ns}:products_index`, JSON.stringify([...idx, { id: p.id, name, updatedAt: p.updatedAt }]));
+  return p;
 }
 
 export interface Page { driver: () => StorageDriver | null }
