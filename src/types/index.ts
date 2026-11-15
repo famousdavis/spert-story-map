@@ -251,7 +251,13 @@ export interface StorageDriver {
   saveProductImmediate(product: Product): Promise<void>;
   replaceProduct(product: Product): Promise<void>;
   deleteProduct(id: string): Promise<void>;
-  loadPreferences(): Promise<UserSettings>;
+  /**
+   * The settings as this tab will see them once its own entries are written. A failed cloud read
+   * returns `{}` (with this tab's entries) unless `throwOnError` is set, when it throws: the Products
+   * page's order writers must tell a failure from an empty document (v0.56.0, R-6, R88). The local
+   * driver ignores the option: a local read does not fail this way.
+   */
+  loadPreferences(options?: { throwOnError?: boolean }): Promise<UserSettings>;
   /**
    * Write settings field by field (v0.55.14): each entry is a field path and a value, a removal
    * being `REMOVE` or `undefined` (`lib/prefEntries.ts`). Never a whole settings object.
@@ -432,6 +438,8 @@ export interface ImportOutcome {
   replaced: number;
   copied: number;
   skipped: number;
+  /** Every product an add or a replace wrote, under the id it was written to (v0.56.0, R84). */
+  written: Array<{ id: string; name: string }>;
   driftSkipped: Array<{ productName: string; reason: string }>;
   errors: Array<{ productName: string; reason: string }>;
 }

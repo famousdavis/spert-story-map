@@ -14,12 +14,17 @@ import { useId, useState } from 'react';
 import type React from 'react';
 import ProjectTile, { type TileProject } from './ProjectTile';
 import { GRID, GRID_AREA } from './dashboard-styles';
+import type { TileColor } from '../../lib/projectPrefs';
 
 export interface GridProject extends TileProject {
   isShared: boolean;
   canEdit: boolean;
   canDelete: boolean;
   showShare: boolean;
+  /** v0.56.0: this person's colour and archive for it, and why they are off (or null). */
+  color: TileColor | undefined;
+  archived: boolean;
+  prefsDisabledReason: string | null;
 }
 
 interface ProjectGridProps {
@@ -32,9 +37,20 @@ interface ProjectGridProps {
   onDelete: (id: string) => void;
   /** The project `draggedId` was dropped on the tile of `targetId` (never the same id). */
   onMove: (draggedId: string, targetId: string) => void;
+  /** The product whose Tile color popover is open, or null. */
+  colorOpenFor: string | null;
+  onColorOpenChange: (id: string, open: boolean) => void;
+  onPickColor: (id: string, color: TileColor | null) => boolean;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
+  /** Why the grips cannot reorder (R88), or null. */
+  dragDisabledReason: string | null;
 }
 
-export default function ProjectGrid({ projects, onOpen, onShare, onExport, onEdit, onClone, onDelete, onMove }: ProjectGridProps) {
+export default function ProjectGrid({
+  projects, onOpen, onShare, onExport, onEdit, onClone, onDelete, onMove,
+  colorOpenFor, onColorOpenChange, onPickColor, onArchive, onUnarchive, dragDisabledReason,
+}: ProjectGridProps) {
   // Ids for each tile's descriptions, by tile index: a project id may hold a space, and
   // aria-describedby is a space-separated list.
   const idBase = useId();
@@ -80,6 +96,15 @@ export default function ProjectGrid({ projects, onOpen, onShare, onExport, onEdi
             showShare={p.showShare}
             isDragged={draggedId === p.id}
             isDropTarget={overId === p.id}
+            color={p.color}
+            archived={p.archived}
+            colorOpen={colorOpenFor === p.id}
+            onColorOpenChange={open => onColorOpenChange(p.id, open)}
+            onPickColor={color => onPickColor(p.id, color)}
+            onArchive={() => onArchive(p.id)}
+            onUnarchive={() => onUnarchive(p.id)}
+            prefsDisabledReason={p.prefsDisabledReason}
+            dragDisabledReason={dragDisabledReason}
             onOpen={e => onOpen(p.id, e)}
             onShare={() => onShare(p.id)}
             onExport={() => onExport(p.id)}

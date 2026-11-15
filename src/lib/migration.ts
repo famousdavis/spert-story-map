@@ -24,6 +24,7 @@ import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 import { projectsMembersQuery } from './projectsMembersQuery';
 import { sortByOrder } from './sortByOrder';
 import { addEntry, buildMaskedWrite, type PrefEntry } from './prefEntries';
+import { MAX_PROJECT_PREFS, prefEntries, prefOf, sanitizeProjectPrefs, withStoredSlots } from './projectPrefs';
 import type { UserSettings } from '../types';
 import { indexCloud, findEarlierUpload, sharedOriginKeys, type CloudRow } from './uploadRecognition';
 
@@ -48,8 +49,12 @@ export async function testCloudConnection(uid: string): Promise<boolean> {
 
 /** A local product the upload left in this browser because the cloud already holds it. */
 export interface UploadSkip { localId: string; name: string; cloudName: string }
-/** What one upload did: the local ids it uploaded, what it skipped, and how many it could not read. */
-export interface UploadOutcome { uploadedIds: string[]; skipped: UploadSkip[]; unreadable: number }
+/**
+ * What one upload did: the local ids it uploaded, what it skipped, how many it could not read, and
+ * for how many products the cap (`MAX_PROJECT_PREFS`) kept out a colour and archive it would have
+ * copied (v0.56.0, R-1: never silently).
+ */
+export interface UploadOutcome { uploadedIds: string[]; skipped: UploadSkip[]; unreadable: number; prefsNotCopied: number }
 
 /**
  * Upload the local products to Firestore, each under a new id.
@@ -70,7 +75,6 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   const settingsSnap = await getDocFromServer(settingsRef);
   const cloudPrefs: UserSettings = settingsSnap.exists() ? settingsSnap.data() : {};
   const cloudList = await getDocsFromServer(projectsMembersQuery(requireDb(), uid));
-  const cloudTiles = sortByOrder(cloudList.docs.map(d => ({ id: d.id })), cloudPrefs.projectOrder).map(t => t.id);
   const cloud = indexCloud(cloudList.docs.map((d): CloudRow => ({ id: d.id, data: d.data() })), uid);
 
   // Explicit 'local' overrides — migration always reads from the anonymous-
@@ -81,7 +85,9 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   const loaded = index.map(entry => ({ entry, product: loadProduct(entry.id, 'local', false) }));
   const shared = sharedOriginKeys(loaded.map(l => l.product));
   const targetIds = new Map<string, string>();
-  const outcome: UploadOutcome = { uploadedIds: [], skipped: [], unreadable: 0 };
+  /** A skipped product's local id to its earlier upload's cloud id (v0.56.0, R-7). */
+  const skippedIds = new Map<string, string>();
+  const outcome: UploadOutcome = { uploadedIds: [], skipped: [], unreadable: 0, prefsNotCopied: 0 };
 
   for (const { entry, product } of loaded) {
     if (!product) {
@@ -91,6 +97,7 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
     const earlier = findEarlierUpload(product, cloud, shared);
     if (earlier) {
       outcome.skipped.push({ localId: entry.id, name: product.name, cloudName: earlier.cloudName });
+      skippedIds.set(entry.id, earlier.cloudId);
       continue;
     }
 
@@ -108,29 +115,91 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
     outcome.uploadedIds.push(entry.id);
   }
 
-  await setDoc(settingsRef, ...uploadedSettings(cloudPrefs, localPrefs, cloudTiles, sortByOrder(index, localPrefs.projectOrder), targetIds));
+  // v0.56.0 (R-6): the upload is an order writer, so it reads the stored order again just before
+  // its write: another device's reorder made while the products went up is kept. A failed re-read
+  // falls back to the first read (the products are already up; the settings must still go).
+  let latest = cloudPrefs;
+  try {
+    const again = await getDocFromServer(settingsRef);
+    latest = again.exists() ? again.data() : {};
+  } catch {
+    // keep the first read
+  }
+  // R89: every id the stored order holds keeps its slot, listed or not (a product made on another
+  // device since the list was read, or a deleted one), then the listed products it lacks.
+  const tiles = withStoredSlots(latest.projectOrder, cloudList.docs.map(d => d.id));
+  const localTiles = sortByOrder(index, localPrefs.projectOrder);
+  const ids = { targetIds, skippedIds };
+  const copies = prefCopies(latest, localPrefs, localTiles, ids);
+  await setDoc(settingsRef, ...uploadedSettings(latest, localPrefs, tiles, localTiles, ids, copies.entries));
+  outcome.prefsNotCopied = copies.overCap;
   return outcome;
 }
+
+/**
+ * R-7 (v0.56.0): each uploaded product's local colour and archive, copied to its new cloud id, and
+ * each skipped product's to its earlier upload's id, only where the cloud has no entry at all for
+ * it (so a colour set in the cloud since is kept, and a retry after an upload that stopped carries
+ * the first try's). Local entries stay. Within the cap, as one entry per field.
+ *
+ * "No entry at all" is read on the RAW stored map: an unarchive or No color made in the cloud
+ * removes one field, and the emptied entry `{}` stays stored, which the normaliser reads as none.
+ * Read through the normaliser, the next upload copied the local archive or colour back (PR #245
+ * review -01).
+ */
+function prefCopies(
+  cloud: UserSettings, local: UserSettings, localTiles: { id: string }[], ids: UploadIds,
+): { entries: PrefEntry[]; overCap: number } {
+  const cloudMap = sanitizeProjectPrefs(cloud.projectPrefs);
+  const rawCloud: unknown = cloud.projectPrefs;
+  const stored = rawCloud && typeof rawCloud === 'object' && !Array.isArray(rawCloud) ? rawCloud : {};
+  const localMap = sanitizeProjectPrefs(local.projectPrefs);
+  let size = Object.keys(cloudMap).length;
+  let overCap = 0;
+  const entries: PrefEntry[] = [];
+  for (const { id: localId } of localTiles) {
+    const uploaded = ids.targetIds.get(localId);
+    const cloudId = uploaded ?? ids.skippedIds.get(localId);
+    const pref = prefOf(localMap, localId);
+    if (cloudId === undefined || (!pref.color && !pref.archived)) continue;
+    if (uploaded === undefined && Object.prototype.hasOwnProperty.call(stored, cloudId)) continue;
+    if (size >= MAX_PROJECT_PREFS) {
+      overCap++;
+      continue;
+    }
+    size++;
+    entries.push(...prefEntries(cloudId, {}, pref));
+  }
+  return { entries, overCap };
+}
+
+interface UploadIds { targetIds: Map<string, string>; skippedIds: Map<string, string> }
 
 const isBlank = (v: unknown) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
 
 /**
  * The upload's one masked settings write (R63, R64). The tile order: the cloud's tiles as the
- * dashboard shows them, then the uploaded products in this browser's tile order. The export name,
+ * dashboard shows them (every stored id in its slot, R89), then the uploaded products in this
+ * browser's tile order, with a skipped
+ * product the cloud order does not hold placed among them (v0.56.0: a retry after an upload that
+ * stopped put the first try's products in the cloud's id order, ahead of the rest). The export name,
  * identifier and caution switch: this browser's value only where the cloud has none, so the cloud
  * keeps every value it has. Masked, so nothing else in the document changes. Built as entries
  * through the drivers' own rules (`addEntry`, `buildMaskedWrite`), so one mask builder serves both.
  */
 function uploadedSettings(
   cloud: UserSettings, local: UserSettings, cloudTiles: string[],
-  localTiles: { id: string }[], targetIds: Map<string, string>,
+  localTiles: { id: string }[], ids: UploadIds, copies: PrefEntry[],
 ): [Record<string, unknown>, { mergeFields: FieldPath[] }] {
-  const order = [...cloudTiles];
+  const held = new Set(Array.isArray(cloud.projectOrder) ? cloud.projectOrder : []);
+  const placedHere = new Set([...ids.skippedIds.values()].filter(id => !held.has(id)));
+  const order = cloudTiles.filter(id => !placedHere.has(id));
   for (const tile of localTiles) {
-    const id = targetIds.get(tile.id);
+    const id = ids.targetIds.get(tile.id) ?? ids.skippedIds.get(tile.id);
     if (id !== undefined && !order.includes(id)) order.push(id);
   }
   let entries: PrefEntry[] = addEntry([], { path: ['projectOrder'], value: order });
+  for (const entry of copies) entries = addEntry(entries, entry);
   for (const key of ['exportName', 'exportId'] as const) {
     if (isBlank(cloud[key]) && !isBlank(local[key])) entries = addEntry(entries, { path: [key], value: local[key] });
   }

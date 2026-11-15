@@ -15,6 +15,7 @@ import {
   ICON_HUE_CYAN,
   ICON_HUE_GREEN,
   ICON_HUE_RED,
+  ICON_HUE_SLATE,
   ICON_HUE_VIOLET,
   ICON_REST,
 } from './button-styles';
@@ -112,4 +113,14 @@ export function DragHandle() {
       <div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500" />
     </div>
   );
+}
+
+// GanttApp's archive glyphs (Forecaster's `ArchiveIconButton.tsx` at 09c4cda): a box, with a bar,
+// or with an up arrow.
+const BOX = 'M21 8v13H3V8M1 3h22v5H1z';
+const ARCHIVE_PATHS = { archive: `${BOX}M10 12h4`, unarchive: `${BOX}M12 18v-6M9 15l3-3 3 3` } as const;
+
+/** Archive or Unarchive (v0.56.0), in GanttApp's slate. */
+export function ArchiveIconButton({ variant, ...props }: IconButtonProps & { variant: 'archive' | 'unarchive' }) {
+  return <IconButton {...props} hue={ICON_HUE_SLATE}><path d={ARCHIVE_PATHS[variant]} /></IconButton>;
 }

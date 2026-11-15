@@ -172,7 +172,7 @@ export async function applyImport(
 ): Promise<ImportOutcome> {
   const outcome: ImportOutcome = {
     added: 0, replaced: 0, copied: 0, skipped: 0,
-    driftSkipped: [], errors: [],
+    written: [], driftSkipped: [], errors: [],
   };
 
   const freshProducts = await driver.loadProductIndex();
@@ -233,6 +233,7 @@ export async function applyImport(
     try {
       await Promise.resolve().then(() => driver.createProduct(prod, { throwOnError: true }));
       outcome.added++;
+      outcome.written.push({ id: prod.id, name: prod.name });
     } catch (err) {
       outcome.errors.push({ productName: prod.name, reason: (err as Error).message });
     }
@@ -242,6 +243,7 @@ export async function applyImport(
     try {
       await Promise.resolve().then(() => driver.replaceProduct(prod));
       outcome.replaced++;
+      outcome.written.push({ id: prod.id, name: prod.name });
     } catch (err) {
       outcome.errors.push({ productName: prod.name, reason: (err as Error).message });
     }

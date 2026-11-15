@@ -10,6 +10,8 @@ import { exportProduct, createNewProduct, duplicateProduct, loadProductIndex as 
 import { exportAllProductsBundled } from '../lib/importExport';
 import { useImportState } from '../hooks/useImportState';
 import { useProjectOrder } from '../hooks/useProjectOrder';
+import { useProductArchive } from '../hooks/useProductArchive';
+import { isArchived, prefOf } from '../lib/projectPrefs';
 import ImportPreviewSection from '../components/product/ImportPreviewSection';
 import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete, isRibUnsized } from '../lib/calculations';
@@ -24,8 +26,9 @@ import AppSettingsModal from '../components/settings/AppSettingsModal';
 import AppNotices from '../components/ui/AppNotices';
 import ProjectsHeader from '../components/product/ProjectsHeader';
 import ProjectsToolbar from '../components/product/ProjectsToolbar';
-import ProjectGrid, { type GridProject } from '../components/product/ProjectGrid';
-import ProjectsEmptyState from '../components/product/ProjectsEmptyState';
+import { type GridProject } from '../components/product/ProjectGrid';
+import ProductsBody from '../components/product/ProductsBody';
+import { ShowArchivedFilter } from '../components/product/ArchiveControls';
 import ProjectDialog, { type ProjectEdits } from '../components/product/ProjectDialog';
 import DeleteProjectDialog from '../components/product/DeleteProjectDialog';
 import { findTile, findTileControl } from '../components/product/tile-focus';
@@ -68,7 +71,6 @@ export default function ProductList() {
   // an import, an invitation) updates the list in place, so untouched tiles keep their DOM nodes
   // and focus stays where it was.
   const [loadedFor, setLoadedFor] = useState<StorageDriver | null>(null);
-  const loading = loadedFor !== driver;
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
@@ -102,9 +104,13 @@ export default function ProductList() {
 
   const order = useProjectOrder(driver, products);
   const { refreshStarted, listed } = order;
+  // v0.56.0 (R-3): the grid waits for the first settings read too, so an archived tile never shows
+  // and then vanishes.
+  const loading = loadedFor !== driver || order.settings.status === 'loading';
 
-  const refresh = useCallback(async () => {
-    if (!driver) return;
+  /** The list as loaded, or null; also shown. */
+  const refresh = useCallback(async (): Promise<EnrichedProduct[] | null> => {
+    if (!driver) return null;
     const gen = refreshStarted();
     try {
       const allProducts = await driver.loadProductIndex();
@@ -132,6 +138,7 @@ export default function ProductList() {
       } else {
         setLocalOrphanCount(0);
       }
+      return detailed;
     } finally {
       setLoadedFor(driver);
     }
@@ -140,6 +147,7 @@ export default function ProductList() {
   useEffect(() => {
     if (storageReady) refresh();
   }, [storageReady, refresh]);
+  const refreshList = useCallback(async () => { await refresh(); }, [refresh]);
 
   // Reset cloud hydration flag when mode or driver changes (e.g., uid-change
   // driver swap). Each change is followed by exactly one refresh() call →
@@ -182,7 +190,7 @@ export default function ProductList() {
     setDecision: setImportDecision,
     handleConfirmImport,
     handleCancel: cancelImport,
-  } = useImportState(driver, mode, cloudDataLoaded, refresh);
+  } = useImportState(driver, mode, cloudDataLoaded, refreshList);
 
   // Refresh project list when a pending invitation is claimed.
   // `refresh` is useCallback([driver, mode]) — stable; effect re-attaches
@@ -241,6 +249,12 @@ export default function ProductList() {
     if (announceTimerRef.current !== null) window.clearTimeout(announceTimerRef.current);
   }, []);
 
+  // Tile colour, Archive and "Show archived (N)" (v0.56.0): the person's own settings, never the product.
+  const archive = useProductArchive({
+    driver, products: order.sorted, settings: order.settings, rootRef: mainRef, newProductRef: newProjectRef, announce,
+    importOutcome: importPhase.tag === 'done' ? importPhase.outcome : null,
+  });
+
   const handleCreate = async (name: string, desc: string) => {
     if (!driver) return;
     const product = createNewProduct(name, desc, driver.getWorkspaceId());
@@ -281,6 +295,7 @@ export default function ProductList() {
     const name = cloneName(original.name, order.takenNames());
     const dup = { ...duplicateProduct(original, driver.getWorkspaceId()), name };
     const flight = order.placeClone(id, dup.id, name);
+    archive.copyColor(id, dup.id);
     await driver.createProduct(dup);
     flight.settled();
     await refresh();
@@ -289,7 +304,7 @@ export default function ProductList() {
   };
 
   const openDelete = (id: string) => {
-    const shown = order.sorted;
+    const shown = archive.shown;
     const index = shown.findIndex(p => p.id === id);
     const p = shown[index];
     if (!p) return;
@@ -304,7 +319,9 @@ export default function ProductList() {
     deleteConfirmedRef.current = true;
     setDeleteTarget(null);
     await driver.deleteProduct(target.id);
-    await refresh();
+    const list = await refresh();
+    // R-5: the entry goes only once the list no longer holds the product (a refused delete keeps it).
+    if (list && !list.some(p => p.id === target.id)) archive.dropEntry(target.id);
     setFocusRequest({ kind: 'deleted', ...target });
   };
 
@@ -332,13 +349,18 @@ export default function ProductList() {
   const openProject = (id: string, e: React.MouseEvent<HTMLButtonElement>) => {
     // A mouse or touch click (not a key): the rest of a double-click must not land on Structure.
     if (e.detail === 1) swallowRestOfGesture();
+    // R61 with R86: an archived tile's open button says it unarchives; nothing is said after.
+    archive.unarchiveForOpen(id);
     navigate(`/product/${id}/structure`);
   };
 
-  const gridProjects: GridProject[] = order.sorted.map(p => {
+  const gridProjects: GridProject[] = archive.shown.map(p => {
     const role = roleOf(p, isCloudMode, user?.uid);
     return {
       ...p,
+      color: prefOf(archive.prefs, p.id).color,
+      archived: isArchived(archive.prefs, p.id),
+      prefsDisabledReason: archive.disabledReason(p.id),
       isShared: !!(p._owner && user && p._owner !== user.uid),
       canEdit: role === 'owner' || role === 'editor',
       canDelete: role === 'owner',
@@ -417,6 +439,7 @@ export default function ProductList() {
             onLoadSample={() => handleLoadSample(false)}
             onNewProject={openNew}
           />
+          {!loading && archive.archivedCount > 0 && <ShowArchivedFilter count={archive.archivedCount} checked={archive.showArchived} onChange={archive.setShowArchived} />}
 
           <ImportPreviewSection
             phase={importPhase}
@@ -427,6 +450,7 @@ export default function ProductList() {
             onSetDecision={setImportDecision}
             onConfirm={handleConfirmImport}
             onCancel={cancelImport}
+            archivedNote={archive.importNote}
           />
 
           {/* Cloud orphan warning */}
@@ -439,24 +463,28 @@ export default function ProductList() {
             </div>
           )}
 
-          {loading ? (
-            <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-              <p className="text-sm">Loading products...</p>
-            </div>
-          ) : products.length === 0 ? (
-            <ProjectsEmptyState onCreateNew={openNew} onLoadSample={() => handleLoadSample(true)} />
-          ) : (
-            <ProjectGrid
-              projects={gridProjects}
-              onOpen={openProject}
-              onShare={openShare}
-              onExport={handleExport}
-              onEdit={openEdit}
-              onClone={handleClone}
-              onDelete={openDelete}
-              onMove={order.moveOnto}
-            />
-          )}
+          <ProductsBody
+            loading={loading}
+            settingsUnread={order.settings.status === 'failed'}
+            listedCount={products.length}
+            archivedCount={archive.archivedCount}
+            notice={archive.notice}
+            onCreateNew={openNew}
+            onLoadSample={() => handleLoadSample(true)}
+            projects={gridProjects}
+            onOpen={openProject}
+            onShare={openShare}
+            onExport={handleExport}
+            onEdit={openEdit}
+            onClone={handleClone}
+            onDelete={openDelete}
+            onMove={(draggedId, targetId) => { void order.moveOnto(draggedId, targetId, archive.hiddenIds); }}
+            colorOpenFor={archive.colorOpenFor}
+            onColorOpenChange={archive.setColorOpen}
+            onPickColor={archive.pickColor}
+            onArchive={archive.archiveId}
+            onUnarchive={archive.unarchiveId}
+          />
 
           {/* What Clone and Load Sample did, for a screen reader: the new tile may be out of sight. */}
           <div role="status" className="sr-only">{announcement}</div>

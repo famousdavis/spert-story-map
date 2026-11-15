@@ -27,6 +27,8 @@ interface ImportPreviewSectionProps {
   onSetDecision: (importedProductId: string, action: ConflictAction) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  /** R84 (v0.56.0): the products the import wrote that this person has archived, or null. */
+  archivedNote?: string | null;
 }
 
 function buildBannerText(outcome: ImportPhase & { tag: 'done' }): string {
@@ -214,7 +216,7 @@ function ImportPreviewBody({
 
 export default function ImportPreviewSection({
   phase, mode, cloudDataLoaded, fileInputRef,
-  onFileChange, onSetDecision, onConfirm, onCancel,
+  onFileChange, onSetDecision, onConfirm, onCancel, archivedNote = null,
 }: ImportPreviewSectionProps) {
   useEffect(() => {
     if (phase.tag === 'idle') return;
@@ -289,6 +291,7 @@ export default function ImportPreviewSection({
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1">
               <p className={`text-sm font-medium ${textCls}`}>{buildBannerText(phase)}</p>
+              {archivedNote && <p className={`text-sm ${textCls}`}>{archivedNote}</p>}
               {hasDriftSkips && (
                 <ul className="mt-1 text-xs text-yellow-700 dark:text-yellow-400 list-disc list-inside">
                   {o.driftSkipped.map((s, i) => <li key={i}><strong>{s.productName}</strong>: {s.reason}</li>)}

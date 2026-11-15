@@ -110,7 +110,8 @@ export function createLocalStorageDriver(): StorageDriver {
       return Promise.resolve();
     },
 
-    loadPreferences() {
+    /** A local read does not fail this way, so `throwOnError` changes nothing here. */
+    loadPreferences(_options?: { throwOnError?: boolean }) {
       return Promise.resolve(_loadPreferences());
     },
 

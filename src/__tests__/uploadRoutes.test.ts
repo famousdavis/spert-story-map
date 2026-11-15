@@ -104,7 +104,7 @@ describe('a second upload adds nothing already uploaded', () => {
     await r.importFile(r.cloudExport('tmpl'));
     r.addWork('tmpl');
     const out = await r.upload();
-    expect(out).toEqual({ uploadedIds: [], skipped: [{ localId: 'tmpl', name: 'Template', cloudName: 'Template' }], unreadable: 0 });
+    expect(out).toEqual({ uploadedIds: [], skipped: [{ localId: 'tmpl', name: 'Template', cloudName: 'Template' }], unreadable: 0, prefsNotCopied: 0 });
     expect(r.owned()).toHaveLength(0);
   });
 
