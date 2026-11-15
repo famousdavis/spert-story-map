@@ -15,6 +15,7 @@ import { auth, db, isFirebaseAvailable } from './firebase';
 import { callClaimPendingInvitations } from './callables';
 import { signOutCleanup } from './signOutCleanup';
 import { endAiSessionForSignOut } from './aiSessionTeardown';
+import { clearTermsSignOutNotice, setTermsSignOutNotice } from './termsSignOutNotice';
 import {
   isTosAcceptedLocally,
   isTosAcceptedInFirestore,
@@ -72,7 +73,6 @@ interface AuthContextValue {
   firebaseAvailable: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithMicrosoft: () => Promise<void>;
-  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -93,6 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
 
       if (firebaseUser && db) {
+        // A sign-in clears the notice of an earlier Terms sign-out (v0.55.16, R81); the
+        // branches below set it again if this one fails too.
+        clearTermsSignOutNotice();
+
         // ── Profile dual-write ──────────────────────────────────────────────
         const normalizedName = denormalizeLastFirst(firebaseUser.displayName || '');
         const normalizedEmail = (firebaseUser.email || '').toLowerCase();
@@ -138,15 +142,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (accepted) {
               cacheTosAcceptance();
             } else {
-              // ToS outdated or missing — sign out
+              // ToS outdated or missing — sign out. The notice is set first, so a
+              // cleanup that throws still leaves it (v0.55.16).
               clearTosAcceptance();
+              setTermsSignOutNotice();
               await signOutCleanup();
               return;
             }
           } catch (e) {
             console.error('Failed to check ToS acceptance:', e instanceof Error ? e.message : 'Unknown error');
-            // Cannot verify ToS — sign out to prevent bypass
+            // Cannot verify ToS — sign out to prevent bypass. Also reached when the
+            // cleanup above throws.
             clearTosAcceptance();
+            setTermsSignOutNotice();
             await signOutCleanup();
             return;
           }
@@ -190,11 +198,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithPopup(auth, provider);
   };
 
-  const signOut = async () => {
-    if (!auth) return;
-    await signOutCleanup();
-  };
-
   return (
     <AuthContext.Provider value={{
       user,
@@ -202,7 +205,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       firebaseAvailable: isFirebaseAvailable,
       signInWithGoogle,
       signInWithMicrosoft,
-      signOut,
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 0.55.16 (2026-11-14)
+
+### Fixed
+
+- **When Story Map signs you out because the Terms of Service changed or could not be checked, it no longer deletes the products, export name and identifier this browser keeps for use while signed out.** That sign-out happens while a remembered sign-in is being checked, for example at the first visit after the Terms of Service changed. As before, it also keeps the products, export name and identifier this browser keeps for you while you are signed in. Products deleted this way by earlier versions, for example after the Terms updates of 2026-10-05 and 2026-10-25, cannot be recovered.
+- **Story Map now says why it signed you out**, at the top of the page, until you dismiss the message or sign in again; reloading the page also removes it. The message reads: “You were signed out because the Terms of Service changed or could not be checked. Your products, export name and identifier in this browser were not deleted. If you used Cloud storage, choose it again in Settings after you sign in.” That sign-out still sets storage to this browser, which is why the message asks a person who used Cloud storage to choose it again in Settings after signing in.
+- **An edit made just before that sign-out is now saved.** When the page loaded while the app was offline, the sign-out could arrive later, when the connection came back, and an edit made in the moment before was lost.
+
+### Changed
+
+- **Unused code was removed**: a sign-out function nothing called and two type definitions nothing used. Nothing changes in how the app works.
+
 ## Version 0.55.15 (2026-11-14)
 
 ### Fixed

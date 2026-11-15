@@ -6,6 +6,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import InvitationBanner from './components/ui/InvitationBanner';
 import AiTeardownBanner from './components/ui/AiTeardownBanner';
+import TermsSignOutBanner from './components/ui/TermsSignOutBanner';
 import ProductList from './pages/ProductList';
 import ProductLayout from './components/layout/ProductLayout';
 import StructureView from './pages/StructureView';
@@ -23,6 +24,7 @@ export default function App() {
     <ErrorBoundary>
     <InvitationBanner />
     <AiTeardownBanner />
+    <TermsSignOutBanner />
     <Routes>
       <Route path="/" element={<ProductList />} />
       <Route path="/about" element={<AboutView />} />
