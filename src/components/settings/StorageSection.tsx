@@ -266,9 +266,9 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
         open={showCleanupConfirm}
         onClose={() => setShowCleanupConfirm(false)}
         onConfirm={confirmCleanup}
-        title="Clear Local Data"
+        title="Clear Uploaded Copies"
         message={lastUpload ? clearOfferMessage(lastUpload) ?? '' : ''}
-        confirmLabel="Clear Local Data"
+        confirmLabel="Clear Uploaded Copies"
         danger={true}
       />
 

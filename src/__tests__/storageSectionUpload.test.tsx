@@ -59,9 +59,12 @@ describe('StorageSection upload', () => {
     expect(line.textContent).toBe('Uploaded 1 product to the cloud.');
     expect(line.className).toContain('text-green-600');
     expect(screen.getByText(ASK)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Local Data' }));
+    expect(screen.getByRole('heading', { name: 'Clear Uploaded Copies' })).toBeTruthy();
+    expect(screen.queryByText('Clear Local Data')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Uploaded Copies' }));
     expect(localStorage.getItem(`rp:local:product_${a}`)).toBeNull();
     expect(localIndex()).toEqual([]);
+    expect(line.textContent).toBe('Uploaded 1 product to the cloud. Copies of the uploaded products were cleared from this browser.');
   });
 
   it('a product edited after its upload is named, kept, and not removed by the clear', async () => {
@@ -74,7 +77,7 @@ describe('StorageSection upload', () => {
     expect(line.textContent).toBe(`Uploaded 1 product to the cloud. Already in the cloud, so not uploaded again: “A”. ${KEPT}`);
     expect(line.className).toContain('text-amber-700');
     expect(screen.getByText(`${ASK} ${STAY}`)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Local Data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Uploaded Copies' }));
     expect(localStorage.getItem(`rp:local:product_${b}`)).toBeNull();
     expect(localStorage.getItem(`rp:local:product_${a}`)).not.toBeNull();
     expect(localIndex()).toEqual(['A']);
@@ -87,7 +90,7 @@ describe('StorageSection upload', () => {
     const line = result('No new products to upload.');
     expect(line.className).toContain('text-amber-700');
     expect(screen.queryByText(ASK, { exact: false })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Clear Local Data' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear Uploaded Copies' })).toBeNull();
   });
 
   it('an unreadable product is counted and stays; the rest are uploaded', async () => {
@@ -96,7 +99,7 @@ describe('StorageSection upload', () => {
     await uploadThroughTheDialog();
     expect(result('Uploaded 1 product').textContent).toBe('Uploaded 1 product to the cloud. 1 product could not be read and was not uploaded.');
     expect(screen.getByText(`${ASK} ${STAY}`)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Local Data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Uploaded Copies' }));
     expect(localIndex()).toEqual(['Gone']);
   });
 
@@ -109,7 +112,7 @@ describe('StorageSection upload', () => {
     expect(line.textContent).toBe('The upload stopped before it finished. Products it had already uploaded are in the cloud, and uploading again will not add them twice.');
     expect(line.className).toContain('text-red-500');
     expect(h.switchMode).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Clear Local Data' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear Uploaded Copies' })).toBeNull();
   });
 
   it('switching to the cloud with nothing to upload, when the cloud cannot be reached: the line is red', async () => {

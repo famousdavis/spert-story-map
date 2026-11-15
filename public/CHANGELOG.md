@@ -11,7 +11,7 @@
 
 ### Changed
 
-- **The upload's message says what happened:** how many products were uploaded, which ones were already in the cloud (with their name in the cloud where it differs), and how many could not be read. It is green when everything was uploaded, amber when anything was skipped or could not be read, and red when the upload stopped before it finished. The message saying that cloud storage could not be reached is now red as well; it was green. The offer to clear local copies appears only when something was uploaded, and, when anything was not uploaded, says that those products stay in this browser.
+- **The upload's message says what happened:** how many products were uploaded, which ones were already in the cloud (with their name in the cloud where it differs), and how many could not be read. It is green when everything was uploaded, amber when anything was skipped or could not be read, and red when the upload stopped before it finished. The message saying that cloud storage could not be reached is now red as well; it was green. The offer to clear local copies appears only when something was uploaded, and, when anything was not uploaded, says that those products stay in this browser. Its title and button read Clear Uploaded Copies; they said Clear Local Data.
 
 ## Version 0.55.14 (2026-11-14)
 
