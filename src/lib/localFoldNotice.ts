@@ -13,7 +13,7 @@ let lines: string[] | null = null;
 const listeners = new Set<() => void>();
 
 const changed = () => { for (const listener of listeners) listener(); };
-const STOPPED_LINE = 'Some products could not be moved because this browser’s storage is full. They are kept, but not shown, until there is room: export or delete products you no longer need, then reload the page.';
+const STOPPED_LINE = 'Some products could not be moved because this browser’s storage is full. They are kept, but not shown, until there is room: delete products you no longer need, then reload the page.';
 
 /** Singular or plural words for a count. */
 function forms(n: number) {
