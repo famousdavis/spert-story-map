@@ -10,17 +10,20 @@ import { guardCloudProduct } from './cloudLoadGuard';
 import { reportGuardedLoad } from './cloudLoadNotices';
 import { addEntry, applyEntries, type PrefEntry } from './prefEntries';
 
-// ── localStorage namespace ──────────────────────────────────────────
+// ── localStorage namespaces ─────────────────────────────────────────
 //
-// Every per-user write goes through a namespace so the same browser can
-// hold multiple users' caches without collision. StorageProvider binds the
-// active namespace on every auth transition: `uid` when signed in, `'local'`
-// when anonymous. Callers can override per-call (e.g. ProductList's orphan
-// check reads `'local'` while in cloud mode).
+// Products and the products index live in ONE store per browser, `rp:local`, signed in or
+// not (v0.56.1, R71). Preferences keep a per-person namespace: StorageProvider binds it on
+// every auth transition, `uid` when signed in, `'local'` when anonymous. Callers can override
+// per call.
 //
 // Workspace identity (rp_workspace_id) is NEVER namespaced — it's a
 // per-browser academic integrity token that must survive sign-outs.
 
+/** Where products and the products index are kept, signed in or not (v0.56.1, R71). */
+export const PRODUCT_NS = 'local';
+
+/** The preferences namespace: the signed-in person's uid, or 'local'. */
 let activeNamespace: string = 'local';
 
 export function setStorageNamespace(ns: string): void {
@@ -142,12 +145,12 @@ function immediatelyLoad(key: string): unknown {
 
 // Product Index
 export function loadProductIndex(ns?: string): { id: string; name: string; updatedAt?: string }[] {
-  const key = indexKeyFor(ns ?? activeNamespace);
+  const key = indexKeyFor(ns ?? PRODUCT_NS);
   return (immediatelyLoad(key) as { id: string; name: string; updatedAt?: string }[] | null) || [];
 }
 
 export function saveProductIndex(index: { id: string; name: string; updatedAt?: string }[], ns?: string): void {
-  debouncedSave(indexKeyFor(ns ?? activeNamespace), index, 100);
+  debouncedSave(indexKeyFor(ns ?? PRODUCT_NS), index, 100);
 }
 
 // Schema migration: v1 → v2 (per-release progress)
@@ -238,7 +241,7 @@ function guardStoredProduct(stored: unknown, id: string, notify: boolean): Produ
  * at sign-in). No notice: opening it runs the guard again.
  */
 export function loadProduct(id: string, ns?: string, notify = true): Product | null {
-  const namespace = ns ?? activeNamespace;
+  const namespace = ns ?? PRODUCT_NS;
   const key = productKeyFor(id, namespace);
   // Boundary cast: immediatelyLoad returns `unknown` because localStorage JSON
   // is untrusted. This is the same validation boundary validateProduct sits on
@@ -269,7 +272,7 @@ export function loadProduct(id: string, ns?: string, notify = true): Product | n
 
 export function saveProduct(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
-  debouncedSave(productKeyFor(product.id, activeNamespace), updated);
+  debouncedSave(productKeyFor(product.id, PRODUCT_NS), updated);
 
   // Update index
   const index = loadProductIndex();
@@ -287,7 +290,7 @@ export function saveProduct(product: Product): Product {
 export function saveProductImmediate(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
   try {
-    localStorage.setItem(productKeyFor(product.id, activeNamespace), JSON.stringify(updated));
+    localStorage.setItem(productKeyFor(product.id, PRODUCT_NS), JSON.stringify(updated));
     const index = loadProductIndex();
     const existing = index.findIndex(p => p.id === product.id);
     const entry = { id: product.id, name: product.name, updatedAt: updated.updatedAt };
@@ -296,7 +299,7 @@ export function saveProductImmediate(product: Product): Product {
     } else {
       index.push(entry);
     }
-    localStorage.setItem(indexKeyFor(activeNamespace), JSON.stringify(index));
+    localStorage.setItem(indexKeyFor(PRODUCT_NS), JSON.stringify(index));
   } catch (e) {
     handleSaveError(e);
   }
@@ -313,7 +316,7 @@ export function saveProductImmediate(product: Product): Product {
  */
 export function saveProductImmediateOrThrow(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
-  localStorage.setItem(productKeyFor(product.id, activeNamespace), JSON.stringify(updated));
+  localStorage.setItem(productKeyFor(product.id, PRODUCT_NS), JSON.stringify(updated));
   const index = loadProductIndex();
   const existing = index.findIndex(p => p.id === product.id);
   const entry = { id: product.id, name: product.name, updatedAt: updated.updatedAt };
@@ -322,7 +325,7 @@ export function saveProductImmediateOrThrow(product: Product): Product {
   } else {
     index.push(entry);
   }
-  localStorage.setItem(indexKeyFor(activeNamespace), JSON.stringify(index));
+  localStorage.setItem(indexKeyFor(PRODUCT_NS), JSON.stringify(index));
   return updated;
 }
 
@@ -335,8 +338,8 @@ export function deleteProduct(id: string): void {
   // Drop any pending debounced writes for this product and the index — a
   // trailing save would resurrect the deleted product or write a stale
   // index entry referencing it.
-  const productKey = productKeyFor(id, activeNamespace);
-  const indexKey = indexKeyFor(activeNamespace);
+  const productKey = productKeyFor(id, PRODUCT_NS);
+  const indexKey = indexKeyFor(PRODUCT_NS);
   dropPendingSave(productKey);
   dropPendingSave(indexKey);
   try {
@@ -350,7 +353,7 @@ export function deleteProduct(id: string): void {
 
 /** Remove all local products in a namespace and clear that namespace's index. */
 export function clearAllLocalProducts(ns?: string): void {
-  const namespace = ns ?? activeNamespace;
+  const namespace = ns ?? PRODUCT_NS;
   const index = loadProductIndex(namespace);
   for (const entry of index) {
     localStorage.removeItem(productKeyFor(entry.id, namespace));
@@ -399,6 +402,26 @@ export function writePreferences(entries: readonly PrefEntry[], ns?: string): vo
   pendingPrefs[key] = pending;
   if (prefsTimers[key]) clearTimeout(prefsTimers[key]);
   prefsTimers[key] = setTimeout(() => writePendingPrefs(key), 200);
+}
+
+/**
+ * Remove the export name and identifier from a person's stored settings, synchronously, and keep
+ * the rest (v0.56.1, R-2). Direct, not through `writePreferences`: a driver swap cancels pending
+ * entries, and sign-out swaps the driver.
+ */
+export function removeExportIdentity(ns: string): void {
+  const key = preferencesKeyFor(ns);
+  try {
+    const stored = immediatelyLoad(key);
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return;
+    const rest = { ...(stored as Record<string, unknown>) };
+    if (!('exportName' in rest) && !('exportId' in rest)) return;
+    delete rest.exportName;
+    delete rest.exportId;
+    localStorage.setItem(key, JSON.stringify(rest));
+  } catch (e) {
+    handleSaveError(e);
+  }
 }
 
 // Workspace identity — generated once per browser, persists across sessions

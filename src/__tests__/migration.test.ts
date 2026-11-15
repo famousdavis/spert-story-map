@@ -147,8 +147,8 @@ describe('migrateLocalToCloud', () => {
 
   it('migrates preferences', async () => {
     seedLocalStorage([]);
-    // v0.33.0 namespaced shape — pre-migration prefs live at rp:local:preferences.
-    localStorage.setItem('rp:local:preferences', JSON.stringify({ exportName: 'Alice' }));
+    // v0.56.1 (R94): the signed-in person's own settings, never this browser's signed-out ones.
+    localStorage.setItem('rp:user-1:preferences', JSON.stringify({ exportName: 'Alice' }));
 
     await migrateLocalToCloud('user-1');
 

@@ -8,6 +8,8 @@ import { isFirebaseAvailable } from './firebase';
 import { useAuth } from './AuthProvider';
 import { registerDriverCleanup, clearDriverCleanup } from './driverCleanupRegistry';
 import { setStorageNamespace } from './storage';
+import { foldLocalStore } from './localStoreFold';
+import { reportFold } from './localFoldNotice';
 import type { StorageDriver, StorageMode } from '../types';
 
 interface StorageContextValue {
@@ -52,21 +54,29 @@ export function StorageProvider({ children }: { children: React.ReactNode }) {
   // Update driver when auth resolves or mode changes
   /* eslint-disable react-hooks/set-state-in-effect -- driver must be created after auth resolves */
   useEffect(() => {
-    // Bind the active localStorage namespace before the (cloud-pending) early
-    // return so any synchronous code that runs while we wait for auth reads
-    // from the correct namespace. UID wins whenever signed in, even in local
-    // mode, so per-user local caches stay isolated.
+    // Bind the preferences namespace before the (cloud-pending) early return so any
+    // synchronous code that runs while we wait for auth reads the right person's settings.
+    // Products are not namespaced: they live in rp:local signed in or not (v0.56.1, R71).
     setStorageNamespace(user?.uid ?? 'local');
 
     if (authLoading && persistedMode === 'cloud' && isFirebaseAvailable) {
       return; // Still waiting for auth
     }
 
-    if (effectiveMode === 'cloud' && user) {
-      setDriver(createFirestoreDriver(user.uid));
-    } else {
-      setDriver(createLocalStorageDriver());
+    const create = () => (effectiveMode === 'cloud' && user ? createFirestoreDriver(user.uid) : createLocalStorageDriver());
+    if (!user) {
+      setDriver(create());
+      return;
     }
+    // R71 R-3: here the uid is bound, which is after setUser and so after the Terms check. The
+    // person's products an earlier version kept in rp:{uid} move into rp:local first, under a lock;
+    // then the driver for this uid is created, so its first list holds them.
+    let cancelled = false;
+    void foldLocalStore(user.uid).then(outcome => {
+      reportFold(outcome);
+      if (!cancelled) setDriver(create());
+    });
+    return () => { cancelled = true; };
   }, [authLoading, effectiveMode, user?.uid, persistedMode]); // eslint-disable-line react-hooks/exhaustive-deps -- user?.uid captures the needed dependency
   /* eslint-enable react-hooks/set-state-in-effect */
 

@@ -102,49 +102,38 @@ describe('signOutCleanup', () => {
     expect(tearDownListeners).toHaveBeenCalledTimes(1);
   });
 
-  it('removes every product key in the active namespace but preserves non-matching keys', async () => {
+  it('at a uid (the Sign out button) removes no product key in any namespace (v0.56.1, R71 R-2)', async () => {
     setStorageNamespace('test-user-uid');
-    // The signed-in user's namespaced index — clearAllLocalProducts iterates
-    // this to remove individual product docs.
-    localStorage.setItem('rp:test-user-uid:products_index', JSON.stringify([
-      { id: 'aaa', name: 'A' }, { id: 'bbb', name: 'B' }, { id: 'ccc', name: 'C' },
-    ]));
+    localStorage.setItem('rp:test-user-uid:products_index', JSON.stringify([{ id: 'aaa', name: 'A' }]));
     localStorage.setItem('rp:test-user-uid:product_aaa', '{}');
-    localStorage.setItem('rp:test-user-uid:product_bbb', '{}');
-    localStorage.setItem('rp:test-user-uid:product_ccc', '{}');
+    localStorage.setItem('rp:local:products_index', JSON.stringify([{ id: 'zzz', name: 'Z' }]));
+    localStorage.setItem('rp:local:product_zzz', '{}');
     localStorage.setItem('rp_workspace_id', 'ws-123');
     localStorage.setItem('spert-theme', 'dark');
-    // Anonymous-namespace orphans must SURVIVE — a signed-out user may still
-    // want to see anonymous data they had before signing in.
-    localStorage.setItem('rp:local:product_zzz', '{}');
 
     await signOutCleanup();
 
-    expect(localStorage.getItem('rp:test-user-uid:product_aaa')).toBeNull();
-    expect(localStorage.getItem('rp:test-user-uid:product_bbb')).toBeNull();
-    expect(localStorage.getItem('rp:test-user-uid:product_ccc')).toBeNull();
-    expect(localStorage.getItem('rp:test-user-uid:products_index')).toBeNull();
+    expect(localStorage.getItem('rp:test-user-uid:product_aaa')).toBe('{}');
+    expect(localStorage.getItem('rp:test-user-uid:products_index')).toBe(JSON.stringify([{ id: 'aaa', name: 'A' }]));
     expect(localStorage.getItem('rp:local:product_zzz')).toBe('{}');
+    expect(localStorage.getItem('rp:local:products_index')).toBe(JSON.stringify([{ id: 'zzz', name: 'Z' }]));
     expect(localStorage.getItem('rp_workspace_id')).toBe('ws-123');
     expect(localStorage.getItem('spert-theme')).toBe('dark');
   });
 
-  it('removes namespaced products_index and preferences', async () => {
+  it('at a uid removes only the export name and identifier from that person\'s settings, and keeps the rest (R91)', async () => {
     setStorageNamespace('test-user-uid');
-    localStorage.setItem('rp:test-user-uid:products_index', '[]');
-    localStorage.setItem('rp:test-user-uid:preferences', '{"exportName":"Alice","exportId":"UF001"}');
+    localStorage.setItem('rp:test-user-uid:preferences', '{"exportName":"Alice","exportId":"UF001","projectOrder":["a"],"suppressLocalStorageWarning":true}');
+    localStorage.setItem('rp:local:preferences', '{"exportName":"Signed out","exportId":"L-1"}');
 
     await signOutCleanup();
 
-    expect(localStorage.getItem('rp:test-user-uid:products_index')).toBeNull();
-    expect(localStorage.getItem('rp:test-user-uid:preferences')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('rp:test-user-uid:preferences') ?? 'null')).toEqual({ projectOrder: ['a'], suppressLocalStorageWarning: true });
+    expect(localStorage.getItem('rp:local:preferences')).toBe('{"exportName":"Signed out","exportId":"L-1"}');
   });
 
   it('preserves the academic integrity token and UI preferences', async () => {
-    // A uid namespace: at 'local' the cleanup removes nothing (v0.55.16), so this would pass
-    // whatever the cleanup did to these keys.
     setStorageNamespace('test-user-uid');
-    localStorage.setItem('rp:test-user-uid:products_index', '[]');
     localStorage.setItem('rp_workspace_id', 'ws-persistent');
     localStorage.setItem('spert-theme', 'dark');
     localStorage.setItem('spert_firstRun_seen', 'true');
@@ -156,7 +145,19 @@ describe('signOutCleanup', () => {
     expect(localStorage.getItem('spert-theme')).toBe('dark');
     expect(localStorage.getItem('spert_firstRun_seen')).toBe('true');
     expect(localStorage.getItem('spert_map_hint_dismissed')).toBe('1');
-    expect(localStorage.getItem('rp:test-user-uid:products_index')).toBeNull();
+  });
+
+  it('at a uid writes a pending save before the driver cleanup can cancel it (v0.56.1: products live in rp:local)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    setStorageNamespace('test-user-uid');
+    const product = { ...createNewProduct('Pending'), name: 'Pending (edited)' };
+    saveProduct(product);
+    registerDriverCleanup(async () => { cancelPendingSaves(); });
+
+    await signOutCleanup();
+
+    expect(JSON.parse(localStorage.getItem(`rp:local:product_${product.id}`) ?? '{}').name).toBe('Pending (edited)');
+    vi.useRealTimers();
   });
 
   it("at 'local' (a Terms sign-out) removes no product, index or preferences (v0.55.16)", async () => {

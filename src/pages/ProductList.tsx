@@ -33,6 +33,8 @@ import ProjectDialog, { type ProjectEdits } from '../components/product/ProjectD
 import DeleteProjectDialog from '../components/product/DeleteProjectDialog';
 import { findTile, findTileControl } from '../components/product/tile-focus';
 import ShareDialog from '../components/product/ShareDialog';
+import { LocalSignedInLine } from '../components/product/LocalStoreNotes';
+import { useExportAll } from '../components/product/useExportAll';
 import { Footer } from './ChangelogView';
 import type { MemberRole, Product, StorageDriver } from '../types';
 
@@ -103,6 +105,8 @@ export default function ProductList() {
   const deleteConfirmedRef = useRef(false);
 
   const order = useProjectOrder(driver, products);
+  // R71 R-6: Export All bundles every product the driver lists; in Local mode that is everyone's.
+  const exportAll = useExportAll(driver, mode === 'local', products.length, () => { if (driver) void exportAllProductsBundled(driver, driver.getWorkspaceId()); });
   const { refreshStarted, listed } = order;
   // v0.56.0 (R-3): the grid waits for the first settings read too, so an archived tile never shows
   // and then vanishes.
@@ -434,7 +438,7 @@ export default function ProductList() {
             hasProjects={products.length > 0}
             importDisabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
             newProjectRef={newProjectRef}
-            onExportAll={() => driver && exportAllProductsBundled(driver, driver.getWorkspaceId())}
+            onExportAll={exportAll.onExportAll}
             onImport={() => fileInputRef.current?.click()}
             onLoadSample={() => handleLoadSample(false)}
             onNewProject={openNew}
@@ -452,6 +456,9 @@ export default function ProductList() {
             onCancel={cancelImport}
             archivedNote={archive.importNote}
           />
+
+          <LocalSignedInLine show={mode === 'local' && !!user} />
+          {exportAll.dialog}
 
           {/* Cloud orphan warning */}
           {localOrphanCount > 0 && (

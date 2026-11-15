@@ -57,7 +57,9 @@ export interface UploadSkip { localId: string; name: string; cloudName: string }
 export interface UploadOutcome { uploadedIds: string[]; skipped: UploadSkip[]; unreadable: number; prefsNotCopied: number }
 
 /**
- * Upload the local products to Firestore, each under a new id.
+ * Upload the local products to Firestore, each under a new id: those in `selected`, or every one
+ * when it is absent. The caller never passes an empty selection (R71 R-4: nothing ticked switches
+ * without an upload).
  *
  * A product an earlier upload already put in the cloud is skipped (v0.55.15, R67): decided from the
  * server list in `uploadRecognition.ts`, which replaced a per-product get of the product's own id
@@ -67,7 +69,7 @@ export interface UploadOutcome { uploadedIds: string[]; skipped: UploadSkip[]; u
  *
  * Local data is left in place as a backup.
  */
-export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
+export async function migrateLocalToCloud(uid: string, selected?: ReadonlySet<string>): Promise<UploadOutcome> {
   // v0.55.14 (R63): the cloud's tile order and settings, read BEFORE any product is written and
   // from the server: offline the members query resolves empty from cache without throwing, which
   // would put every uploaded product ahead of the cloud's. A failed read stops the upload here.
@@ -77,12 +79,13 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   const cloudList = await getDocsFromServer(projectsMembersQuery(requireDb(), uid));
   const cloud = indexCloud(cloudList.docs.map((d): CloudRow => ({ id: d.id, data: d.data() })), uid);
 
-  // Explicit 'local' overrides — migration always reads from the anonymous-
-  // session namespace. At sign-in the active namespace becomes the uid, but
-  // the user's pre-sign-in projects live at rp:local:*, not rp:{uid}:*.
+  // Products: rp:local, this browser's one product store (v0.56.1, R71). Settings: the signed-in
+  // person's own (R94), never this browser's signed-out ones, so a classmate's export name is not
+  // copied into this person's cloud.
   const index = loadProductIndex('local');
-  const localPrefs = loadPreferences('local');
+  const localPrefs = loadPreferences(uid);
   const loaded = index.map(entry => ({ entry, product: loadProduct(entry.id, 'local', false) }));
+  // R67's recognition counts EVERY local product (the shared-origin rung included), ticked or not.
   const shared = sharedOriginKeys(loaded.map(l => l.product));
   const targetIds = new Map<string, string>();
   /** A skipped product's local id to its earlier upload's cloud id (v0.56.0, R-7). */
@@ -90,6 +93,8 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   const outcome: UploadOutcome = { uploadedIds: [], skipped: [], unreadable: 0, prefsNotCopied: 0 };
 
   for (const { entry, product } of loaded) {
+    // R71 R-4: only the products the person ticked (all of them when no selection is given).
+    if (selected && !selected.has(entry.id)) continue;
     if (!product) {
       outcome.unreadable++;
       continue;

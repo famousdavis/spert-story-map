@@ -46,7 +46,7 @@ function seedLocal(prefs: Record<string, unknown>) {
   const ps = [localProduct('l1', 'Local 1'), localProduct('l2', 'Local 2'), localProduct('l3', 'Local 3')];
   localStorage.setItem('rp:local:products_index', JSON.stringify(ps.map(p => ({ id: p.id, name: p.name }))));
   for (const p of ps) localStorage.setItem(`rp:local:product_${p.id}`, JSON.stringify(p));
-  localStorage.setItem('rp:local:preferences', JSON.stringify(prefs));
+  localStorage.setItem('rp:u:preferences', JSON.stringify(prefs));
 }
 /** The dashboard's tiles: every product u is a member of, sorted by the stored order. */
 function tiles(): string[] {

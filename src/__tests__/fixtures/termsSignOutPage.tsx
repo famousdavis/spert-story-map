@@ -39,10 +39,10 @@ export async function seed(uid: string, mode: 'local' | 'cloud', tosKey: string 
   const a = storage.createNewProduct('Signed-out Alpha');
   storage.saveProductImmediate(a);
   storage.saveProductImmediate(storage.createNewProduct('Signed-out Beta'));
-  storage.setStorageNamespace(uid);
+  // Written raw, as an earlier version kept it: since v0.56.1 the app writes products to rp:local only.
   const u = storage.createNewProduct('Made signed in');
-  storage.saveProductImmediate(u);
-  storage.setStorageNamespace('local');
+  localStorage.setItem(`rp:${uid}:product_${u.id}`, JSON.stringify(u));
+  localStorage.setItem(`rp:${uid}:products_index`, JSON.stringify([{ id: u.id, name: u.name, updatedAt: u.updatedAt }]));
   localStorage.setItem('rp:local:preferences', JSON.stringify({ exportName: 'Signed-out person', exportId: 'L-1' }));
   localStorage.setItem(`rp:${uid}:preferences`, JSON.stringify({ exportName: 'Signed-in person', exportId: 'U-1' }));
   localStorage.setItem(MODE_KEY, mode);

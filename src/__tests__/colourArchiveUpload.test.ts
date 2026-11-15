@@ -46,11 +46,11 @@ function seedLocal(projectPrefs: Prefs) {
   const ps = [localProduct('l1', 'Local 1'), localProduct('l2', 'Local 2'), localProduct('l3', 'Local 3')];
   localStorage.setItem('rp:local:products_index', JSON.stringify(ps.map(p => ({ id: p.id, name: p.name }))));
   for (const p of ps) localStorage.setItem(`rp:local:product_${p.id}`, JSON.stringify(p));
-  localStorage.setItem('rp:local:preferences', JSON.stringify({ projectOrder: ['l3', 'l1', 'l2'], projectPrefs }));
+  localStorage.setItem('rp:u:preferences', JSON.stringify({ projectOrder: ['l3', 'l1', 'l2'], projectPrefs }));
 }
 const settings = () => (h.fs.docs.get(SETTINGS) ?? {}) as { projectOrder?: string[]; projectPrefs?: Prefs; exportName?: string };
 const cloudPrefs = () => settings().projectPrefs ?? {};
-const localPrefs = () => (JSON.parse(localStorage.getItem('rp:local:preferences') ?? '{}') as { projectPrefs?: Prefs }).projectPrefs;
+const localPrefs = () => (JSON.parse(localStorage.getItem('rp:u:preferences') ?? '{}') as { projectPrefs?: Prefs }).projectPrefs;
 /** The cloud id the upload gave a local product, by its name. */
 const cloudId = (name: string) => req(
   [...h.fs.docs.entries()].find(([p, d]) => p.startsWith(PROJECTS) && d.name === name)?.[0].slice(PROJECTS.length), `cloud ${name}`);
