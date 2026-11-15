@@ -30,7 +30,12 @@ vi.mock('../lib/callables', () => ({
 }));
 
 import { signOutCleanup } from '../lib/signOutCleanup';
-import { setStorageNamespace } from '../lib/storage';
+import {
+  cancelPendingSaves,
+  createNewProduct,
+  saveProduct,
+  setStorageNamespace,
+} from '../lib/storage';
 import {
   registerDriverCleanup,
   clearDriverCleanup,
@@ -49,6 +54,7 @@ vi.stubGlobal('localStorage', {
 });
 
 beforeEach(() => {
+  vi.useRealTimers();
   localStorage.clear();
   firebaseSignOutMock.mockClear();
   clearDriverCleanup();
@@ -135,6 +141,10 @@ describe('signOutCleanup', () => {
   });
 
   it('preserves the academic integrity token and UI preferences', async () => {
+    // A uid namespace: at 'local' the cleanup removes nothing (v0.55.16), so this would pass
+    // whatever the cleanup did to these keys.
+    setStorageNamespace('test-user-uid');
+    localStorage.setItem('rp:test-user-uid:products_index', '[]');
     localStorage.setItem('rp_workspace_id', 'ws-persistent');
     localStorage.setItem('spert-theme', 'dark');
     localStorage.setItem('spert_firstRun_seen', 'true');
@@ -146,6 +156,43 @@ describe('signOutCleanup', () => {
     expect(localStorage.getItem('spert-theme')).toBe('dark');
     expect(localStorage.getItem('spert_firstRun_seen')).toBe('true');
     expect(localStorage.getItem('spert_map_hint_dismissed')).toBe('1');
+    expect(localStorage.getItem('rp:test-user-uid:products_index')).toBeNull();
+  });
+
+  it("at 'local' (a Terms sign-out) removes no product, index or preferences (v0.55.16)", async () => {
+    localStorage.setItem('rp:local:products_index', JSON.stringify([{ id: 'aaa', name: 'A' }]));
+    localStorage.setItem('rp:local:product_aaa', '{"id":"aaa"}');
+    localStorage.setItem('rp:local:preferences', '{"exportName":"Alice","exportId":"UF001"}');
+    localStorage.setItem(TOS_ACCEPTED_VERSION_KEY, 'old');
+
+    await signOutCleanup();
+
+    expect(localStorage.getItem('rp:local:products_index')).toBe(JSON.stringify([{ id: 'aaa', name: 'A' }]));
+    expect(localStorage.getItem('rp:local:product_aaa')).toBe('{"id":"aaa"}');
+    expect(localStorage.getItem('rp:local:preferences')).toBe('{"exportName":"Alice","exportId":"UF001"}');
+    // Still cleared on every sign-out (B-10), and the session still ends.
+    expect(localStorage.getItem(TOS_ACCEPTED_VERSION_KEY)).toBeNull();
+    expect(firebaseSignOutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("at 'local' writes a pending save before the driver cleanup can cancel it (v0.55.16)", async () => {
+    // Hold the 200 ms save timer, so only the cleanup can write the edit.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const product = { ...createNewProduct('Pending'), name: 'Pending (edited)' };
+    saveProduct(product);
+    const storedBefore = localStorage.getItem(`rp:local:product_${product.id}`);
+    let storedWhenCancelled: string | null = null;
+    registerDriverCleanup(async () => {
+      storedWhenCancelled = localStorage.getItem(`rp:local:product_${product.id}`);
+      cancelPendingSaves();
+    });
+
+    await signOutCleanup();
+
+    expect(storedBefore).toBeNull();
+    expect(storedWhenCancelled).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem(`rp:local:product_${product.id}`) ?? '{}').name).toBe('Pending (edited)');
+    vi.useRealTimers();
   });
 
   it('clears the Terms-acceptance flag so the next user is re-prompted (B-10)', async () => {

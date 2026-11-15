@@ -305,27 +305,6 @@ export interface StorageDriver {
 }
 
 // ---------------------------------------------------------------------------
-// Context value types
-// ---------------------------------------------------------------------------
-
-export interface AuthContextValue {
-  user: { uid: string; displayName: string | null; email: string | null } | null;
-  loading: boolean;
-  firebaseAvailable: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signInWithMicrosoft: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-export interface StorageContextValue {
-  driver: StorageDriver | null;
-  mode: StorageMode;
-  switchMode: (newMode: StorageMode) => void;
-  isCloudAvailable: boolean;
-  storageReady: boolean;
-}
-
-// ---------------------------------------------------------------------------
 // Settings & profiles
 // ---------------------------------------------------------------------------
 
