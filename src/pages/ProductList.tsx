@@ -252,6 +252,7 @@ export default function ProductList() {
   // Tile colour, Archive and "Show archived (N)" (v0.56.0): the person's own settings, never the product.
   const archive = useProductArchive({
     driver, products: order.sorted, settings: order.settings, rootRef: mainRef, newProductRef: newProjectRef, announce,
+    importOutcome: importPhase.tag === 'done' ? importPhase.outcome : null,
   });
 
   const handleCreate = async (name: string, desc: string) => {
@@ -368,7 +369,6 @@ export default function ProductList() {
   });
 
   const editTarget = dialog?.kind === 'edit' ? dialog : null;
-  const importArchived = importPhase.tag === 'done' ? archive.importNote(importPhase.outcome.written) : null;
 
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950">
@@ -450,7 +450,7 @@ export default function ProductList() {
             onSetDecision={setImportDecision}
             onConfirm={handleConfirmImport}
             onCancel={cancelImport}
-            archivedNote={importArchived}
+            archivedNote={archive.importNote}
           />
 
           {/* Cloud orphan warning */}

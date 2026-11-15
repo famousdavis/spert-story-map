@@ -85,6 +85,30 @@ describe('R84 on the Products page', () => {
     expect(tileNames()).toEqual(['B']);
   });
 
+  // F4 (Exec-CA-2's takeover): the line read the map this tab held since it loaded, so a product
+  // archived in another tab since was not named. One fresh read at the end of the import now.
+  it('a product archived in another tab since this one loaded is named, and the grid agrees', async () => {
+    const a = makeProject({ id: 'p-A', name: 'Alpha' });
+    seedLocal([a, makeProject({ id: 'p-B', name: 'B' })]);
+    setPrefs({});
+    renderPage();
+    await screen.findByText('Products');
+    await settle();
+    expect(tileNames()).toEqual(['Alpha', 'B']);
+    setPrefs({ 'p-A': { archived: true } }); // another tab archives Alpha
+    const reads = vi.spyOn(driver, 'loadPreferences');
+    await userEvent.upload(fileInput(), fileOf({ ...a, description: 'new' }));
+    await userEvent.click(within(await screen.findByRole('radiogroup', { name: 'Decision for Alpha' })).getByLabelText('Replace existing'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirm Import' }));
+    await screen.findByText(/replaced/);
+    await settle();
+    expect(screen.getByText('“Alpha” is archived: Show archived lists it.')).toBeTruthy();
+    expect(reads, 'one settings read for the import').toHaveBeenCalledTimes(1);
+    reads.mockRestore();
+    expect(tileNames()).toEqual(['B']);
+    expect(screen.getByRole('checkbox', { name: /^Show archived/ }).parentElement?.textContent).toBe('Show archived (1)');
+  });
+
   it('several: one line naming them', async () => {
     const a = makeProject({ id: 'p-A', name: 'Alpha' });
     const b = makeProject({ id: 'p-B', name: 'Beta' });

@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
 import {
-  canHoldPref, hasRoomFor, isArchived, prefEntries, prefOf, withPref,
+  canHoldPref, hasRoomFor, isArchived, prefEntries, prefOf, sanitizeProjectPrefs, withPref,
   type ProjectPref, type ProjectPrefs, type TileColor,
 } from '../lib/projectPrefs';
 import { REMOVE } from '../lib/prefEntries';
@@ -13,7 +13,7 @@ import {
 } from '../components/product/archive-text';
 import { focusAfterTileLeaves, resolveFocusTarget, type TileFocusTarget } from '../components/product/tile-focus';
 import type { FirstSettingsRead } from './useProjectOrder';
-import type { StorageDriver } from '../types';
+import type { ImportOutcome, StorageDriver } from '../types';
 
 interface Args<P> {
   driver: StorageDriver | null;
@@ -25,6 +25,8 @@ interface Args<P> {
   newProductRef: RefObject<HTMLButtonElement | null>;
   /** ProductList's own live region (R-3: no second one). */
   announce: (message: string) => void;
+  /** The finished import's outcome while its banner shows, else null (R84). */
+  importOutcome?: ImportOutcome | null;
 }
 
 /**
@@ -38,7 +40,7 @@ interface Args<P> {
  *   first. The map shown is what the first read gave plus this tab's own changes: no listener.
  */
 export function useProductArchive<P extends { id: string; name: string }>(
-  { driver, products, settings, rootRef, newProductRef, announce }: Args<P>,
+  { driver, products, settings, rootRef, newProductRef, announce, importOutcome = null }: Args<P>,
 ) {
   const [held, setHeld] = useState<{ base: ProjectPrefs; prefs: ProjectPrefs }>({ base: settings.prefs, prefs: settings.prefs });
   // A new read replaces what this tab holds (React's "storing information from previous renders").
@@ -49,6 +51,8 @@ export function useProductArchive<P extends { id: string; name: string }>(
   const [colorOpenFor, setColorOpenFor] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ target: TileFocusTarget } | null>(null);
+  /** R84: the settings read at the end of an import, for that import (`fresh` null: the read failed). */
+  const [importRead, setImportRead] = useState<{ outcome: ImportOutcome; fresh: ProjectPrefs | null } | null>(null);
 
   const archivedCount = useMemo(() => products.filter(p => isArchived(prefs, p.id)).length, [products, prefs]);
   if (showArchived && archivedCount === 0) setShowArchived(false);
@@ -65,6 +69,24 @@ export function useProductArchive<P extends { id: string; name: string }>(
   useEffect(() => {
     if (focusRequest) resolveFocusTarget(rootRef.current, focusRequest.target, newProductRef.current)?.focus();
   }, [focusRequest, rootRef, newProductRef]);
+
+  // R84 (F4): once an import finishes, one fresh read of the settings, so a product archived in
+  // another tab since this one loaded is named too. This tab then holds that map, so the grid and
+  // "Show archived (N)" agree with the line. Not while the first read has failed (R88).
+  useEffect(() => {
+    if (!importOutcome || !driver || settings.status !== 'ready') return;
+    let live = true;
+    driver.loadPreferences({ throwOnError: true }).then(
+      raw => {
+        if (!live) return;
+        const fresh = sanitizeProjectPrefs(raw.projectPrefs);
+        setHeld(h => ({ base: h.base, prefs: fresh }));
+        setImportRead({ outcome: importOutcome, fresh });
+      },
+      () => { if (live) setImportRead({ outcome: importOutcome, fresh: null }); },
+    );
+    return () => { live = false; };
+  }, [importOutcome, driver, settings.status]);
 
   /** Why colour and archive are off for this product, or null. */
   const disabledReason = useCallback((id: string): string | null => {
@@ -136,11 +158,12 @@ export function useProductArchive<P extends { id: string; name: string }>(
   const archiveId = useCallback((id: string) => { const p = shown.find(x => x.id === id); if (p) archive(p); }, [shown, archive]);
   const unarchiveId = useCallback((id: string) => { const p = shown.find(x => x.id === id); if (p) unarchive(p); }, [shown, unarchive]);
 
-  /** R84: the import banner's line for the products an import wrote that are archived, or null. */
-  const importNote = useCallback(
-    (written: readonly { id: string; name: string }[]) => importArchivedLine(written.filter(w => isArchived(prefs, w.id)).map(w => w.name)),
-    [prefs],
-  );
+  /** R84: the import banner's line for the products the import wrote that are archived, or null. */
+  const read = importRead && importRead.outcome === importOutcome ? importRead : null;
+  const importMap = read ? (read.fresh ?? prefs) : null;
+  const importNote = importMap && importOutcome
+    ? importArchivedLine(importOutcome.written.filter(w => isArchived(importMap, w.id)).map(w => w.name))
+    : null;
 
   const setColorOpen = useCallback((id: string, open: boolean) => {
     setColorOpenFor(current => (open ? id : current === id ? null : current));
