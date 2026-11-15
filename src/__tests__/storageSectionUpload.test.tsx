@@ -111,4 +111,14 @@ describe('StorageSection upload', () => {
     expect(h.switchMode).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Clear Local Data' })).toBeNull();
   });
+
+  it('switching to the cloud with nothing to upload, when the cloud cannot be reached: the line is red', async () => {
+    h.fs.setOffline(true);
+    render(<MemoryRouter><StorageSection /></MemoryRouter>);
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'Cloud (sync across devices)' })); });
+    const line = result('Could not connect');
+    expect(line.textContent).toBe('Could not connect to cloud storage. Please check your internet connection and try again.');
+    expect(line.className).toContain('text-red-500');
+    expect(h.switchMode).not.toHaveBeenCalled();
+  });
 });
