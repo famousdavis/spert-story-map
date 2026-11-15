@@ -237,6 +237,19 @@ describe('what recognition does not accept', () => {
     expect(r.owned()).toHaveLength(1);
   });
 
+  it.each([
+    ['both set (the control: it matches)', null, 1],
+    ['an empty `_originRef`', '_originRef', 2],
+    ['an empty `createdAt`', 'createdAt', 2],
+  ] as const)('a creation time and origin with %s, on both sides', async (_label, emptied, owned) => {
+    const id = await r.create('A', false);
+    if (emptied) r.patch(id, { [emptied]: '' });
+    const p = r.local(id);
+    r.put('c', { name: 'C', owner: U, members: { [U]: 'owner' }, createdAt: p.createdAt, _originRef: p._originRef, _changeLog: [] });
+    await r.upload();
+    expect(r.owned()).toHaveLength(owned);
+  });
+
   it("someone else's document holding this user's record with this product's history does not skip it", async () => {
     const id = await r.create('A');
     const p = r.local(id);

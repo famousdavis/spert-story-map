@@ -55,6 +55,8 @@ export function uploadRoutes(fs: Fs) {
       saveProductImmediate({ ...p, description: `${p.description}+`, _changeLog: appendChangeLogEntry(p, { op: 'add', entity: 'rib', id: `r${clock}` }) });
     },
     rename(id: string, name: string) { saveProductImmediate({ ...local(id), name }); },
+    /** Overwrite fields of the stored local product as they are (no changelog entry). */
+    patch(id: string, fields: Partial<Product>) { saveProductImmediate({ ...local(id), ...fields }); },
     async clone(id: string): Promise<string> {
       tick();
       const dup = { ...duplicateProduct(local(id)), name: `${local(id).name} (Copy)` };
