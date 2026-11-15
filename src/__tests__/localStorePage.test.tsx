@@ -103,6 +103,28 @@ describe('one Local store per browser', { timeout: 20_000 }, () => {
     expect(localStorage.getItem(`rp:u-other:product_${other.id}`)).not.toBeNull();
   });
 
+  it('an export name still waiting to be saved at Sign out is not written back after the export identity is removed (review -05, K31)', async () => {
+    fresh('local', TOS_VERSION);
+    localStorage.setItem('rp:u11:preferences', JSON.stringify({ projectOrder: ['x'] }));
+    S.record = TOS_VERSION;
+    S.current = user('u11');
+    const page = await load(S);
+    await settle(S);
+    fireEvent.click(screen.getByRole('button', { name: /Signed in as/ }));
+    const out = await screen.findByRole('button', { name: 'Sign out' });
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); // hold the 200 ms settings write: only the sign-out can write it
+    await page.driver()?.writePreferences([{ path: ['exportName'], value: 'Typed just before Sign out' }]);
+    expect(prefsOf('u11')).toEqual({ projectOrder: ['x'] }); // pending, not yet stored
+    fireEvent.click(out);
+    await settle(S);
+
+    expect(S.current).toBeNull();
+    expect(prefsOf('u11')).toEqual({ projectOrder: ['x'] });
+    const { loadPreferences } = await import('../lib/storage');
+    expect(loadPreferences('u11')).toEqual({ projectOrder: ['x'] });
+  });
+
   it('a Terms sign-out does not fold: the person’s rp:{uid} products stay where they were', async () => {
     fresh('local', OLD_EDITION);
     const kept = await keepIn('u3', 'Made signed in');

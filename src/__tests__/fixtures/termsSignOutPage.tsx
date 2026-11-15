@@ -69,10 +69,17 @@ export async function keepIn(ns: string, name: string): Promise<Product> {
   return p;
 }
 
-export interface Page { driver: () => StorageDriver | null }
+export interface Page {
+  driver: () => StorageDriver | null;
+  /** StorageProvider's `switchMode`, as App Settings calls it. */
+  switchMode: (mode: 'local' | 'cloud') => void;
+}
 
-/** Load the app at `at` with whatever Firebase holds (`s.current`). Call `vi.resetModules()` first for a fresh page. */
-export async function load(s: FirebaseStub, at = '/'): Promise<Page> {
+/**
+ * Load the app at `at` with whatever Firebase holds (`s.current`). Call `vi.resetModules()` first for a fresh page.
+ * `onDriver` is called with each driver StorageProvider makes, as the page receives it.
+ */
+export async function load(s: FirebaseStub, at = '/', onDriver?: (driver: StorageDriver) => void): Promise<Page> {
   cleanup();
   s.listeners.clear();
   s.runs = [];
@@ -82,10 +89,14 @@ export async function load(s: FirebaseStub, at = '/'): Promise<Page> {
   const { StorageProvider, useStorage } = await import('../../lib/StorageProvider');
   const App = (await import('../../App')).default;
   const { MemoryRouter } = await import('react-router-dom');
-  const held: { driver: StorageDriver | null } = { driver: null };
+  const held: { driver: StorageDriver | null; switchMode: Page['switchMode'] } = { driver: null, switchMode: () => {} };
   function Hold() {
-    const { driver } = useStorage();
-    useEffect(() => { held.driver = driver; }, [driver]);
+    const { driver, switchMode } = useStorage();
+    useEffect(() => {
+      held.driver = driver;
+      if (driver) onDriver?.(driver);
+    }, [driver]);
+    useEffect(() => { held.switchMode = switchMode; }, [switchMode]);
     return null;
   }
   render(
@@ -95,7 +106,7 @@ export async function load(s: FirebaseStub, at = '/'): Promise<Page> {
   );
   // AuthProvider's observer is called on a 0 ms timer set while it rendered; this one fires after it.
   await act(async () => { await new Promise(r => setTimeout(r, 0)); });
-  return { driver: () => held.driver };
+  return { driver: () => held.driver, switchMode: mode => held.switchMode(mode) };
 }
 
 /**

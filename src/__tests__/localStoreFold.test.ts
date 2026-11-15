@@ -24,8 +24,9 @@ function keep(ns: string, p: Product, indexed = true): void {
 }
 const listed = () => (JSON.parse(localStorage.getItem('rp:local:products_index') ?? '[]') as { name: string }[]).map(e => e.name).sort();
 const keys = (ns: string) => Object.keys(localStorage).filter(k => k.startsWith(`rp:${ns}:product_`)).length;
+/** A product made in the past: a copy that restamped `createdAt` with the time of the fold cannot match it (review -05, K12). */
 function made(name: string): Product {
-  const p = storage.createNewProduct(name);
+  const p = { ...storage.createNewProduct(name), createdAt: '2026-01-05T09:30:00.000Z' };
   return { ...p, _changeLog: storage.appendChangeLogEntry(p, { op: 'add', entity: 'theme', id: 't1' }) };
 }
 
@@ -255,6 +256,29 @@ describe('the fold', () => {
     foldOwnProducts(U);
     expect({ theirs: keys('uB'), listed: listed() }).toEqual({ theirs: 1, listed: ['Mine'] });
     expect(foldOwnProducts('local')).toEqual({ moved: 0, copies: 0, unreadable: 0, stopped: false });
+  });
+
+  it('a fold that stops part way still takes the person’s colour and order to the copies it made (review -05, K27)', () => {
+    const p = made('Lab 3');
+    const q = made('Lab 4');
+    keep('local', { ...p, description: 'someone else’s copy' });
+    keep('local', { ...q, description: 'someone else’s copy' });
+    keep(U, p);
+    keep(U, q);
+    localStorage.setItem(`rp:${U}:preferences`, JSON.stringify({ projectOrder: [p.id, q.id], projectPrefs: { [p.id]: { color: 'rose' }, [q.id]: { color: 'teal' } } }));
+    let copiesWritten = 0;
+    const setItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      const copy = k.startsWith('rp:local:product_') && k !== `rp:local:product_${p.id}` && k !== `rp:local:product_${q.id}`;
+      if (copy && ++copiesWritten === 2) throw new DOMException('full', 'QuotaExceededError');
+      setItem.call(this, k, v);
+    });
+    expect(foldOwnProducts(U)).toEqual({ moved: 1, copies: 1, unreadable: 0, stopped: true });
+    const index = JSON.parse(localStorage.getItem('rp:local:products_index') ?? '[]') as { id: string; name: string }[];
+    const to = index.find(e => e.name === 'Lab 3 (Copy)')?.id ?? 'no copy';
+    expect(JSON.parse(localStorage.getItem(`rp:${U}:preferences`) ?? '{}')).toEqual({
+      projectOrder: [to, q.id], projectPrefs: { [to]: { color: 'rose' }, [q.id]: { color: 'teal' } },
+    });
   });
 
   it('a copy under a fresh id takes the person’s tile order, colour and archive with it; the old id’s AI record is ended', async () => {
