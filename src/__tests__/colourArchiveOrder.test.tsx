@@ -56,7 +56,7 @@ async function openOrder(driver: StorageDriver, list = P) {
   return hook;
 }
 type Hook = Awaited<ReturnType<typeof openOrder>>;
-const shown = (hook: Hook) => hook.result.current.sorted.map(p => p.id);
+const shown = (hook: { result: { current: { sorted: { id: string }[] } } }) => hook.result.current.sorted.map(p => p.id);
 /** `moveOnto` returns a promise from v0.56.0 and nothing before: awaiting undefined is harmless. */
 const drop = (hook: Hook, from: string, to: string, hidden?: ReadonlySet<string>) =>
   act(async () => { await (hook.result.current.moveOnto as (a: string, b: string, h?: ReadonlySet<string>) => unknown)(from, to, hidden); });
@@ -215,6 +215,30 @@ describe('cloud: a failed read', () => {
     await wait(0);
     expect(A.result.current.settings.status).toBe('ready');
     expect(shown(A)).toEqual(['p4', 'p3', 'p2', 'p1']);
+  });
+
+  // PR #245 review -08: a sign-in swaps the driver while the retry after a failed first read is
+  // out, and the new driver's first read fails too. What the old driver then answers must not
+  // become the new driver's order or settings (it left the grid on "Loading" for good).
+  it('the retry after a failed first read: an answer that arrives after a driver swap is dropped', async () => {
+    let answerRetry: (prefs: { projectOrder: string[] }) => void = () => {};
+    let calls = 0;
+    const old = { loadPreferences: () => (++calls === 1
+      ? Promise.reject(unavailable())
+      : new Promise(r => { answerRetry = r; })) } as unknown as StorageDriver;
+    const next = { loadPreferences: () => Promise.reject(unavailable()) } as unknown as StorageDriver;
+    const hook = renderHook(({ d }) => useProjectOrder(d, P), { initialProps: { d: old } });
+    await wait(0);
+    expect(hook.result.current.settings.status).toBe('failed');
+    act(() => { hook.result.current.listed(P, hook.result.current.refreshStarted()); });
+    expect(calls, 'the retry is out').toBe(2);
+    hook.rerender({ d: next });
+    await wait(0);
+    expect(hook.result.current.settings.status).toBe('failed');
+    await act(async () => { answerRetry({ projectOrder: ['p4', 'p3', 'p2', 'p1'] }); });
+    await wait(0);
+    expect(hook.result.current.settings.status).toBe('failed');
+    expect(shown(hook)).toEqual(['p1', 'p2', 'p3', 'p4']);
   });
 
   it('the strict read: a failure is told apart from an empty document', async () => {

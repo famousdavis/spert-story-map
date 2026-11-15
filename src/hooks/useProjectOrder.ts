@@ -58,6 +58,8 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
   const pendingRef = useRef<Move[]>([]);
   /** The first read's state, for `listed`, which must stay stable: `refresh` depends on it. */
   const failedForRef = useRef<StorageDriver | null>(null);
+  /** The driver now in use, for a read that answers after a swap (review -08). */
+  const driverRef = useRef<StorageDriver | null>(null);
 
   const sorted = useMemo(() => sortByOrder(products, projectOrder), [products, projectOrder]);
   const settings: FirstSettingsRead = read.driver === driver ? read : { status: 'loading', prefs: EMPTY };
@@ -76,6 +78,7 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
 
   // The first read, once per driver. Strict (R88): a failure is not an empty document.
   useEffect(() => {
+    driverRef.current = driver;
     if (!driver) return;
     let live = true;
     everReadRef.current = false;
@@ -141,7 +144,8 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
   /**
    * A refresh's list arrived. An in-flight clone leaves the pool once listed, or once its create
    * settled before this refresh began: a create that failed is never listed, and must not hold its
-   * name and place for ever. After a failed first read (R88), each refresh reads the settings again.
+   * name and place for ever. After a failed first read (R88), each refresh reads the settings again;
+   * what it reads is taken only if this is still the driver in use (a sign-in can swap it meanwhile).
    */
   const listed = useCallback((list: P[], gen: number) => {
     const ids = new Set(list.map(p => p.id));
@@ -153,7 +157,7 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
     if (driver && failedForRef.current === driver && !retryingRef.current) {
       retryingRef.current = true;
       driver.loadPreferences({ throwOnError: true })
-        .then(prefs => { if (!everReadRef.current) took(driver, prefs); }, () => {})
+        .then(prefs => { if (driverRef.current === driver && !everReadRef.current) took(driver, prefs); }, () => {})
         .finally(() => { retryingRef.current = false; });
     }
   }, [driver, orderFrom, took]);
