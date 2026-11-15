@@ -83,6 +83,14 @@ describe('Delete (R-5) and focus (R-4, R86)', () => {
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Unarchive and open Structure for A');
   });
 
+  // PR #245 review -04 (KB26): with a tile on each side, the next one wins.
+  it('Archive moves focus to the next tile, not the previous one', async () => {
+    await show(['A', 'B', 'C']);
+    await userEvent.click(button('B', 'Archive B'));
+    await settle();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Open Structure for C');
+  });
+
   it('R-4: Archive moves focus past a hidden tile to the next shown one', async () => {
     await show(['A', 'H', 'B'], { 'p-H': { archived: true } });
     await userEvent.click(button('A', 'Archive A'));

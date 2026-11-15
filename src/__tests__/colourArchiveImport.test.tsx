@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe('R84 on the Products page', () => {
-  async function importOver(stored: Product[], prefs: Prefs, file: unknown, replace: string[]) {
+  async function importOver(stored: Product[], prefs: Prefs, file: unknown, replace: string[], done = /replaced/) {
     seedLocal(stored);
     setPrefs(prefs);
     renderPage();
@@ -64,9 +64,18 @@ describe('R84 on the Products page', () => {
       await userEvent.click(within(await screen.findByRole('radiogroup', { name: `Decision for ${name}` })).getByLabelText('Replace existing'));
     }
     await userEvent.click(await screen.findByRole('button', { name: 'Confirm Import' }));
-    await screen.findByText(/replaced/);
+    await screen.findByText(done);
     await settle();
   }
+
+  // PR #245 review -04 (KB14): an entry can outlive its product (removed elsewhere, no delete here),
+  // and an import that ADDS that product back writes an archived product too.
+  it('an added product that is archived stays archived, and the banner says so', async () => {
+    const a = makeProject({ id: 'p-A', name: 'Alpha' });
+    await importOver([makeProject({ id: 'p-B', name: 'B' })], { 'p-A': { archived: true } }, a, [], /1 added/);
+    expect(screen.getByText('“Alpha” is archived: Show archived lists it.')).toBeTruthy();
+    expect(tileNames()).toEqual(['B']);
+  });
 
   it('a replaced product that is archived stays archived, and the banner says so', async () => {
     const a = makeProject({ id: 'p-A', name: 'Alpha' });
@@ -99,12 +108,12 @@ describe('R84 on the Products page', () => {
 });
 
 describe('R84 on Settings → Data', () => {
-  async function replaceOpen(prefs: Prefs) {
+  async function replaceOpen(prefs: Prefs, fileId?: string) {
     seedLocal([makeProject({ id: 'p-A', name: 'Alpha' })]);
     setPrefs(prefs);
     const product = req(await driver.loadProduct('p-A'), 'product');
     render(<DataSection product={product} driver={driver} updateProduct={() => {}} />);
-    await userEvent.upload(fileInput(), fileOf({ ...product, name: 'Alpha 2' }));
+    await userEvent.upload(fileInput(), fileOf({ ...product, id: fileId ?? product.id, name: 'Alpha 2' }));
     await userEvent.click(await screen.findByRole('button', { name: /replace all data/i }));
     await waitFor(() => expect(screen.queryByRole('button', { name: /replace all data/i })).toBeNull());
     await settle();
@@ -118,6 +127,18 @@ describe('R84 on Settings → Data', () => {
 
   it('control: not archived, no line', async () => {
     await replaceOpen({ 'p-A': { color: 'pink' } });
+    expect(screen.queryByText(/is archived/)).toBeNull();
+  });
+
+  // PR #245 review -04 (KB50): the replace writes over the OPEN product, so its id decides, never
+  // the file's.
+  it('a file with another id: the open product\'s archive decides', async () => {
+    await replaceOpen({ 'p-A': { archived: true } }, 'p-file');
+    expect(screen.getByText('“Alpha 2” is archived: Show archived on the Products page lists it.')).toBeTruthy();
+  });
+
+  it('a file with another id that is archived: the open product is not, so no line', async () => {
+    await replaceOpen({ 'p-file': { archived: true } }, 'p-file');
     expect(screen.queryByText(/is archived/)).toBeNull();
   });
 });

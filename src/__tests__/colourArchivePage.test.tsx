@@ -104,6 +104,19 @@ describe('Archive (R-3)', () => {
     expect(storedPrefs()).toEqual({});
   });
 
+  // PR #245 review -04 (KB20): the box goes off when N returns to 0, so the next Archive hides.
+  it('once N returns to 0 the box is off: a product archived after that leaves the grid', async () => {
+    await show(['A', 'B'], { 'p-A': { archived: true } });
+    await userEvent.click(req(box(), 'box'));
+    await userEvent.click(button('A', 'Unarchive A'));
+    await settle();
+    expect(box()).toBeNull();
+    await userEvent.click(button('B', 'Archive B'));
+    await settle();
+    expect(tileNames()).toEqual(['A']);
+    expect((req(box(), 'box') as HTMLInputElement).checked).toBe(false);
+  });
+
   it('every product archived and the box off: the line, not the welcome panel', async () => {
     await show(['A'], { 'p-A': { archived: true } });
     expect(screen.getByText('All products are archived. Select "Show archived (1)" to see them.')).toBeTruthy();
@@ -129,6 +142,33 @@ describe('Archive (R-3)', () => {
     await settle();
     flushPendingSaves();
     expect(JSON.parse(localStorage.getItem('rp:local:preferences')!).projectOrder).toEqual(['p-B', 'p-H', 'p-A', 'p-C']);
+  });
+});
+
+// PR #245 review -04 (KB44): with the box ticked, an archived tile is a tile like any other.
+describe('Show archived ticked: archived tiles can be dragged and dropped on', () => {
+  const dt = { setData: vi.fn(), setDragImage: vi.fn(), dropEffect: '', effectAllowed: '' };
+  function dragOnto(from: string, to: string) {
+    fireEvent.dragStart(req(tileOf(from).querySelector('[draggable="true"]'), `grip ${from}`), { dataTransfer: dt });
+    fireEvent.dragOver(tileOf(to), { dataTransfer: dt });
+    fireEvent.drop(tileOf(to), { dataTransfer: dt });
+  }
+  const storedOrder = () => { flushPendingSaves(); return JSON.parse(localStorage.getItem('rp:local:preferences')!).projectOrder; };
+
+  it('an archived tile dropped on another, then a tile dropped on the archived one', async () => {
+    seed(['A', 'H', 'B'], { 'p-H': { archived: true } });
+    const prefs = JSON.parse(localStorage.getItem('rp:local:preferences')!);
+    localStorage.setItem('rp:local:preferences', JSON.stringify({ ...prefs, projectOrder: ['p-A', 'p-H', 'p-B'] }));
+    renderPage();
+    await screen.findByRole('list', { name: 'Products' });
+    await settle();
+    await userEvent.click(req(box(), 'box'));
+    dragOnto('H', 'A');
+    await settle();
+    expect(storedOrder()).toEqual(['p-H', 'p-A', 'p-B']);
+    dragOnto('B', 'H');
+    await settle();
+    expect(storedOrder()).toEqual(['p-B', 'p-H', 'p-A']);
   });
 });
 
