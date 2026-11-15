@@ -4,7 +4,7 @@
 
 import { signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from './firebase';
-import { clearAllLocalProducts, flushPendingSaves, getActiveNamespace } from './storage';
+import { flushPendingSaves, getActiveNamespace, removeExportIdentity } from './storage';
 import { runDriverCleanup } from './driverCleanupRegistry';
 import { clearTosAcceptance } from './tosHelpers';
 import { endAiSessionForSignOut } from './aiSessionTeardown';
@@ -20,18 +20,18 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
  * Single source of truth for sign-out cleanup.
  *
  * Sequence (enforced ordering):
- *   0. When the active namespace is 'local', write any pending local save
- *      first (v0.55.16): those are this browser's own writes, made while
- *      signed out, and step 1 would cancel them.
+ *   0. Write any pending local save first, on every path (v0.56.1, R71 R-2;
+ *      only at 'local' from v0.55.16): products live in rp:local, signed in
+ *      or not, and step 1 would cancel the write. Local writes only.
  *   1. Run driver teardown via the registry (cancelPendingSaves +
  *      tearDownListeners). The registry decouples this from React
  *      context — StorageProvider registers the teardown on every
  *      driver swap, so AuthProvider's ToS-failure branches can fire
  *      it without holding a driver reference.
- *   2. Clear every product key in the active namespace, unless it is 'local'.
- *   3. Clear the namespaced products index (covered by step 2 in
- *      practice; explicit here for the edge case of an orphaned index).
- *   4. Clear the namespaced preferences key (contains Export Attribution PII).
+ *   2-4. At a uid, remove the person's export name and identifier from
+ *      their own settings, directly and synchronously, and keep the rest
+ *      (v0.56.1, R-2, R91). No product key is removed in any namespace:
+ *      rp:local is this browser's one product store.
  *   5. Reset persisted storage mode to 'local'. If switchMode is
  *      provided (UI-initiated sign-out), use it so React state stays
  *      in sync; otherwise write directly to localStorage (used by
@@ -48,15 +48,15 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
  *
  * Steps 2-4 run only for a uid namespace (v0.55.16, Scheduler's WI-118 guard).
  * The Sign out button runs with the signed-in person's uid active. The Terms
- * sign-outs in AuthProvider run before setUser, while the active namespace is
- * still 'local' (this browser's signed-out store): until v0.55.16 they deleted
- * the products, export name and identifier kept there. Now they clear neither
- * store; the person's own rp:{uid} is kept too.
+ * sign-outs in AuthProvider run before setUser, while the preferences
+ * namespace is still 'local', so they remove nothing; that person's export
+ * identity stays in their own rp:{uid}:preferences, which no one else reads.
  *
  * Preserved (must NOT be cleared):
  *   - rp_workspace_id (per-browser academic integrity token)
  *   - spert-theme, spert_firstRun_seen, spert_map_hint_dismissed (UI prefs)
- *   - rp:local:* keys (this browser's signed-out store), on every path
+ *   - every product key and products index, on every path (v0.56.1)
+ *   - the rest of the person's settings (tile order, colour, archive, caution switch)
  *
  * Cleared (B-10): spert_tos_accepted_version, via clearTosAcceptance. Keeping
  * it across sign-out let the next person on a shared browser be treated as
@@ -75,25 +75,21 @@ const STORAGE_MODE_KEY = 'spert-storage-mode';
 export async function signOutCleanup(
   switchMode?: ((mode: StorageMode) => void) | null,
 ): Promise<void> {
-  // 0. A Terms sign-out ('local' active): write this browser's pending saves
-  //    rather than let step 1 cancel them. Local writes only, so nothing
-  //    reaches the cloud after the sign-out.
+  // 0. Write this browser's pending saves rather than let step 1 cancel them,
+  //    on every path (v0.56.1). Local writes only, so nothing reaches the cloud
+  //    after the sign-out.
   const ns = getActiveNamespace();
-  if (ns === 'local') flushPendingSaves();
+  flushPendingSaves();
 
   // 1. Driver teardown via registry — cancels pending writes + detaches
   //    onSnapshot listeners. The registry is a leaf module (no imports of
   //    its own), so static import is cycle-safe.
   await runDriverCleanup();
 
-  // 2-4. Clear the signed-in user's namespaced state. getActiveNamespace
-  //      returns the uid when signed in; 'local' is this browser's
-  //      signed-out store and is never cleared (v0.55.16).
-  if (ns !== 'local') {
-    clearAllLocalProducts(ns);
-    localStorage.removeItem(`rp:${ns}:products_index`);
-    localStorage.removeItem(`rp:${ns}:preferences`);
-  }
+  // 2-4. At a uid: the export name and identifier leave the person's own
+  //      settings; the rest stays for their next sign-in (R91). No product is
+  //      removed (v0.56.1, R71).
+  if (ns !== 'local') removeExportIdentity(ns);
 
   // 4b. Reset Terms acceptance (B-10) so the next person to sign in is shown
   //     the Terms. See the header note for why this is cleared here.

@@ -33,6 +33,8 @@ import ProjectDialog, { type ProjectEdits } from '../components/product/ProjectD
 import DeleteProjectDialog from '../components/product/DeleteProjectDialog';
 import { findTile, findTileControl } from '../components/product/tile-focus';
 import ShareDialog from '../components/product/ShareDialog';
+import { LocalSignedInLine, LocalOrphanNote } from '../components/product/LocalStoreNotes';
+import { useExportAll } from '../components/product/useExportAll';
 import { Footer } from './ChangelogView';
 import type { MemberRole, Product, StorageDriver } from '../types';
 
@@ -103,6 +105,8 @@ export default function ProductList() {
   const deleteConfirmedRef = useRef(false);
 
   const order = useProjectOrder(driver, products);
+  // R71 R-6: Export All bundles every product the driver lists; in Local mode that is everyone's.
+  const exportAll = useExportAll(driver, mode === 'local', products.length, () => { if (driver) void exportAllProductsBundled(driver, driver.getWorkspaceId()); });
   const { refreshStarted, listed } = order;
   // v0.56.0 (R-3): the grid waits for the first settings read too, so an archived tile never shows
   // and then vanishes.
@@ -128,11 +132,9 @@ export default function ProductList() {
       listed(detailed, gen);
       setProducts(detailed);
       if (mode === 'cloud') setCloudDataLoaded(true);
-      // In cloud mode, detect local projects that weren't migrated. Explicit
-      // 'local' override — the active namespace is the cloud user's uid here,
-      // so the default-namespace read would return that user's local-mode
-      // cache (signed-in users can technically have a per-uid local cache),
-      // not the anonymous-session orphans we want to surface a banner for.
+      // In cloud mode, detect local projects that weren't migrated: rp:local, this browser's
+      // one product store since v0.56.1 (R71), which is also the default; 'local' is kept
+      // explicit so the read cannot follow any future namespace binding.
       if (mode === 'cloud' && detailed.length === 0) {
         setLocalOrphanCount(loadLocalIndex('local').length);
       } else {
@@ -434,7 +436,7 @@ export default function ProductList() {
             hasProjects={products.length > 0}
             importDisabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
             newProjectRef={newProjectRef}
-            onExportAll={() => driver && exportAllProductsBundled(driver, driver.getWorkspaceId())}
+            onExportAll={exportAll.onExportAll}
             onImport={() => fileInputRef.current?.click()}
             onLoadSample={() => handleLoadSample(false)}
             onNewProject={openNew}
@@ -453,15 +455,11 @@ export default function ProductList() {
             archivedNote={archive.importNote}
           />
 
+          <LocalSignedInLine show={mode === 'local' && !!user} />
+          {exportAll.dialog}
+
           {/* Cloud orphan warning */}
-          {localOrphanCount > 0 && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg px-4 py-3 mb-6">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
-                Your cloud account has no products, but you have {localOrphanCount} product{localOrphanCount !== 1 ? 's' : ''} stored locally.
-                Go to App Settings → Storage to upload them, or switch back to Local mode.
-              </p>
-            </div>
-          )}
+          <LocalOrphanNote count={localOrphanCount} />
 
           <ProductsBody
             loading={loading}

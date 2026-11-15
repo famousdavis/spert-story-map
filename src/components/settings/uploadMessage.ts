@@ -14,7 +14,7 @@ import { MAX_PROJECT_PREFS } from '../../lib/projectPrefs';
 export type StorageStatus = 'ok' | 'notice' | 'error';
 export interface StorageMessage { status: StorageStatus; text: string }
 
-/** At most this many skipped products are named; the rest are counted. */
+/** At most this many products are named in one list (skipped, not ticked, or to be cleared); the rest are counted. */
 const MAX_NAMED = 10;
 
 export const STATUS_CLASS: Record<StorageStatus, string> = {
@@ -30,10 +30,15 @@ export const UPLOAD_STOPPED: StorageMessage = {
   text: 'The upload stopped before it finished. Products it had already uploaded are in the cloud, and uploading again will not add them twice.',
 };
 
+/** At most MAX_NAMED of these, each already quoted, then "and N more". */
+function nameList(quoted: string[]): string {
+  const more = quoted.length > MAX_NAMED ? ` and ${quoted.length - MAX_NAMED} more` : '';
+  return `${quoted.slice(0, MAX_NAMED).join(', ')}${more}`;
+}
+
 function skippedLine(skipped: UploadOutcome['skipped']): string {
-  const named = skipped.slice(0, MAX_NAMED).map(s => (s.cloudName === s.name ? `“${s.name}”` : `“${s.name}” (in the cloud as “${s.cloudName}”)`));
-  const more = skipped.length > MAX_NAMED ? ` and ${skipped.length - MAX_NAMED} more` : '';
-  return `Already in the cloud, so not uploaded again: ${named.join(', ')}${more}. This browser still has its own copy of each, which may differ from the cloud version.`;
+  const named = skipped.map(s => (s.cloudName === s.name ? `“${s.name}”` : `“${s.name}” (in the cloud as “${s.cloudName}”)`));
+  return `Already in the cloud, so not uploaded again: ${nameList(named)}. This browser still has its own copy of each, which may differ from the cloud version.`;
 }
 
 function headline({ uploadedIds, skipped }: UploadOutcome): string {
@@ -41,8 +46,13 @@ function headline({ uploadedIds, skipped }: UploadOutcome): string {
   return skipped.length > 0 ? 'No new products to upload.' : 'No products uploaded.';
 }
 
-export function uploadMessage(outcome: UploadOutcome): StorageMessage {
+/**
+ * `stayed`: the names of the products the person did not tick (v0.56.1, R71 R-4), which stay in
+ * this browser only.
+ */
+export function uploadMessage(outcome: UploadOutcome, stayed: readonly string[] = []): StorageMessage {
   const lines = [headline(outcome)];
+  if (stayed.length > 0) lines.push(`Not ticked, so kept in this browser only: ${nameList(stayed.map(n => `“${n}”`))}.`);
   if (outcome.skipped.length > 0) lines.push(skippedLine(outcome.skipped));
   if (outcome.unreadable > 0) {
     lines.push(`${products(outcome.unreadable)} could not be read and ${outcome.unreadable === 1 ? 'was' : 'were'} not uploaded.`);
@@ -54,10 +64,17 @@ export function uploadMessage(outcome: UploadOutcome): StorageMessage {
   return { status: allSent ? 'ok' : 'notice', text: lines.join(' ') };
 }
 
-/** The clear offered after an upload, or null when nothing was uploaded (R72: it removes only what was sent). */
-export function clearOfferMessage(outcome: UploadOutcome): string | null {
-  if (outcome.uploadedIds.length === 0) return null;
-  const ask = 'Your uploaded products are now in the cloud. Clear their copies from this browser?';
-  const keptAny = outcome.skipped.length > 0 || outcome.unreadable > 0;
+/**
+ * The clear offered after an upload, or null when nothing was uploaded (R72: it removes only what was
+ * sent). It names what it removes and says everyone using this browser loses it (v0.56.1, R71 R-4):
+ * the products in this browser are everyone's.
+ */
+export function clearOfferMessage(outcome: UploadOutcome, uploadedNames: readonly string[] = [], stayedAny = false): string | null {
+  const n = outcome.uploadedIds.length;
+  if (n === 0) return null;
+  const one = n === 1;
+  const what = uploadedNames.length > 0 ? nameList(uploadedNames.map(x => `“${x}”`)) : `the ${one ? 'uploaded product' : 'uploaded products'}`;
+  const ask = `Remove ${what} from this browser? ${one ? 'It is' : 'They are'} now in your cloud account. Everyone who uses this browser will no longer have ${one ? 'it' : 'them'} here.`;
+  const keptAny = outcome.skipped.length > 0 || outcome.unreadable > 0 || stayedAny;
   return keptAny ? `${ask} The products that were not uploaded stay in this browser.` : ask;
 }

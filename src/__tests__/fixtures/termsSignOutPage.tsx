@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 import { vi } from 'vitest';
 import type { FirebaseStub } from './termsSignOutFirebase';
-import type { StorageDriver } from '../../types';
+import type { Product, StorageDriver } from '../../types';
 
 /** The edition an out-of-date acceptance names. Written out: the current one is read from tosConstants. */
 export const OLD_EDITION = '10-05-2026';
@@ -39,10 +39,10 @@ export async function seed(uid: string, mode: 'local' | 'cloud', tosKey: string 
   const a = storage.createNewProduct('Signed-out Alpha');
   storage.saveProductImmediate(a);
   storage.saveProductImmediate(storage.createNewProduct('Signed-out Beta'));
-  storage.setStorageNamespace(uid);
+  // Written raw, as an earlier version kept it: since v0.56.1 the app writes products to rp:local only.
   const u = storage.createNewProduct('Made signed in');
-  storage.saveProductImmediate(u);
-  storage.setStorageNamespace('local');
+  localStorage.setItem(`rp:${uid}:product_${u.id}`, JSON.stringify(u));
+  localStorage.setItem(`rp:${uid}:products_index`, JSON.stringify([{ id: u.id, name: u.name, updatedAt: u.updatedAt }]));
   localStorage.setItem('rp:local:preferences', JSON.stringify({ exportName: 'Signed-out person', exportId: 'L-1' }));
   localStorage.setItem(`rp:${uid}:preferences`, JSON.stringify({ exportName: 'Signed-in person', exportId: 'U-1' }));
   localStorage.setItem(MODE_KEY, mode);
@@ -51,10 +51,35 @@ export async function seed(uid: string, mode: 'local' | 'cloud', tosKey: string 
   return { uid, localId: a.id, uidId: u.id };
 }
 
-export interface Page { driver: () => StorageDriver | null }
+/** A fresh browser: empty storage, the stored mode, the welcome banner seen, and the Terms cache. */
+export function fresh(mode: 'local' | 'cloud', tos: string | null): void {
+  localStorage.clear();
+  localStorage.setItem(MODE_KEY, mode);
+  localStorage.setItem('spert_firstRun_seen', '1');
+  if (tos) localStorage.setItem(TOS_KEY, tos);
+}
 
-/** Load the app at `at` with whatever Firebase holds (`s.current`). Call `vi.resetModules()` first for a fresh page. */
-export async function load(s: FirebaseStub, at = '/'): Promise<Page> {
+/** A product kept in rp:{ns} the way an earlier version wrote it (raw: the app now writes products to rp:local only). */
+export async function keepIn(ns: string, name: string): Promise<Product> {
+  const { createNewProduct } = await import('../../lib/storage');
+  const p = createNewProduct(name);
+  localStorage.setItem(`rp:${ns}:product_${p.id}`, JSON.stringify(p));
+  const idx = JSON.parse(localStorage.getItem(`rp:${ns}:products_index`) ?? '[]') as unknown[];
+  localStorage.setItem(`rp:${ns}:products_index`, JSON.stringify([...idx, { id: p.id, name, updatedAt: p.updatedAt }]));
+  return p;
+}
+
+export interface Page {
+  driver: () => StorageDriver | null;
+  /** StorageProvider's `switchMode`, as App Settings calls it. */
+  switchMode: (mode: 'local' | 'cloud') => void;
+}
+
+/**
+ * Load the app at `at` with whatever Firebase holds (`s.current`). Call `vi.resetModules()` first for a fresh page.
+ * `onDriver` is called with each driver StorageProvider makes, as the page receives it.
+ */
+export async function load(s: FirebaseStub, at = '/', onDriver?: (driver: StorageDriver) => void): Promise<Page> {
   cleanup();
   s.listeners.clear();
   s.runs = [];
@@ -64,10 +89,14 @@ export async function load(s: FirebaseStub, at = '/'): Promise<Page> {
   const { StorageProvider, useStorage } = await import('../../lib/StorageProvider');
   const App = (await import('../../App')).default;
   const { MemoryRouter } = await import('react-router-dom');
-  const held: { driver: StorageDriver | null } = { driver: null };
+  const held: { driver: StorageDriver | null; switchMode: Page['switchMode'] } = { driver: null, switchMode: () => {} };
   function Hold() {
-    const { driver } = useStorage();
-    useEffect(() => { held.driver = driver; }, [driver]);
+    const { driver, switchMode } = useStorage();
+    useEffect(() => {
+      held.driver = driver;
+      if (driver) onDriver?.(driver);
+    }, [driver]);
+    useEffect(() => { held.switchMode = switchMode; }, [switchMode]);
     return null;
   }
   render(
@@ -77,7 +106,7 @@ export async function load(s: FirebaseStub, at = '/'): Promise<Page> {
   );
   // AuthProvider's observer is called on a 0 ms timer set while it rendered; this one fires after it.
   await act(async () => { await new Promise(r => setTimeout(r, 0)); });
-  return { driver: () => held.driver };
+  return { driver: () => held.driver, switchMode: mode => held.switchMode(mode) };
 }
 
 /**

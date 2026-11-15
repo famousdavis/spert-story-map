@@ -13,6 +13,7 @@ import { exportAllProducts } from '../../lib/importExport';
 import { signOutCleanup } from '../../lib/signOutCleanup';
 import { Section } from '../ui/Section';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import UploadChoiceDialog, { type UploadRow } from './UploadChoiceDialog';
 import TosConsentModal from './TosConsentModal';
 import { useSignInWithTosGate } from '../../hooks/useSignInWithTosGate';
 import { normalizeDisplayName } from '../../lib/userDisplay';
@@ -32,16 +33,33 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   const [migrating, setMigrating] = useState(false);
   const [migrateResult, setMigrateResult] = useState<StorageMessage | null>(null);
   const [lastUpload, setLastUpload] = useState<UploadOutcome | null>(null);
+  /** The products listed when the dialog opened (R71 R-4), and the clear's names after an upload. */
+  const [uploadRows, setUploadRows] = useState<UploadRow[]>([]);
+  const [clearText, setClearText] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const tos = useSignInWithTosGate();
 
   // Don't render if Firebase is not configured
   if (!isCloudAvailable || !firebaseAvailable) return null;
 
-  // Explicit 'local' override — the local-projects count for the migration
-  // banner must reflect the anonymous-session cache, not the signed-in
-  // user's per-uid local cache (which is empty for fresh sign-ins).
+  // rp:local: this browser's one product store (v0.56.1, R71), everyone's products.
   const localCount = mode === 'local' ? loadProductIndex('local').length : 0;
+
+  // No products to upload, or none ticked: verify the cloud is reachable before switching (v0.16.1).
+  const switchWithoutUpload = async (uid: string) => {
+    setMigrating(true);
+    setMigrateResult(null);
+    try {
+      const reachable = await testCloudConnection(uid);
+      if (!reachable) {
+        setMigrateResult({ status: 'error', text: 'Could not connect to cloud storage. Please check your internet connection and try again.' });
+        return;
+      }
+      switchMode('cloud');
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const handleModeSwitch = async (newMode: StorageMode) => {
     if (newMode === mode) return;
@@ -60,41 +78,40 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
     if (!user) return;
 
     if (localCount > 0) {
-      // Has local products — ask to upload
+      // Has local products: list them, none ticked (R71 R-4).
+      setUploadRows(loadProductIndex('local').map(e => ({ id: e.id, name: e.name, updatedAt: e.updatedAt })));
       setShowUploadConfirm(true);
     } else {
-      // No local products — verify cloud is reachable before switching
-      setMigrating(true);
-      setMigrateResult(null);
-      try {
-        const reachable = await testCloudConnection(user.uid);
-        if (!reachable) {
-          setMigrateResult({ status: 'error', text: 'Could not connect to cloud storage. Please check your internet connection and try again.' });
-          return;
-        }
-        switchMode('cloud');
-      } finally {
-        setMigrating(false);
-      }
+      await switchWithoutUpload(user.uid);
     }
   };
 
-  const confirmUpload = async () => {
+  const confirmUpload = async (ids: string[]) => {
     // Unreachable — the upload flow is only reachable while signed in — but the
     // migration needs a uid, and returning is honest where the previous code
     // would have thrown on `user.uid`.
     if (!user) return;
     setShowUploadConfirm(false);
+    // Nothing ticked: switch as with no Local products; never an upload of nothing (R71 R-4).
+    if (ids.length === 0) {
+      await switchWithoutUpload(user.uid);
+      return;
+    }
     setMigrating(true);
     setMigrateResult(null);
 
     try {
-      const result = await migrateLocalToCloud(user.uid);
+      const ticked = new Set(ids);
+      const result = await migrateLocalToCloud(user.uid, ticked);
       switchMode('cloud');
-      setMigrateResult(uploadMessage(result));
+      const stayed = uploadRows.filter(r => !ticked.has(r.id)).map(r => r.name);
+      setMigrateResult(uploadMessage(result, stayed));
       // R72: offered only when something was uploaded, and it removes only what was.
       setLastUpload(result);
-      if (clearOfferMessage(result) !== null) setShowCleanupConfirm(true);
+      const sent = new Set(result.uploadedIds);
+      const text = clearOfferMessage(result, uploadRows.filter(r => sent.has(r.id)).map(r => r.name), stayed.length > 0);
+      setClearText(text);
+      if (text !== null) setShowCleanupConfirm(true);
     } catch (e) {
       console.error('Migration failed:', e instanceof Error ? e.message : 'Unknown error');
       setMigrateResult(UPLOAD_STOPPED);
@@ -104,9 +121,8 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
   };
 
   const confirmCleanup = () => {
-    // Explicit 'local' override — the upload read the anonymous-session store, not the user's
-    // per-uid local namespace (which is unrelated and should not be touched). Only the products
-    // this upload sent are removed (v0.55.15, R72); skipped and unreadable ones stay.
+    // rp:local, the one product store. Only the products this upload sent are removed (v0.55.15,
+    // R72); skipped, unreadable and unticked ones stay.
     removeLocalProducts(lastUpload?.uploadedIds ?? [], 'local');
     setShowCleanupConfirm(false);
     setMigrateResult(prev => prev && { ...prev, text: `${prev.text} Copies of the uploaded products were cleared from this browser.` });
@@ -250,16 +266,15 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
         </div>
       )}
 
-      {/* Upload confirmation */}
-      <ConfirmDialog
-        open={showUploadConfirm}
-        onClose={() => setShowUploadConfirm(false)}
-        onConfirm={confirmUpload}
-        title="Upload Local Products"
-        message={`You have ${localCount} local product${localCount !== 1 ? 's' : ''}. Upload them to cloud?`}
-        confirmLabel="Upload"
-        danger={false}
-      />
+      {/* Upload choice: every Local product, none ticked (R71 R-4). Keyed so each opening starts unticked. */}
+      {showUploadConfirm && (
+        <UploadChoiceDialog
+          open
+          rows={uploadRows}
+          onCancel={() => setShowUploadConfirm(false)}
+          onConfirm={ids => { void confirmUpload(ids); }}
+        />
+      )}
 
       {/* Cleanup confirmation */}
       <ConfirmDialog
@@ -267,7 +282,7 @@ export default function StorageSection({ onClose }: StorageSectionProps = {}) {
         onClose={() => setShowCleanupConfirm(false)}
         onConfirm={confirmCleanup}
         title="Clear Uploaded Copies"
-        message={lastUpload ? clearOfferMessage(lastUpload) ?? '' : ''}
+        message={clearText ?? ''}
         confirmLabel="Clear Uploaded Copies"
         danger={true}
       />

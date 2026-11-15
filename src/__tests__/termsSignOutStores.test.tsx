@@ -106,7 +106,7 @@ describe('a Terms sign-out keeps what this browser keeps', { timeout: 20_000 }, 
     expect(screen.queryByText(NOTICE)).not.toBeNull();
   });
 
-  it('the Sign out button still clears the signed-in store and keeps the signed-out one', async () => {
+  it('the Sign out button (v0.56.1): the signed-in person’s products were moved into rp:local at sign-in and are kept; only their export name and identifier go', async () => {
     await seed('u4', 'local', TOS_VERSION);
     S.record = TOS_VERSION;
     S.current = user('u4');
@@ -120,8 +120,9 @@ describe('a Terms sign-out keeps what this browser keeps', { timeout: 20_000 }, 
 
     expect(S.current).toBeNull();
     expect(names('u4')).toEqual([]);
-    expect(exportName('u4')).toBeNull();
-    expect(names('local')).toEqual(['Signed-out Alpha', 'Signed-out Beta']);
+    expect(exportName('u4')).toBeUndefined();
+    expect(localStorage.getItem('rp:u4:preferences')).toBe('{}');
+    expect(names('local')).toEqual(['Made signed in', 'Signed-out Alpha', 'Signed-out Beta']);
     expect(exportName('local')).toBe('Signed-out person');
   });
 

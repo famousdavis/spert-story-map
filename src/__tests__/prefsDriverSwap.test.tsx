@@ -48,6 +48,8 @@ afterEach(() => { cleanup(); localStorage.clear(); h.fs?.reset(); });
 describe('a driver swap cancels pending settings writes', () => {
   it.each([true, false])('a setting typed just before the swap is not written after it (swap=%s; without the swap it lands)', async swap => {
     const view = render(<StorageProvider><Controls /></StorageProvider>);
+    // v0.56.1 (R71 R-3): with someone signed in, the driver is created after the fold; wait for it.
+    await wait(0);
     expect(view.getByTestId('mode').textContent).toBe('local');
     await act(async () => { view.getByText('write').click(); });
     expect(storedLocally().exportName).toBeUndefined(); // still inside the debounce

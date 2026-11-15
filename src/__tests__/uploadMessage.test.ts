@@ -82,9 +82,18 @@ describe('clearOfferMessage', () => {
     expect(clearOfferMessage(outcome(0, [{ name: 'A' }], 1))).toBeNull();
   });
   it('the offer, and the line about what stays when anything was not uploaded', () => {
-    const ASK = 'Your uploaded products are now in the cloud. Clear their copies from this browser?';
-    expect(clearOfferMessage(outcome(2))).toBe(ASK);
-    expect(clearOfferMessage(outcome(1, [{ name: 'A' }]))).toBe(`${ASK} The products that were not uploaded stay in this browser.`);
-    expect(clearOfferMessage(outcome(1, [], 1))).toBe(`${ASK} The products that were not uploaded stay in this browser.`);
+    // v0.56.1 (R71 R-4): it names what it removes and says everyone using this browser loses it; no "Your".
+    const TWO = 'Remove “B”, “C” from this browser? They are now in your cloud account. Everyone who uses this browser will no longer have them here.';
+    const ONE = 'Remove “B” from this browser? It is now in your cloud account. Everyone who uses this browser will no longer have it here.';
+    const STAY = 'The products that were not uploaded stay in this browser.';
+    expect(clearOfferMessage(outcome(2), ['B', 'C'])).toBe(TWO);
+    expect(clearOfferMessage(outcome(1, [{ name: 'A' }]), ['B'])).toBe(`${ONE} ${STAY}`);
+    expect(clearOfferMessage(outcome(1, [], 1), ['B'])).toBe(`${ONE} ${STAY}`);
+    expect(clearOfferMessage(outcome(1), ['B'], true)).toBe(`${ONE} ${STAY}`);
+    expect(clearOfferMessage(outcome(2))).toBe('Remove the uploaded products from this browser? They are now in your cloud account. Everyone who uses this browser will no longer have them here.');
+  });
+  it('names at most ten products that stayed, then counts the rest', () => {
+    const stayed = Array.from({ length: 12 }, (_, i) => `P${i + 1}`);
+    expect(uploadMessage(outcome(1), stayed).text).toBe(`Uploaded 1 product to the cloud. Not ticked, so kept in this browser only: ${stayed.slice(0, 10).map(n => `“${n}”`).join(', ')} and 2 more.`);
   });
 });

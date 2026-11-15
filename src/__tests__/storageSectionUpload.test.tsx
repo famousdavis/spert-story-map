@@ -37,7 +37,8 @@ import { uploadRoutes } from './fixtures/uploadRoutes';
 
 const r = uploadRoutes(h.fs);
 const KEPT = 'This browser still has its own copy of each, which may differ from the cloud version.';
-const ASK = 'Your uploaded products are now in the cloud. Clear their copies from this browser?';
+// v0.56.1 (R71 R-4): the clear names what it removes and says everyone using this browser loses it.
+const ASK = (name: string) => `Remove “${name}” from this browser? It is now in your cloud account. Everyone who uses this browser will no longer have it here.`;
 const STAY = 'The products that were not uploaded stay in this browser.';
 
 beforeEach(() => { h.fs.reset(); localStorage.clear(); r.start(); h.switchMode = vi.fn(); vi.spyOn(console, 'error').mockImplementation(() => {}); });
@@ -46,7 +47,9 @@ afterEach(() => { cleanup(); r.stop(); vi.restoreAllMocks(); });
 async function uploadThroughTheDialog() {
   render(<MemoryRouter><StorageSection /></MemoryRouter>);
   fireEvent.click(screen.getByRole('radio', { name: 'Cloud (sync across devices)' }));
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Upload' })); });
+  // v0.56.1 (R71 R-4): the list starts with none ticked; these tests upload every product.
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select all' }));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Upload \d+ products?$/ })); });
 }
 const result = (start: string) => screen.getByText((t, el) => el?.tagName === 'P' && t.startsWith(start));
 const localIndex = () => JSON.parse(localStorage.getItem('rp:local:products_index') ?? '[]').map((e: { name: string }) => e.name);
@@ -58,7 +61,7 @@ describe('StorageSection upload', () => {
     const line = result('Uploaded 1 product to the cloud.');
     expect(line.textContent).toBe('Uploaded 1 product to the cloud.');
     expect(line.className).toContain('text-green-600');
-    expect(screen.getByText(ASK)).toBeTruthy();
+    expect(screen.getByText(ASK('A'))).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Clear Uploaded Copies' })).toBeTruthy();
     expect(screen.queryByText('Clear Local Data')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Clear Uploaded Copies' }));
@@ -76,7 +79,7 @@ describe('StorageSection upload', () => {
     const line = result('Uploaded 1 product to the cloud.');
     expect(line.textContent).toBe(`Uploaded 1 product to the cloud. Already in the cloud, so not uploaded again: “A”. ${KEPT}`);
     expect(line.className).toContain('text-amber-700');
-    expect(screen.getByText(`${ASK} ${STAY}`)).toBeTruthy();
+    expect(screen.getByText(`${ASK('B')} ${STAY}`)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Clear Uploaded Copies' }));
     expect(localStorage.getItem(`rp:local:product_${b}`)).toBeNull();
     expect(localStorage.getItem(`rp:local:product_${a}`)).not.toBeNull();
@@ -89,7 +92,7 @@ describe('StorageSection upload', () => {
     await uploadThroughTheDialog();
     const line = result('No new products to upload.');
     expect(line.className).toContain('text-amber-700');
-    expect(screen.queryByText(ASK, { exact: false })).toBeNull();
+    expect(screen.queryByText(/^Remove /)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Clear Uploaded Copies' })).toBeNull();
   });
 
@@ -98,7 +101,7 @@ describe('StorageSection upload', () => {
     localStorage.setItem('rp:local:products_index', JSON.stringify([...JSON.parse(localStorage.getItem('rp:local:products_index')!), { id: 'gone', name: 'Gone' }]));
     await uploadThroughTheDialog();
     expect(result('Uploaded 1 product').textContent).toBe('Uploaded 1 product to the cloud. 1 product could not be read and was not uploaded.');
-    expect(screen.getByText(`${ASK} ${STAY}`)).toBeTruthy();
+    expect(screen.getByText(`${ASK('A')} ${STAY}`)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Clear Uploaded Copies' }));
     expect(localIndex()).toEqual(['Gone']);
   });
