@@ -183,6 +183,14 @@ describe('R-6: the upload re-reads the stored order just before its settings wri
     expect(settings().exportName).toBe('Alice');
   });
 
+  it('R89: an id the stored order holds and the list does not keeps its slot', async () => {
+    seedCloud({ projectOrder: ['c1', 'elsewhere', 'c2'] });
+    seedLocal({});
+    await migrateLocalToCloud('u');
+    expect(settings().projectOrder?.slice(0, 3)).toEqual(['c1', 'elsewhere', 'c2']);
+    expect(tiles()).toEqual(['Cloud c1', 'Cloud c2', 'Local 3', 'Local 1', 'Local 2']);
+  });
+
   it('a failed re-read falls back to the first read, and the settings still go', async () => {
     seedCloud({ projectOrder: ['c2', 'c1'] });
     seedLocal({ l1: { color: 'teal' } });

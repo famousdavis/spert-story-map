@@ -24,7 +24,7 @@ import { PROJECTS_COL, SETTINGS_COL } from './firestoreCollections';
 import { projectsMembersQuery } from './projectsMembersQuery';
 import { sortByOrder } from './sortByOrder';
 import { addEntry, buildMaskedWrite, type PrefEntry } from './prefEntries';
-import { MAX_PROJECT_PREFS, prefEntries, prefOf, sanitizeProjectPrefs } from './projectPrefs';
+import { MAX_PROJECT_PREFS, prefEntries, prefOf, sanitizeProjectPrefs, withStoredSlots } from './projectPrefs';
 import type { UserSettings } from '../types';
 import { indexCloud, findEarlierUpload, sharedOriginKeys, type CloudRow } from './uploadRecognition';
 
@@ -121,7 +121,9 @@ export async function migrateLocalToCloud(uid: string): Promise<UploadOutcome> {
   } catch {
     // keep the first read
   }
-  const tiles = sortByOrder(cloudList.docs.map(d => ({ id: d.id })), latest.projectOrder).map(t => t.id);
+  // R89: every id the stored order holds keeps its slot, listed or not (a product made on another
+  // device since the list was read, or a deleted one), then the listed products it lacks.
+  const tiles = withStoredSlots(latest.projectOrder, cloudList.docs.map(d => d.id));
   await setDoc(settingsRef, ...uploadedSettings(latest, localPrefs, tiles, sortByOrder(index, localPrefs.projectOrder), { targetIds, skippedIds }));
   return outcome;
 }
@@ -163,7 +165,8 @@ const isBlank = (v: unknown) => v === undefined || v === null || (typeof v === '
 
 /**
  * The upload's one masked settings write (R63, R64). The tile order: the cloud's tiles as the
- * dashboard shows them, then the uploaded products in this browser's tile order, with a skipped
+ * dashboard shows them (every stored id in its slot, R89), then the uploaded products in this
+ * browser's tile order, with a skipped
  * product the cloud order does not hold placed among them (v0.56.0: a retry after an upload that
  * stopped put the first try's products in the cloud's id order, ahead of the rest). The export name,
  * identifier and caution switch: this browser's value only where the cloud has none, so the cloud

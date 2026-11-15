@@ -115,6 +115,28 @@ describe.each<Kind>(['cloud', 'local'])('%s: an order write reads the stored ord
     expect(stored(kind).projectOrder).toEqual(['p4', 'p1', 'p2', 'p3']);
   });
 
+  // R89 (PR #245 review -02): X was made, or placed, on another device; this tab does not list it.
+  // Its slot is kept, as a hidden tile's is. Before, the write dropped it and it went to the end.
+  it.each([
+    [['X', 'p1', 'p2', 'p3', 'p4'], 'p4', 'p3', ['X', 'p1', 'p2', 'p4', 'p3']],
+    [['p1', 'X', 'p2', 'p3', 'p4'], 'p4', 'p1', ['p4', 'X', 'p1', 'p2', 'p3']],
+    [['p1', 'p2', 'p3', 'p4', 'X'], 'p1', 'p4', ['p2', 'p3', 'p4', 'p1', 'X']],
+  ])('R89: stored %j with X unlisted: %s dropped on %s gives %j', async (order, from, to, want) => {
+    seed(kind, order);
+    const A = await openOrder(await makeDriver(kind));
+    await drop(A, from, to);
+    await wait(300);
+    expect(stored(kind).projectOrder).toEqual(want);
+  });
+
+  it('R89: a clone keeps an unlisted product\'s slot', async () => {
+    seed(kind, ['X', 'p1', 'p2', 'p3', 'p4']);
+    const A = await openOrder(await makeDriver(kind));
+    await clone(A, 'p2', 'c');
+    await wait(300);
+    expect(stored(kind).projectOrder).toEqual(['X', 'p1', 'p2', 'c', 'p3', 'p4']);
+  });
+
   // Forecaster's slot rule (`reorderShown`): the slots that held a shown product take the new order;
   // a hidden product keeps its slot. Before and after give the same answer under the old rule.
   it.each([

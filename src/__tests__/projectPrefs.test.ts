@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   MAX_PROJECT_PREFS, canHoldPref, hasRoomFor, isArchived, prefEntries, prefOf, reorderShown, sanitizeProjectPrefs, withPref,
+  withStoredSlots,
 } from '../lib/projectPrefs';
 import { REMOVE, isWritablePath } from '../lib/prefEntries';
 
@@ -101,5 +102,16 @@ describe('reorderShown, Forecaster\'s slot rule (R-4)', () => {
     [['A', 'B'], ['B', 'A'], ['B', 'A']],
   ])('%j shown as %j gives %j', (full, shown, want) => {
     expect(reorderShown(full, shown)).toEqual(want);
+  });
+});
+
+describe('withStoredSlots (R89): the stored order with every id in its slot, then the listed ids it lacks', () => {
+  it.each([
+    [['X', 'a', 'b'], ['b', 'a', 'c'], ['X', 'a', 'b', 'c']],
+    [undefined, ['b', 'a'], ['b', 'a']],
+    ['not a list', ['a'], ['a']],
+    [['a', 7, null, 'a', 'b'], ['c'], ['a', 'b', 'c']],
+  ])('stored %j, listed %j gives %j', (stored, ids, want) => {
+    expect(withStoredSlots(stored, ids)).toEqual(want);
   });
 });

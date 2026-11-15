@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { sortByOrder } from '../lib/sortByOrder';
-import { reorderShown, sanitizeProjectPrefs, type ProjectPrefs } from '../lib/projectPrefs';
+import { reorderShown, sanitizeProjectPrefs, withStoredSlots, type ProjectPrefs } from '../lib/projectPrefs';
 import type { StorageDriver, UserSettings } from '../types';
 
 /** A clone created but not yet listed by a refresh: its name is taken and its place is held. */
@@ -30,6 +30,10 @@ const EMPTY: ProjectPrefs = {};
  * the other's. A failed read keeps the order this tab holds; a tab that never read an order (its
  * first read failed, R88) writes none. The window left is the other tab's 200 ms debounce, plus
  * round trips in the cloud, and the whole time a tab is offline (the read then serves the cache).
+ *
+ * Every order written keeps each stored id this tab does not list in its slot (R89): a product made
+ * or placed on another device keeps its place, and a deleted product's id stays in the stored order,
+ * unseen.
  *
  * `projectOrder` (state) is what the list is sorted by. `orderRef` is the latest order this tab
  * holds. A clone in flight also holds its name until a refresh lists it, so a double-click on Clone
@@ -80,12 +84,15 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
     return () => { live = false; };
   }, [driver, took]);
 
-  /** Every listed product and every in-flight clone, in `stored`'s order. */
-  const orderFrom = useCallback((stored: string[] | undefined): string[] => {
+  /** The ids this tab knows: every listed product and every in-flight clone. */
+  const knownIds = useCallback((): string[] => {
     const ids = listedRef.current.map(p => p.id);
     for (const id of inFlightRef.current.keys()) if (!ids.includes(id)) ids.push(id);
-    return sortByOrder(ids.map(id => ({ id })), stored).map(x => x.id);
+    return ids;
   }, []);
+
+  /** `stored`'s ids in their slots (R89: those this tab does not list too), then the known ids it lacks. */
+  const orderFrom = useCallback((stored: string[] | undefined): string[] => withStoredSlots(stored, knownIds()), [knownIds]);
 
   /**
    * The stored order now, for a write: an `undefined` order means none is stored. A failed read
@@ -165,13 +172,15 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
 
   /**
    * Dropping one product on another's tile puts it in that tile's place, in both directions.
-   * `hidden` are the tiles the grid leaves out: each keeps its slot (Forecaster's slot rule). The
-   * move shows at once from the order this tab holds; the write then builds from a fresh read and
-   * shows what it wrote, which differs only when another tab's reorder was read.
+   * `hidden` are the tiles the grid leaves out: each keeps its slot (Forecaster's slot rule), as does
+   * every stored id this tab does not list (R89). The move shows at once from the order this tab
+   * holds; the write then builds from a fresh read and shows what it wrote, which differs only when
+   * another tab's reorder was read.
    */
   const moveOnto = useCallback((draggedId: string, targetId: string, hidden: ReadonlySet<string> = new Set()) => {
     const place = (full: string[]): string[] | null => {
-      const shown = full.filter(id => !hidden.has(id));
+      const known = new Set(knownIds());
+      const shown = full.filter(id => known.has(id) && !hidden.has(id));
       const from = shown.indexOf(draggedId);
       const to = shown.indexOf(targetId);
       if (from < 0 || to < 0 || from === to) return null;
@@ -188,7 +197,7 @@ export function useProjectOrder<P extends { id: string; name: string }>(driver: 
       if (ids) saveOrder(ids);
       else setProjectOrder(fresh ? orderFrom(fresh.order) : orderRef.current);
     });
-  }, [enqueue, freshOrder, orderFrom, saveOrder]);
+  }, [enqueue, freshOrder, knownIds, orderFrom, saveOrder]);
 
   return { sorted, settings, refreshStarted, listed, takenNames, placeClone, moveOnto };
 }

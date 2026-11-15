@@ -113,3 +113,21 @@ export function reorderShown(full: readonly string[], shownIds: readonly string[
   let next = 0;
   return full.map(id => (shown.has(id) ? shownIds[next++]! : id));
 }
+
+/**
+ * The full order an order write starts from (R89): every id the stored order holds, in its slot,
+ * whether or not this tab lists it, then each of `ids` the stored order lacks, in `ids`' order. So
+ * a product made or placed on another device keeps its place through a drop or a clone in a tab
+ * that does not list it, and a deleted product's id stays, unseen (`sortByOrder` ignores an id it
+ * is not given). A stored value that is not a list reads as none; a repeated id keeps its first slot.
+ */
+export function withStoredSlots(stored: unknown, ids: readonly string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (id: unknown) => {
+    if (typeof id === 'string' && !seen.has(id)) { seen.add(id); out.push(id); }
+  };
+  if (Array.isArray(stored)) stored.forEach(add);
+  ids.forEach(add);
+  return out;
+}
