@@ -32,6 +32,9 @@ import { describe, it, expect } from 'vitest';
  * heading form the renderer requires.
  */
 const MIRRORED_ASSETS = [
+  // Adding a guide to public/? Also add it, with a one-line description, to spertsuite.com's
+  // src/data/help.ts (spert-landing-page). The landing page's daily "Guide list matches the app
+  // repos" check stays red until you do. The PDF guide house rules say the same.
   'SPERTStoryMap_Quick_Reference_Guide.pdf',
   'SPERTStoryMap_Connect_AI_Guide.pdf',
 ];

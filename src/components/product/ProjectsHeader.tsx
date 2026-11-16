@@ -7,12 +7,14 @@
 // gradient runs between Forecaster's two light and dark SPERT blues, written here as their values:
 // Story Map's theme does not define Forecaster's names for them, which as classes produce no CSS,
 // and with `text-transparent` the title would be invisible. The logo (passed in by the page, which
-// keeps it as it was) links home; the gear, theme toggle, About and storage pill are Story Map's,
-// unchanged.
+// keeps it as it was) links home; the gear, theme toggle, About and storage pill are Story Map's.
+// v0.56.3 added Help Center left of About, and gave About the shared header-link greys.
 
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../ui/ThemeToggle';
 import StorageStatusPill from '../ui/StorageStatusPill';
+import HelpCenterLink from '../ui/HelpCenterLink';
+import { HEADER_LINK_CLASS } from '../ui/header-link-styles';
 import type { ComponentProps, ReactNode } from 'react';
 
 type ThemeMode = ComponentProps<typeof ThemeToggle>['theme'];
@@ -55,7 +57,8 @@ export default function ProjectsHeader({ logo, theme, onToggleTheme, onOpenSetti
           </svg>
         </button>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-        <Link to="/about" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
+        <HelpCenterLink />
+        <Link to="/about" className={HEADER_LINK_CLASS}>
           About
         </Link>
         <StorageStatusPill onClick={onOpenSettings} />

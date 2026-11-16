@@ -93,6 +93,8 @@ src/
 │   │   ├── Section.tsx               # Reusable Section and Field layout components
 │   │   ├── ThemeToggle.tsx           # Sun/moon dark mode toggle button
 │   │   ├── StorageStatusPill.tsx    # 3-state pill showing local/cloud/sign-in status
+│   │   ├── HelpCenterLink.tsx        # Header link to the SPERT® Suite Help Center's Story Map page, in a new tab
+│   │   ├── header-link-styles.ts     # The one class string for the headers' text links (Help Center, About)
 │   │   └── FirstRunBanner.tsx       # Dismissible first-run ToS informational banner
 │   ├── layout/
 │   │   └── ProductLayout.tsx         # Header, tab nav, footer, outlet context

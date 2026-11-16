@@ -10,6 +10,7 @@ import { formatRelativeTime } from '../../lib/formatDate';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import ThemeToggle from '../ui/ThemeToggle';
 import StorageStatusPill from '../ui/StorageStatusPill';
+import HelpCenterLink from '../ui/HelpCenterLink';
 import AppSettingsModal from '../settings/AppSettingsModal';
 import AppNotices from '../ui/AppNotices';
 import CloudLoadNotice from '../ui/CloudLoadNotice';
@@ -176,6 +177,7 @@ export default function ProductLayout() {
                 </svg>
               </button>
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              <HelpCenterLink />
               <StorageStatusPill onClick={() => setShowSettings(true)} />
             </div>
           </div>
