@@ -1,11 +1,12 @@
 # Changelog
 
-## Version 0.56.2 (2026-11-15)
+## Version 0.56.2 (2026-11-16)
 
 ### Fixed
 
-- **A product file whose change log holds more than 500 entries now imports.** Each product keeps a change log, a list of its structural changes saved with it and carried in its exports; no screen shows it. Before this version, an import refused a file whose change log held more than 500 entries, and an Import of a file holding several products refused the whole file when one of them did. A cloud product's change log has no such limit, so its own export could be refused. Now the import shortens the change log to 500 entries. It keeps the entries for the product's creation, for each import of the product and each copy made of it, and for each upload to the cloud together with the entry just before it, then the newest entries. Where it removes entries, it puts one entry in their place that records how many were removed and the time of the first one.
-- **A product's first change log entry is no longer dropped once its change log holds 500 entries.** Before this version, each change past 500 dropped the oldest entry, so the entry for the product's creation went first. With Local storage, this browser now keeps at most 500 entries for each product, shortened the same way; the open product keeps every entry made while it is open. With Cloud storage the change log is not shortened, as before.
+- **A product file whose change log holds more than 500 entries now imports.** Each product keeps a change log, a list of its structural changes saved with it and carried in its exports; no screen shows it. Before this version, an import refused a file whose change log held more than 500 entries, and an Import of a file holding several products refused the whole file when one of them did. A cloud product's change log has no such limit, so its own export could be refused. Now the import shortens a change log of more than 500 entries to 500 before adding its own entries. It keeps the entry for the product's creation; the entry for each import into it and, if it was made as a copy of another product, the entry recording that; and the entry for each upload to the cloud with the entry just before it. Then it keeps the newest entries. Where it removes entries, it puts one entry in their place that records how many were removed and the time of the first one.
+- **A product's first change log entry is no longer dropped once its change log holds 500 entries.** Before this version, each change past 500 dropped the oldest entry, so the entry for the product's creation went first. With Local storage, this browser now keeps at most 500 entries for each product, shortened the same way; the open product keeps every entry made while it is open. With Cloud storage, neither the open product nor the cloud shortens it as entries are added.
+- **With Cloud storage, a product's export from its Data section now holds its whole change log.** Before this version, after a structural change in that tab, the export held at most the newest 500 entries, so a longer change log lost its oldest entries, the entry for the product's creation first.
 - **An import that replaces a product's data can no longer be undone with Ctrl+Z.** The import dialog already said “This cannot be undone.” Before this version, Ctrl+Z on the Map or Sizing tab brought back the product as it was before the import and saved it, and with Cloud storage it also put back the change log entries the import had removed. Now undo and redo are cleared in the tab that made the import, and the next edit can be undone as usual.
 - With Cloud storage, a save still on its way when an import replaced the product no longer puts back the replaced product's change log entries.
 
@@ -15,9 +16,9 @@
 
 ### Not changed, and what follows
 
-- A long change log imported into Story Map keeps its first entries and its newest entries and drops the ones between them, with an entry recording where they were removed.
-- A Local product's export from its Data section may hold more than 500 change log entries: it exports the open product, which keeps every entry made while it is open. Its tile Export, Export All and Download All read what this browser stored, at most 500.
-- A cloud product's export holds its whole change log, and the cloud's stored change log is not shortened, as before.
+- A long change log imported into Story Map keeps the entries listed above and its newest entries, and drops the others, with an entry recording where they were removed.
+- A Local product's export from its Data section may hold more than 500 change log entries: it exports the open product, which keeps every entry made while it is open. Its tile Export and Export All read what this browser stored, at most 500.
+- No save shortens the change log stored in the cloud, and a cloud product's tile Export, Export All and Download All hold all of it.
 - Another tab that had the product open when an import replaced it elsewhere keeps its undo, as before: Ctrl+Z there still brings back its older copy and, with Cloud storage, saves that copy's change log entries back.
 - The 5 MB import limit allows about 26,000 change log entries across all the products in one file (an estimate from the size of an entry).
 - **Reload any tab left open from an earlier version.** Until it is reloaded, a tab still running version 0.56.1 or earlier keeps dropping a Local product's oldest change log entry each time it adds one past 500, refuses a file whose change log holds more than 500 entries, and, when it imports a 500-entry export from this version, drops the file's first entry.
