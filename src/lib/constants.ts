@@ -61,3 +61,10 @@ export const UNDO_HINT = 'To undo, open the Map or Sizing tab and press Ctrl+Z (
  * sweeping the pointer across cards doesn't flash tooltips — the user must dwell.
  */
 export const RIB_NAME_TOOLTIP_DELAY = 500;
+
+/**
+ * Story Map's page in the SPERT® Suite Help Center (v0.56.3): its guides, the way back to About,
+ * and how to get help. Opened by `HelpCenterLink` in both headers. The page lives in the
+ * spert-landing-page repo (`src/data/help.ts` lists the guides).
+ */
+export const HELP_CENTER_URL = 'https://spertsuite.com/help/storymap';

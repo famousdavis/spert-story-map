@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.56.3 (2026-11-16)
+
+### Added
+
+- **A Help Center link in the header opens the SPERT® Suite Help Center, with every Story Map guide in one place, in a new tab.** It is on the Products page, just left of About, and in each product's header, just right of the theme toggle.
+
+### Changed
+
+- The About link on the Products page is now easier to read (higher contrast), and the Help Center link uses the same colours.
+
 ## Version 0.56.2 (2026-11-16)
 
 ### Fixed
