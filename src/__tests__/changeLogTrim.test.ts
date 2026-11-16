@@ -127,7 +127,7 @@ describe('trimChangeLog: upload units', () => {
     expect(represented(out)).toBe(represented(log));
   });
 
-  it('origin entries over the cap: the newest upload unit whole, then oldest first, never above the cap', () => {
+  it('origin entries over the cap: the newest upload unit whole, the newest import, then oldest first, never above the cap', () => {
     const c = create();
     const pred = edit();
     const up = upload();
@@ -138,20 +138,22 @@ describe('trimChangeLog: upload units', () => {
     expect(out.length).toBeLessThanOrEqual(500);
     expect(out[out.indexOf(up) - 1]).toBe(pred);
     expect(out).toContain(c);
-    const keptImps = imps.filter(i => out.includes(i));
-    expect(keptImps.length).toBeGreaterThan(200);
-    // oldest first, stopping at the first that does not fit
-    expect(keptImps).toEqual(imps.slice(0, keptImps.length));
+    // The newest import is kept second (O53); then the oldest, stopping at the first that does not fit.
+    // create, the edits' marker, the unit and the first import 5; the newest import with a marker on
+    // each side 3; each later import 2: 246 of them, 500 in all.
+    expect(imps.filter(i => out.includes(i))).toEqual([...imps.slice(0, 247), imps[599]]);
+    expect(out).toHaveLength(500);
     expect(noAdjacentMarkers(out)).toBe(true);
     expect(represented(out)).toBe(represented(log));
   });
 });
 
 describe('trimChangeLog: origin entries over the cap, upload unit last', () => {
-  // [create, 50 edits, (import, edit) x 600, pred, upload, a late import, 20 edits]. The unit and
-  // create take 5 slots; each older import costs 2 (itself and a marker), so 247 fit and the 248th
-  // does not. The late import would cost 1, but the trim has stopped by then.
-  it('keeps the newest upload unit first, then imports oldest first, and stops at the first that does not fit', () => {
+  // [create, 50 edits, (import, edit) x 600, pred, upload, a late import, 20 edits]. The unit, the late
+  // import (the newest, kept second since O53) and the marker after it take 4 slots; create, the edits'
+  // marker, the first import and the marker after the last kept one 4; each later import costs 2
+  // (itself and a marker), so 247 imports fit and the 248th does not.
+  it('keeps the newest upload unit first, then the newest import, then imports oldest first, and stops at the first that does not fit', () => {
     const c = create();
     const log: E[] = [c, ...edits(50)];
     const imps: E[] = [];
@@ -161,12 +163,36 @@ describe('trimChangeLog: origin entries over the cap, upload unit last', () => {
     const late = imported();
     log.push(pred, up, late, ...edits(20));
     const out = trimChangeLog(log, 500);
-    expect(out).toHaveLength(499);
+    expect(out).toHaveLength(500);
     expect(out[out.indexOf(up) - 1]).toBe(pred);
+    expect(out[out.indexOf(up) + 1]).toBe(late);
     expect(out).toContain(c);
     expect(imps.filter(i => out.includes(i))).toEqual(imps.slice(0, 247));
-    expect(out).not.toContain(late);
     expect(noAdjacentMarkers(out)).toBe(true);
+    expect(represented(out)).toBe(represented(log));
+  });
+});
+
+describe('trimChangeLog: rule 4 stops at the first that does not fit', () => {
+  // [create, 50 edits, (import, edit) x 600, product copy, pred, upload, a late import]. The unit and the
+  // late import 3; create, the edits' marker, the first import and the marker after the last kept one 4;
+  // each later import 2, so 246 more fit: 499. The 248th import does not fit, and the trim stops there,
+  // so the copy, which would cost 1 next to the unit, is not reached.
+  it('a later entry that would fit is not kept once one has not fitted', () => {
+    const c = create();
+    const log: E[] = [c, ...edits(50)];
+    const imps: E[] = [];
+    for (let i = 0; i < 600; i++) { const imp = imported(); imps.push(imp); log.push(imp, edit()); }
+    const cp = copied();
+    const pred = edit();
+    const up = upload();
+    const late = imported();
+    log.push(cp, pred, up, late);
+    const out = trimChangeLog(log, 500);
+    expect(out).toHaveLength(499);
+    expect(out.slice(-3)).toEqual([pred, up, late]);
+    expect(imps.filter(i => out.includes(i))).toEqual(imps.slice(0, 247));
+    expect(out).not.toContain(cp);
     expect(represented(out)).toBe(represented(log));
   });
 });
@@ -305,6 +331,45 @@ describe('trimChangeLog: three cases the first tests could not see (review Opus-
     expect(out.filter(x => x === imp)).toHaveLength(1);
     expect(copies.filter(x => out.includes(x))).toEqual(copies.slice(0, 248));
     expect(out).toHaveLength(499);
+    expect(noAdjacentMarkers(out)).toBe(true);
+    expect(represented(out)).toBe(represented(log));
+  });
+});
+
+describe('trimChangeLog: rule 4 keeps the newest import (O53)', () => {
+  // A file of create and 499 product-level imports, and this browser's own import of it: 501 protected
+  // entries. Before O53 the oldest-first fill kept create and 498 imports and removed the new one.
+  it('create, 499 imports and a new import: the new import is kept, then the oldest imports', () => {
+    const c = create();
+    const imps = Array.from({ length: 499 }, imported);
+    const newest = imported();
+    const out = trimChangeLog([c, ...imps, newest], 500);
+    expect(out).toHaveLength(500);
+    expect(out[0]).toBe(c);
+    expect(out[499]).toBe(newest);
+    expect(imps.filter(i => out.includes(i))).toEqual(imps.slice(0, 497));
+    expect(out[498]).toMatchObject({ op: 'compact', source: '2' });
+  });
+
+  it('a newest import that is the entry before an upload is kept with its unit, once', () => {
+    const c = create();
+    const copies: E[] = [];
+    const log: E[] = [c];
+    for (let i = 0; i < 300; i++) { const cp = copied(); copies.push(cp); log.push(cp, edit()); }
+    const imp = imported();
+    const up = upload();
+    const older = upload();
+    log.splice(1, 0, edit(), older);
+    log.push(imp, up, ...edits(5));
+    // [create, edit, older upload, (copy, edit) x 300, import, upload, 5 edits]. The newest import is in the
+    // newest unit, so the unit is placed once: create, the older unit and the first copy 4; the marker
+    // after the kept copies, the unit and the trailing marker 4; each later copy 2: 246 of them.
+    const out = trimChangeLog(log, 500);
+    expect(out).toHaveLength(500);
+    expect(copies.filter(x => out.includes(x))).toEqual(copies.slice(0, 247));
+    expect(out.filter(x => x === imp)).toHaveLength(1);
+    expect(out[out.indexOf(up) - 1]).toBe(imp);
+    expect(out.slice(0, 3)).toEqual(log.slice(0, 3));
     expect(noAdjacentMarkers(out)).toBe(true);
     expect(represented(out)).toBe(represented(log));
   });

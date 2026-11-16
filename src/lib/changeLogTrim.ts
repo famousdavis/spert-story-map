@@ -15,8 +15,9 @@ import type { ChangeLogEntry } from '../types';
  *     Existing markers are never kept by the newest fill: each joins the stretch it sits in, so a
  *     trim never puts two markers side by side.
  * When the origin entries and their markers alone exceed `cap`, the newest upload unit is kept first,
- * then the other origin entries and units oldest first, each kept or removed whole, stopping at the
- * first that does not fit. A `cap` below 3 keeps the last `cap` entries and adds no marker.
+ * then the newest product-level `import` (with its unit when it is in one, O53), then the other origin
+ * entries and units oldest first, each kept or removed whole, stopping at the first that does not fit.
+ * A `cap` below 3 keeps the last `cap` entries and adds no marker.
  *
  * Callers: `validateProduct` (an import) and the local store's writes (`storage.ts`). Nothing else
  * trims: memory and the cloud keep every entry.
@@ -26,7 +27,7 @@ export function trimChangeLog<T>(log: T[], cap: number): Array<T | ChangeLogEntr
   const room = Math.max(0, Math.floor(cap));
   if (room < 3) return log.slice(log.length - room);
   const groups = findGroups(log);
-  const mask = fillNewest(log, groups, room) ?? fillOverflow(log.length, groups, room);
+  const mask = fillNewest(log, groups, room) ?? fillOverflow(log, groups, room);
   return assemble(log, mask);
 }
 
@@ -151,18 +152,32 @@ function groupsSize(kept: readonly Group[], length: number): number {
   return next < length ? size + 1 : size;
 }
 
-/** Rule 4 (O51): the newest upload unit, then the rest oldest first, stopping at the first that does not fit. */
-function fillOverflow(length: number, groups: readonly Group[], cap: number): Uint8Array {
-  const uploads = groups.filter(g => g.upload);
-  const newestUpload = uploads[uploads.length - 1];
-  const order = newestUpload ? [newestUpload, ...groups.filter(g => g !== newestUpload)] : groups;
+function isProductImport(entry: unknown): boolean {
+  return opOf(entry) === 'import' && asRecord(entry)?.entity === 'product';
+}
+
+/**
+ * Rule 4's order: the newest upload unit (O51), then the group holding the newest product-level `import`
+ * (O53: this browser's own import of a file, when the file alone fills the cap), then the rest oldest
+ * first. An import is a group's first entry, alone or as the entry before an upload.
+ */
+function overflowOrder(log: readonly unknown[], groups: readonly Group[]): Group[] {
+  const newestUpload = groups.filter(g => g.upload).pop();
+  const newestImport = groups.filter(g => isProductImport(log[g.start])).pop();
+  const first: Group[] = [];
+  for (const g of [newestUpload, newestImport]) if (g && !first.includes(g)) first.push(g);
+  return [...first, ...groups.filter(g => !first.includes(g))];
+}
+
+/** Rule 4 (O51, O53): groups in `overflowOrder`, stopping at the first that does not fit. */
+function fillOverflow(log: readonly unknown[], groups: readonly Group[], cap: number): Uint8Array {
   let kept: Group[] = [];
-  for (const g of order) {
+  for (const g of overflowOrder(log, groups)) {
     const trial = [...kept, g].sort((a, b) => a.start - b.start);
-    if (groupsSize(trial, length) > cap) break;
+    if (groupsSize(trial, log.length) > cap) break;
     kept = trial;
   }
-  return maskOf(length, kept);
+  return maskOf(log.length, kept);
 }
 
 // ── the result ─────────────────────────────────────────────────────────

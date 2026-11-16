@@ -15,7 +15,7 @@ import { applyImport, parseImportFile } from '../lib/import-utils';
 import { createLocalStorageDriver } from '../lib/storageDriver';
 import { CHANGELOG_MAX_ENTRIES } from '../lib/constants';
 import type { ChangeLogEntry, ImportDecision, Product, StorageDriver } from '../types';
-import { ALL_KEPT, fileProduct, originKept } from './fixtures/changeLogFiles';
+import { ALL_KEPT, T0, fileProduct, originKept } from './fixtures/changeLogFiles';
 
 const CAP = CHANGELOG_MAX_ENTRIES;
 
@@ -120,4 +120,29 @@ describe('Data section import (replace) keeps origin entries at every length', (
       expect(newImports(stored?._changeLog)).toHaveLength(1);
     });
   }
+});
+
+describe('a file whose origin entries alone fill the cap (rule 4, O53)', () => {
+  it('create and 499 product-level imports: the store keeps the import this browser adds', async () => {
+    const { driver, handed } = recordingDriver();
+    const file = fileProduct('p1', 'Imports', 0);
+    file._changeLog = [
+      { t: T0, op: 'create', entity: 'product', seq: 'f-create' },
+      ...Array.from({ length: 499 }, (_, i): ChangeLogEntry =>
+        ({ t: T0 + 1 + i, op: 'import', entity: 'product', source: 'file', seq: `f-imp${i}` })),
+    ];
+    const parsed = parseImportFile(JSON.stringify(file));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const outcome = await applyImport(driver, { products: parsed.products, fileName: 'f.json' }, []);
+    expect(outcome.added).toBe(1);
+    const log = handed[handed.length - 1]?._changeLog ?? [];
+    expect(log).toHaveLength(CAP + 1);
+    expect(newImports(log)).toHaveLength(1);
+    const storedLog = (await driver.loadProduct('p1'))?._changeLog ?? [];
+    expect(storedLog).toHaveLength(CAP);
+    expect(storedLog[0]?.seq).toBe('f-create');
+    expect(newImports(storedLog)).toEqual(newImports(log));
+    expect(storedLog[CAP - 1]).toEqual(newImports(log)[0]);
+  });
 });
