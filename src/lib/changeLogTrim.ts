@@ -31,16 +31,16 @@ export function trimChangeLog<T>(log: T[], cap: number): Array<T | ChangeLogEntr
 }
 
 /** The marker's op. An entry with this op is a marker wherever it came from. */
-export const MARKER_OP = 'compact';
+const MARKER_OP = 'compact';
 
 /** How a product began, each import into it and each copy of it, and each upload (R97, O50). */
-export function isOriginEntry(entry: unknown): boolean {
+function isOriginEntry(entry: unknown): boolean {
   const op = opOf(entry);
   if (op === 'create' || op === 'cloud-migration') return true;
   return (op === 'import' || op === 'duplicate') && asRecord(entry)?.entity === 'product';
 }
 
-export function isMarker(entry: unknown): boolean {
+function isMarker(entry: unknown): boolean {
   return opOf(entry) === MARKER_OP;
 }
 

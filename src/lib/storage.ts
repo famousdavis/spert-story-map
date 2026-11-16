@@ -255,6 +255,7 @@ export function loadProduct(id: string, ns?: string, notify = true): Product | n
   if (product && needsV2Migration(product.schemaVersion)) {
     product = migrateToV2(product);
     // Save immediately so migration only runs once
+    // Not trimmed (v0.56.2, R-3): only a product stored before 0.3.0 gets here; the change log began at 0.12.0.
     try {
       localStorage.setItem(key, JSON.stringify(product));
     } catch (e) {
@@ -447,8 +448,9 @@ export function getWorkspaceId(): string {
  *
  * Never trims (v0.56.2, R73). Until then it dropped the oldest entry past
  * CHANGELOG_MAX_ENTRIES, so a 500-entry product lost its `create` entry on its
- * next change. Only the local store trims, when it writes (`storedForm`); memory
- * and the cloud keep every entry.
+ * next change. Two places trim, both through `trimChangeLog`: an import
+ * (`validateProduct`) and the local store's writes (`storedForm`). Nothing else
+ * does: the product in memory and the cloud keep every entry they are given.
  */
 export function appendChangeLogEntry(product: Pick<Product, '_changeLog'>, entry: Omit<ChangeLogEntry, 't' | 'seq'>): ChangeLogEntry[] {
   const log = product._changeLog || [];
