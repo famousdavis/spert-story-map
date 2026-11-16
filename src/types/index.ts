@@ -31,7 +31,9 @@ export type ChangeLogOp =
   | 'cloud-migration'
   | 'duplicate'
   | 'split'
-  | 'update';
+  | 'update'
+  /** A marker where a trim removed entries (v0.56.2): `id` the first removed time, `source` the count. */
+  | 'compact';
 
 export type ChangeLogEntity =
   | 'product'
@@ -227,13 +229,19 @@ export interface Product {
 /** Functional updater: accepts a transform function or a full replacement. */
 export type ProductUpdater = ((prev: Product) => Product) | Product;
 
+/**
+ * `resetHistory`: the update starts a new history, clearing undo and redo (v0.56.2, R101). An import
+ * that replaces a product passes it, so Ctrl+Z cannot bring back, and save, the product it replaced.
+ */
+export interface UpdateOptions { resetHistory?: boolean }
+
 // ---------------------------------------------------------------------------
 // Outlet context (shared between ProductLayout and all page views)
 // ---------------------------------------------------------------------------
 
 export interface OutletContextValue {
   product: Product;
-  updateProduct: (updater: ProductUpdater) => void;
+  updateProduct: (updater: ProductUpdater, options?: UpdateOptions) => void;
   undo: () => void;
   redo: () => void;
 }

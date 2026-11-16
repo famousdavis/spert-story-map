@@ -245,6 +245,10 @@ export function createFirestoreDriver(uid: string): StorageDriver {
         'updatedAt',
       ];
       const updatedAt = new Date().toISOString();
+      // Changelog delta — only entries new to the server. ⚠️ Worked out BEFORE the write below
+      // (v0.56.2, O52): a replace that lands while this write is on its way resets the baseline
+      // to the file's log, and a delta taken after it then sent every entry the replace removed.
+      const newEntries = getNewChangeLogEntries(product.id, product._changeLog ?? []);
       await setDoc(ref, {
         ...sanitized,
         ...Object.fromEntries(repairs.map(k => [k, deleteField()])),
@@ -255,8 +259,6 @@ export function createFirestoreDriver(uid: string): StorageDriver {
       // `updatedAt` is now what a colleague and a reload will read.
       reportProductSaved(product.id, updatedAt);
 
-      // Changelog delta — push only entries new to the server.
-      const newEntries = getNewChangeLogEntries(product.id, product._changeLog ?? []);
       if (newEntries.length > 0) {
         await updateDoc(ref, { _changeLog: arrayUnion(...newEntries) });
         advanceBaseline(product.id, newEntries);

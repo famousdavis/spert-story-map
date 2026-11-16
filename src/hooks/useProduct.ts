@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Product, ProductUpdater } from '../types';
+import type { Product, ProductUpdater, UpdateOptions } from '../types';
 import { useStorage } from '../lib/StorageProvider';
 import { parseDate } from '../lib/formatDate';
 import { migrateCardColors } from '../lib/ribCardColors';
@@ -164,13 +164,17 @@ export function useProduct(productId: string | undefined) {
     }
   }, [driver, mode]);
 
-  const updateProduct = useCallback((updater: ProductUpdater) => {
+  // `resetHistory` clears undo and redo INSIDE the same updater that would push, so a push can
+  // never land after the clear (v0.56.2, R101: DataSection's replace passes it).
+  const updateProduct = useCallback((updater: ProductUpdater, options?: UpdateOptions) => {
     setProduct(prev => {
       if (!prev) return prev;
       const next = typeof updater === 'function' ? updater(prev) : updater;
 
       // Push current state onto undo stack
-      undoStackRef.current = [...undoStackRef.current.slice(-MAX_UNDO + 1), prev];
+      undoStackRef.current = options?.resetHistory
+        ? []
+        : [...undoStackRef.current.slice(-MAX_UNDO + 1), prev];
       redoStackRef.current = [];
 
       scheduleSave(next);

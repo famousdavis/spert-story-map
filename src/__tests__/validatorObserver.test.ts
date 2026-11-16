@@ -284,13 +284,18 @@ describe('C3 — classification corpus', () => {
     expect(out).not.toContain('REJECTED');
   });
 
-  it('>500 changelog → rejected', () => {
+  // v0.56.2 (R73): import trims a long changelog instead of refusing the file, so the observer
+  // reports it as repaired, with the one path `_changeLog.length` (it was `rejected` before).
+  it('>500 changelog → repaired, path _changeLog.length', () => {
     const p = { ...pristineFixture(), id: nextId() } as Product;
     p._changeLog = Array.from(
       { length: 501 },
       () => ({ op: 'add', entity: 'rib', t: 1 }),
     ) as unknown as Product['_changeLog'];
-    expect(runObserve(p)).toContain('[observer] REJECTED');
+    const s = spyConsole();
+    observe(p, { rawSchemaVersion: p.schemaVersion });
+    expect(s.texts().join(' | ')).not.toContain('REJECTED');
+    expect(payloadOf(s.warnCalls(), 'REPAIRED')?.paths).toEqual(['_changeLog.length']);
   });
 
   it('unknown top-level field → repaired, reported as an unknown-field sub-class', () => {

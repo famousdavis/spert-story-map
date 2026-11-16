@@ -27,6 +27,7 @@ src/
 │   ├── constants.ts                  # Storage keys, schema version, size defaults
 │   ├── version.ts                    # APP_VERSION constant (single source of truth)
 │   ├── storage.ts                    # localStorage CRUD with debouncing, workspace identity
+│   ├── changeLogTrim.ts              # The one rule that shortens a change log (import, local store writes): origin entries and upload units kept, newest fill, one marker per removed stretch
 │   ├── prefEntries.ts                # Settings written field by field: entries, the overlap rule, refused paths, the one masked-write builder
 │   ├── projectPrefs.ts               # Tile colours and archive (per person, in settings): the normaliser, the 1000-entry cap, entries, the hidden-tile slot rule
 │   ├── importExport.ts               # Export product JSON, bundled export, legacy single-file import helper

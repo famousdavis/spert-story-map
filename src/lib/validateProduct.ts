@@ -8,6 +8,8 @@ import type {
 } from '../types';
 import { isRibCardColorKey, resolveCardColorKey } from './ribCardColors';
 import { normalizeSchemaVersion } from './schemaVersion';
+import { CHANGELOG_MAX_ENTRIES } from './constants';
+import { trimChangeLog } from './changeLogTrim';
 
 /**
  * Comprehensive schema validation for imported product data.
@@ -28,7 +30,6 @@ const MAX_ALLOCATIONS = 100;
 const MAX_PROGRESS = 10000;
 const MAX_SIZE_MAPPING = 20;
 const MAX_SIZE_LABEL = 20;    // Max length for a size row's label
-const MAX_CHANGELOG = 500;
 
 /** Throw if condition is false. */
 function assert(condition: unknown, message: string): asserts condition {
@@ -574,10 +575,11 @@ export function validateProduct(data: unknown): Product {
   // ⚠️ DROPPED, NOT REJECTED, like the oversized strings below: the log is advisory, an
   // older export can hold such a value, and `guardCloudProduct` keeps the same entries.
   // An object is still held to its timestamp.
+  //
+  // A log over CHANGELOG_MAX_ENTRIES is TRIMMED, never refused (v0.56.2, R73, R97): before this, one
+  // long log refused the file, and a bundle holding it refused every product in it.
   if (Array.isArray(d._changeLog)) {
     d._changeLog = d._changeLog.filter(isRecord);
-    assert(d._changeLog.length <= MAX_CHANGELOG,
-      `Changelog too long (max ${MAX_CHANGELOG} entries)`);
     for (const entry of d._changeLog) {
       assert(isNum(entry.t) && entry.t > 0 && entry.t < 4102444800,
         'Changelog entry timestamp must be a valid Unix timestamp');
@@ -591,6 +593,9 @@ export function validateProduct(data: unknown): Product {
       }
       stripObject(entry, KNOWN_CHANGELOG_FIELDS);
     }
+    // ⚠️ AFTER the checks above (PF-10): a bad timestamp anywhere still refuses the file, so a
+    // marker's `t` is always a checked one, and the `seq` it copies is at most 128 characters.
+    d._changeLog = trimChangeLog(d._changeLog, CHANGELOG_MAX_ENTRIES);
   } else {
     delete d._changeLog;
   }
