@@ -260,7 +260,8 @@ export async function applyImport(
       // duplicateProduct regenerates ALL nested IDs but REPLACES _changeLog with
       // a single [{op:'duplicate'}] entry. Splice the original file history back
       // in so the 'copy' path preserves audit provenance, matching the 'add' path.
-      // appendChangeLogEntry caps total length at CHANGELOG_MAX_ENTRIES.
+      // Nothing here trims (v0.56.2): the parse trimmed the file's log, so a copy holds at
+      // most CHANGELOG_MAX_ENTRIES + 3 entries, and the local store trims what it writes.
       const dup = duplicateProduct(prod, driver.getWorkspaceId());
       const withHistory: Product = {
         ...dup,

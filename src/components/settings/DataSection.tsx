@@ -12,13 +12,13 @@ import { isArchived, sanitizeProjectPrefs } from '../../lib/projectPrefs';
 import { dataImportArchivedLine } from '../product/archive-text';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { Section } from '../ui/Section';
-import type { Product, StorageDriver, ProductUpdater } from '../../types';
+import type { Product, StorageDriver, ProductUpdater, UpdateOptions } from '../../types';
 
 interface DataSectionProps {
   product: Product;
   driver: StorageDriver;
   /** Updates in-memory product state after a successful replace (replaces window.location.reload). */
-  updateProduct: (updater: ProductUpdater) => void;
+  updateProduct: (updater: ProductUpdater, options?: UpdateOptions) => void;
 }
 
 export default function DataSection({ product, driver, updateProduct }: DataSectionProps) {
@@ -117,11 +117,14 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
       // import, and stripFirestoreFields destroys them on every Firestore
       // listener echo. doSaveProduct's payload therefore omits them, and
       // merge:true preserves Firestore's existing values.
+      //
+      // `resetHistory` (v0.56.2, R101): the dialog says "This cannot be undone.", and an undo
+      // here saved the replaced product back, in the cloud with every entry the replace removed.
       updateProduct({
         ...merged,
         createdAt: product.createdAt ?? merged.createdAt,
         _originRef: product._originRef ?? merged._originRef,
-      });
+      }, { resetHistory: true });
 
       setImportConfirm(null);
       setArchivedLine(null);

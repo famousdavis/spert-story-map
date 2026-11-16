@@ -83,14 +83,15 @@ describe('appendChangeLogEntry', () => {
     expect(result[1]?.op).toBe('add');
   });
 
-  it('caps at CHANGELOG_MAX_ENTRIES', () => {
+  // v0.56.2 (R73): the append no longer drops the oldest entry past CHANGELOG_MAX_ENTRIES;
+  // only the local store trims, when it writes (changeLogLocalStore.test.ts).
+  it('does not cap at CHANGELOG_MAX_ENTRIES: the oldest entry stays', () => {
     const log: ChangeLogEntry[] = Array.from({ length: CHANGELOG_MAX_ENTRIES }, (_, i) => ({ t: i, op: 'add', entity: 'theme', id: `t${i}` }));
     const product: Pick<Product, '_changeLog'> = { _changeLog: log };
     const result = appendChangeLogEntry(product, { op: 'add', entity: 'theme', id: 'new' });
-    expect(result).toHaveLength(CHANGELOG_MAX_ENTRIES);
-    expect(result[CHANGELOG_MAX_ENTRIES - 1]?.id).toBe('new');
-    // Oldest entry dropped
-    expect(result[0]?.id).toBe('t1');
+    expect(result).toHaveLength(CHANGELOG_MAX_ENTRIES + 1);
+    expect(result[CHANGELOG_MAX_ENTRIES]?.id).toBe('new');
+    expect(result[0]?.id).toBe('t0');
   });
 });
 

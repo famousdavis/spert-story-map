@@ -9,6 +9,7 @@ import { needsV2Migration } from './schemaVersion';
 import { guardCloudProduct } from './cloudLoadGuard';
 import { reportGuardedLoad } from './cloudLoadNotices';
 import { addEntry, applyEntries, type PrefEntry } from './prefEntries';
+import { trimChangeLog } from './changeLogTrim';
 
 // ── localStorage namespaces ─────────────────────────────────────────
 //
@@ -270,9 +271,21 @@ export function loadProduct(id: string, ns?: string, notify = true): Product | n
   return guardStoredProduct(product, id, notify);
 }
 
+/**
+ * What this browser's store keeps of a product: its changelog trimmed to CHANGELOG_MAX_ENTRIES
+ * (v0.56.2, R102, O48). The product in memory keeps every entry of this session, so the three
+ * writers below return it untrimmed; no caller reads what they return.
+ */
+function storedForm(product: Product): Product {
+  const log = product._changeLog;
+  if (!Array.isArray(log)) return product;
+  const trimmed = trimChangeLog(log, CHANGELOG_MAX_ENTRIES);
+  return trimmed === log ? product : { ...product, _changeLog: trimmed };
+}
+
 export function saveProduct(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
-  debouncedSave(productKeyFor(product.id, PRODUCT_NS), updated);
+  debouncedSave(productKeyFor(product.id, PRODUCT_NS), storedForm(updated));
 
   // Update index
   const index = loadProductIndex();
@@ -290,7 +303,7 @@ export function saveProduct(product: Product): Product {
 export function saveProductImmediate(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
   try {
-    localStorage.setItem(productKeyFor(product.id, PRODUCT_NS), JSON.stringify(updated));
+    localStorage.setItem(productKeyFor(product.id, PRODUCT_NS), JSON.stringify(storedForm(updated)));
     const index = loadProductIndex();
     const existing = index.findIndex(p => p.id === product.id);
     const entry = { id: product.id, name: product.name, updatedAt: updated.updatedAt };
@@ -316,7 +329,7 @@ export function saveProductImmediate(product: Product): Product {
  */
 export function saveProductImmediateOrThrow(product: Product): Product {
   const updated = { ...product, updatedAt: new Date().toISOString() };
-  localStorage.setItem(productKeyFor(product.id, PRODUCT_NS), JSON.stringify(updated));
+  localStorage.setItem(productKeyFor(product.id, PRODUCT_NS), JSON.stringify(storedForm(updated)));
   const index = loadProductIndex();
   const existing = index.findIndex(p => p.id === product.id);
   const entry = { id: product.id, name: product.name, updatedAt: updated.updatedAt };
@@ -432,17 +445,17 @@ export function getWorkspaceId(): string {
  * arrayUnion dedupes by structural equality, so bulk-delete entries that
  * omit id/uid/source would collapse to a single entry without seq.
  *
- * Caps at CHANGELOG_MAX_ENTRIES.
+ * Never trims (v0.56.2, R73). Until then it dropped the oldest entry past
+ * CHANGELOG_MAX_ENTRIES, so a 500-entry product lost its `create` entry on its
+ * next change. Only the local store trims, when it writes (`storedForm`); memory
+ * and the cloud keep every entry.
  */
 export function appendChangeLogEntry(product: Pick<Product, '_changeLog'>, entry: Omit<ChangeLogEntry, 't' | 'seq'>): ChangeLogEntry[] {
   const log = product._changeLog || [];
   const nonce = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const updated = [...log, { ...entry, t: Math.floor(Date.now() / 1000), seq: nonce }];
-  return updated.length > CHANGELOG_MAX_ENTRIES
-    ? updated.slice(updated.length - CHANGELOG_MAX_ENTRIES)
-    : updated;
+  return [...log, { ...entry, t: Math.floor(Date.now() / 1000), seq: nonce }];
 }
 
 // Create new product
