@@ -270,6 +270,46 @@ describe('trimChangeLog: markers', () => {
   });
 });
 
+describe('trimChangeLog: three cases the first tests could not see (review Opus-PR247-1-05)', () => {
+  it('a removed stretch that ends in an existing marker takes its seq from its last removed entry, never the marker', () => {
+    const c = create();
+    const e = edit();
+    const old: E = { t: T0, op: 'compact', entity: 'product', id: String(T0), source: '4', seq: 'compact:old' };
+    const imp = imported();
+    const log: E[] = [c, e, old, imp, ...edits(600)];
+    const out = trimChangeLog(log, 500);
+    expect(out[0]).toBe(c);
+    expect(out[2]).toBe(imp);
+    expect(out[1]).toMatchObject({ op: 'compact', source: '5', seq: `compact:${String(e.seq)}` });
+  });
+
+  it('a marker seq cut to 128 characters keeps its compact: prefix', () => {
+    const long = (): E => ({ ...edit(), seq: 'q'.repeat(128) });
+    const out = trimChangeLog([create(), ...Array.from({ length: 700 }, long)], 500);
+    const [m] = markers(out);
+    expect(m?.seq).toBe(`compact:${'q'.repeat(120)}`);
+  });
+
+  // [create, import, upload, (product copy, edit) x 600], cap 500: protected entries alone overflow. The
+  // import just before the upload is in the upload's unit, so it is counted once: create, the unit and
+  // the first copy take 4, each later copy 2 (itself and a marker), the trailing marker 1, so 248 copies.
+  it('rule 4: an origin entry just before an upload is counted once, in its unit', () => {
+    const c = create();
+    const imp = imported();
+    const up = upload();
+    const log: E[] = [c, imp, up];
+    const copies: E[] = [];
+    for (let i = 0; i < 600; i++) { const cp = copied(); copies.push(cp); log.push(cp, edit()); }
+    const out = trimChangeLog(log, 500);
+    expect(out.slice(0, 3)).toEqual([c, imp, up]);
+    expect(out.filter(x => x === imp)).toHaveLength(1);
+    expect(copies.filter(x => out.includes(x))).toEqual(copies.slice(0, 248));
+    expect(out).toHaveLength(499);
+    expect(noAdjacentMarkers(out)).toBe(true);
+    expect(represented(out)).toBe(represented(log));
+  });
+});
+
 describe('trimChangeLog: a marker is a valid entry everywhere', () => {
   it('passes validateProduct with every field, and guardCloudProduct reports nothing', () => {
     const log = trimChangeLog([create(), ...edits(800)], 500) as ChangeLogEntry[];
