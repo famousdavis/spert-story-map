@@ -2,13 +2,20 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Products page's header (v0.55.0): SPERT Forecaster's
-// (`src/shell/components/AppShell.tsx:121-152` at 38f1a63), the suite's header. The title's
-// gradient runs between Forecaster's two light and dark SPERT blues, written here as their values:
-// Story Map's theme does not define Forecaster's names for them, which as classes produce no CSS,
-// and with `text-transparent` the title would be invisible. The logo (passed in by the page, which
-// keeps it as it was) links home; the gear, theme toggle, About and storage pill are Story Map's.
-// v0.56.3 added Help Center left of About, and gave About the shared header-link greys.
+// The Products page's header (v0.55.0, laid out like SPERT Forecaster's). The logo (passed in by
+// the page, which keeps it as it was) links home; the gear, theme toggle, About and storage pill
+// are Story Map's. v0.56.3 added Help Center left of About, and gave About the shared header-link
+// greys.
+//
+// The title (v0.56.4, HDR26) is a gradient in Story Map's own favicon indigo (#4f46e5), one per
+// word, light end on the left: #696ef5 → #3a27bd on the page's white, #828dff → #4c45d9 on its
+// gray-950. Every point of each ramp is at least 3 : 1 on that background (4.07 and 3.03 at the
+// weakest), which `src/__tests__/projectsHeaderTitleGradient.test.ts` checks. The colours are
+// written as values in one literal string: a class name built from a variable produces no CSS,
+// and with `text-transparent` the title would vanish. Printed, or with the system asking for more
+// contrast, the title falls back to the page's own solid near-black (near-white in the dark theme
+// under more contrast). `font-bold` sits on the `<h1>` so the space before "Story Map", which is
+// the `<h1>`'s own text (inside a span, jsdom's accessible name drops it), stays as wide as it was.
 
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../ui/ThemeToggle';
@@ -19,7 +26,8 @@ import type { ComponentProps, ReactNode } from 'react';
 
 type ThemeMode = ComponentProps<typeof ThemeToggle>['theme'];
 
-const GRADIENT = 'font-bold bg-gradient-to-r from-[#0099ff] to-[#0051cc] bg-clip-text text-transparent';
+const GRADIENT =
+  'bg-gradient-to-r from-[#696ef5] to-[#3a27bd] dark:from-[#828dff] dark:to-[#4c45d9] bg-clip-text text-transparent print:bg-none print:text-gray-900 contrast-more:bg-none contrast-more:text-gray-900 dark:contrast-more:text-gray-100';
 
 interface ProjectsHeaderProps {
   /** Story Map's own logo, linked home: the page renders it, unchanged. */
@@ -35,10 +43,10 @@ export default function ProjectsHeader({ logo, theme, onToggleTheme, onOpenSetti
       <div>
         <div className="flex items-center gap-3 mb-1">
           {logo}
-          <h1 className="text-2xl sm:text-[1.75rem] md:text-[2.1rem] leading-[normal]">
+          <h1 className="font-bold text-2xl sm:text-[1.75rem] md:text-[2.1rem] leading-[normal]">
             <span className={GRADIENT}>SPERT</span>
             <span className="text-gray-400 dark:text-gray-500 font-normal text-base sm:text-lg align-top">®</span>
-            <span className={GRADIENT}>{' Story Map'}</span>
+            {' '}<span className={GRADIENT}>Story Map</span>
           </h1>
         </div>
         <p className="text-sm leading-[normal] text-gray-500 dark:text-gray-400 italic">
