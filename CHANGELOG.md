@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 0.56.4 (2026-11-21)
+
+### Changed
+
+- **The SPERT® Story Map title on the Products page is now drawn in Story Map's own indigo, the colour of its icon**, as a light-to-dark gradient on each word. It now meets the suite's contrast standard for large titles (3:1) at every point, in both the light and the dark theme, where the old blue did not.
+- **The title now prints.** Printed, it appears as solid near-black text; before this version it printed blank unless "Background graphics" was turned on.
+- If your system is set to increase contrast (on a Mac, "Increase contrast" in Accessibility settings), the title is shown as solid near-black text, or near-white in the dark theme, instead of the gradient.
+
+### Internal
+
+- The title's gradient is `#696ef5` → `#3a27bd` on the page's white (`#ffffff`) and `#828dff` → `#4c45d9` on its dark `gray-950` (`#030712`), derived from the favicon's `#4f46e5` by the suite's header-title rule (HDR26). The weakest point of each ramp is 4.07:1 and 3.03:1. The old blue (`#0099ff` → `#0051cc`) measured 2.99:1 and 2.92:1.
+- `font-bold` moved from the gradient string to the `<h1>`, so the space before "Story Map", now the heading's own text rather than the start of a span, keeps its width. Every glyph renders at the weight it had.
+- New guard `src/__tests__/projectsHeaderTitleGradient.test.ts` (15 tests) reads the end colours from `ProjectsHeader.tsx`, resolves the page background from `ProductList.tsx` through the installed Tailwind's `theme.css`, samples each ramp at 41 points in Oklab and sRGB against 3:1, checks the print and increased-contrast fallbacks are the body's own `text-gray-900` / `text-gray-100`, and compiles the classes to check that the print colour comes after every other text colour in the CSS.
+- `projectsDashboard.test.tsx`'s title test now expects the spans `SPERT`, `®`, `Story Map` and the heading text `SPERT® Story Map`.
+- Known limitation, accepted: printed from the dark theme with "Background graphics" on, the near-black title prints on the page's near-black background (1.13:1). The old blue printed at 2.92:1 there.
+
 ## Version 0.56.3 (2026-11-16)
 
 ### Added

@@ -77,7 +77,9 @@ describe('the header and the page', () => {
     await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
     const header = req(document.querySelector('header'), 'header');
     const h1 = within(header).getByRole('heading', { level: 1 });
-    expect([...h1.querySelectorAll('span')].map(s => s.textContent)).toEqual(['SPERT', '®', ' Story Map']);
+    // v0.56.4 (HDR26): the space before "Story Map" is the heading's own text, not the start of a span.
+    expect([...h1.querySelectorAll('span')].map(s => s.textContent)).toEqual(['SPERT', '®', 'Story Map']);
+    expect(h1.textContent).toBe('SPERT® Story Map');
     expect(req(header.querySelector('p'), 'tagline').textContent).toBe('Plan and track agile product releases');
     expect(document.body.textContent).not.toMatch(/Data is stored (locally|in your cloud)/);
     const main = req(document.querySelector('main'), 'main');
