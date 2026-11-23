@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.56.5 (2026-11-23)
+
+### Changed
+
+- **The footer links and the storage pill in the header are now easy to read in both the light and the dark theme.** In the dark theme the footer links (Version, SPERT® Suite, Terms of Service, Privacy Policy, AI Privacy Notice, License) and the pill's "Sign in" are a lighter blue; in the light theme "Local only" and the padlock are a darker grey. Each now meets the suite's contrast standard on every header and footer it appears on.
+
+### Internal
+
+- Footer links (`Footer` in `ChangelogView.tsx`) gain `dark:text-blue-400 dark:hover:text-blue-300`: blue-600 on the dark footer (`#101828`) was 3.38:1, and the hover blue-700 2.60:1; now 6.73:1 and 9.79:1. Light is unchanged (5.25:1).
+- `StorageStatusPill`, signed out: "Local only" goes from `text-gray-400` (2.60:1 on white) to `text-gray-500 dark:text-gray-400` (4.84:1 on white; dark unchanged). "Sign in" takes its colour from `text-[#0070f3] dark:text-blue-400` instead of an inline style, which no `dark:` class can override; light is unchanged (4.55:1 on white), dark goes from 3.90:1 on the product header and 4.42:1 on the Products page to 6.73:1 and 7.63:1. The padlock's strokes go from a fixed `#9CA3AF` (2.54:1 on white) to `currentColor` with `text-gray-500 dark:text-gray-400` (4.84:1 light), in both states that show it; signed in with local storage it is the only visual sign of the storage mode, so WCAG 1.4.11's 3:1 applies.
+- New guard `src/__tests__/frameStage0Contrast.test.tsx` (12 tests) renders the real footer and pill and checks the class pairs and the absence of inline colours, then compiles each class against `src/index.css` and checks the ratio on every ground (white, `gray-50`, `gray-800`, `gray-900`, `gray-950`), with a must-fail control (the old blue-600 on the dark footer, 3.38:1).
+- Known, not changed here: on the light pill's hover ground (`gray-50`), "Sign in" is 4.36:1, as before.
+
 ## Version 0.56.4 (2026-11-21)
 
 ### Changed

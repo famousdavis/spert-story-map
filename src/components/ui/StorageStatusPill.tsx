@@ -18,10 +18,17 @@ function CloudIcon() {
 }
 
 function LockIcon() {
+  // `currentColor` + themed classes, not a fixed #9CA3AF, which measured 2.54 on the light
+  // header. In the signed-in-local state this glyph is the only visual sign of the storage
+  // mode, so WCAG 1.4.11's 3:1 applies. The colour is on the svg because the icon renders
+  // in two segments: beside "Local only" when signed out, alone on the right when signed in.
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="11" width="18" height="11" rx="2" stroke="#9CA3AF" strokeWidth="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+    <svg
+      width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+      className="text-gray-500 dark:text-gray-400"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -112,7 +119,7 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
           {/* Left segment: lock icon + "Local only" */}
           <div className="flex items-center gap-1.5 py-1 pl-2.5 pr-2.5">
             <LockIcon />
-            <span style={{ fontSize: 13 }} className="text-gray-400">
+            <span style={{ fontSize: 13 }} className="text-gray-500 dark:text-gray-400">
               Local only
             </span>
           </div>
@@ -120,7 +127,8 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
           <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
           {/* Right segment: "Sign in" label (visual only) */}
           <div className="flex items-center justify-center px-2.5 py-1">
-            <span style={{ fontSize: 12, fontWeight: 500, color: '#0070f3' }}>
+            {/* Colour from classes, never an inline style, which would beat the dark: variant. */}
+            <span style={{ fontSize: 12, fontWeight: 500 }} className="text-[#0070f3] dark:text-blue-400">
               Sign in
             </span>
           </div>
