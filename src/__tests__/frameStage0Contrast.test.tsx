@@ -186,14 +186,34 @@ describe('the storage pill, signed out', () => {
     expect(span.style.fontSize).toBe('12px');
   });
 
+  it('SM-3: on the pill\'s hover, "Sign in" steps to #155dfc in light and stays blue-400 in dark', () => {
+    render(<StorageStatusPill onClick={() => {}} />);
+    expect(tokens(screen.getByRole('button'))).toContain('group/pill');
+    expect(tokens(screen.getByText('Sign in'))).toEqual(expect.arrayContaining(
+      ['group-hover/pill:text-[#155dfc]', 'dark:group-hover/pill:text-blue-400'],
+    ));
+  });
+
   it('SM-3: "Sign in" clears 4.5 in dark on both headers and the hover; light at rest unchanged', async () => {
     for (const g of ['gray900', 'gray950', 'gray800'] as const) {
       expect(await ratio('dark:text-blue-400', g), g).toBeGreaterThanOrEqual(4.5);
     }
-    // Light is #0070f3 as before (4.55 at rest). On the light hover ground it is 4.36, as it was
-    // before this release; recorded, not changed here.
+    expect(await ratio('dark:group-hover/pill:text-blue-400', 'gray800')).toBeGreaterThanOrEqual(4.5);
+    // Light is #0070f3 as before (4.55 at rest). On the light hover ground it is 4.36, which is
+    // why hover steps to #155dfc.
     expect(await compiledColor('text-[#0070f3]')).toBe('#0070f3');
     expect(await ratio('text-[#0070f3]', 'white')).toBeGreaterThanOrEqual(4.5);
+    expect(await ratio('text-[#0070f3]', 'gray50')).toBeLessThan(4.5);
+    expect(await ratio('group-hover/pill:text-[#155dfc]', 'gray50')).toBeGreaterThanOrEqual(4.5);
+  }, 60_000);
+
+  it('SM-3: in dark, the dark hover rule comes after the light one, so it wins (equal specificity)', async () => {
+    const out = (await compile(CSS, { base: SRC, onDependency() {} }))
+      .build(['group-hover/pill:text-[#155dfc]', 'dark:group-hover/pill:text-blue-400']);
+    const light = out.indexOf('.' + escapeClass('group-hover/pill:text-[#155dfc]') + ' {');
+    const dark = out.indexOf('.' + escapeClass('dark:group-hover/pill:text-blue-400') + ' {');
+    expect(light).toBeGreaterThan(-1);
+    expect(dark).toBeGreaterThan(light);
   }, 60_000);
 });
 

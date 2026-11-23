@@ -50,7 +50,7 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center rounded-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+      className="group/pill flex items-center rounded-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
       style={{ border: '0.5px solid #D1D5DB' }}
       aria-label={
         isCloudSignedIn
@@ -127,8 +127,13 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
           <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
           {/* Right segment: "Sign in" label (visual only) */}
           <div className="flex items-center justify-center px-2.5 py-1">
-            {/* Colour from classes, never an inline style, which would beat the dark: variant. */}
-            <span style={{ fontSize: 12, fontWeight: 500 }} className="text-[#0070f3] dark:text-blue-400">
+            {/* Colour from classes, never an inline style, which would beat the dark: variant. On the
+                light hover ground (gray-50) #0070f3 is 4.36:1, so hover steps to #155dfc (5.02:1);
+                the dark pair restates blue-400 on hover, where it is 5.56:1 on gray-800. */}
+            <span
+              style={{ fontSize: 12, fontWeight: 500 }}
+              className="text-[#0070f3] group-hover/pill:text-[#155dfc] dark:text-blue-400 dark:group-hover/pill:text-blue-400"
+            >
               Sign in
             </span>
           </div>
