@@ -168,29 +168,29 @@ export function Footer() {
       <div className="mx-auto w-full max-w-7xl px-4 text-center">
         <div>
           &copy; {new Date().getFullYear()} William W. Davis, MSPM, PMP |{' '}
-          <Link to="/changelog" className="text-blue-600 hover:text-blue-700">
+          <Link to="/changelog" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
             Version {APP_VERSION}
           </Link>{' '}
           | Licensed under GNU GPL v3
         </div>
         <div className="mt-1">
-          <a href="https://spertsuite.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+          <a href="https://spertsuite.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
             SPERT® Suite
           </a>
           {' | '}
-          <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+          <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
             Terms of Service
           </a>
           {' | '}
-          <a href={PRIVACY_POLICY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+          <a href={PRIVACY_POLICY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
             Privacy Policy
           </a>
           {' | '}
-          <a href={AI_PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+          <a href={AI_PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
             AI Privacy Notice
           </a>
           {' | '}
-          <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">
+          <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
             License
           </a>
         </div>
