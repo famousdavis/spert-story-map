@@ -26,7 +26,7 @@ interface ProjectsToolbarProps {
   newProjectRef: React.RefObject<HTMLButtonElement | null>;
   onExportAll: () => void;
   onImport: () => void;
-  onLoadSample: () => void;
+  onLoadSample: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onNewProject: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 

@@ -24,6 +24,7 @@ import { createSampleProduct } from '../lib/sampleData';
 import { importProductFromJSON } from '../lib/importExport';
 import { resetLocalCaution } from '../lib/localCaution';
 import { resetGestureGuard } from '../lib/gestureGuard';
+import { resetAppAnnouncer } from '../lib/appAnnouncer';
 import { req } from './testHelpers';
 import { installPageEnv, makeProject, renderPage, seedLocal, stored, storedOrder, tileNames, tiles } from './fixtures/projectsPage';
 import type { StorageDriver } from '../types';
@@ -41,6 +42,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   resetGestureGuard();
+  resetAppAnnouncer();
   flushPendingSaves();
   localStorage.clear();
   vi.unstubAllGlobals();
@@ -159,7 +161,8 @@ describe('the list updates in place (O4)', () => {
     return { seen, stop: () => observer.disconnect() };
   };
 
-  it.each(['Load Sample', 'Clone', 'Edit', 'Delete', 'an import'])('after %s, an untouched tile is the same node, and "Loading projects..." never shows', async (action) => {
+  // Load Sample left this table in v0.58.0: it opens the sample's Map, so there is no list left to keep in place.
+  it.each(['Clone', 'Edit', 'Delete', 'an import'])('after %s, an untouched tile is the same node, and "Loading projects..." never shows', async (action) => {
     // The list arrives a task later, as a cloud read does: a page that showed "Loading projects..."
     // for every refresh would render it in between. On a same-task read it would never paint.
     const realIndex = driver.loadProductIndex.bind(driver);
@@ -170,10 +173,7 @@ describe('the list updates in place (O4)', () => {
     const keepOpen = control('Keep', 'Open Structure for');
     const { seen, stop } = watchLoading();
     try {
-      if (action === 'Load Sample') {
-        await userEvent.click(screen.getByRole('button', { name: 'Load Sample' }));
-        await waitFor(() => expect(tiles()).toHaveLength(3));
-      } else if (action === 'Clone') {
+      if (action === 'Clone') {
         await userEvent.click(control('Work', 'Clone'));
         await waitFor(() => expect(tiles()).toHaveLength(3));
       } else if (action === 'Edit') {
@@ -209,41 +209,51 @@ describe('the list updates in place (O4)', () => {
   });
 });
 
-describe('Load Sample', () => {
-  it('from the toolbar: says so, adds the sample at the end, focus stays on Load Sample', async () => {
+describe('Load Sample (v0.58.0): adds "Sample: …", opens it on the Map, and says so in the app\'s own region', () => {
+  const MESSAGE = 'Added “Sample: Billing System v2” to your products and opened it.';
+  const region = () => req(document.querySelector<HTMLElement>('[data-app-announcer]'), 'the app\'s live region');
+  const names = () => indexIds().map(e => e.name).sort();
+
+  it('from the toolbar: "Sample: Billing System v2", its Map open at once, the message said', async () => {
     await show([{ id: 'x', name: 'X' }]);
-    const button = screen.getByRole('button', { name: 'Load Sample' });
-    await userEvent.click(button);
-    await waitFor(() => expect(tiles()).toHaveLength(2));
-    expect(tileNames()[1]).toBe(createSampleProduct().name);
-    expect(screen.getByRole('status').textContent).toBe('Loaded the sample product.');
-    expect(document.activeElement).toBe(button);
+    await userEvent.click(screen.getByRole('button', { name: 'Load Sample' }));
+    expect(await screen.findByText('Map page')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sample: Billing System v2' })).toBeTruthy();
+    await waitFor(() => expect(region().textContent).toBe(MESSAGE));
+    expect(region().getAttribute('aria-live')).toBe('polite');
+    expect(names()).toEqual(['Sample: Billing System v2', 'X']);
   });
 
-  it('says so again the second time: the region is emptied, then set, so the same words are heard twice', async () => {
+  it('the second time: "(2)", and the region is emptied first, so each message is heard', async () => {
     await show([{ id: 'x', name: 'X' }]);
-    const region = screen.getByRole('status');
-    let heard = 0;
-    const observer = new MutationObserver(() => { if (region.textContent === 'Loaded the sample product.') heard += 1; });
-    observer.observe(region, { childList: true, subtree: true, characterData: true });
+    const heard: string[] = [];
+    const observer = new MutationObserver(() => { if (region().textContent) heard.push(region().textContent ?? ''); });
+    observer.observe(region(), { childList: true, subtree: true, characterData: true });
     try {
       await userEvent.click(screen.getByRole('button', { name: 'Load Sample' }));
-      await waitFor(() => expect(heard).toBe(1));
-      await userEvent.click(screen.getByRole('button', { name: 'Load Sample' }));
-      await waitFor(() => expect(tiles()).toHaveLength(3));
-      await waitFor(() => expect(heard).toBe(2));
+      await screen.findByRole('heading', { level: 1, name: 'Sample: Billing System v2' });
+      await waitFor(() => expect(heard).toEqual([MESSAGE]));
+      // Load Sample's click swallows the rest of its gesture for 500 ms (a double-click's second click); these two
+      // clicks are separate gestures, which a real person makes further apart than userEvent does.
+      resetGestureGuard();
+      await userEvent.click(within(req(document.querySelector('nav'), 'nav')).getByRole('link', { name: 'Products' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Load Sample' }));
+      await screen.findByRole('heading', { level: 1, name: 'Sample: Billing System v2 (2)' });
+      await waitFor(() => expect(heard).toEqual([MESSAGE, 'Added “Sample: Billing System v2 (2)” to your products and opened it.']));
     } finally {
       observer.disconnect();
     }
+    expect(names()).toEqual(['Sample: Billing System v2', 'Sample: Billing System v2 (2)', 'X']);
   });
 
-  it('from the welcome panel, which goes: focus to the sample tile\'s open button', async () => {
+  it('from the Welcome panel: the same handler, the same result', async () => {
     seedLocal([]);
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Load Sample Product' }));
-    await waitFor(() => expect(tiles()).toHaveLength(1));
-    await settle();
-    expect(document.activeElement).toBe(within(tiles()[0]!).getByRole('button', { name: /^Open Structure for / }));
+    expect(await screen.findByText('Map page')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sample: Billing System v2' })).toBeTruthy();
+    await waitFor(() => expect(region().textContent).toBe(MESSAGE));
+    expect(names()).toEqual(['Sample: Billing System v2']);
   });
 });
 

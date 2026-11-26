@@ -17,7 +17,7 @@ export default function AboutView() {
       <HeadingRow>About This App</HeadingRow>
       <div className="sf-below max-w-3xl">
         <div className="mb-8">
-          <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Products</Link>
+          <Link to="/" className="text-sm text-[color:var(--sf-text-muted)] hover:text-[color:var(--sf-text)]">← Back to Products</Link>
         </div>
 
         {/* Purpose */}

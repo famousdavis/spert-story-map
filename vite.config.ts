@@ -27,5 +27,13 @@ export default defineConfig({
     // discovers every sandbox copy of every test file: the suite inflates several
     // times over and reports "failures" that are actually surviving mutants.
     exclude: [...configDefaults.exclude, '**/.claude/**', '**/.stryker-tmp/**'],
+    // Firebase is never configured in a test (v0.58.0), whatever a developer's `.env.local` holds. With it configured,
+    // `lib/firebase.ts` built the real app and a test could reach production: the local-store fold's test ended a
+    // recorded Connect AI session with a real Firestore delete and a real call to the `teardownAiSession` Cloud
+    // Function. CI has no `.env.local`, so this is how the suite already ran there. A test that needs Firebase mocks
+    // `lib/firebase` itself. `setup/networkGuard.ts` fails any test file that still connects to a Google or Firebase
+    // host, and `networkGuard.test.ts` holds both.
+    env: { VITE_FIREBASE_API_KEY: '', VITE_FIREBASE_PROJECT_ID: '', VITE_FIREBASE_APP_ID: '' },
+    setupFiles: ['src/__tests__/setup/networkGuard.ts'],
   },
 })

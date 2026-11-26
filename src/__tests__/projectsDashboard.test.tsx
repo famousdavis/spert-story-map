@@ -92,7 +92,7 @@ describe('the header and the page', () => {
   it('keeps the brand\'s link home, Settings, About and the theme button (in the frame since v0.57.0)', async () => {
     seedLocal([]);
     renderPage();
-    await screen.findByText('Welcome to SPERT® Story Map');
+    await screen.findByRole('heading', { name: 'Welcome to SPERT® Story Map' });
     const header = req(document.querySelector('header'), 'header');
     expect(within(header).getByRole('link', { name: 'SPERT® Story Map' }).getAttribute('href')).toBe('/');
     expect(within(header).getByRole('button', { name: /^(Light mode|Dark mode|System default)$/ })).toBeTruthy();

@@ -231,8 +231,9 @@ export default function StructureView() {
                       className={`w-4 h-4 rounded-full ${themeColor.swatch} ring-1 ring-black/10 hover:ring-2 hover:ring-black/20 transition-shadow`}
                       title="Change theme color"
                     />
+                    {/* z-20: below the sticky navigation row's 30 (X3), so a scroll never draws it over the row (v0.58.0). */}
                     {colorPickerThemeId === theme.id && (
-                      <div ref={colorPickerRef} className="absolute top-6 left-0 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2 flex gap-1.5">
+                      <div ref={colorPickerRef} className="absolute top-6 left-0 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-2 flex gap-1.5">
                         {THEME_COLOR_OPTIONS.map(opt => (
                           <button
                             key={opt.key}

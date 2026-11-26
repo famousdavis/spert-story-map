@@ -118,7 +118,7 @@ describe('the Products page in the frame', () => {
 
   it('a first visit: the welcome panel is the empty panel, with no grid and no filter row', async () => {
     const { filters, tiles, empty } = await show([]);
-    await screen.findByText('Welcome to SPERT® Story Map');
+    await screen.findByRole('heading', { name: 'Welcome to SPERT® Story Map' });
     expect(tiles()).toBeNull();
     expect(filters()).toHaveLength(0);
     expect(empty()).toHaveLength(1);

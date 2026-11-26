@@ -17,6 +17,8 @@ import { createSampleProduct } from '../lib/sampleData';
 import { getTotalProjectPoints, getAllRibItems, getProjectPercentComplete, isRibUnsized } from '../lib/calculations';
 import { getStrandedRows } from '../lib/reconciliation';
 import { cloneName } from '../lib/cloneName';
+import { sampleName, sampleAddedMessage } from '../lib/sampleName';
+import { announceApp } from '../lib/appAnnouncer';
 import { swallowRestOfGesture } from '../lib/gestureGuard';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
@@ -51,7 +53,8 @@ type EnrichedProduct = ReturnType<typeof enrichProduct>;
 
 type DialogState = { kind: 'new' } | { kind: 'edit'; id: string; name: string; description: string };
 type DeleteTarget = { id: string; name: string; next?: string; prev?: string };
-type FocusRequest = { kind: 'open'; id: string } | ({ kind: 'deleted' } & DeleteTarget);
+/** After a delete (v0.55.0). Load Sample's welcome-panel focus request went in v0.58.0: it now leaves the page. */
+type FocusRequest = { kind: 'deleted' } & DeleteTarget;
 
 /**
  * The person's role on a project, as the Firestore rules decide it (`members[uid]`). Local mode:
@@ -98,6 +101,8 @@ export default function ProductList() {
   // The button that opened the New Product dialog: the toolbar's, or the welcome panel's.
   const newOpenerRef = useRef<HTMLElement | null>(null);
   const deleteConfirmedRef = useRef(false);
+  // Load Sample: a second click while one load is in flight is ignored (v0.58.0).
+  const sampleInFlightRef = useRef(false);
 
   const order = useProjectOrder(driver, products);
   // R71 R-6: Export All bundles every product the driver lists; in Local mode that is everyone's.
@@ -213,10 +218,6 @@ export default function ProductList() {
   useEffect(() => {
     if (!focusRequest) return;
     const root = mainRef.current;
-    if (focusRequest.kind === 'open') {
-      findTileControl(root, focusRequest.id, 'open')?.focus();
-      return;
-    }
     // A refused delete leaves the project listed: focus goes back to its Delete. Otherwise the
     // next tile's open button, else the previous one's, else New Product.
     const { id, next, prev } = focusRequest;
@@ -227,13 +228,13 @@ export default function ProductList() {
     target?.focus();
   }, [focusRequest]);
 
-  // A new tile (a clone, the sample) is scrolled into view once it is on the page.
+  // A new tile (a clone) is scrolled into view once it is on the page.
   useEffect(() => {
     if (scrollTarget) findTile(mainRef.current, scrollTarget.id)?.scrollIntoView({ block: 'nearest' });
   }, [scrollTarget]);
 
-  // A live region speaks only when its text changes, so the same message twice (a second Load
-  // Sample) would be silent. Empty it first, in its own render, then set the message a tick later.
+  // A live region speaks only when its text changes, so the same message twice (two archives of
+  // one product) would be silent. Empty it first, in its own render, then set the message a tick later.
   const announce = (message: string) => {
     if (announceTimerRef.current !== null) window.clearTimeout(announceTimerRef.current);
     flushSync(() => setAnnouncement(''));
@@ -271,15 +272,29 @@ export default function ProductList() {
     await refresh();
   };
 
-  const handleLoadSample = async (fromWelcome: boolean) => {
-    if (!driver) return;
-    const sample = createSampleProduct();
-    await driver.createProduct(sample);
-    await refresh();
-    announce('Loaded the sample product.');
-    setScrollTarget({ id: sample.id });
-    // The welcome panel goes once a project exists, and its button with it.
-    if (fromWelcome) setFocusRequest({ kind: 'open', id: sample.id });
+  // Load Sample (v0.58.0, contract §7), from the toolbar or the Welcome panel: adds "Sample: Billing System v2", or the
+  // next free number, opens it at once on the Map, and says so in the app's own live region, which outlives this page.
+  // - The names checked are read fresh, every product the person has (archived ones included: archive is a setting,
+  //   not a removal), plus any clone still in flight: the list on screen is empty before the first load finishes,
+  //   and knows nothing of a sample another tab just added.
+  // - The rest of a mouse double-click is swallowed, as the tile's open does: it would land on the Map, where a click
+  //   on a rib card opens its editor. A second click while one load is in flight is ignored, so two clicks never make
+  //   two products of one name.
+  // - In the cloud it saves where the person's products are, as New Product does; samples loaded before keep their names.
+  const handleLoadSample = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!driver || sampleInFlightRef.current) return;
+    if (e.detail === 1) swallowRestOfGesture();
+    sampleInFlightRef.current = true;
+    try {
+      const current = await driver.loadProductIndex();
+      const sample = createSampleProduct();
+      const name = sampleName(sample.name, [...current.filter(Boolean).map(p => p.name), ...order.takenNames()]);
+      await driver.createProduct({ ...sample, name });
+      announceApp(sampleAddedMessage(name));
+      navigate(`/product/${sample.id}/storymap`);
+    } finally {
+      sampleInFlightRef.current = false;
+    }
   };
 
   // Clone: import's numbering against every name taken, so a double-click gives (Copy) and
@@ -382,7 +397,7 @@ export default function ProductList() {
         newProjectRef={newProjectRef}
         onExportAll={exportAll.onExportAll}
         onImport={() => fileInputRef.current?.click()}
-        onLoadSample={() => handleLoadSample(false)}
+        onLoadSample={handleLoadSample}
         onNewProject={openNew}
       />
       {showFilters && (
@@ -443,7 +458,7 @@ export default function ProductList() {
         listedCount={products.length}
         archivedCount={archive.archivedCount}
         onCreateNew={openNew}
-        onLoadSample={() => handleLoadSample(true)}
+        onLoadSample={handleLoadSample}
         projects={gridProjects}
         onOpen={openProject}
         onShare={openShare}
@@ -459,7 +474,8 @@ export default function ProductList() {
         onUnarchive={archive.unarchiveId}
       />
 
-      {/* What Clone and Load Sample did, for a screen reader: the new tile may be out of sight. */}
+      {/* What Clone and Archive did, for a screen reader: the tile may be out of sight. Load Sample leaves the page,
+          so it speaks through the app's own region (AppShell's AppAnnouncer). */}
       <div role="status" className="sr-only">{announcement}</div>
 
       {dialog && (

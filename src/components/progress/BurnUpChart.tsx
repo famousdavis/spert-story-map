@@ -3,7 +3,7 @@
 // See LICENSE file in the project root for full license text.
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useDarkMode } from '../../hooks/useDarkMode';
+import { useIsDark } from '../../hooks/useIsDark';
 
 interface BurnUpDataPoint {
   sprintName: string;
@@ -16,7 +16,7 @@ interface BurnUpChartProps {
 }
 
 export default function BurnUpChart({ data }: BurnUpChartProps) {
-  const { isDark } = useDarkMode();
+  const isDark = useIsDark();
 
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4">

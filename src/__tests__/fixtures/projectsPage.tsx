@@ -96,7 +96,10 @@ export function storedOrder(): string[] | undefined {
   return raw ? (JSON.parse(raw) as { projectOrder?: string[] }).projectOrder : undefined;
 }
 
-/** The Projects page, with Structure behind it: a stub, or the real page. Inside the app frame (AppShell, v0.57.0). */
+/**
+ * The Projects page, with Structure behind it: a stub, or the real page. Inside the app frame (AppShell, v0.57.0). The
+ * Map is a stub (v0.58.0): Load Sample opens it.
+ */
 export function renderPage(structure: 'stub' | 'real' = 'stub') {
   return render(
     <MemoryRouter>
@@ -105,6 +108,7 @@ export function renderPage(structure: 'stub' | 'real' = 'stub') {
           <Route path="/" element={<ProductList />} />
           <Route path="/product/:productId" element={<ProductLayout />}>
             <Route path="structure" element={structure === 'stub' ? <p>Structure page</p> : <StructureView />} />
+            <Route path="storymap" element={<p>Map page</p>} />
           </Route>
         </Route>
       </Routes>

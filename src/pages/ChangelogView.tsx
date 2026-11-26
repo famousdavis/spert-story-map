@@ -25,7 +25,7 @@ export default function ChangelogView() {
       <HeadingRow>Changelog</HeadingRow>
       <div className="sf-below max-w-3xl">
         <div className="mb-8">
-          <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Products</Link>
+          <Link to="/" className="text-sm text-[color:var(--sf-text-muted)] hover:text-[color:var(--sf-text)]">← Back to Products</Link>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
           Version history for SPERT® Story Map. Current version: <strong>v{APP_VERSION}</strong>

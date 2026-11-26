@@ -86,3 +86,17 @@ export function mainClass(pathname: string): string {
  */
 export const CANVAS_TOP = 176;
 export const CANVAS_HEIGHT = `calc(100vh - ${CANVAS_TOP}px)`;
+
+/**
+ * Release Planning's board (v0.58.0, re-derived for the frame). Its top is `CANVAS_TOP` (176) + the view's own title
+ * row, 28 (`text-lg`'s line height) + that row's `mb-6`, 24 = 228 (measured 228). Each column, its header and its card
+ * list together, is at most the window less that top and the board's own `pb-4` (16): `100vh − 244px`, so it ends
+ * 16 px above the window's bottom and its list scrolls its own cards. The list takes whatever the header leaves, and
+ * the header's height differs by release (108 px with a target date and a progress bar, 64 for Unassigned).
+ *
+ * Before, the lists carried `100vh − 280px` and `− 250px`, sized for the header and tabs above v0.57.0's frame and
+ * holding a guess at the column header: every column ended 57 px below the window. A notice above the board pushes it
+ * down, and the page then scrolls by that much, as on the canvases.
+ */
+export const RELEASE_BOARD_TOP = CANVAS_TOP + 28 + 24;
+export const RELEASE_COLUMN_MAX_HEIGHT = `calc(100vh - ${RELEASE_BOARD_TOP + 16}px)`;

@@ -10,6 +10,7 @@ import ProgressBar from '../ui/ProgressBar';
 import { useTooltip } from '../ui/Tooltip';
 import useInlineEdit from '../storymap/useInlineEdit';
 import { formatDate } from '../../lib/formatDate';
+import { RELEASE_COLUMN_MAX_HEIGHT } from '../../lib/framePlace';
 import { releaseDeleteMessage, releaseHasAllocations } from '../../lib/settingsMutations';
 import type { Release, Product } from '../../types';
 import type { EnrichedRib } from '../../lib/calculations';
@@ -141,14 +142,14 @@ export default function ReleaseColumn({
         onDragOver={e => onColumnDragOver?.(e, 'unassigned')}
         onDrop={e => { e.preventDefault(); onColumnDrop('unassigned'); }}
       >
-        <div className={`bg-amber-50 dark:bg-amber-900/20 border rounded-xl overflow-hidden transition-colors ${
+        <div className={`flex flex-col bg-amber-50 dark:bg-amber-900/20 border rounded-xl overflow-hidden transition-colors ${
           isOver ? 'border-amber-400 ring-2 ring-amber-200 dark:border-amber-500 dark:ring-amber-700' : 'border-amber-200 dark:border-amber-700'
-        }`}>
-          <div className="px-4 py-3 border-b border-amber-200 dark:border-amber-700">
+        }`} style={{ maxHeight: RELEASE_COLUMN_MAX_HEIGHT }}>
+          <div className="flex-none px-4 py-3 border-b border-amber-200 dark:border-amber-700">
             <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Unassigned</h3>
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{ribs.length} items</p>
           </div>
-          <div className="p-2 min-h-[60px] max-h-[calc(100vh-250px)] overflow-y-auto">
+          <div className="flex-auto p-2 min-h-[60px] overflow-y-auto">
             {cardList}
             {ribs.length === 0 && !isOver && (
               <p className="text-xs text-amber-400 dark:text-amber-500 text-center py-4 italic">All items assigned</p>
@@ -180,14 +181,14 @@ export default function ReleaseColumn({
         <div className="w-1 bg-blue-400 rounded-full flex-shrink-0 mx-1 self-stretch" />
       )}
       <div className={`w-72 transition-opacity ${isColDragging ? 'opacity-40' : ''}`}>
-        <div className={`bg-white dark:bg-gray-900 border rounded-xl overflow-hidden h-full transition-colors ${
+        <div className={`flex flex-col bg-white dark:bg-gray-900 border rounded-xl overflow-hidden h-full transition-colors ${
           isOver ? 'border-blue-400 ring-2 ring-blue-200 dark:border-blue-500 dark:ring-blue-700' : 'border-gray-200 dark:border-gray-700'
-        }`}>
+        }`} style={{ maxHeight: RELEASE_COLUMN_MAX_HEIGHT }}>
           <div
             draggable={!nameEditing}
             onDragStart={e => { if (nameEditing) { e.preventDefault(); return; } onColDragStart?.(e, release.id); }}
             onDragEnd={onColDragEnd}
-            className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 ${nameEditing ? '' : 'cursor-grab active:cursor-grabbing'}`}
+            className={`flex-none px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 ${nameEditing ? '' : 'cursor-grab active:cursor-grabbing'}`}
           >
             <div className="flex items-center justify-between">
               {nameEditing ? (
@@ -241,7 +242,7 @@ export default function ReleaseColumn({
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Target: {formatDate(release.targetDate)}</p>
             )}
           </div>
-          <div className="p-2 min-h-[60px] max-h-[calc(100vh-280px)] overflow-y-auto">
+          <div className="flex-auto p-2 min-h-[60px] overflow-y-auto">
             {cardList}
             {ribs.length === 0 && !isOver && (
               <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4 italic">

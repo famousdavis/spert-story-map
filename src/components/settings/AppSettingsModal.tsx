@@ -33,7 +33,7 @@ export default function AppSettingsModal({ open, onClose }: AppSettingsModalProp
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Cloud Storage">
+    <Modal open={open} onClose={onClose} title="Settings">
       <StorageSection onClose={onClose} />
 
       <Section title="Export Attribution">
