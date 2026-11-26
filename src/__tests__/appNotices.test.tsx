@@ -6,7 +6,9 @@
 
 /**
  * The two app-wide notices (v0.53.32): the terms notice and the local-storage
- * caution, on every page, directly below the page header.
+ * caution, on every page, directly below the page header. Since v0.57.0 (FRAME26)
+ * they are the frame's notices, in its notices slot, between the navigation row
+ * and `main`, so above every page's heading row.
  *
  * Runs the real pages on the real local driver, through a router, because the
  * caution's dismissal has to survive navigation between pages that each mount
@@ -34,6 +36,7 @@ import ProductList from '../pages/ProductList';
 import ProductLayout from '../components/layout/ProductLayout';
 import AboutView from '../pages/AboutView';
 import ChangelogView from '../pages/ChangelogView';
+import AppShell from '../components/layout/AppShell';
 import type { StorageDriver } from '../types';
 
 const TERMS = /SPERT® Suite web apps are free to use/;
@@ -60,11 +63,13 @@ function renderApp(at = '/') {
     <MemoryRouter initialEntries={[at]}>
       <Nav />
       <Routes>
-        <Route path="/" element={<ProductList />} />
-        <Route path="/about" element={<AboutView />} />
-        <Route path="/changelog" element={<ChangelogView />} />
-        <Route path="/product/:productId" element={<ProductLayout />}>
-          <Route path="structure" element={<p>Structure page</p>} />
+        <Route element={<AppShell />}>
+          <Route path="/" element={<ProductList />} />
+          <Route path="/about" element={<AboutView />} />
+          <Route path="/changelog" element={<ChangelogView />} />
+          <Route path="/product/:productId" element={<ProductLayout />}>
+            <Route path="structure" element={<p>Structure page</p>} />
+          </Route>
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -181,7 +186,7 @@ describe('local-storage caution', () => {
   it('the Settings switch hides it at once, and turning it back on shows it again', async () => {
     renderApp();
     await screen.findByText(CAUTION);
-    await userEvent.click(screen.getAllByTitle('App Settings')[0]!);
+    await userEvent.click(within(document.querySelector('nav')!).getByRole('button', { name: 'Settings' }));
     const toggle = await screen.findByRole('switch', { name: 'Warn me on startup when using local storage' });
     expect(toggle.getAttribute('aria-describedby')).toBeTruthy();
     expect(document.getElementById(toggle.getAttribute('aria-describedby')!)?.textContent)
@@ -229,30 +234,30 @@ describe('placement on every page', () => {
   });
 
   it.each([['/about', 'About This App'], ['/changelog', 'Changelog']])(
-    '%s shows both, after its back link and before its heading',
+    '%s shows both above its heading row, and its back link below it (v0.57.0)',
     async (path, title) => {
       renderApp(path);
       const caution = await screen.findByText(CAUTION);
       const terms = screen.getByText(TERMS);
       const back = screen.getByRole('link', { name: /← Back/ });
       const heading = screen.getByRole('heading', { level: 1, name: title });
-      expect(follows(back, terms)).toBe(true);
       expect(follows(terms, caution)).toBe(true);
       expect(follows(caution, heading)).toBe(true);
+      expect(follows(heading, back)).toBe(true);
     },
   );
 
-  it('each notice is a card with an outlined "Got it" in its own colour', async () => {
+  it('each notice is the frame\'s notice, in its slot, with its "Got it" as the frame\'s dismiss button (v0.57.0)', async () => {
     renderApp('/about');
     const caution = await screen.findByText(CAUTION);
-    for (const [text, colour] of [[screen.getByText(TERMS), 'blue'], [caution, 'amber']] as const) {
+    const slot = document.querySelector('[data-sf="notices"]')!;
+    for (const [text, variant] of [[screen.getByText(TERMS), 'info'], [caution, 'caution']] as const) {
       const card = text.closest('div')!;
-      expect(card.className).toContain('rounded-lg');
-      expect(card.className).toContain(`border-${colour}-200`);
-      expect(text.closest('p')!.className).toContain('text-sm');
+      expect(card.parentElement).toBe(slot);
+      expect(card.className.split(/\s+/)).toEqual(['sf-notice', `sf-notice--${variant}`]);
       const button = card.querySelector('button')!;
       expect(button.textContent).toBe('Got it');
-      expect(button.className).toContain(`border-${colour}-300`);
+      expect(button.className).toBe('sf-notice-dismiss');
     }
   });
 });

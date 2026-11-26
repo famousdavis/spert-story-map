@@ -27,6 +27,7 @@ import type { MapEntityTarget } from '../components/storymap/mapEntity';
 import useEdgeAutoPan from '../hooks/useEdgeAutoPan';
 import CardColorLegend from '../components/ui/CardColorLegend';
 import type { OutletContextValue } from '../types';
+import { CANVAS_HEIGHT } from '../lib/framePlace';
 
 /** The docked panel takes room beside the map from Tailwind's `md` breakpoint up. */
 const isDockedViewport = () => typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px)').matches;
@@ -181,7 +182,7 @@ export default function StoryMapView() {
   });
 
   return (
-    <div ref={rootRef} className="-mx-6 -mt-6 relative flex" style={{ height: 'calc(100vh - 112px)' }}>
+    <div ref={rootRef} className="relative flex -mb-12" style={{ height: CANVAS_HEIGHT }}>
       <div ref={mapAreaRef} data-map-area="" className="relative flex-1 min-w-0 h-full" onPointerDownCapture={handleMapAreaPointerDownCapture}>
         <MapCanvas
           zoom={zoom}

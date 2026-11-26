@@ -50,14 +50,15 @@ describe('Cloud storage with products in this browser', { timeout: 20_000 }, () 
     [2, 'This browser’s Local storage holds 2 products, which may include other people’s.'],
   ])('an empty cloud with %i Local product(s): the warning says they may be other people’s and where to upload yours', async (n, held) => {
     await cloudPage(`c${n}`, ['Ana’s lab', 'Mine'].slice(0, n));
-    const words = `Your cloud account has no products. ${held} To upload any that are yours, go to App Settings → Storage, choose Local, then choose Cloud again and tick only your own.`;
+    const words = `Your cloud account has no products. ${held} To upload any that are yours, go to Settings → Storage, choose Local, then choose Cloud again and tick only your own.`;
     await until(() => screen.queryByText(words) !== null, 'the warning');
   });
 
   it('following the warning’s words lists this browser’s products, none ticked', async () => {
     await cloudPage('c3', ['Ana’s lab', 'Mine']);
     await until(() => screen.queryByText(/^Your cloud account has no products/) !== null, 'the warning');
-    fireEvent.click(screen.getByTitle('App Settings'));
+    // v0.57.0: the app's Settings dialog opens from the frame's "Settings" navigation item (the gear is gone).
+    fireEvent.click(within(document.querySelector('nav')!).getByRole('button', { name: 'Settings' }));
     fireEvent.click(await screen.findByRole('radio', { name: 'Local (browser only)' }));
     await settle(S);
     fireEvent.click(await screen.findByRole('radio', { name: 'Cloud (sync across devices)' }));

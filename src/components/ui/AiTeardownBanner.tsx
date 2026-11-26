@@ -12,9 +12,12 @@ import {
 } from '../../lib/aiSessionTeardown';
 
 /**
+ * The frame's caution notice (FRAME26, v0.57.0), in its notices slot. "Try again" keeps its own look; "Dismiss" is
+ * `.sf-notice-dismiss`.
+ *
  * B-04 — tell the user, in plain words, when sign-out could NOT end their
  * Connect AI session on the server (e.g. they were offline). Mounted once in
- * App.tsx, outside <Routes>, so it shows on whichever page the user lands on
+ * the frame's notices slot (AppShell, a layout route around every page), so it shows on whichever page the user lands on
  * after signing out. Returns null when there is nothing pending.
  *
  * It retries the teardown on mount and whenever the browser comes back online,
@@ -74,39 +77,34 @@ export default function AiTeardownBanner() {
   if (!pending) return null;
 
   return (
-    <div
-      className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700/50 px-4 py-3"
-      role="alert"
-      aria-live="assertive"
-    >
-      <div className="max-w-2xl mx-auto flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-1">
-            Your AI assistant may still be connected.
-          </p>
-          <p className="text-xs text-amber-800 dark:text-amber-200">
-            Signing out could not reach the server to end your Connect AI
-            session. Until it does, a paired AI assistant can still read and
-            change your last-open product. Story Map keeps trying whenever you
-            are online, and you can retry now with Try again. Otherwise the
-            session ends on its own within 7 days.
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          <button
-            onClick={() => void retry()}
-            disabled={retrying}
-            className="text-xs font-medium px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white transition-colors"
-          >
-            {retrying ? 'Trying…' : 'Try again'}
-          </button>
-          <button
-            onClick={() => { clearPendingAiTeardown(); refresh(); }}
-            className="text-xs text-amber-600 dark:text-amber-400"
-          >
-            Dismiss
-          </button>
-        </div>
+    <div className="sf-notice sf-notice--caution" role="alert" aria-live="assertive">
+      <div className="flex-1">
+        <p className="font-medium">
+          Your AI assistant may still be connected.
+        </p>
+        <p>
+          Signing out could not reach the server to end your Connect AI
+          session. Until it does, a paired AI assistant can still read and
+          change your last-open product. Story Map keeps trying whenever you
+          are online, and you can retry now with Try again. Otherwise the
+          session ends on its own within 7 days.
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        <button
+          onClick={() => void retry()}
+          disabled={retrying}
+          className="text-xs font-medium px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white transition-colors"
+        >
+          {retrying ? 'Trying…' : 'Try again'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { clearPendingAiTeardown(); refresh(); }}
+          className="sf-notice-dismiss"
+        >
+          Dismiss
+        </button>
       </div>
     </div>
   );

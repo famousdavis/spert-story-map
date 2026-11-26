@@ -826,7 +826,7 @@ describe('checkSprintFinishDates', () => {
     const issues = checkSprintFinishDates(makeProduct({ sprints: [sprint('s1', 1, null)] }));
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatch(/^"Sprint 1" has no finish date\./);
-    expect(issues[0]).toContain('Sprints section in Settings');
+    expect(issues[0]).toContain('Sprints section in Product Settings');
   });
 
   it('names every undated sprint in sprint order, and only those', () => {

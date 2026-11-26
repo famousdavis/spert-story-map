@@ -16,9 +16,10 @@ import {
  * Shows on each page load in local mode unless Settings turns it off. "Got it"
  * hides it until the next page load (see `localCaution.ts`). Hidden until
  * preferences have loaded, so a user who turned it off never sees it flash.
+ * The frame's caution notice (v0.57.0), in its notices slot; "Got it" is `.sf-notice-dismiss`.
  * Preferences are read in local mode only: in cloud mode it never shows.
  */
-export default function LocalStorageCaution({ className = '' }: { className?: string }) {
+export default function LocalStorageCaution() {
   const { driver, mode } = useStorage();
   const { dismissed, suppressed } = useSyncExternalStore(subscribeLocalCaution, getLocalCaution);
   const [loaded, setLoaded] = useState<{ driver: unknown; suppressed: boolean } | null>(null);
@@ -39,19 +40,14 @@ export default function LocalStorageCaution({ className = '' }: { className?: st
   if (mode !== 'local' || !prefsReady || off || dismissed) return null;
 
   return (
-    <div className={className}>
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
-        <p className="text-sm text-amber-800 dark:text-amber-200">
-          <strong>Your data exists only in this browser</strong> and can be lost
-          without warning. Export at the end of every session to protect your work.
-        </p>
-        <button
-          onClick={dismissLocalCaution}
-          className="text-sm text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 rounded px-2.5 py-1 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition-colors flex-shrink-0"
-        >
-          Got it
-        </button>
-      </div>
+    <div className="sf-notice sf-notice--caution">
+      <p>
+        <strong>Your data exists only in this browser</strong> and can be lost
+        without warning. Export at the end of every session to protect your work.
+      </p>
+      <button type="button" onClick={dismissLocalCaution} className="sf-notice-dismiss">
+        Got it
+      </button>
     </div>
   );
 }

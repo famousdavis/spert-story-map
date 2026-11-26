@@ -1,5 +1,34 @@
 # Changelog
 
+## Version 0.57.0 (2026-11-26)
+
+### Changed
+
+- **Story Map now wears the SPERT® Suite's shared app frame, the same on every screen, as the other suite apps do.** At the top: a brand row with the SPERT® Story Map title (a link to Products), its tagline, the theme button and the storage button; under it a navigation row. The Products page and every screen inside a product share it, so the separate product header is gone. The page is one 1,600 px column, with the same footer at the bottom of every screen except the Map and Sizing.
+- **The navigation row is the way around:** Products · Structure · Releases · Map · Sizing · Progress · Insights · Product Settings inside a product, then Settings · About · Help Center ↗. The current screen is underlined. "← Products" is gone: Products is the first item on every screen. The product tabs are text only; their small symbols are gone.
+- **The product tab "Settings" is now "Product Settings"**, so it is never confused with the app's Settings. Messages that point to it say "Product Settings" (for example, "check the Sprints section in Product Settings"), and messages that pointed to "App Settings" now say "Settings".
+- **Settings** in the navigation row opens the app's settings (Cloud Storage, Export Attribution, Notifications), as the gear button did. The storage button opens them too.
+- **Inside a product, its name is the page heading**, with Saved and Connect AI on the right of the same row. A long name is cut short with "…"; hover over it to see it whole.
+- **Inside a product, the navigation row stays at the top of the window as you scroll.** The brand row and the product's heading row (with Saved and Connect AI) scroll away; before, the whole product header stayed.
+- **The Map and Sizing** still fill the width of the window, now under the product's heading row. At 1,280 × 800 the canvas is 624 px tall (688 before).
+- **Notices** (the terms notice, the local-storage caution, an invitation and the others) now sit full width under the navigation row, each with its own "Got it" or "Dismiss" button. A notice about one product (a failed save, part of the product left out when it opened) sits under that product's heading.
+- **The dark theme's background is now the suite's dark blue-grey** (`#101828`) on every screen; it was near-black. The title's gradient was adjusted so it stays readable on it.
+- **Help Center** is now at the right end of the navigation row on every screen. **About** moved there too.
+- **An address that does not exist** now shows "Page not found" with a link back to Products. Before, the page was blank.
+- **While a product is loading**, the frame and its navigation stay on screen, and only the page says "Loading...".
+- **The page's own scrollbar is your system's.** Story Map's thin scrollbars stay on its own scrolling panels.
+- A "Skip to main content" link is the first thing the keyboard reaches on every screen.
+
+### Internal
+
+- FRAME26 stage 5. The suite's stylesheet is vendored byte for byte as `src/styles/spert-frame.css` (md5 `69146fd77679c71e03d2f06cfea96cf1`, version "2", from `spert-suite-docs/suite/frame/`), imported once by `src/index.css`, unlayered; `frameStylesheet.test.ts` pins its md5 and its one import. Contract `FRAME-CONTRACT.md` at spert-suite-docs `6764cb3`.
+- One layout route, `AppShell` (`src/components/layout/`), around every route: the skip link, `AppHeader` (brand row), `AppNav` (navigation row, reading the route through `src/lib/framePlace.ts`), the notices slot, `main` and `AppFooter`, plus the app's Settings dialog. Every element carries the frame's `data-sf` hooks, which the suite's live check, frame-check, reads. `HeadingRow` is each page's heading row. `ProjectsHeader`, `HelpCenterLink`, `header-link-styles` and `AppNotices` are gone; `Footer` moved out of `ChangelogView` as `AppFooter`, wording unchanged.
+- Exceptions used, all registered in the contract (§8): X2, the Map and Sizing run full bleed; X3, the navigation row sticks inside a product; X5, no footer on the Map and Sizing; X6, the navigation's product items may scroll sideways at 150 % zoom (853 px), where they need 692 px and have 548. At 1,024 px (125 %) they fit with 27 px to spare on macOS fonts; Windows' Segoe UI could not be measured here (Arial leaves 63 px), and the sideways scroll is the safety net if it is wider.
+- The title's dark gradient, re-derived by HDR26's method for the new ground: `#8d99ff` → `#534fe3` (weakest point 3.03:1 on `#101828`; the old `#828dff` → `#4c45d9` measured 2.67:1 there). The light gradient is unchanged (4.07:1). The ramps are `--app-grad-light` / `--app-grad-dark` in `src/index.css`. Under increased contrast the title is the frame's solid heading colour (`#333333` / `#e2e8f0`); in print it is black. `projectsHeaderTitleGradient.test.ts` is re-pinned to the frame and falsified once.
+- The thin-scrollbar rule in `src/index.css` is scoped to `#root *`: on the root it defeated the frame's `scrollbar-gutter: stable` with overlay scrollbars, so the column moved 3 px between a short page and a long one (`rootScrollbar.test.ts`).
+- `frameStage0Contrast.test.tsx` is rewritten against the frame's tokens; eleven new tests hold the shell, the navigation, the chip, the theme button, the notices, the product's heading row, the Products page, the 404 and the canvases' outer box. Each new test was falsified once.
+- The toolbar's secondary button and the tile's focus ring take the new dark ground (`gray-900`), as Forecaster's do.
+
 ## Version 0.56.5 (2026-11-23)
 
 ### Changed

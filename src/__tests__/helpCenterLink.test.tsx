@@ -9,13 +9,14 @@
 // @vitest-environment jsdom
 
 /**
- * The Help Center link (v0.56.3), in both headers: the Products page's and a product's. It opens
- * Story Map's page in the SPERT® Suite Help Center in a new tab.
+ * The Help Center link (v0.56.3). Since v0.57.0 (FRAME26) it is the last element of the app
+ * frame's navigation row, after Settings and About, on every page: the Products page and a
+ * product's. It opens Story Map's page in the SPERT® Suite Help Center in a new tab.
  *
  * The URL is written out here, not imported: a test that reads the constant passes whatever the
  * constant says. jsdom applies no CSS, so "out of sight" is pinned as the `sr-only` class and the
- * colours as their class names; how they render was checked in a real browser, and the contrast
- * ratios measured there are in the pull request that added this file.
+ * look as the frame's `.sf-help` class, whose colour, size and hover underline are the vendored
+ * stylesheet's; frame-check measures how they render.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -32,12 +33,11 @@ import { resetLocalCaution } from '../lib/localCaution';
 import { flushPendingSaves } from '../lib/storage';
 import ProductList from '../pages/ProductList';
 import ProductLayout from '../components/layout/ProductLayout';
+import AppShell from '../components/layout/AppShell';
 import { req } from './testHelpers';
 
 const HELP_URL = 'https://spertsuite.com/help/storymap';
 const NAME = 'Help Center (opens in a new tab)';
-/** AA greys at rest and on hover, light and dark (v0.56.3). */
-const SHARED_GREYS = ['text-sm', 'text-gray-500', 'hover:text-gray-600', 'dark:text-gray-400', 'dark:hover:text-gray-300'];
 
 const driver = createLocalStorageDriver();
 
@@ -45,9 +45,11 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/" element={<ProductList />} />
-        <Route path="/product/:productId" element={<ProductLayout />}>
-          <Route path="structure" element={<p>Structure page</p>} />
+        <Route element={<AppShell />}>
+          <Route path="/" element={<ProductList />} />
+          <Route path="/product/:productId" element={<ProductLayout />}>
+            <Route path="structure" element={<p>Structure page</p>} />
+          </Route>
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -61,22 +63,22 @@ function seedOne(): string {
   return p.id;
 }
 
-async function productsPageHeader(): Promise<HTMLElement> {
+/** The navigation row's app zone (Settings · About · Help Center) on the Products page. */
+async function productsPageZone(): Promise<HTMLElement> {
   seedOne();
   renderAt('/');
-  await screen.findByRole('heading', { level: 2, name: 'Products' });
-  return req(document.querySelector('header'), 'the Products page header');
+  await screen.findByRole('heading', { level: 1, name: 'Products' });
+  return req(document.querySelector<HTMLElement>('[data-sf="nav-app"]'), 'the Products page\'s app zone');
 }
 
-async function productHeader(): Promise<HTMLElement> {
+/** The same zone inside a product. */
+async function productZone(): Promise<HTMLElement> {
   renderAt(`/product/${seedOne()}/structure`);
   await screen.findByText('Structure page');
-  return req(document.querySelector('header'), "a product's header");
+  return req(document.querySelector<HTMLElement>('[data-sf="nav-app"]'), "a product's app zone");
 }
 
-const helpLink = (header: HTMLElement) => within(header).getByRole('link', { name: NAME });
-const themeToggle = (header: HTMLElement) =>
-  within(header).getByRole('button', { name: /^(Light mode|Dark mode|System default)$/ });
+const helpLink = (zone: HTMLElement) => within(zone).getByRole('link', { name: NAME });
 const classes = (el: Element) => (el.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
 
 beforeEach(() => {
@@ -95,9 +97,9 @@ afterEach(() => {
 });
 
 describe.each([
-  ['the Products page header', productsPageHeader],
-  ["a product's header", productHeader],
-])('the Help Center link in %s', (_where, open) => {
+  ['the Products page', productsPageZone],
+  ['a product', productZone],
+])('the Help Center link on %s', (_where, open) => {
   it('links to Story Map\'s Help Center page, the whole URL', async () => {
     const link = helpLink(await open());
     expect(link.getAttribute('href')).toBe(HELP_URL);
@@ -128,35 +130,15 @@ describe.each([
     expect(shown.trim()).toBe('Help Center ↗');
   });
 
-  it('sits immediately right of the theme toggle', async () => {
-    const header = await open();
-    expect(helpLink(header).previousElementSibling).toBe(themeToggle(header));
+  it('is the navigation row\'s last element, right after About (contract §3: Settings · About · Help Center)', async () => {
+    const zone = await open();
+    expect(zone.lastElementChild).toBe(helpLink(zone));
+    expect(helpLink(zone).previousElementSibling).toBe(within(zone).getByRole('link', { name: 'About' }));
   });
 
-  it('uses the shared header-link greys, which reach AA contrast, not About\'s old ones', async () => {
+  it('wears the frame\'s `.sf-help` and nothing else: no utility colour or size to fight the stylesheet', async () => {
     const link = helpLink(await open());
-    expect(classes(link)).toEqual(expect.arrayContaining(SHARED_GREYS));
-    expect(classes(link)).not.toContain('text-gray-400');
-    expect(classes(link)).not.toContain('dark:text-gray-500');
-  });
-});
-
-describe('on the Products page', () => {
-  it('comes immediately before About', async () => {
-    const header = await productsPageHeader();
-    expect(helpLink(header).nextElementSibling).toBe(within(header).getByRole('link', { name: 'About' }));
-  });
-
-  it('About carries the same class string, so the pair cannot drift', async () => {
-    const header = await productsPageHeader();
-    const about = within(header).getByRole('link', { name: 'About' });
-    expect(about.getAttribute('class')).toBe(helpLink(header).getAttribute('class'));
-  });
-});
-
-describe("in a product's header", () => {
-  it('comes immediately before the storage pill, where About sits on the Products page', async () => {
-    const header = await productHeader();
-    expect(helpLink(header).nextElementSibling).toBe(within(header).getByRole('button', { name: 'Sign in' }));
+    expect(classes(link)).toEqual(['sf-help']);
+    expect(link.getAttribute('aria-current')).toBeNull();
   });
 });

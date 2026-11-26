@@ -91,7 +91,7 @@ export async function sendToForecaster(
     data = buildForecasterExport(product);
   } catch {
     return [
-      'The export could not be built. A sprint may have an invalid end date — check the Sprints section in Settings.',
+      'The export could not be built. A sprint may have an invalid end date — check the Sprints section in Product Settings.',
     ];
   }
 

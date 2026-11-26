@@ -3,15 +3,18 @@
 // See LICENSE file in the project root for full license text.
 
 // What the Products page shows under its notes (v0.56.0): "Loading products...", the welcome panel,
-// or the notes above the grid and then the all-archived line or the grid. "Show archived (N)" sits
-// higher, directly under the heading row (ProductList). Split out of ProductList so the page stays
-// within the complexity bound (O28).
+// or the all-archived line or the grid. "Show archived (N)" and the status lines (R88's, the cap's)
+// sit higher, in the frame's filter row under the heading row (ProductList, v0.57.0). Split out of
+// ProductList so the page stays within the complexity bound (O28).
+//
+// In the frame (FRAME26, v0.57.0), the welcome panel and the all-archived line stand in for the tile
+// grid, so each carries `data-sf="empty"` (contract §7).
 
 import type { ComponentProps } from 'react';
 import ProjectGrid from './ProjectGrid';
 import ProjectsEmptyState from './ProjectsEmptyState';
-import { AllArchivedLine, GridNote } from './ArchiveControls';
-import { SETTINGS_UNREAD_NOTICE, SETTINGS_UNREAD_REASON } from './archive-text';
+import { AllArchivedLine } from './ArchiveControls';
+import { SETTINGS_UNREAD_REASON } from './archive-text';
 
 type GridProps = ComponentProps<typeof ProjectGrid>;
 
@@ -22,14 +25,12 @@ interface ProductsBodyProps extends Omit<GridProps, 'dragDisabledReason'> {
   /** Listed products, archived ones included. */
   listedCount: number;
   archivedCount: number;
-  /** The cap's line (R-1), or null. */
-  notice: string | null;
   onCreateNew: ComponentProps<typeof ProjectsEmptyState>['onCreateNew'];
   onLoadSample: () => void;
 }
 
 export default function ProductsBody({
-  loading, settingsUnread, listedCount, archivedCount, notice, onCreateNew, onLoadSample,
+  loading, settingsUnread, listedCount, archivedCount, onCreateNew, onLoadSample,
   ...grid
 }: ProductsBodyProps) {
   if (loading) {
@@ -40,13 +41,7 @@ export default function ProductsBody({
     );
   }
   if (listedCount === 0) return <ProjectsEmptyState onCreateNew={onCreateNew} onLoadSample={onLoadSample} />;
-  return (
-    <>
-      {settingsUnread && <GridNote text={SETTINGS_UNREAD_NOTICE} />}
-      {notice && <GridNote text={notice} />}
-      {grid.projects.length === 0
-        ? <AllArchivedLine count={archivedCount} />
-        : <ProjectGrid {...grid} dragDisabledReason={settingsUnread ? SETTINGS_UNREAD_REASON : null} />}
-    </>
-  );
+  return grid.projects.length === 0
+    ? <div className="sf-below" data-sf="empty"><AllArchivedLine count={archivedCount} /></div>
+    : <ProjectGrid {...grid} dragDisabledReason={settingsUnread ? SETTINGS_UNREAD_REASON : null} />;
 }

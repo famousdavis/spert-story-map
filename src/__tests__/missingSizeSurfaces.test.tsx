@@ -41,10 +41,10 @@ beforeAll(() => {
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
 });
 
-const PICKER_TITLE = '“XL” is no longer in your size list. Pick a size, or add “XL” back in Settings → T-Shirt Size Mapping.';
-const LOCKED_SENTENCE = '“XL” is no longer in your size list. Add “XL” back in Settings → T-Shirt Size Mapping to count its points again.';
-const EMPTY_PICKER_TITLE = (label: string) => `Your size list is empty. Add “${label}” in Settings → T-Shirt Size Mapping.`;
-const EMPTY_LOCKED_SENTENCE = (label: string) => `Your size list is empty. Add “${label}” in Settings → T-Shirt Size Mapping to count its points again.`;
+const PICKER_TITLE = '“XL” is no longer in your size list. Pick a size, or add “XL” back in Product Settings → T-Shirt Size Mapping.';
+const LOCKED_SENTENCE = '“XL” is no longer in your size list. Add “XL” back in Product Settings → T-Shirt Size Mapping to count its points again.';
+const EMPTY_PICKER_TITLE = (label: string) => `Your size list is empty. Add “${label}” in Product Settings → T-Shirt Size Mapping.`;
+const EMPTY_LOCKED_SENTENCE = (label: string) => `Your size list is empty. Add “${label}” in Product Settings → T-Shirt Size Mapping to count its points again.`;
 
 /** What a picker shows: its text, its tooltip, and its menu's items, read by opening it. */
 function readPicker(button: HTMLElement) {
@@ -92,7 +92,7 @@ describe('Structure: the size picker', () => {
     mountHosted(StructureView, orphanProduct());
     const { title, items } = structurePicker('spaced');
     expect({ title, clear: items[items.length - 1] }).toStrictEqual({
-      title: '“M ” is no longer in your size list. Pick a size, or add “M ” back in Settings → T-Shirt Size Mapping.',
+      title: '“M ” is no longer in your size list. Pick a size, or add “M ” back in Product Settings → T-Shirt Size Mapping.',
       clear: 'Clear “M ” (not in size list)',
     });
   });
@@ -390,7 +390,7 @@ describe('the locked sentence\'s layout', () => {
 // ─── A stray space in the locked size's sentence ────────────────────
 
 describe('the locked size quotes a label with a stray space', () => {
-  const SPACED_SENTENCE = '“M ” is no longer in your size list. Add “M ” back in Settings → T-Shirt Size Mapping to count its points again.';
+  const SPACED_SENTENCE = '“M ” is no longer in your size list. Add “M ” back in Product Settings → T-Shirt Size Mapping to count its points again.';
 
   it('in Structure\'s tooltip', () => {
     mountHosted(StructureView, orphanProduct());

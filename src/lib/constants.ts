@@ -64,7 +64,8 @@ export const RIB_NAME_TOOLTIP_DELAY = 500;
 
 /**
  * Story Map's page in the SPERT® Suite Help Center (v0.56.3): its guides, the way back to About,
- * and how to get help. Opened by `HelpCenterLink` in both headers. The page lives in the
+ * and how to get help. Opened by the Help Center link at the end of the frame's navigation row
+ * (`AppNav`, v0.57.0). The page lives in the
  * spert-landing-page repo (`src/data/help.ts` lists the guides).
  */
 export const HELP_CENTER_URL = 'https://spertsuite.com/help/storymap';

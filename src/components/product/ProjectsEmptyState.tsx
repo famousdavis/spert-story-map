@@ -23,6 +23,7 @@ export default function ProjectsEmptyState({ onCreateNew, onLoadSample }: Projec
       className="mt-6 rounded-[10px] border border-dashed border-[#e5e5e5] dark:border-gray-700 p-8 text-center bg-white dark:bg-[#171717]"
       role="region"
       aria-labelledby="empty-state-heading"
+      data-sf="empty"
     >
       <h2 id="empty-state-heading" className="text-xl font-semibold text-[#333] dark:text-gray-100 mb-3">
         Welcome to SPERT® Story Map

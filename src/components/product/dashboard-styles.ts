@@ -8,27 +8,20 @@
 //
 // ⚠️ Copied through the brief's token map. Forecaster's theme defines colours Story Map does not
 // (`spert-blue` and friends): written as is they produce NO CSS, and the dialog's Create button
-// would be white on #f9f9f9. Here they are literal values. Forecaster's dark page is gray-900,
-// Story Map's gray-950, so the open button's dark focus gap is gray-950.
+// would be white on #f9f9f9. Here they are literal values. The open button's dark focus gap is the
+// page's ground: gray-900 (`#101828`), the frame's dark ground since v0.57.0 (FRAME26), as
+// Forecaster's; it was gray-950, Story Map's old ground.
 //
-// ⚠️ The reveal, the whole-tile click and the grid depend on PAIRS of classes, and a class string
-// is not proof that it renders:
+// ⚠️ The reveal and the whole-tile click depend on PAIRS of classes, and a class string is not
+// proof that it renders:
 // - the revealed row's `group-hover/tile:` and `group-focus-within/tile:` match only inside an
 //   element carrying `group/tile` (the tile root);
-// - the grid's `@min-[560px]:` / `@min-[860px]:` match only inside an ANCESTOR carrying
-//   `@container`; on the grid itself they never match;
 // - the open button's `::after` covers the tile because the tile root is `relative`, and the
 //   grip, Delete and the revealed row sit above it only because each is `relative z-[1]`.
 // `projectsDashboard.test.tsx` pins each pair; the release's browser check pins the rendering.
 
-/** The heading row: "Products" on the left, the toolbar on the right; wraps on a narrow screen. */
-export const HEAD_ROW = 'flex flex-wrap items-center justify-between gap-x-4 gap-y-3';
-export const HEADING = 'text-2xl leading-[normal] font-bold text-[#333] dark:text-[#e2e8f0]';
-
-/** The container the grid measures. Must be an ancestor of the grid, never the grid itself. */
-export const GRID_AREA = '@container';
-/** One column, two from 560 px of container width, three from 860; 16 px gaps. */
-export const GRID = 'grid grid-cols-1 gap-4 @min-[560px]:grid-cols-2 @min-[860px]:grid-cols-3 list-none m-0 p-0';
+// The heading row and the grid's geometry are the frame's since v0.57.0 (FRAME26): `HeadingRow`
+// (`.sf-headrow`) and `.sf-tiles`, from the vendored `src/styles/spert-frame.css`.
 
 /** The tile root. `group/tile` names the group the revealed row reads; `relative` anchors the open button's `::after`. */
 export const TILE =
@@ -57,7 +50,7 @@ export const NAME_ARCHIVED = 'text-[#666] dark:text-[#a0aec0]';
  * box-shadow that draws focus here, and only `outline-hidden` leaves an outline for them to paint.
  */
 export const OPEN =
-  "bg-transparent border-0 p-0 m-0 text-left font-semibold cursor-pointer underline-offset-[3px] group-hover/tile:underline focus-visible:underline focus-visible:outline-hidden after:absolute after:inset-0 after:rounded-[6px] after:content-[''] focus-visible:after:shadow-[0_0_0_2px_#ffffff,0_0_0_4px_#0070f3] dark:focus-visible:after:shadow-[0_0_0_2px_var(--color-gray-950),0_0_0_4px_#60a5fa]";
+  "bg-transparent border-0 p-0 m-0 text-left font-semibold cursor-pointer underline-offset-[3px] group-hover/tile:underline focus-visible:underline focus-visible:outline-hidden after:absolute after:inset-0 after:rounded-[6px] after:content-[''] focus-visible:after:shadow-[0_0_0_2px_#ffffff,0_0_0_4px_#0070f3] dark:focus-visible:after:shadow-[0_0_0_2px_var(--color-gray-900),0_0_0_4px_#60a5fa]";
 export const BADGE =
   'flex-none self-center px-[7px] py-px rounded-[4px] text-[0.72rem] font-semibold leading-[normal] whitespace-nowrap bg-[#e5e7eb] text-[#374151] dark:bg-[#2d3748] dark:text-[#e2e8f0]';
 /** Above the open button's `::after`, for controls that carry no `z-[1]` of their own. */
@@ -89,7 +82,7 @@ export const CHECKBOX = 'size-4 m-0 accent-[#0070f3]';
 /** "All products are archived…" (GanttApp's `.pt-empty`): the meta colour, italic. */
 export const ALL_ARCHIVED = 'leading-[normal] text-[#666] dark:text-[#a0aec0] italic';
 /** A one-line note above the grid (Forecaster's NOTE, whose `text-spert-text-secondary` produces no CSS here: its light value, #555). */
-export const NOTE = 'mb-4 text-sm text-[#555] dark:text-gray-300';
+export const NOTE = 'text-sm text-[#555] dark:text-gray-300';
 
 // ── The project dialog (New Product / Edit Product) ──
 export const OVERLAY = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50';

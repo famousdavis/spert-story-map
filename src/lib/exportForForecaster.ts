@@ -75,7 +75,7 @@ export function checkSprintFinishDates(product: Product): string[] {
   return [
     `${names} ${verb} no finish date. Forecaster places every sprint by its finish date, so ` +
       'an undated sprint would be left out, along with the progress recorded in it. Set the ' +
-      'dates in the Sprints section in Settings, then try again.',
+      'dates in the Sprints section in Product Settings, then try again.',
   ];
 }
 

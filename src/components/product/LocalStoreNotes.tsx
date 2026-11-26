@@ -19,7 +19,7 @@ export function LocalSignedInLine({ show }: { show: boolean }) {
  */
 function localOrphanText(count: number): string {
   const held = count === 1 ? '1 product, which may be someone else’s' : `${count} products, which may include other people’s`;
-  return `Your cloud account has no products. This browser’s Local storage holds ${held}. To upload any that are yours, go to App Settings → Storage, choose Local, then choose Cloud again and tick only your own.`;
+  return `Your cloud account has no products. This browser’s Local storage holds ${held}. To upload any that are yours, go to Settings → Storage, choose Local, then choose Cloud again and tick only your own.`;
 }
 
 export function LocalOrphanNote({ count }: { count: number }) {
