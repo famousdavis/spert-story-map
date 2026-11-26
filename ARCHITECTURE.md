@@ -17,8 +17,10 @@
 ```
 src/
 ├── main.tsx                          # Entry point, mounts BrowserRouter + App
-├── App.tsx                           # Route definitions
-├── index.css                         # Tailwind imports + dark mode variant + scrollbar styles
+├── App.tsx                           # Route definitions, all inside the AppShell layout route (the suite frame)
+├── index.css                         # Tailwind + the vendored frame stylesheet + dark mode variant + the title's two ramps + scrollbars of the app's own panels (#root *)
+├── styles/
+│   └── spert-frame.css               # The SPERT® Suite app frame's stylesheet, vendored byte for byte (never edited here; md5 pinned)
 │
 ├── types/
 │   └── index.ts                      # Core domain interfaces (Product, Theme, Backbone, RibItem, etc.)
@@ -43,6 +45,7 @@ src/
 │   ├── cloneName.ts                  # A copy's name (Clone, Import as copy): import's (Copy) numbering, never longer than 1000 characters
 │   ├── gestureGuard.ts               # Swallows the rest of a double-click after a tile opens its project
 │   ├── undoKeys.ts                   # The one rule for the undo keys on the Map and Sizing tabs (Ctrl/Cmd+Z, Shift+Z, Y) and the Mac check
+│   ├── framePlace.ts                 # Where a route sits in the frame: the current nav item, a product's tabs, canvas / capped / sticky; the canvas height
 │   ├── aiSessionRecords.ts           # Which Connect AI session this browser holds for each product (one localStorage key per product)
 │   ├── aiSessionTeardown.ts          # Ending Connect AI sessions outside the hook: sign-out, other sessions ended in the background, and the retry of a failed end
 │   ├── progressViewHelpers.ts        # Pure helpers for progress view (pct, delta, comments)
@@ -91,13 +94,16 @@ src/
 │   │   ├── CollapsibleSection.tsx    # Collapsible section with toggle
 │   │   ├── Tooltip.tsx               # Fast tooltip (200ms) via useTooltip hook
 │   │   ├── Section.tsx               # Reusable Section and Field layout components
-│   │   ├── ThemeToggle.tsx           # Sun/moon dark mode toggle button
-│   │   ├── StorageStatusPill.tsx    # 3-state pill showing local/cloud/sign-in status
-│   │   ├── HelpCenterLink.tsx        # Header link to the SPERT® Suite Help Center's Story Map page, in a new tab
-│   │   ├── header-link-styles.ts     # The one class string for the headers' text links (Help Center, About)
+│   │   ├── ThemeToggle.tsx           # The frame's theme button (.sf-theme): Light → Dark → System
+│   │   ├── StorageStatusPill.tsx    # The frame's account chip (.sf-chip): local / cloud / sign-in, three states
 │   │   └── FirstRunBanner.tsx       # Dismissible first-run ToS informational banner
-│   ├── layout/
-│   │   └── ProductLayout.tsx         # Header, tab nav, footer, outlet context
+│   ├── layout/                       # The SPERT® Suite app frame (FRAME26, v0.57.0)
+│   │   ├── AppShell.tsx              # The layout route around every page: skip link, brand row, nav row, notices slot, main, footer, Settings dialog
+│   │   ├── AppHeader.tsx             # Brand row: the brand link (favicon + gradient title), tagline, theme button, account chip
+│   │   ├── AppNav.tsx                # Navigation row: Products (+ a product's seven tabs) · Settings · About · Help Center
+│   │   ├── AppFooter.tsx             # The footer (two lines; wording and links unchanged)
+│   │   ├── HeadingRow.tsx            # A page's heading row: its h1, optional status text, toolbar
+│   │   └── ProductLayout.tsx         # A product's heading row (name, Saved, Connect AI), its notices, outlet context
 │   ├── settings/                     # Global and per-project settings components
 │   │   ├── AppSettingsModal.tsx      # Global settings modal (storage mode + export attribution)
 │   │   ├── StorageSection.tsx        # Storage mode toggle, auth UI, migration controls
@@ -106,9 +112,8 @@ src/
 │   │   ├── SizeMappingSection.tsx    # T-shirt size mapping editor
 │   │   └── DataSection.tsx           # Per-project import (parseImportFile + updateProduct) and export buttons
 │   ├── product/
-│   │   ├── ProjectsHeader.tsx        # Projects page header: suite title and tagline, gear, theme, About, storage pill
-│   │   ├── ProjectsToolbar.tsx       # "Projects" heading row: Export All · Import · Load Sample · New Project
-│   │   ├── ProjectGrid.tsx           # Grid of tiles (1/2/3 columns by container width); grip drag, drop takes the target's place
+│   │   ├── ProjectsToolbar.tsx       # "Products" heading row (the frame's): Export All · Import · Load Sample · New Product
+│   │   ├── ProjectGrid.tsx           # Grid of tiles (the frame's .sf-tiles: 3 columns at 1280 and 1440, 4 at 1920); grip drag, drop takes the target's place
 │   │   ├── ProjectTile.tsx           # One project's tile: grip, open button over the whole tile, lines, Delete, revealed Share · Export · Edit · Clone · Archive · Tile color; the archived look
 │   │   ├── tile-meta.ts              # A tile's lines: items/points/% complete, releases/sprints, unsized and progress not counting
 │   │   ├── tile-focus.ts             # Finds a tile's controls by project id and name, never by a selector built from them
@@ -182,7 +187,8 @@ src/
     ├── InsightsView.tsx              # Analytics dashboard
     ├── SettingsView.tsx              # Product configuration
     ├── ChangelogView.tsx             # Version history (reads CHANGELOG.md)
-    └── AboutView.tsx                 # About page (purpose, data security, license)
+    ├── AboutView.tsx                 # About page (purpose, data security, license)
+    └── NotFoundView.tsx              # An address no route matches: "Page not found", inside the frame
 
 legal/
 ├── TOS.pdf                           # Reference copy of Terms of Service
@@ -266,7 +272,7 @@ All state mutations flow through `updateProduct(prev => next)`. The `useProductM
 
 16. **Collapsible group summaries** — Progress tab group headers display item count, total points, % done, and a mini progress bar. Groups are collapsible via a `collapsedGroups` Set (reset on groupBy or sprint change). Both follow the selected sprint. Release groups show allocated points and `getReleasePercentComplete`; backbone/theme groups show whole ribs weighted by points. A footer shows what the groups leave out, so they add up to the header. Release Planning column headers also show a progress bar via the same `ProgressBar` component.
 
-17. **ToS & Privacy Policy acceptance (v0.17.0)** — Browsewrap footer links (ToS + Privacy Policy) render on all pages via the shared `Footer` component. A first-run banner (dismissed via `spert_firstRun_seen` localStorage key) informs new visitors that Cloud Storage requires agreement. A clickwrap consent modal (`TosConsentModal`) gates Cloud Storage sign-in — users must check a checkbox and click "Enable Cloud Storage" before Firebase Auth fires. Post-auth, `AuthProvider` writes acceptance to Firestore at `users/{uid}` with version, timestamp, auth provider, and originating app ID. Returning users are verified on app load: if the stored ToS version doesn't match the current version, the user is signed out and must re-accept. `tosHelpers.js` provides pure async functions for localStorage caching and Firestore read/write; `tosConstants.js` centralizes version strings and keys.
+17. **ToS & Privacy Policy acceptance (v0.17.0)** — Browsewrap footer links (ToS + Privacy Policy) render on all pages via the frame's `AppFooter` (every page but the Map and Sizing). A first-run banner (dismissed via `spert_firstRun_seen` localStorage key) informs new visitors that Cloud Storage requires agreement. A clickwrap consent modal (`TosConsentModal`) gates Cloud Storage sign-in — users must check a checkbox and click "Enable Cloud Storage" before Firebase Auth fires. Post-auth, `AuthProvider` writes acceptance to Firestore at `users/{uid}` with version, timestamp, auth provider, and originating app ID. Returning users are verified on app load: if the stored ToS version doesn't match the current version, the user is signed out and must re-accept. `tosHelpers.js` provides pure async functions for localStorage caching and Firestore read/write; `tosConstants.js` centralizes version strings and keys.
 
 19. **Excel export** — `exportForExcel.ts` transforms a `Product` into a three-sheet ExcelJS workbook, ordered high level to detail since v0.54.3 (Excel opens on the first): Sheet 1 (Themes & Backbones, added v0.54.2 as "Backbone Items") walks the themes themselves, so a theme with no backbones and a backbone with no ribs still appear: a shaded theme row carrying the theme's description, then one row per backbone (theme name repeated in column A for filtering) with its description; Sheet 2 (Release Summary) has one row per release; Sheet 3 (Rib Items) has one data row per rib item with a color-coded theme group header row before each theme. Each sheet is built by its own function (`addThemesAndBackbonesSheet`, `addReleaseSummarySheet`, `addRibItemsSheet`), and `buildExcelWorkbook` calls them in sheet order. Until v0.54.2 Rib Items was the first sheet, so anything reading the export by sheet position, rather than by name, changed with v0.54.3. `buildExcelWorkbook(product, ExcelJS)` accepts the ExcelJS constructor as a parameter so it is a pure async function testable in Vitest without a browser. `downloadExcelExport(product)` owns the dynamic `import('exceljs')` so ExcelJS (~1 MB) stays out of the initial bundle and loads on demand. Theme group header rows span all 10 Rib Items columns (`RIB_ITEM_COLUMNS`) via `mergeCells` (called before setting value/style). % Complete cells are conditionally filled: green (`FFD1FAE5`) at 100%, yellow (`FFFEF3C7`) for partial progress. The rib Description column (width 60, v0.54.2, placed just before Notes so columns A–H keep their places) and the Notes column (width 80) use `wrapText: true` + `vertical: 'top'` alignment on data cells only. Every text cell goes through `safeCell` (formula-injection guard).
 
