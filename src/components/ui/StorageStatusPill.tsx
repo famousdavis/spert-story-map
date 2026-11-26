@@ -6,26 +6,26 @@ import { useAuth } from '../../lib/AuthProvider';
 import { useStorage } from '../../lib/StorageProvider';
 import { getFirstName } from '../../lib/userDisplay';
 
+// The icons draw in `currentColor`, so they take the chip segment's colour: the state segment's muted text, or the act
+// segment's link blue (FRAME26, v0.57.0). Before, the cloud was a fixed #0070f3 and the lock its own grey.
 function CloudIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path
         d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"
-        fill="#0070f3"
+        fill="currentColor"
       />
     </svg>
   );
 }
 
+// In the signed-in-local state this glyph is the only sign of the storage mode, so WCAG 1.4.11's 3:1 applies: it is the
+// chip's muted text colour (4.84 / 6.82 : 1 on the page ground), in both segments.
 function LockIcon() {
-  // `currentColor` + themed classes, not a fixed #9CA3AF, which measured 2.54 on the light
-  // header. In the signed-in-local state this glyph is the only visual sign of the storage
-  // mode, so WCAG 1.4.11's 3:1 applies. The colour is on the svg because the icon renders
-  // in two segments: beside "Local only" when signed out, alone on the right when signed in.
   return (
     <svg
-      width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-      className="text-gray-500 dark:text-gray-400"
+      width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+      className="text-[color:var(--sf-text-muted)]"
     >
       <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -33,10 +33,28 @@ function LockIcon() {
   );
 }
 
+/** The signed-in person's initial: #0070f3 with a white letter (4.55 : 1), 22 px so it fits the 30 px chip. */
+function Avatar({ initial }: { initial: string }) {
+  return (
+    <span
+      className="flex items-center justify-center rounded-full text-white shrink-0"
+      style={{ width: 22, height: 22, backgroundColor: '#0070f3', fontSize: 11, fontWeight: 500 }}
+    >
+      {initial}
+    </span>
+  );
+}
+
 interface StorageStatusPillProps {
   onClick: () => void;
 }
 
+/**
+ * The frame's account chip (FRAME26, contract §3 and §7, v0.57.0): `.sf-chip`, 30 px tall, its right edge at the
+ * column's right edge, last in the brand row. Two segments: the state (`.sf-chip-state`, muted) and the act
+ * (`.sf-chip-act`, the link colour). The chip's ground on hover is the frame's `--sf-hover`. Every click, in every
+ * state, opens the app's Settings dialog. The accessible names are unchanged from v0.56.5.
+ */
 export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
   const { user } = useAuth();
   const { mode } = useStorage();
@@ -50,8 +68,8 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
     <button
       type="button"
       onClick={onClick}
-      className="group/pill flex items-center rounded-full cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-      style={{ border: '0.5px solid #D1D5DB' }}
+      className="sf-chip"
+      data-sf="chip"
       aria-label={
         isCloudSignedIn
           ? `Signed in as ${firstName} — cloud storage — click to open Cloud Storage settings`
@@ -60,83 +78,23 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
             : 'Sign in'
       }
     >
-      {isCloudSignedIn ? (
+      {isCloudSignedIn || isSignedInLocal ? (
         <>
-          {/* Left segment: avatar + first name */}
-          <div className="flex items-center gap-1.5 py-1 pl-1 pr-2.5">
-            <div
-              className="flex items-center justify-center rounded-full text-white shrink-0"
-              style={{
-                width: 26,
-                height: 26,
-                backgroundColor: '#0070f3',
-                fontSize: 11,
-                fontWeight: 500,
-              }}
-            >
-              {initial}
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-gray-100">
-              {firstName}
-            </span>
-          </div>
-          {/* Vertical divider */}
-          <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
-          {/* Right segment: cloud icon (visual only) */}
-          <div className="flex items-center justify-center px-2.5 py-1">
-            <CloudIcon />
-          </div>
-        </>
-      ) : isSignedInLocal ? (
-        <>
-          {/* Left segment: avatar + first name */}
-          <div className="flex items-center gap-1.5 py-1 pl-1 pr-2.5">
-            <div
-              className="flex items-center justify-center rounded-full text-white shrink-0"
-              style={{
-                width: 26,
-                height: 26,
-                backgroundColor: '#0070f3',
-                fontSize: 11,
-                fontWeight: 500,
-              }}
-            >
-              {initial}
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 500 }} className="text-gray-900 dark:text-gray-100">
-              {firstName}
-            </span>
-          </div>
-          {/* Vertical divider */}
-          <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
-          {/* Right segment: lock icon (visual only) */}
-          <div className="flex items-center justify-center px-2.5 py-1">
-            <LockIcon />
-          </div>
+          <span className="sf-chip-state">
+            <Avatar initial={initial} />
+            <span className="font-medium text-gray-900 dark:text-gray-100">{firstName}</span>
+          </span>
+          <span className="sf-chip-act">
+            {isCloudSignedIn ? <CloudIcon /> : <LockIcon />}
+          </span>
         </>
       ) : (
         <>
-          {/* Left segment: lock icon + "Local only" */}
-          <div className="flex items-center gap-1.5 py-1 pl-2.5 pr-2.5">
+          <span className="sf-chip-state">
             <LockIcon />
-            <span style={{ fontSize: 13 }} className="text-gray-500 dark:text-gray-400">
-              Local only
-            </span>
-          </div>
-          {/* Vertical divider */}
-          <div className="self-stretch" style={{ width: '0.5px', backgroundColor: '#D1D5DB' }} />
-          {/* Right segment: "Sign in" label (visual only) */}
-          <div className="flex items-center justify-center px-2.5 py-1">
-            {/* Colour from classes, never an inline style, which would beat the dark: variant. On the
-                light hover ground (gray-50) #0070f3 is 4.36:1, so hover steps to #155dfc (5.02:1);
-                the dark pair restates blue-400 on hover, where it is 5.56:1 on gray-800. */}
-            <span
-              style={{ fontSize: 12, fontWeight: 500 }}
-              className="text-[#0070f3] group-hover/pill:text-[#155dfc] dark:text-blue-400 dark:group-hover/pill:text-blue-400"
-            >
-              Sign in
-            </span>
-          </div>
+            <span>Local only</span>
+          </span>
+          <span className="sf-chip-act">Sign in</span>
         </>
       )}
     </button>

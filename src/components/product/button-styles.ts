@@ -8,9 +8,9 @@
 //
 // ⚠️ Copied through the brief's token map. Forecaster's SPERT blue is a theme colour Story Map
 // does not define: written as Forecaster names it, the class produces NO CSS and New Product's
-// label is white on white. Here it is the literal `[#0070f3]`. Forecaster's dark page is gray-900 and Story
-// Map's is gray-950, so the secondary button's dark background, which is meant to be the page
-// colour, is gray-950 here.
+// label is white on white. Here it is the literal `[#0070f3]`. The secondary button's dark
+// background is meant to be the page colour: gray-900 (`#101828`), the frame's dark ground since
+// v0.57.0 (FRAME26), as Forecaster's; it was gray-950, Story Map's old ground.
 //
 // Hover is `hover:` only: Tailwind 4 wraps it in `@media (hover: hover)`, so a touch screen never
 // keeps a hover look. Every hover and focus look is `enabled:`-gated, so a disabled button shows
@@ -22,7 +22,7 @@ export const TOOLBAR_BUTTON =
 
 /** Grey outline, dark text, the page's own background. */
 export const TOOLBAR_SECONDARY =
-  'font-medium bg-white text-[#333] border-[#8a8a8a] enabled:hover:bg-[#f5f5f5] dark:bg-gray-950 dark:text-[#e2e8f0] dark:border-[#8b9bb4] dark:enabled:hover:bg-[#2d3748]';
+  'font-medium bg-white text-[#333] border-[#8a8a8a] enabled:hover:bg-[#f5f5f5] dark:bg-gray-900 dark:text-[#e2e8f0] dark:border-[#8b9bb4] dark:enabled:hover:bg-[#2d3748]';
 
 /** The one filled button of a group. Hover #005bc4, as Forecaster's. */
 export const TOOLBAR_PRIMARY =

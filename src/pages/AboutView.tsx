@@ -4,21 +4,21 @@
 
 import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
-import { Footer } from './ChangelogView';
-import AppNotices from '../components/ui/AppNotices';
+import HeadingRow from '../components/layout/HeadingRow';
 
 const R = () => <sup className="text-[0.45em] text-gray-400 font-normal tracking-wide align-super">®</sup>;
 
+// In the frame (FRAME26, v0.57.0): a capped screen (X4). The heading row is `main`'s first child and stays full width;
+// the body below it keeps its 768 px measure, left-aligned at the column's edge (no `mx-auto`, which the 896 px cap
+// would centre). The back link stays as the body's first line.
 export default function AboutView() {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-3xl mx-auto px-6 py-12 flex-1 w-full">
+    <>
+      <HeadingRow>About This App</HeadingRow>
+      <div className="sf-below max-w-3xl">
         <div className="mb-8">
           <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Products</Link>
         </div>
-        <AppNotices className="mb-6" />
-
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-8">About This App</h1>
 
         {/* Purpose */}
         <Section title="Purpose">
@@ -73,7 +73,7 @@ export default function AboutView() {
         {/* Your Data & Security */}
         <Section title="Your Data & Security">
           <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-2">
-            SPERT Story Map offers two storage modes, configurable in App Settings:
+            SPERT Story Map offers two storage modes, configurable in Settings:
           </p>
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-3 mb-1">Local storage (default)</p>
           <ul className="ml-6 list-disc text-sm text-gray-600 dark:text-gray-400 leading-relaxed space-y-1">
@@ -138,8 +138,7 @@ export default function AboutView() {
           </p>
         </Section>
       </div>
-      <Footer />
-    </div>
+    </>
   );
 }
 

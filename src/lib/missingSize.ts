@@ -23,7 +23,7 @@ export function missingSizeLabel(size: Size | undefined, sizeMapping: SizeMappin
 /** Quoted, so a stray space or a change of case is visible: the label must be typed back exactly. */
 const quoted = (label: string) => `“${label}”`;
 
-const WHERE = 'Settings → T-Shirt Size Mapping';
+const WHERE = 'Product Settings → T-Shirt Size Mapping';
 
 /** The size picker's tooltip on a missing label. An empty list has nothing to pick. */
 export function pickerMissingTitle(label: string, sizeMapping: SizeMapping[]): string {

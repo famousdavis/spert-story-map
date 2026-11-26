@@ -23,6 +23,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import CardColorLegend from '../components/ui/CardColorLegend';
 import { isRibLocked } from '../lib/ribHelpers';
 import type { OutletContextValue } from '../types';
+import { CANVAS_HEIGHT } from '../lib/framePlace';
 
 export default function SizingView() {
   const { product, updateProduct, undo, redo } = useOutletContext<OutletContextValue>();
@@ -239,7 +240,7 @@ export default function SizingView() {
   }, [dragState]);
 
   return (
-    <div ref={containerRef} className="-mx-6 -mt-6 relative" style={{ height: 'calc(100vh - 112px)' }}>
+    <div ref={containerRef} className="relative -mb-12" style={{ height: CANVAS_HEIGHT }}>
       <MapCanvas
         zoom={zoom}
         setZoom={setZoom}

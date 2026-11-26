@@ -11,9 +11,8 @@ import { ALL_ARCHIVED, CHECK, CHECKBOX, NOTE } from './dashboard-styles';
 import { allArchivedLine } from './archive-text';
 
 /**
- * Directly under the heading row, above the import banner and every note, as Forecaster's
- * ProjectsTab places it: 12 px below the row (`-mt-1` against the row's `mb-4`) and 16 px above
- * what follows (GanttApp's `.pt-filter`). The caller renders it only while a listed product is
+ * In the frame's filter row (FRAME26, v0.57.0, `data-sf="filters"`): 16 px under the heading row,
+ * above the page's notes and the grid. The caller renders it only while a listed product is
  * archived.
  */
 export function ShowArchivedFilter({ count, checked, onChange }: {
@@ -23,7 +22,7 @@ export function ShowArchivedFilter({ count, checked, onChange }: {
 }) {
   const id = useId();
   return (
-    <div className="-mt-1 mb-4 leading-[normal]">
+    <div className="leading-[normal]">
       <label className={CHECK} htmlFor={id}>
         <input
           type="checkbox"
@@ -44,7 +43,7 @@ export function AllArchivedLine({ count }: { count: number }) {
   return <p className={ALL_ARCHIVED}>{allArchivedLine(count)}</p>;
 }
 
-/** A one-line note above the grid: R88's, or the cap's. */
+/** The filter row's status line about the tiles' own controls: R88's, or the cap's. */
 export function GridNote({ text }: { text: string }) {
   return <p className={NOTE}>{text}</p>;
 }

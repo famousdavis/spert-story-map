@@ -2,8 +2,9 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The Products dashboard's grid of tiles (v0.55.0): one column, two from 560 px of the grid's own
-// width, three from 860. Reordering is by dragging a tile's grip onto another tile, and the
+// The Products dashboard's grid of tiles (v0.55.0). Its geometry is the frame's `.sf-tiles` since
+// v0.57.0 (FRAME26, contract §3): `repeat(auto-fill, minmax(340px, 1fr))` with 16 px gaps, so 3
+// columns at 1280 and 1440, 4 at 1920. The tile itself is unchanged. Reordering is by dragging a tile's grip onto another tile, and the
 // dragged project takes that tile's place, in both directions: a box drawn round a whole tile
 // promises "this project will go here" (SPERT Forecaster's
 // `src/features/projects/components/ProjectList.tsx:118-148` at 38f1a63).
@@ -13,7 +14,6 @@
 import { useId, useState } from 'react';
 import type React from 'react';
 import ProjectTile, { type TileProject } from './ProjectTile';
-import { GRID, GRID_AREA } from './dashboard-styles';
 import type { TileColor } from '../../lib/projectPrefs';
 
 export interface GridProject extends TileProject {
@@ -83,46 +83,44 @@ export default function ProjectGrid({
   };
 
   return (
-    <div className={GRID_AREA}>
-      <ul className={GRID} aria-label="Products">
-        {projects.map((p, index) => (
-          <ProjectTile
-            key={p.id}
-            project={p}
-            idBase={`${idBase}-${index}`}
-            isShared={p.isShared}
-            canEdit={p.canEdit}
-            canDelete={p.canDelete}
-            showShare={p.showShare}
-            isDragged={draggedId === p.id}
-            isDropTarget={overId === p.id}
-            color={p.color}
-            archived={p.archived}
-            colorOpen={colorOpenFor === p.id}
-            onColorOpenChange={open => onColorOpenChange(p.id, open)}
-            onPickColor={color => onPickColor(p.id, color)}
-            onArchive={() => onArchive(p.id)}
-            onUnarchive={() => onUnarchive(p.id)}
-            prefsDisabledReason={p.prefsDisabledReason}
-            dragDisabledReason={dragDisabledReason}
-            onOpen={e => onOpen(p.id, e)}
-            onShare={() => onShare(p.id)}
-            onExport={() => onExport(p.id)}
-            onEdit={() => onEdit(p.id)}
-            onClone={() => onClone(p.id)}
-            onDelete={() => onDelete(p.id)}
-            onGripDragStart={e => handleGripDragStart(e, p.id, index)}
-            onDragEnd={endDrag}
-            onDragOver={e => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
-              setOverId(p.id);
-            }}
-            onDragLeave={() => setOverId(null)}
-            onDrop={e => handleDrop(e, p.id)}
-          />
-        ))}
-      </ul>
-    </div>
+    <ul className="sf-tiles" data-sf="tiles" aria-label="Products">
+      {projects.map((p, index) => (
+        <ProjectTile
+          key={p.id}
+          project={p}
+          idBase={`${idBase}-${index}`}
+          isShared={p.isShared}
+          canEdit={p.canEdit}
+          canDelete={p.canDelete}
+          showShare={p.showShare}
+          isDragged={draggedId === p.id}
+          isDropTarget={overId === p.id}
+          color={p.color}
+          archived={p.archived}
+          colorOpen={colorOpenFor === p.id}
+          onColorOpenChange={open => onColorOpenChange(p.id, open)}
+          onPickColor={color => onPickColor(p.id, color)}
+          onArchive={() => onArchive(p.id)}
+          onUnarchive={() => onUnarchive(p.id)}
+          prefsDisabledReason={p.prefsDisabledReason}
+          dragDisabledReason={dragDisabledReason}
+          onOpen={e => onOpen(p.id, e)}
+          onShare={() => onShare(p.id)}
+          onExport={() => onExport(p.id)}
+          onEdit={() => onEdit(p.id)}
+          onClone={() => onClone(p.id)}
+          onDelete={() => onDelete(p.id)}
+          onGripDragStart={e => handleGripDragStart(e, p.id, index)}
+          onDragEnd={endDrag}
+          onDragOver={e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            setOverId(p.id);
+          }}
+          onDragLeave={() => setOverId(null)}
+          onDrop={e => handleDrop(e, p.id)}
+        />
+      ))}
+    </ul>
   );
 }

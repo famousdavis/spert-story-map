@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const storage = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
 vi.mock('../lib/StorageProvider', () => ({ useStorage: () => storage.value }));
@@ -25,6 +25,7 @@ vi.mock('../lib/AuthProvider', () => ({ useAuth: () => ({ user: null }) }));
 import { createLocalStorageDriver } from '../lib/storageDriver';
 import { createSampleProduct } from '../lib/sampleData';
 import ProductList from '../pages/ProductList';
+import AppShell from '../components/layout/AppShell';
 import { resetLocalCaution } from '../lib/localCaution';
 
 const GANTT_ICON_PATHS = {
@@ -59,10 +60,15 @@ function seedProject() {
 
 /** The toolbar's buttons: the button siblings of the `Projects` heading's row. */
 function toolbarButtons(): HTMLButtonElement[] {
-  const heading = screen.getByRole('heading', { level: 2, name: 'Products' });
+  const heading = screen.getByRole('heading', { level: 1, name: 'Products' });
   const row = heading.parentElement!;
   return within(row).getAllByRole('button') as HTMLButtonElement[];
 }
+
+/** The Products page inside the app frame (AppShell, v0.57.0), which holds the app-wide notices. */
+const renderList = () => render(
+  <MemoryRouter><Routes><Route element={<AppShell />}><Route path="/" element={<ProductList />} /></Route></Routes></MemoryRouter>,
+);
 
 const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
@@ -82,14 +88,14 @@ afterEach(() => {
 
 describe('project list toolbar', () => {
   it('shows Export All · Import · Load Sample · New Project, in that order, beside a Projects heading', async () => {
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await loaded();
     const buttons = toolbarButtons();
     expect(buttons.map(b => b.textContent)).toEqual(EXPECTED.map(e => e.label));
   });
 
   it('gives each button an accessible name that begins with its visible label', async () => {
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await loaded();
     for (const [i, button] of toolbarButtons().entries()) {
       const want = EXPECTED[i]!;
@@ -100,7 +106,7 @@ describe('project list toolbar', () => {
   });
 
   it('puts GanttApp\'s icon, 18 px and hidden from assistive tech, before each label', async () => {
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await loaded();
     for (const [i, button] of toolbarButtons().entries()) {
       const svgs = button.querySelectorAll('svg');
@@ -118,14 +124,14 @@ describe('project list toolbar', () => {
   });
 
   it('keeps Export All in place but disabled with no projects; the rest stay enabled', async () => {
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await loaded();
     expect(toolbarButtons().map(b => b.disabled)).toEqual([true, false, false, false]);
   });
 
   it('enables Export All once there is a project, with the order unchanged', async () => {
     const p = seedProject();
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await screen.findByText(p.name);
     const buttons = toolbarButtons();
     expect(buttons.map(b => b.textContent)).toEqual(EXPECTED.map(e => e.label));
@@ -134,9 +140,9 @@ describe('project list toolbar', () => {
 
   it('sits below the app-wide notices and above the import area and the list', async () => {
     const p = seedProject();
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await screen.findByText(p.name);
-    const heading = screen.getByRole('heading', { level: 2, name: 'Products' });
+    const heading = screen.getByRole('heading', { level: 1, name: 'Products' });
     const terms = screen.getByText(/SPERT® Suite web apps are free to use/);
     const caution = await screen.findByText(/Your data exists only in this browser/);
     const fileInput = document.querySelector('input[type="file"]')!;
@@ -149,7 +155,7 @@ describe('project list toolbar', () => {
   it('keeps Import disabled, with its note, while cloud projects load; every button still renders', async () => {
     const pending = { ...driver, loadProductIndex: () => new Promise<never>(() => {}) };
     storage.value = { driver: pending, mode: 'cloud', storageReady: true };
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await screen.findByText('Loading products...');
     const buttons = toolbarButtons();
     expect(buttons.map(b => b.textContent)).toEqual(EXPECTED.map(e => e.label));
@@ -161,7 +167,7 @@ describe('project list toolbar', () => {
     const created = new Promise<void>(() => {});
     const blocked = { ...driver, createProduct: () => created };
     storage.value = { driver: blocked, mode: 'local', storageReady: true };
-    render(<MemoryRouter><ProductList /></MemoryRouter>);
+    renderList();
     await loaded();
     const file = new File([JSON.stringify(createSampleProduct())], 'p.json', { type: 'application/json' });
     await userEvent.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, file);

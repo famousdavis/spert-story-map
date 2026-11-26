@@ -76,35 +76,39 @@ describe('the header and the page', () => {
   it('is a header over a main: the title in three runs, the tagline without the storage sentence', async () => {
     await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
     const header = req(document.querySelector('header'), 'header');
-    const h1 = within(header).getByRole('heading', { level: 1 });
-    // v0.56.4 (HDR26): the space before "Story Map" is the heading's own text, not the start of a span.
-    expect([...h1.querySelectorAll('span')].map(s => s.textContent)).toEqual(['SPERT', '®', 'Story Map']);
-    expect(h1.textContent).toBe('SPERT® Story Map');
+    // v0.57.0 (FRAME26): the title is the frame's brand title, not a heading; the page's h1 is in main.
+    const title = req(header.querySelector('[data-sf="title"]'), 'title');
+    expect(within(header).queryByRole('heading')).toBeNull();
+    // v0.56.4 (HDR26): the space before "Story Map" is the title's own text, not the start of a span.
+    expect([...title.querySelectorAll('span')].map(s => s.textContent)).toEqual(['SPERT', '®', 'Story Map']);
+    expect(title.textContent).toBe('SPERT® Story Map');
     expect(req(header.querySelector('p'), 'tagline').textContent).toBe('Plan and track agile product releases');
     expect(document.body.textContent).not.toMatch(/Data is stored (locally|in your cloud)/);
     const main = req(document.querySelector('main'), 'main');
-    expect(within(main).getByRole('heading', { level: 2, name: 'Products' })).toBeTruthy();
+    expect(within(main).getByRole('heading', { level: 1, name: 'Products' })).toBeTruthy();
     expect(within(main).getByRole('list', { name: 'Products' })).toBeTruthy();
   });
 
-  it('keeps the logo\'s link home, the gear, About and the theme toggle', async () => {
+  it('keeps the brand\'s link home, Settings, About and the theme button (in the frame since v0.57.0)', async () => {
     seedLocal([]);
     renderPage();
     await screen.findByText('Welcome to SPERT® Story Map');
     const header = req(document.querySelector('header'), 'header');
-    expect(within(header).getByRole('link', { name: 'Go to products home' }).getAttribute('href')).toBe('/');
-    expect(within(header).getByTitle('App Settings')).toBeTruthy();
-    expect(within(header).getByRole('link', { name: 'About' })).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'SPERT® Story Map' }).getAttribute('href')).toBe('/');
+    expect(within(header).getByRole('button', { name: /^(Light mode|Dark mode|System default)$/ })).toBeTruthy();
+    const nav = req(document.querySelector('nav'), 'nav');
+    expect(within(nav).getByRole('button', { name: 'Settings' })).toBeTruthy();
+    expect(within(nav).getByRole('link', { name: 'About' })).toBeTruthy();
   });
 });
 
 describe('the grid: the class pairs a look depends on', () => {
-  it('the grid\'s column queries are answered by an ANCESTOR carrying @container, never by the grid itself', async () => {
+  it('the grid is the frame\'s `.sf-tiles` (v0.57.0): its columns and gaps are the stylesheet\'s, with no container queries', async () => {
     await showProjects([makeProject({ id: 'p1', name: 'Alpha' })]);
     const grid = screen.getByRole('list', { name: 'Products' });
-    expect(classes(grid)).toEqual(expect.arrayContaining(['grid', 'grid-cols-1', '@min-[560px]:grid-cols-2', '@min-[860px]:grid-cols-3', 'gap-4']));
-    expect(classes(grid)).not.toContain('@container');
-    expect(classes(grid.parentElement)).toContain('@container');
+    expect(classes(grid)).toEqual(['sf-tiles']);
+    expect(grid.getAttribute('data-sf')).toBe('tiles');
+    expect(classes(grid.parentElement)).not.toContain('@container');
   });
 
   it('the revealed row shows on tile hover, on focus inside the tile, and always without hover, and the tile root is the group it reads', async () => {

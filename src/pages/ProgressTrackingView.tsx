@@ -237,7 +237,7 @@ export default function ProgressTrackingView() {
       {/* Rib item progress table */}
       {product.sprints.length === 0 ? (
         <div className="text-center py-12 text-gray-400 dark:text-gray-500">
-          <p>No sprints defined. Add sprints in Settings to start tracking progress.</p>
+          <p>No sprints defined. Add sprints in Product Settings to start tracking progress.</p>
         </div>
       ) : assignedRibs.length === 0 ? (
         <div className="text-center py-12 text-gray-400 dark:text-gray-500">

@@ -2,20 +2,15 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-import { useState, useEffect, useCallback } from 'react';
-import { NavLink, Link, useParams, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { Link, useParams, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useProduct } from '../../hooks/useProduct';
 import { useStorage } from '../../lib/StorageProvider';
 import { formatRelativeTime } from '../../lib/formatDate';
-import { useDarkMode } from '../../hooks/useDarkMode';
-import ThemeToggle from '../ui/ThemeToggle';
-import StorageStatusPill from '../ui/StorageStatusPill';
-import HelpCenterLink from '../ui/HelpCenterLink';
-import AppSettingsModal from '../settings/AppSettingsModal';
-import AppNotices from '../ui/AppNotices';
+import { framePlace } from '../../lib/framePlace';
 import CloudLoadNotice from '../ui/CloudLoadNotice';
 import ErrorBoundary from '../ui/ErrorBoundary';
-import { Footer } from '../../pages/ChangelogView';
+import HeadingRow from './HeadingRow';
 import { useAiConnectivity } from '../../hooks/useAiConnectivity';
 import { isFirebaseAvailable } from '../../lib/firebase';
 import { AI_CONSENT_KEY, AI_CONSENT_VERSION } from '../../lib/aiConstants';
@@ -23,15 +18,10 @@ import { anySessionRecorded } from '../../lib/aiSessionRecords';
 import ConsentModal from '../ConnectAI/ConsentModal';
 import ConnectPanel from '../ConnectAI/ConnectPanel';
 
-const tabs = [
-  { path: 'structure', label: 'Structure', icon: '◫' },
-  { path: 'releases', label: 'Releases', icon: '▦' },
-  { path: 'storymap', label: 'Map', icon: '▤' },
-  { path: 'sizing', label: 'Sizing', icon: '⊞' },
-  { path: 'progress', label: 'Progress', icon: '◔' },
-  { path: 'insights', label: 'Insights', icon: '◨' },
-  { path: 'settings', label: 'Settings', icon: '⚙' },
-];
+/** On the Map and Sizing `main` runs full bleed (X2): the heading row and the notices go in the shared column there. */
+function ProductColumn({ canvas, children }: { canvas: boolean; children: ReactNode }) {
+  return canvas ? <div className="sf-col">{children}</div> : <>{children}</>;
+}
 
 export default function ProductLayout() {
   const { productId } = useParams();
@@ -39,10 +29,8 @@ export default function ProductLayout() {
   const { driver, mode } = useStorage();
   const navigate = useNavigate();
   const [saveError, setSaveError] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const { theme, toggleTheme, isDark } = useDarkMode();
   const location = useLocation();
-  const isCanvasView = /\/(storymap|sizing)(\/|$)/.test(location.pathname);
+  const isCanvasView = framePlace(location.pathname).canvas;
 
   // Called before the null-check early returns below so the Rules of Hooks
   // hold (product may be null during initial load).
@@ -97,142 +85,87 @@ export default function ProductLayout() {
     }
   }, [loading, product, mode, navigate]);
 
+  // Inside the frame (FRAME26, v0.57.0): the navigation row already shows this product's tabs, read from the route,
+  // so while the product loads, or cannot be found, only the body says so. On the Map and Sizing `main` runs full
+  // bleed (X2), so the heading row and the product's notices sit in the shared column there.
   if (loading) {
-    return <div className="flex items-center justify-center h-screen text-gray-400 dark:text-gray-500">Loading...</div>;
+    return (
+      <ProductColumn canvas={isCanvasView}>
+        <HeadingRow>Product</HeadingRow>
+        <p className="sf-below text-sm text-gray-600 dark:text-gray-300">Loading...</p>
+      </ProductColumn>
+    );
   }
 
   if (!product) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">Product not found</p>
+      <ProductColumn canvas={isCanvasView}>
+        <HeadingRow>Product</HeadingRow>
+        <div className="sf-below">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Product not found</p>
           <Link to="/" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium">Back to Products</Link>
         </div>
-      </div>
+      </ProductColumn>
     );
   }
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
-        <div className="max-w-[1600px] mx-auto px-6">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-4">
-              <Link
-                to="/"
-                onClick={() => window.scrollTo(0, 0)}
-                aria-label="Go to products home"
-                className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              >
-                <img
-                  src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
-                  alt="SPERT Story Map icon"
-                  className="h-7 w-7 rounded-lg ring-1 ring-white/20"
-                />
-              </Link>
-              <Link
-                to="/"
-                onClick={() => window.scrollTo(0, 0)}
-                className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-sm"
-              >
-                ← Products
-              </Link>
-              <div className="h-5 w-px bg-gray-200 dark:bg-gray-700" />
-              <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate max-w-xs">
-                {product.name}
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              {lastSaved && (
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  Saved {formatRelativeTime(lastSaved)}
-                </span>
-              )}
-              {isFirebaseAvailable && (
-                <button onClick={handleConnectAiClick}
-                  title={sessionState.sessionActive ? 'AI session active' : 'Connect an AI assistant'}
-                  className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
-                    sessionState.sessionActive
-                      ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20'
-                      : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
-                  }`}
-                >
-                  {sessionState.sessionActive && (
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      sessionState.aiConnected ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
-                    }`} />
-                  )}
-                  {sessionState.sessionActive ? 'AI' : 'Connect AI'}
-                </button>
-              )}
-              <button
-                onClick={() => setShowSettings(true)}
-                title="App Settings"
-                className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-              </button>
-              <ThemeToggle theme={theme} onToggle={toggleTheme} />
-              <HelpCenterLink />
-              <StorageStatusPill onClick={() => setShowSettings(true)} />
-            </div>
-          </div>
-          {/* Tab navigation */}
-          <nav className="flex gap-1 -mb-px">
-            {tabs.map(tab => (
-              <NavLink
-                key={tab.path}
-                to={`/product/${productId}/${tab.path}`}
-                className={({ isActive }) =>
-                  `px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                    isActive
-                      ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
-                  }`
-                }
-              >
-                <span className="mr-1.5">{tab.icon}</span>
-                {tab.label}
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-      </header>
-
-      <AppNotices className="max-w-[1600px] mx-auto w-full px-6 mt-4" />
-
-      {/* Save error banner — mode-aware copy. Cloud failures are usually
-          transient network issues, not quota exhaustion; the localStorage
-          message would be misleading there. */}
-      {saveError && (
-        <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-700/50 px-6 py-2 text-center">
-          <p className="text-xs text-red-700 dark:text-red-300">
-            {mode === 'cloud'
-              ? 'Changes may not have saved. Check your connection.'
-              : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
-          </p>
-        </div>
+  // The product's own heading row (contract §7): its name is the page's h1, one line, cut with an ellipsis, the full
+  // name in `title`. Saved is status text just left of the toolbar, outside it, at its own 12 px (D10), in the frame's
+  // muted colour (4.84 : 1 on #ffffff, 6.82 on #101828). Connect AI is the toolbar's one button, 36 px (`.sf-btn`),
+  // its two states and colours as before.
+  const saved = lastSaved ? (
+    <span className="flex-none text-xs whitespace-nowrap text-[color:var(--sf-text-muted)]">
+      Saved {formatRelativeTime(lastSaved)}
+    </span>
+  ) : null;
+  const connectAi = isFirebaseAvailable ? (
+    <button type="button" onClick={handleConnectAiClick}
+      title={sessionState.sessionActive ? 'AI session active' : 'Connect an AI assistant'}
+      className={`sf-btn px-2.5 rounded-md transition-colors ${
+        sessionState.sessionActive
+          ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20'
+          : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+      }`}
+    >
+      {sessionState.sessionActive && (
+        <span className={`w-1.5 h-1.5 rounded-full ${
+          sessionState.aiConnected ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
+        }`} />
       )}
+      {sessionState.sessionActive ? 'AI' : 'Connect AI'}
+    </button>
+  ) : null;
 
-      <CloudLoadNotice productId={product.id} productName={product.name} />
+  return (
+    <>
+      <ProductColumn canvas={isCanvasView}>
+        <HeadingRow title={product.name} status={saved} toolbar={connectAi}>{product.name}</HeadingRow>
 
-      {/* Content — its own boundary, so a view that cannot render leaves the
-          header, the tabs and the way back to the project list in place. The
-          app-level boundary's Reload re-renders the same data, which is no way
-          out at all. Cleared on navigation. */}
-      <main className={`flex-1 w-full px-6 py-6 ${isCanvasView ? '' : 'max-w-[1600px] mx-auto'}`}>
+        {/* The product's own notices, below its heading row: they belong to this product on every tab, not to the
+            app, so they are not in the frame's notices slot. The save error's words are mode-aware: cloud failures
+            are usually a network issue, not quota exhaustion. */}
+        {saveError && (
+          <div className="sf-notice sf-notice--error sf-below">
+            <p>
+              {mode === 'cloud'
+                ? 'Changes may not have saved. Check your connection.'
+                : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
+            </p>
+          </div>
+        )}
+
+        <CloudLoadNotice productId={product.id} productName={product.name} />
+      </ProductColumn>
+
+      {/* The view, with its own boundary, so a view that cannot render leaves the frame, the tabs and the way back to
+          the product list in place. The app-level boundary's Reload re-renders the same data, which is no way out at
+          all. Cleared on navigation. */}
+      <div className="sf-below">
         <ErrorBoundary inline resetKey={location.pathname}>
           <Outlet context={{ product, updateProduct, undo, redo }} />
         </ErrorBoundary>
-      </main>
+      </div>
 
-      {!isCanvasView && <Footer />}
-
-      <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
       <ConsentModal
         open={showAiConsent}
         onClose={() => setShowAiConsent(false)}
@@ -247,6 +180,6 @@ export default function ProductLayout() {
         onChangePermissions={changePermissions}
         onDisconnect={stopSession}
       />
-    </div>
+    </>
   );
 }

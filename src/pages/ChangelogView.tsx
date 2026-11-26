@@ -5,9 +5,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../lib/version';
-import { TOS_URL, PRIVACY_POLICY_URL, LICENSE_URL } from '../lib/tosConstants';
-import { AI_PRIVACY_URL } from '../lib/aiConstants';
-import AppNotices from '../components/ui/AppNotices';
+import HeadingRow from '../components/layout/HeadingRow';
 
 export default function ChangelogView() {
   const [content, setContent] = useState('');
@@ -20,14 +18,15 @@ export default function ChangelogView() {
       .catch(() => { setContent(''); setLoading(false); });
   }, []);
 
+  // In the frame (FRAME26, v0.57.0): a capped screen (X4), reached from the footer's Version link, so no navigation
+  // item is current. The heading row is `main`'s first child; the body keeps its 768 px measure at the column's edge.
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
-      <div className="max-w-3xl mx-auto px-6 py-12 flex-1 w-full">
+    <>
+      <HeadingRow>Changelog</HeadingRow>
+      <div className="sf-below max-w-3xl">
         <div className="mb-8">
           <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">← Back to Products</Link>
         </div>
-        <AppNotices className="mb-6" />
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Changelog</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
           Version history for SPERT® Story Map. Current version: <strong>v{APP_VERSION}</strong>
         </p>
@@ -41,8 +40,7 @@ export default function ChangelogView() {
           <p className="text-gray-400 dark:text-gray-500">No changelog available.</p>
         )}
       </div>
-      <Footer />
-    </div>
+    </>
   );
 }
 
@@ -160,41 +158,4 @@ export function MarkdownRenderer({ content }: { content: string }) {
   flushAll();
 
   return <>{elements}</>;
-}
-
-export function Footer() {
-  return (
-    <footer className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-3 text-sm text-gray-500 dark:text-gray-400">
-      <div className="mx-auto w-full max-w-7xl px-4 text-center">
-        <div>
-          &copy; {new Date().getFullYear()} William W. Davis, MSPM, PMP |{' '}
-          <Link to="/changelog" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-            Version {APP_VERSION}
-          </Link>{' '}
-          | Licensed under GNU GPL v3
-        </div>
-        <div className="mt-1">
-          <a href="https://spertsuite.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-            SPERT® Suite
-          </a>
-          {' | '}
-          <a href={TOS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-            Terms of Service
-          </a>
-          {' | '}
-          <a href={PRIVACY_POLICY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-            Privacy Policy
-          </a>
-          {' | '}
-          <a href={AI_PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-            AI Privacy Notice
-          </a>
-          {' | '}
-          <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-            License
-          </a>
-        </div>
-      </div>
-    </footer>
-  );
 }

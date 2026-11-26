@@ -11,6 +11,8 @@ interface CloudLoadNoticeProps {
 }
 
 /**
+ * The frame's caution notice (v0.57.0), below the product's heading row: it belongs to this product, on every tab.
+ *
  * Shown when part of a project could not be read and was left out so the project
  * could open, on either read path (see `guardCloudProduct`). Names the project, never the
  * value. The next save removes the part that was left out. The cloud driver raises this
@@ -20,14 +22,14 @@ export default function CloudLoadNotice({ productId, productName }: CloudLoadNot
   const shown = useSyncExternalStore(subscribeGuardedLoads, () => isGuardedLoad(productId));
   if (!shown) return null;
   return (
-    <div role="status" className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700/50 px-6 py-2 flex items-center justify-center gap-3">
-      <p className="text-xs text-amber-800 dark:text-amber-200">
+    <div role="status" className="sf-notice sf-notice--caution sf-below">
+      <p>
         Part of &ldquo;{productName || 'this product'}&rdquo; could not be read and was left out so the product could open. If you make changes, that part will not be kept.
       </p>
       <button
         type="button"
         onClick={() => dismissGuardedLoad(productId)}
-        className="text-xs font-medium text-amber-800 dark:text-amber-200 underline hover:no-underline flex-shrink-0"
+        className="sf-notice-dismiss"
       >
         Dismiss
       </button>

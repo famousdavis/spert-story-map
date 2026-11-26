@@ -19,6 +19,7 @@ vi.mock('../lib/StorageProvider', () => ({ useStorage: () => storage.value }));
 vi.mock('../lib/AuthProvider', () => ({ useAuth: () => ({ user: null, firebaseAvailable: false }) }));
 
 import ProductLayout from '../components/layout/ProductLayout';
+import AppShell from '../components/layout/AppShell';
 import SettingsView from '../pages/SettingsView';
 import StoryMapView from '../pages/StoryMapView';
 import { createLocalStorageDriver } from '../lib/storageDriver';
@@ -54,9 +55,12 @@ describe('a Data replace through the real layout and Settings tab', () => {
     render(
       <MemoryRouter initialEntries={['/product/p1/settings']}>
         <Routes>
-          <Route path="/product/:productId" element={<ProductLayout />}>
-            <Route path="settings" element={<SettingsView />} />
-            <Route path="storymap" element={<StoryMapView />} />
+          {/* v0.57.0: the product's tabs are the app frame's (AppShell), around the layout. */}
+          <Route element={<AppShell />}>
+            <Route path="/product/:productId" element={<ProductLayout />}>
+              <Route path="settings" element={<SettingsView />} />
+              <Route path="storymap" element={<StoryMapView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -69,7 +73,7 @@ describe('a Data replace through the real layout and Settings tab', () => {
     await waitFor(() => expect(shownName()).toBe('From file'));
 
     // The Map tab, by its own link: the stacks live in the layout, so they survive the tab change.
-    await userEvent.click(screen.getByRole('link', { name: /Map/ }));
+    await userEvent.click(screen.getByRole('link', { name: 'Map' }));
     await waitFor(() => expect(document.querySelector('[data-map-container]')).not.toBeNull());
 
     key({ key: 'z', ctrlKey: true });

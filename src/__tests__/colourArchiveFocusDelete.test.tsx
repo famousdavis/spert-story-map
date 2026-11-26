@@ -55,7 +55,7 @@ function storedPrefs(): Prefs {
 async function show(names: string[], projectPrefs: Prefs = {}) {
   seed(names, projectPrefs);
   renderPage();
-  await screen.findByText('Products');
+  await screen.findByRole('heading', { level: 1, name: 'Products' });
   await settle();
 }
 const tileOf = (name: string) => req(tiles().find(t => t.querySelector('h3')?.textContent === name), `tile ${name}`);

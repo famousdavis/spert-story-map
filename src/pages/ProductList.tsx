@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import type React from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { exportProduct, createNewProduct, duplicateProduct, loadProductIndex as loadLocalIndex } from '../lib/storage';
 import { exportAllProductsBundled } from '../lib/importExport';
 import { useImportState } from '../hooks/useImportState';
@@ -21,21 +21,17 @@ import { swallowRestOfGesture } from '../lib/gestureGuard';
 import { useStorage } from '../lib/StorageProvider';
 import { useAuth } from '../lib/AuthProvider';
 import { INVITATIONS_ENABLED } from '../lib/featureFlags';
-import { useDarkMode } from '../hooks/useDarkMode';
-import AppSettingsModal from '../components/settings/AppSettingsModal';
-import AppNotices from '../components/ui/AppNotices';
-import ProjectsHeader from '../components/product/ProjectsHeader';
 import ProjectsToolbar from '../components/product/ProjectsToolbar';
 import { type GridProject } from '../components/product/ProjectGrid';
 import ProductsBody from '../components/product/ProductsBody';
-import { ShowArchivedFilter } from '../components/product/ArchiveControls';
+import { ShowArchivedFilter, GridNote } from '../components/product/ArchiveControls';
+import { SETTINGS_UNREAD_NOTICE } from '../components/product/archive-text';
 import ProjectDialog, { type ProjectEdits } from '../components/product/ProjectDialog';
 import DeleteProjectDialog from '../components/product/DeleteProjectDialog';
 import { findTile, findTileControl } from '../components/product/tile-focus';
 import ShareDialog from '../components/product/ShareDialog';
 import { LocalSignedInLine, LocalOrphanNote } from '../components/product/LocalStoreNotes';
 import { useExportAll } from '../components/product/useExportAll';
-import { Footer } from './ChangelogView';
 import type { MemberRole, Product, StorageDriver } from '../types';
 
 function enrichProduct(product: Product) {
@@ -80,7 +76,6 @@ export default function ProductList() {
   const [announcement, setAnnouncement] = useState('');
   const announceTimerRef = useRef<number | null>(null);
   const [cloudDataLoaded, setCloudDataLoaded] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [localOrphanCount, setLocalOrphanCount] = useState(0);
   const [shareTarget, setShareTarget] = useState<{ id: string; name: string } | null>(null);
   // One-shot banner shown when useProduct redirects here with router state
@@ -96,9 +91,9 @@ export default function ProductList() {
   const isCloudMode = mode === 'cloud';
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, toggleTheme, isDark } = useDarkMode();
 
-  const mainRef = useRef<HTMLElement>(null);
+  // The page's own root inside the frame's `main`: tile focus and the archive look for tiles here.
+  const mainRef = useRef<HTMLDivElement>(null);
   const newProjectRef = useRef<HTMLButtonElement>(null);
   // The button that opened the New Product dialog: the toolbar's, or the welcome panel's.
   const newOpenerRef = useRef<HTMLElement | null>(null);
@@ -372,122 +367,100 @@ export default function ProductList() {
 
   const editTarget = dialog?.kind === 'edit' ? dialog : null;
 
+  const settingsUnread = order.settings.status === 'failed';
+  const showFilters = !loading && (archive.archivedCount > 0 || settingsUnread || !!archive.notice);
+
+  // Inside the frame (FRAME26, v0.57.0): the heading row ("Products", the toolbar), then the filter row
+  // (`data-sf="filters"`, 16 px below it: "Show archived (N)" and the one status line about the tiles' own
+  // controls), then this page's own notices in today's order, then the grid or the empty panel (D12, CFD's order).
+  // The app-wide notices are the frame's, above `main`.
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950">
-      <div className="max-w-[1200px] w-full mx-auto px-2 sm:px-4 md:px-8 p-4 sm:p-6 md:p-8 flex-1 flex flex-col">
-        <ProjectsHeader
-          logo={(
-            <Link
-              to="/"
-              onClick={() => window.scrollTo(0, 0)}
-              aria-label="Go to products home"
-              className="mr-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            >
-              <img
-                src={isDark ? "/spert-favicon-storymap-dark.png" : "/spert-favicon-storymap.png"}
-                alt="SPERT Story Map icon"
-                className="h-7 w-7 rounded-lg ring-1 ring-white/20"
-              />
-            </Link>
-          )}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onOpenSettings={() => setShowSettings(true)}
-        />
+    <div ref={mainRef}>
+      <ProjectsToolbar
+        hasProjects={products.length > 0}
+        importDisabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
+        newProjectRef={newProjectRef}
+        onExportAll={exportAll.onExportAll}
+        onImport={() => fileInputRef.current?.click()}
+        onLoadSample={() => handleLoadSample(false)}
+        onNewProject={openNew}
+      />
+      {showFilters && (
+        <div className="sf-below flex flex-col items-start gap-2" data-sf="filters">
+          {archive.archivedCount > 0 && <ShowArchivedFilter count={archive.archivedCount} checked={archive.showArchived} onChange={archive.setShowArchived} />}
+          {settingsUnread && <GridNote text={SETTINGS_UNREAD_NOTICE} />}
+          {archive.notice && <GridNote text={archive.notice} />}
+        </div>
+      )}
 
-        <AppNotices className="mb-4" />
+      {/* Access-denied notice — one-shot, shown after useProduct redirects
+          here because Firestore returned permission-denied (owner revoked
+          collaborator access mid-session, or revoked between sessions). */}
+      {accessDeniedMsg && (
+        <div className="sf-notice sf-notice--caution sf-below">
+          <p>You no longer have access to that product.</p>
+          <button type="button" onClick={() => setAccessDeniedMsg(false)} className="sf-notice-dismiss">
+            Dismiss
+          </button>
+        </div>
+      )}
 
-        <main ref={mainRef}>
-          {/* Access-denied banner — one-shot, shown after useProduct redirects
-              here because Firestore returned permission-denied (owner revoked
-              collaborator access mid-session, or revoked between sessions). */}
-          {accessDeniedMsg && (
-            <div className="mb-4 flex items-start justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg px-4 py-3">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                You no longer have access to that product.
-              </p>
-              <button
-                onClick={() => setAccessDeniedMsg(false)}
-                className="text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 ml-4"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
+      {/* Save error notice — mode-aware copy (matches ProductLayout). */}
+      {saveError && (
+        <div className="sf-notice sf-notice--error sf-below">
+          <p>
+            {mode === 'cloud'
+              ? 'Changes may not have saved. Check your connection.'
+              : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
+          </p>
+          <button type="button" onClick={() => setSaveError(false)} className="sf-notice-dismiss">
+            Dismiss
+          </button>
+        </div>
+      )}
 
-          {/* Save error banner — mode-aware copy (matches ProductLayout). */}
-          {saveError && (
-            <div className="mb-4 flex items-start justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 rounded-lg px-4 py-3">
-              <p className="text-sm text-red-800 dark:text-red-200">
-                {mode === 'cloud'
-                  ? 'Changes may not have saved. Check your connection.'
-                  : 'Your browser may be out of storage or in private mode. Latest changes may not have been saved.'}
-              </p>
-              <button
-                onClick={() => setSaveError(false)}
-                className="text-xs font-medium text-red-700 hover:text-red-900 dark:text-red-300 dark:hover:text-red-100 ml-4"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
+      <ImportPreviewSection
+        phase={importPhase}
+        mode={mode}
+        cloudDataLoaded={cloudDataLoaded}
+        fileInputRef={fileInputRef}
+        onFileChange={handleFileChange}
+        onSetDecision={setImportDecision}
+        onConfirm={handleConfirmImport}
+        onCancel={cancelImport}
+        archivedNote={archive.importNote}
+      />
 
-          <ProjectsToolbar
-            hasProjects={products.length > 0}
-            importDisabled={(mode === 'cloud' && !cloudDataLoaded) || importPhase.tag === 'applying'}
-            newProjectRef={newProjectRef}
-            onExportAll={exportAll.onExportAll}
-            onImport={() => fileInputRef.current?.click()}
-            onLoadSample={() => handleLoadSample(false)}
-            onNewProject={openNew}
-          />
-          {!loading && archive.archivedCount > 0 && <ShowArchivedFilter count={archive.archivedCount} checked={archive.showArchived} onChange={archive.setShowArchived} />}
+      <LocalSignedInLine show={mode === 'local' && !!user} />
+      {exportAll.dialog}
 
-          <ImportPreviewSection
-            phase={importPhase}
-            mode={mode}
-            cloudDataLoaded={cloudDataLoaded}
-            fileInputRef={fileInputRef}
-            onFileChange={handleFileChange}
-            onSetDecision={setImportDecision}
-            onConfirm={handleConfirmImport}
-            onCancel={cancelImport}
-            archivedNote={archive.importNote}
-          />
+      {/* Cloud orphan warning */}
+      <LocalOrphanNote count={localOrphanCount} />
 
-          <LocalSignedInLine show={mode === 'local' && !!user} />
-          {exportAll.dialog}
+      <ProductsBody
+        loading={loading}
+        settingsUnread={settingsUnread}
+        listedCount={products.length}
+        archivedCount={archive.archivedCount}
+        onCreateNew={openNew}
+        onLoadSample={() => handleLoadSample(true)}
+        projects={gridProjects}
+        onOpen={openProject}
+        onShare={openShare}
+        onExport={handleExport}
+        onEdit={openEdit}
+        onClone={handleClone}
+        onDelete={openDelete}
+        onMove={(draggedId, targetId) => { void order.moveOnto(draggedId, targetId, archive.hiddenIds); }}
+        colorOpenFor={archive.colorOpenFor}
+        onColorOpenChange={archive.setColorOpen}
+        onPickColor={archive.pickColor}
+        onArchive={archive.archiveId}
+        onUnarchive={archive.unarchiveId}
+      />
 
-          {/* Cloud orphan warning */}
-          <LocalOrphanNote count={localOrphanCount} />
-
-          <ProductsBody
-            loading={loading}
-            settingsUnread={order.settings.status === 'failed'}
-            listedCount={products.length}
-            archivedCount={archive.archivedCount}
-            notice={archive.notice}
-            onCreateNew={openNew}
-            onLoadSample={() => handleLoadSample(true)}
-            projects={gridProjects}
-            onOpen={openProject}
-            onShare={openShare}
-            onExport={handleExport}
-            onEdit={openEdit}
-            onClone={handleClone}
-            onDelete={openDelete}
-            onMove={(draggedId, targetId) => { void order.moveOnto(draggedId, targetId, archive.hiddenIds); }}
-            colorOpenFor={archive.colorOpenFor}
-            onColorOpenChange={archive.setColorOpen}
-            onPickColor={archive.pickColor}
-            onArchive={archive.archiveId}
-            onUnarchive={archive.unarchiveId}
-          />
-
-          {/* What Clone and Load Sample did, for a screen reader: the new tile may be out of sight. */}
-          <div role="status" className="sr-only">{announcement}</div>
-        </main>
-      </div>
+      {/* What Clone and Load Sample did, for a screen reader: the new tile may be out of sight. */}
+      <div role="status" className="sr-only">{announcement}</div>
 
       {dialog && (
         <ProjectDialog
@@ -514,8 +487,6 @@ export default function ProductList() {
         />
       )}
 
-      <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
-
       {shareTarget && (
         <ShareDialog
           productId={shareTarget.id}
@@ -523,8 +494,6 @@ export default function ProductList() {
           onClose={() => setShareTarget(null)}
         />
       )}
-
-      <Footer />
     </div>
   );
 }

@@ -6,7 +6,8 @@
 
 /**
  * The project page's two ways back to the project list (v0.53.33): "← Projects"
- * in the header and "Back to projects" on the "Project not found" screen. Both
+ * in the header and "Back to projects" on the "Project not found" screen. Since
+ * v0.57.0 (FRAME26) the first is the app frame's "Products" navigation item. Both
  * are router links, so leaving a project keeps the page loaded.
  *
  * jsdom cannot show a page load: a plain `<a href="/">` neither reloads nor
@@ -18,7 +19,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -32,6 +33,7 @@ import { resetLocalCaution } from '../lib/localCaution';
 import { flushPendingSaves } from '../lib/storage';
 import ProductList from '../pages/ProductList';
 import ProductLayout from '../components/layout/ProductLayout';
+import AppShell from '../components/layout/AppShell';
 import type { StorageDriver } from '../types';
 
 const CAUTION = /Your data exists only in this browser/;
@@ -41,16 +43,18 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/" element={<ProductList />} />
-        <Route path="/product/:productId" element={<ProductLayout />}>
-          <Route path="structure" element={<p>Structure page</p>} />
+        <Route element={<AppShell />}>
+          <Route path="/" element={<ProductList />} />
+          <Route path="/product/:productId" element={<ProductLayout />}>
+            <Route path="structure" element={<p>Structure page</p>} />
+          </Route>
         </Route>
       </Routes>
     </MemoryRouter>,
   );
 }
 
-const listHeading = () => screen.findByRole('heading', { level: 2, name: 'Products' });
+const listHeading = () => screen.findByRole('heading', { level: 1, name: 'Products' });
 const settle = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 
 let scrollTo: ReturnType<typeof vi.fn>;
@@ -71,7 +75,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('"← Projects" on a project page', () => {
+describe('"Products" in the navigation row on a project page (was "← Projects")', () => {
   it('opens the project list in the app, at the top, with a dismissed caution still dismissed', async () => {
     const p = createSampleProduct();
     localStorage.setItem(`rp:local:product_${p.id}`, JSON.stringify(p));
@@ -81,7 +85,7 @@ describe('"← Projects" on a project page', () => {
     const caution = await screen.findByText(CAUTION);
     await userEvent.click(caution.closest('div')!.querySelector('button')!);
 
-    await userEvent.click(screen.getByRole('link', { name: '← Products' }));
+    await userEvent.click(within(document.querySelector('nav')!).getByRole('link', { name: 'Products' }));
 
     expect(await listHeading()).toBeTruthy();
     expect(screen.queryByText('Structure page')).toBeNull();

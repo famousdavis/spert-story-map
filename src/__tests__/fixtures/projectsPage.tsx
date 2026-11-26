@@ -11,6 +11,7 @@ import { render } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ProductList from '../../pages/ProductList';
 import ProductLayout from '../../components/layout/ProductLayout';
+import AppShell from '../../components/layout/AppShell';
 import StructureView from '../../pages/StructureView';
 import { createNewProduct, flushPendingSaves } from '../../lib/storage';
 import type { MemberRole, Product, RibItem, Size } from '../../types';
@@ -95,14 +96,16 @@ export function storedOrder(): string[] | undefined {
   return raw ? (JSON.parse(raw) as { projectOrder?: string[] }).projectOrder : undefined;
 }
 
-/** The Projects page, with Structure behind it: a stub, or the real page. */
+/** The Projects page, with Structure behind it: a stub, or the real page. Inside the app frame (AppShell, v0.57.0). */
 export function renderPage(structure: 'stub' | 'real' = 'stub') {
   return render(
     <MemoryRouter>
       <Routes>
-        <Route path="/" element={<ProductList />} />
-        <Route path="/product/:productId" element={<ProductLayout />}>
-          <Route path="structure" element={structure === 'stub' ? <p>Structure page</p> : <StructureView />} />
+        <Route element={<AppShell />}>
+          <Route path="/" element={<ProductList />} />
+          <Route path="/product/:productId" element={<ProductLayout />}>
+            <Route path="structure" element={structure === 'stub' ? <p>Structure page</p> : <StructureView />} />
+          </Route>
         </Route>
       </Routes>
     </MemoryRouter>,

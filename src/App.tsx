@@ -4,10 +4,7 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ErrorBoundary from './components/ui/ErrorBoundary';
-import InvitationBanner from './components/ui/InvitationBanner';
-import AiTeardownBanner from './components/ui/AiTeardownBanner';
-import TermsSignOutBanner from './components/ui/TermsSignOutBanner';
-import LocalFoldBanner from './components/ui/LocalFoldBanner';
+import AppShell from './components/layout/AppShell';
 import ProductList from './pages/ProductList';
 import ProductLayout from './components/layout/ProductLayout';
 import StructureView from './pages/StructureView';
@@ -19,27 +16,29 @@ import StoryMapView from './pages/StoryMapView';
 import SizingView from './pages/SizingView';
 import ChangelogView from './pages/ChangelogView';
 import AboutView from './pages/AboutView';
+import NotFoundView from './pages/NotFoundView';
 
+// Every route sits in the SPERT® Suite app frame (FRAME26, v0.57.0): AppShell is one layout route, mounted once,
+// which also holds the app-wide notices that this file mounted outside <Routes> before.
 export default function App() {
   return (
     <ErrorBoundary>
-    <InvitationBanner />
-    <AiTeardownBanner />
-    <TermsSignOutBanner />
-    <LocalFoldBanner />
     <Routes>
-      <Route path="/" element={<ProductList />} />
-      <Route path="/about" element={<AboutView />} />
-      <Route path="/changelog" element={<ChangelogView />} />
-      <Route path="/product/:productId" element={<ProductLayout />}>
-        <Route index element={<Navigate to="structure" replace />} />
-        <Route path="structure" element={<StructureView />} />
-        <Route path="releases" element={<ReleasePlanningView />} />
-        <Route path="storymap" element={<StoryMapView />} />
-        <Route path="sizing" element={<SizingView />} />
-        <Route path="progress" element={<ProgressTrackingView />} />
-        <Route path="insights" element={<InsightsView />} />
-        <Route path="settings" element={<SettingsView />} />
+      <Route element={<AppShell />}>
+        <Route path="/" element={<ProductList />} />
+        <Route path="/about" element={<AboutView />} />
+        <Route path="/changelog" element={<ChangelogView />} />
+        <Route path="/product/:productId" element={<ProductLayout />}>
+          <Route index element={<Navigate to="structure" replace />} />
+          <Route path="structure" element={<StructureView />} />
+          <Route path="releases" element={<ReleasePlanningView />} />
+          <Route path="storymap" element={<StoryMapView />} />
+          <Route path="sizing" element={<SizingView />} />
+          <Route path="progress" element={<ProgressTrackingView />} />
+          <Route path="insights" element={<InsightsView />} />
+          <Route path="settings" element={<SettingsView />} />
+        </Route>
+        <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
     </ErrorBoundary>

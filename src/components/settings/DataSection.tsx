@@ -206,7 +206,7 @@ export default function DataSection({ product, driver, updateProduct }: DataSect
       if (issues.length > 0) setForecasterIssues(issues);
     } catch {
       setForecasterIssues([
-        'The export could not be built. A sprint may have an invalid end date — check the Sprints section in Settings.',
+        'The export could not be built. A sprint may have an invalid end date — check the Sprints section in Product Settings.',
       ]);
     }
   };

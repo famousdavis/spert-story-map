@@ -9,14 +9,20 @@ const LABELS: Record<ThemeMode, string> = { light: 'Light mode', dark: 'Dark mod
 interface ThemeToggleProps {
   theme: ThemeMode;
   onToggle: () => void;
-  className?: string;
 }
 
-export default function ThemeToggle({ theme, onToggle, className = '' }: ThemeToggleProps) {
+/**
+ * The frame's theme button (FRAME26, contract §3, v0.57.0): `.sf-theme`, 32 px, just left of the account chip. Its
+ * icons draw in `currentColor`: the frame's muted text at rest, its text colour on hover. It cycles Light → Dark →
+ * System, the contract's System → Light → Dark cycle, and keeps its names and the stored `spert-theme` setting.
+ */
+export default function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
   return (
     <button
+      type="button"
       onClick={onToggle}
-      className={`text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors ${className}`}
+      className="sf-theme"
+      data-sf="theme"
       aria-label={LABELS[theme]}
       title={LABELS[theme]}
     >

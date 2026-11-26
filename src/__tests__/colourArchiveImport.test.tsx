@@ -57,7 +57,7 @@ describe('R84 on the Products page', () => {
     seedLocal(stored);
     setPrefs(prefs);
     renderPage();
-    await screen.findByText('Products');
+    await screen.findByRole('heading', { level: 1, name: 'Products' });
     await settle();
     await userEvent.upload(fileInput(), fileOf(file));
     for (const name of replace) {
@@ -92,7 +92,7 @@ describe('R84 on the Products page', () => {
     seedLocal([a, makeProject({ id: 'p-B', name: 'B' })]);
     setPrefs({});
     renderPage();
-    await screen.findByText('Products');
+    await screen.findByRole('heading', { level: 1, name: 'Products' });
     await settle();
     expect(tileNames()).toEqual(['Alpha', 'B']);
     setPrefs({ 'p-A': { archived: true } }); // another tab archives Alpha
@@ -138,13 +138,14 @@ describe('"Show archived (N)" on the Products page', () => {
     seedLocal([makeProject({ id: 'p-A', name: 'Alpha' }), makeProject({ id: 'p-B', name: 'B' })]);
     setPrefs({ 'p-A': { archived: true } });
     renderPage();
-    await screen.findByText('Products');
+    await screen.findByRole('heading', { level: 1, name: 'Products' });
     await settle();
     await userEvent.upload(fileInput(), fileOf(makeProject({ id: 'p-C', name: 'C' })));
     const confirm = await screen.findByRole('button', { name: 'Confirm Import' });
     const box = req(screen.queryByRole('checkbox', { name: /^Show archived/ }), 'box');
-    const before = req(box.closest('div')?.previousElementSibling, 'the element before the box');
-    expect(before.querySelector('h2')?.textContent).toBe('Products');
+    // v0.57.0: the box is in the frame's filter row, whose previous sibling is the heading row.
+    const before = req(box.closest('[data-sf="filters"]')?.previousElementSibling, 'the element before the filter row');
+    expect(before.querySelector('h1')?.textContent).toBe('Products');
     expect(box.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
