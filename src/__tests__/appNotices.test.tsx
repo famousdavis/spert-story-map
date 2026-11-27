@@ -38,6 +38,7 @@ import AboutView from '../pages/AboutView';
 import ChangelogView from '../pages/ChangelogView';
 import AppShell from '../components/layout/AppShell';
 import type { StorageDriver } from '../types';
+import { req } from './testHelpers';
 
 const TERMS = /SPERT® Suite web apps are free to use/;
 const CAUTION = /Your data exists only in this browser/;
@@ -163,7 +164,7 @@ describe('local-storage caution', () => {
     go(`/product/${p.id}/structure`);
     await screen.findByText('Structure page');
     go('/about');
-    await screen.findByText('About This App');
+    await screen.findByRole('heading', { level: 1, name: 'About SPERT® Story Map' });
     go('/changelog');
     await screen.findByText('Changelog');
     go('/');
@@ -233,17 +234,20 @@ describe('placement on every page', () => {
     expect(follows(caution, content)).toBe(true);
   });
 
-  it.each([['/about', 'About This App'], ['/changelog', 'Changelog']])(
-    '%s shows both above its heading row, and its back link below it (v0.57.0)',
-    async (path, title) => {
+  // v0.59.0: About keeps its notices above the heading row and loses its back link (pass 3, D3: nothing between the
+  // heading row and the page); the changelog keeps both.
+  it.each([['/about', 'About SPERT® Story Map', false], ['/changelog', 'Changelog', true]] as const)(
+    '%s shows both above its heading row; a back link below it on the changelog only (v0.57.0, v0.59.0)',
+    async (path, title, hasBack) => {
       renderApp(path);
       const caution = await screen.findByText(CAUTION);
       const terms = screen.getByText(TERMS);
-      const back = screen.getByRole('link', { name: /← Back/ });
       const heading = screen.getByRole('heading', { level: 1, name: title });
       expect(follows(terms, caution)).toBe(true);
       expect(follows(caution, heading)).toBe(true);
-      expect(follows(heading, back)).toBe(true);
+      const back = screen.queryByRole('link', { name: /← Back/ });
+      if (hasBack) expect(follows(heading, req(back, 'back link'))).toBe(true);
+      else expect(back).toBeNull();
     },
   );
 

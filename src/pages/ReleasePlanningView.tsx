@@ -97,11 +97,11 @@ export default function ReleasePlanningView() {
 
   return (
     <div>
-      {/* Top bar */}
+      {/* Top bar. Its muted text and "Add Release" are gray-500 / dark gray-400, at least 4.5:1 on their ground (S3, v0.59.0). */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-baseline gap-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Release Planning</h2>
-          <span className="text-xs text-gray-400 dark:text-gray-500">{totalPoints} pts <span className="text-blue-500 dark:text-blue-400">{totalCore} core</span> · <span className="text-gray-400 dark:text-gray-500">{totalNonCore} non-core</span></span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{totalPoints} pts <span className="text-blue-500 dark:text-blue-400">{totalCore} core</span> · <span className="text-gray-500 dark:text-gray-400">{totalNonCore} non-core</span></span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">Filter:</span>
@@ -176,7 +176,7 @@ export default function ReleasePlanningView() {
           <div className="flex-shrink-0 w-72">
             <button
               onClick={addRelease}
-              className="w-full h-24 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+              className="w-full h-24 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
             >
               <span className="text-lg">+</span>
               <span className="text-sm font-medium">Add Release</span>

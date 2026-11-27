@@ -15,6 +15,11 @@
  * - S4 the Map's +Rib (2.43 / 4.30 hover in light) and +Release (the same, and 3.47 at rest in dark).
  * - The Map's release "×" (gray-400 / gray-500 on the canvas).
  *
+ * FRAME26 pass 3 (v0.59.0): About has no back link any more (D3), so S2 is the changelog's alone; Modal's close button
+ * is named "Close" (S1 of pass 3, its colour unchanged); and Release Planning's gray-400 / gray-500 text (S3 of pass 3:
+ * the totals line, both "non-core", "Target: …", the empty column's placeholder and "Add Release"), measured 2.49–3.67
+ * on production v0.58.0, is gray-500 / gray-400, checked here on each ground it sits on.
+ *
  * Each element is rendered (the Map's +Rib, which needs a pointer over a gap, is read from its source) and each of its
  * colours, in each theme, at rest and on hover, is checked on the ground it sits on. Tokens come from the vendored
  * stylesheet; Tailwind colours from a table measured in Chrome 154 (canvas, 2026-11-26), whose oklch sources are pinned
@@ -24,7 +29,7 @@
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -40,11 +45,12 @@ vi.mock('../lib/StorageProvider', () => ({ useStorage: () => ({ driver: { onSave
 vi.mock('../lib/AuthProvider', () => ({ useAuth: () => ({ user: null, firebaseAvailable: false }) }));
 
 import ProductLayout from '../components/layout/ProductLayout';
-import AboutView from '../pages/AboutView';
 import ChangelogView from '../pages/ChangelogView';
 import ConnectPanel from '../components/ConnectAI/ConnectPanel';
 import Modal from '../components/ui/Modal';
 import ReleaseDivider from '../components/storymap/ReleaseDivider';
+import ReleasePlanningView from '../pages/ReleasePlanningView';
+import { createSampleProduct } from '../lib/sampleData';
 import { req } from './testHelpers';
 
 const SRC = resolve(__dirname, '..');
@@ -70,6 +76,7 @@ const PALETTE: Record<string, [oklch: string, hex: string]> = {
   'blue-500': ['oklch(62.3% 0.214 259.815)', '#2b7fff'], 'blue-600': ['oklch(54.6% 0.245 262.881)', '#155dfc'],
   'blue-700': ['oklch(48.8% 0.243 264.376)', '#1447e6'], 'blue-800': ['oklch(42.4% 0.199 265.638)', '#193cb8'],
   'blue-900': ['oklch(37.9% 0.146 265.522)', '#1c398e'],
+  'gray-50': ['oklch(98.5% 0.002 247.839)', '#f9fafb'],
   'gray-100': ['oklch(96.7% 0.003 264.542)', '#f3f4f6'], 'gray-200': ['oklch(92.8% 0.006 264.531)', '#e5e7eb'],
   'gray-300': ['oklch(87.2% 0.01 258.338)', '#d1d5dc'], 'gray-400': ['oklch(70.7% 0.022 261.325)', '#99a1af'],
   'gray-500': ['oklch(55.1% 0.027 264.364)', '#6a7282'], 'gray-600': ['oklch(44.6% 0.03 256.802)', '#4a5565'],
@@ -135,12 +142,11 @@ describe('each element clears its bar, both themes, at rest and on hover', () =>
     expect(check({ name: 'Connect AI', cls: () => classesOf(button), ground: t => PAGE[t], min: 4.5 })).toEqual([]);
   });
 
-  it.each([['About', '/about', <Route key="a" path="/about" element={<AboutView />} />], ['the changelog', '/changelog', <Route key="c" path="/changelog" element={<ChangelogView />} />]] as const)(
-    'S2: "← Back to Products" on %s, on the page ground (≥ 4.5)', async (_label, path, route) => {
-      await renderAt(path, route);
-      const link = screen.getByRole('link', { name: '← Back to Products' });
-      expect(check({ name: 'back link', cls: () => classesOf(link), ground: t => PAGE[t], min: 4.5 })).toEqual([]);
-    });
+  it('S2: "← Back to Products" on the changelog, on the page ground (≥ 4.5); About has none since v0.59.0', async () => {
+    await renderAt('/changelog', <Route path="/changelog" element={<ChangelogView />} />);
+    const link = screen.getByRole('link', { name: '← Back to Products' });
+    expect(check({ name: 'back link', cls: () => classesOf(link), ground: t => PAGE[t], min: 4.5 })).toEqual([]);
+  });
 
   it('S3 and the code line: ConnectPanel\'s Retry and "Valid 15 min …" on the dialog\'s card (≥ 4.5)', async () => {
     render(<ConnectPanel open onClose={() => {}} onChangePermissions={async () => true} onDisconnect={async () => {}}
@@ -155,9 +161,9 @@ describe('each element clears its bar, both themes, at rest and on hover', () =>
     ]).toEqual([]);
   });
 
-  it('Modal\'s close "×" on its card (≥ 3, an icon), its name unchanged', () => {
+  it('Modal\'s close "×" on its card (≥ 3, an icon), named "Close" since v0.59.0', () => {
     render(<Modal open onClose={() => {}} title="T"><p>body</p></Modal>);
-    const close = screen.getByRole('button', { name: '×' });
+    const close = screen.getByRole('button', { name: 'Close' });
     const card = { light: '#ffffff', dark: hex('gray-900') };
     expect(check({ name: '×', cls: () => classesOf(close), ground: t => card[t], min: 3 })).toEqual([]);
   });
@@ -179,6 +185,39 @@ describe('each element clears its bar, both themes, at rest and on hover', () =>
     ]).toEqual([]);
   });
 
+  it('S3 (v0.59.0): Release Planning\'s muted text and "Add Release", each on its ground (≥ 4.5)', async () => {
+    const product = createSampleProduct();
+    const first = req(product.releases[0], 'a release');
+    product.releases.push({ ...first, id: 'r-empty', name: 'Empty', order: 999, targetDate: '2026-12-31' });
+    const context = { product, updateProduct: () => {}, undo: () => {}, redo: () => {} };
+    await renderAt('/', <Route element={<Outlet context={context} />}><Route path="/" element={<ReleasePlanningView />} /></Route>);
+    const totals = req(screen.getByRole('heading', { name: 'Release Planning' }).nextElementSibling, 'the totals line');
+    const totalsNonCore = req(Array.from(totals.querySelectorAll('span')).find(e => /non-core/.test(e.textContent ?? '')), 'totals non-core');
+    const add = screen.getByRole('button', { name: /Add Release/ });
+    const placeholder = screen.getByText('Drag items here or click to assign');
+    const targets = screen.getAllByText(/^Target: /);
+    const columnNonCore = screen.getAllByText(/^\d+ non-core$/).filter(e => e !== totalsNonCore);
+    expect(targets.length).toBe(product.releases.length);
+    expect(columnNonCore.length).toBe(product.releases.length);
+    // The grounds, read off the markup: a column header is gray-50 / gray-800, its body white / gray-900.
+    const header = req(req(targets[0], 'a target').parentElement, 'header');
+    expect(classesOf(header)).toEqual(expect.arrayContaining(['bg-gray-50', 'dark:bg-gray-800']));
+    const column = req(placeholder.closest('.rounded-xl'), 'the column');
+    expect(classesOf(column)).toEqual(expect.arrayContaining(['bg-white', 'dark:bg-gray-900']));
+    expect(classesOf(add)).toEqual(expect.arrayContaining(['hover:bg-gray-50', 'dark:hover:bg-gray-800']));
+    const headerGround = (t: Theme) => hex(t === 'light' ? 'gray-50' : 'gray-800');
+    const bodyGround = (t: Theme) => t === 'light' ? '#ffffff' : hex('gray-900');
+    const addGround = (t: Theme, st: State) => st === 'rest' ? PAGE[t] : hex(t === 'light' ? 'gray-50' : 'gray-800');
+    expect([
+      ...check({ name: 'totals line', cls: () => classesOf(totals), ground: t => PAGE[t], min: 4.5 }),
+      ...check({ name: 'totals non-core', cls: () => classesOf(totalsNonCore), ground: t => PAGE[t], min: 4.5 }),
+      ...check({ name: 'Add Release', cls: () => classesOf(add), ground: addGround, min: 4.5 }),
+      ...check({ name: 'empty column', cls: () => classesOf(placeholder), ground: bodyGround, min: 4.5 }),
+      ...targets.flatMap(e => check({ name: 'Target', cls: () => classesOf(e), ground: headerGround, min: 4.5 })),
+      ...columnNonCore.flatMap(e => check({ name: 'column non-core', cls: () => classesOf(e), ground: headerGround, min: 4.5 })),
+    ]).toEqual([]);
+  });
+
   it('S4: +Rib, read from MapContent\'s source (it renders only under the pointer) (≥ 4.5)', () => {
     const source = readFileSync(resolve(SRC, 'components/storymap/MapContent.tsx'), 'utf8');
     const at = source.indexOf('+ Rib\n');
@@ -194,6 +233,7 @@ describe('must-fail control: v0.57.0\'s classes fail the same check', () => {
     ['S3 Retry', 'text-xs text-blue-600 hover:underline', 4.5],
     ['S4 +Release', 'text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300', 4.5],
     ['Modal ×', 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300', 3],
+    ['S3 of pass 3 (v0.58.0)', 'text-xs text-gray-400 dark:text-gray-500', 4.5],
   ] as const)('%s', (name, old, min) => {
     const ground = (t: Theme) => t === 'light' ? (name === 'S4 +Release' ? hex('blue-50') : '#ffffff') : hex('gray-900');
     expect(check({ name, cls: () => old.split(' '), ground, min }).length).toBeGreaterThan(0);

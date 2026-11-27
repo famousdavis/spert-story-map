@@ -47,6 +47,19 @@ export default function SizePicker({ value, sizeMapping, onChange }: SizePickerP
     };
   }, []);
 
+  // While open, the dropdown closes when anything scrolls or the window resizes (S4, v0.59.0): it is `position: fixed`
+  // at the place its button had when it opened, so it would otherwise float away from it. KebabMenu does the same.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
   const handleToggle = () => {
     if (!open && ref.current) {
       const rect = ref.current.getBoundingClientRect();

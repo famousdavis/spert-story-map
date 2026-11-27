@@ -230,7 +230,7 @@ export default function ReleaseColumn({
             <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
               <span>{stats.totalPts} pts</span>
               <span className="text-blue-600 dark:text-blue-400">{Math.round(stats.core)} core</span>
-              <span className="text-gray-400 dark:text-gray-500">{Math.round(stats.nonCore)} non-core</span>
+              <span className="text-gray-500 dark:text-gray-400">{Math.round(stats.nonCore)} non-core</span>
               <span>{ribs.length} items</span>
             </div>
             {stats.percentComplete !== undefined && (
@@ -239,13 +239,13 @@ export default function ReleaseColumn({
               </div>
             )}
             {release.targetDate && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Target: {formatDate(release.targetDate)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Target: {formatDate(release.targetDate)}</p>
             )}
           </div>
           <div className="flex-auto p-2 min-h-[60px] overflow-y-auto">
             {cardList}
             {ribs.length === 0 && !isOver && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4 italic">
+              <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4 italic">
                 Drag items here or click to assign
               </p>
             )}

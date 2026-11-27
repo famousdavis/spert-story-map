@@ -66,7 +66,7 @@ async function at(path: string, h1: string | RegExp) {
 
 const ROUTES = () => [
   ['/', 'Products', 'standard', true],
-  ['/about', 'About This App', 'capped', true],
+  ['/about', 'About SPERT® Story Map', 'capped', true],
   ['/changelog', 'Changelog', 'capped', true],
   [`/product/${productId}/structure`, 'Billing System v2', 'standard', true],
   [`/product/${productId}/progress`, 'Billing System v2', 'standard', true],

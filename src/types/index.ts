@@ -350,6 +350,8 @@ export interface TosAcceptance {
 
 export interface ThemeColorOption {
   key: ColorKey;
+  /** The colour's name, for screen readers: each swatch's accessible name in the theme colour picker (S5, v0.59.0). */
+  label: string;
   solid: string;
   light: string;
   dot: string;

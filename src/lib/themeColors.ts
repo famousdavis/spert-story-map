@@ -12,6 +12,7 @@ import type { ColorKey, ThemeColorOption } from '../types';
 export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   {
     key: 'blue',
+    label: 'Blue',
     solid: 'bg-blue-600',
     light: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
     dot: 'bg-blue-400',
@@ -19,6 +20,7 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
   {
     key: 'teal',
+    label: 'Teal',
     solid: 'bg-teal-600',
     light: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200',
     dot: 'bg-teal-400',
@@ -26,6 +28,7 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
   {
     key: 'violet',
+    label: 'Violet',
     solid: 'bg-violet-600',
     light: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200',
     dot: 'bg-violet-400',
@@ -33,6 +36,7 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
   {
     key: 'rose',
+    label: 'Rose',
     solid: 'bg-rose-600',
     light: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
     dot: 'bg-rose-400',
@@ -40,6 +44,7 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
   {
     key: 'amber',
+    label: 'Amber',
     solid: 'bg-amber-600',
     light: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
     dot: 'bg-amber-400',
@@ -47,6 +52,7 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
   {
     key: 'emerald',
+    label: 'Emerald',
     solid: 'bg-emerald-600',
     light: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
     dot: 'bg-emerald-400',
@@ -54,6 +60,7 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
   {
     key: 'indigo',
+    label: 'Indigo',
     solid: 'bg-indigo-600',
     light: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200',
     dot: 'bg-indigo-400',
@@ -61,6 +68,7 @@ export const THEME_COLOR_OPTIONS: ThemeColorOption[] = [
   },
   {
     key: 'orange',
+    label: 'Orange',
     solid: 'bg-orange-600',
     light: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
     dot: 'bg-orange-400',

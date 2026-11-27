@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { APP_VERSION } from '../../lib/version';
 import { TOS_URL, PRIVACY_POLICY_URL, LICENSE_URL } from '../../lib/tosConstants';
 import { AI_PRIVACY_URL } from '../../lib/aiConstants';
+import { copyrightYear } from '../../lib/copyrightYear';
 
 /**
  * The frame's footer (FRAME26, contract §3, v0.57.0): a full-width 69 px band with a 1 px top rule and two centred
@@ -19,7 +20,7 @@ export default function AppFooter() {
     <footer className="sf-footer" data-sf="footer">
       <div className="sf-col">
         <div>
-          &copy; {new Date().getFullYear()} William W. Davis, MSPM, PMP |{' '}
+          &copy; {copyrightYear()} William W. Davis, MSPM, PMP |{' '}
           <Link to="/changelog">Version {APP_VERSION}</Link>{' '}
           | Licensed under GNU GPL v3
         </div>
