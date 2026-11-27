@@ -49,7 +49,7 @@ export function useDarkMode() {
     setTheme(prev => prev === 'light' ? 'dark' : prev === 'dark' ? 'system' : 'light');
   }, []);
 
-  const effective = theme === 'system' ? getSystemPreference() : theme;
-
-  return { theme, toggleTheme, isDark: effective === 'dark' };
+  // AppShell's theme button is this hook's one caller (v0.58.0). It no longer returns `isDark`: a second instance's copy
+  // went stale when the button changed the theme. Colours that follow the theme read `useIsDark()`, the `dark` class.
+  return { theme, toggleTheme };
 }

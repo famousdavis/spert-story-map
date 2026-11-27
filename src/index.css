@@ -29,18 +29,24 @@
 
   /* The thin scrollbars are the app's own scrolling panels' only, never the page's (v0.57.0): on the root, a styled
      scrollbar defeats the frame's `scrollbar-gutter: stable` with overlay scrollbars (a default Mac), and the column
-     moved 3 px between a short screen and a long one. The page's scrollbar is the platform's. */
-  #root *::-webkit-scrollbar {
+     moved 3 px between a short screen and a long one. The page's scrollbar is the platform's.
+     `[data-thin-scrollbars]` (v0.58.0) is a panel portalled to `body`, outside `#root`: the Products page's dialogs
+     (DialogShell). It names the portal's own root, never `html` or `body`, so the page's scrollbar is still untouched. */
+  #root *::-webkit-scrollbar,
+  [data-thin-scrollbars] *::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  #root *::-webkit-scrollbar-track {
+  #root *::-webkit-scrollbar-track,
+  [data-thin-scrollbars] *::-webkit-scrollbar-track {
     background: transparent;
   }
-  #root *::-webkit-scrollbar-thumb {
+  #root *::-webkit-scrollbar-thumb,
+  [data-thin-scrollbars] *::-webkit-scrollbar-thumb {
     @apply bg-gray-300 rounded dark:bg-gray-600;
   }
-  #root *::-webkit-scrollbar-thumb:hover {
+  #root *::-webkit-scrollbar-thumb:hover,
+  [data-thin-scrollbars] *::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-400 dark:bg-gray-500;
   }
 

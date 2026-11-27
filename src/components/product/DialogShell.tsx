@@ -130,6 +130,8 @@ export default function DialogShell({
     <div
       ref={overlayRef}
       className={OVERLAY}
+      // Portalled to body, outside #root: this names it for the app's thin scrollbars (index.css, v0.58.0).
+      data-thin-scrollbars=""
       // Only a press AND release on the backdrop itself counts: a text selection or a resize that
       // ends outside the dialog must not close it (the shared Modal's pattern #41).
       onMouseDown={e => { pressedOnOverlay.current = e.target === overlayRef.current; }}

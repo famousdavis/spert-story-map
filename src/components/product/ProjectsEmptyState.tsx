@@ -2,11 +2,14 @@
 // Licensed under the GNU General Public License v3.0.
 // See LICENSE file in the project root for full license text.
 
-// The welcome panel shown when there are no projects (v0.55.0): SPERT Forecaster's
-// `ProjectsEmptyState` at 38f1a63, with Story Map's words. Its card, border and text colours are
-// Forecaster theme names Story Map does not define (as classes they produce no CSS: a transparent
-// panel with a black dashed border), and its large radius is 10 px there, 8 px here. Each is
-// written here as its value.
+// The Welcome panel, shown when there are no products (v0.55.0; on the frame's `.sf-empty` since v0.58.0, FRAME26's
+// clean-up). Contract §3 and §7: in the tile grid's place, 16 px below the heading row, the full column wide, a dashed
+// card on the page ground in both themes. The stylesheet (v3) draws the card and its parts: the title, the lines, the
+// actions and the note. Its words are Story Map's own (v0.55.0, R22), unchanged.
+//
+// The title is "Welcome to " and the brand row's title exactly, its ® in the same `.sf-mark`. The two buttons are the
+// toolbar's two looks and its handlers: Create New Product is New Product's, Load Sample Product is Load Sample's.
+// `.sf-btn` makes them 36 px.
 
 import type React from 'react';
 import { PRODUCT_DEFINITION } from '../../lib/constants';
@@ -14,35 +17,29 @@ import { TOOLBAR_BUTTON, TOOLBAR_PRIMARY, TOOLBAR_SECONDARY } from './button-sty
 
 interface ProjectsEmptyStateProps {
   onCreateNew: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  onLoadSample: () => void;
+  onLoadSample: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 export default function ProjectsEmptyState({ onCreateNew, onLoadSample }: ProjectsEmptyStateProps) {
   return (
-    <div
-      className="mt-6 rounded-[10px] border border-dashed border-[#e5e5e5] dark:border-gray-700 p-8 text-center bg-white dark:bg-[#171717]"
-      role="region"
-      aria-labelledby="empty-state-heading"
-      data-sf="empty"
-    >
-      <h2 id="empty-state-heading" className="text-xl font-semibold text-[#333] dark:text-gray-100 mb-3">
-        Welcome to SPERT® Story Map
+    <div className="sf-empty" data-sf="empty" role="region" aria-labelledby="empty-state-heading">
+      <h2 id="empty-state-heading" className="sf-empty-title">
+        Welcome to SPERT<span className="sf-mark">®</span> Story Map
       </h2>
-      <p className="text-sm text-[#666] dark:text-gray-400 max-w-prose mx-auto">
+      <p className="sf-empty-text">
         Plan releases on a story map: themes, backbones and rib items, sized in story points, allocated to
         releases and tracked sprint by sprint.
       </p>
-      <p className="mt-2 text-sm text-[#666] dark:text-gray-400 max-w-prose mx-auto">{PRODUCT_DEFINITION}</p>
-      {/* The secondary button is transparent in dark mode: it sits on this panel, not on the page. */}
-      <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
-        <button type="button" onClick={onCreateNew} className={`${TOOLBAR_BUTTON} ${TOOLBAR_PRIMARY}`}>
+      <p className="sf-empty-text">{PRODUCT_DEFINITION}</p>
+      <div className="sf-empty-actions">
+        <button type="button" onClick={onCreateNew} className={`sf-btn ${TOOLBAR_BUTTON} ${TOOLBAR_PRIMARY}`}>
           Create New Product
         </button>
-        <button type="button" onClick={onLoadSample} className={`${TOOLBAR_BUTTON} ${TOOLBAR_SECONDARY} dark:bg-transparent`}>
+        <button type="button" onClick={onLoadSample} className={`sf-btn ${TOOLBAR_BUTTON} ${TOOLBAR_SECONDARY}`}>
           Load Sample Product
         </button>
       </div>
-      <p className="mt-4 text-xs italic text-[#666] dark:text-gray-500 max-w-prose mx-auto">
+      <p className="sf-empty-note">
         The sample product is a working example with four releases and four sprints of progress. You can explore
         it, edit it, or delete it at any time.
       </p>

@@ -212,7 +212,7 @@ export default function ReleaseDivider({
       {/* Left bottom buttons: + Release and × (hidden on collapsed lanes — no room) */}
       {!collapsed && onAddReleaseAfter && (
         <button
-          className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
+          className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
           style={{ left: 8, top: bottomBtnY }}
           onClick={() => onAddReleaseAfter(lane.releaseId)}
           title="Add release after this one"
@@ -228,7 +228,7 @@ export default function ReleaseDivider({
           className={`absolute text-[10px] font-medium rounded px-1 py-0.5 transition-colors ${
             hasAllocations
               ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
-              : 'text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 cursor-pointer'
+              : 'text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 cursor-pointer'
           }`}
           style={{ left: 72, top: bottomBtnY }}
           onClick={(e) => { e.stopPropagation(); if (!hasAllocations) onDeleteRelease(lane.releaseId); }}
@@ -295,7 +295,7 @@ export default function ReleaseDivider({
       {/* Right bottom buttons: + Release and × (hidden on collapsed lanes — no room) */}
       {!collapsed && onAddReleaseAfter && (
         <button
-          className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-400 hover:text-blue-600 dark:text-blue-500 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
+          className="absolute bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-[10px] font-medium rounded px-1.5 py-0.5 transition-colors whitespace-nowrap"
           style={{ left: rightLabelX + 8, top: bottomBtnY }}
           onClick={() => onAddReleaseAfter(lane.releaseId)}
           title="Add release after this one"
@@ -311,7 +311,7 @@ export default function ReleaseDivider({
           className={`absolute text-[10px] font-medium rounded px-1 py-0.5 transition-colors ${
             hasAllocations
               ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
-              : 'text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 cursor-pointer'
+              : 'text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 cursor-pointer'
           }`}
           style={{ left: rightLabelX + 72, top: bottomBtnY }}
           onClick={(e) => { e.stopPropagation(); if (!hasAllocations) onDeleteRelease(lane.releaseId); }}

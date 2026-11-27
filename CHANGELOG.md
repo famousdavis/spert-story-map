@@ -1,5 +1,32 @@
 # Changelog
 
+## Version 0.58.0 (2026-11-26)
+
+### Changed
+
+- **Load Sample now opens the sample on the Map, and names it "Sample: Billing System v2".** Load it again and the next one is "Sample: Billing System v2 (2)", then "(3)", so two samples never share a name; a product you archived, or named that way yourself, counts too. Samples you loaded before keep their names. A screen reader hears "Added “Sample: Billing System v2” to your products and opened it." The toolbar's Load Sample and the welcome panel's Load Sample Product both do this.
+- **The welcome panel** you see when you have no products now matches the other SPERT® Suite apps: it sits just under the Products heading, its buttons are the toolbar's size, and in the dark theme it is on the page's own background rather than a near-black card. Its words and buttons are unchanged.
+- **The app's settings dialog is now titled "Settings"**, the name of the navigation item that opens it. It still holds Cloud Storage, Export Attribution and Notifications. (The Quick Reference Guide still calls it the Cloud Storage modal until its next revision.)
+- **Easier to read, in the light and the dark theme:** the Connect AI button when no AI is connected; "← Back to Products" on About and the changelog; the Map's "+ Rib" and "+ Release" buttons and a release's "×"; the "×" that closes a dialog; and, in the Connect AI panel, Retry and the line under the session code.
+- **Charts follow the theme button at once.** Before, the Progress and Insights charts kept their old colours until you left the tab and came back.
+- **Release Planning's columns now fit the window.** Each column ends just above the bottom of the window and scrolls its own cards; before, every column ran 57 px past it.
+- At 150 % zoom, an item in the navigation row that the keyboard reaches is scrolled fully into view, focus ring and all.
+- Structure's theme colour picker no longer draws over the navigation row when it is scrolled under it.
+- The New Product, Edit Product and Delete dialogs on the Products page have thin scrollbars again, like every other dialog.
+- Every dialog is announced to screen readers as a dialog, by its title.
+
+### Internal
+
+- FRAME26 clean-up. Stylesheet v3 vendored byte for byte (`src/styles/spert-frame.css`, md5 `b00d0759ec0a0a4d2db6ba10b16678f0`, version "3", spert-suite-docs `346d584`), which adds the Welcome panel (`.sf-empty`); `frameStylesheet.test.ts` re-pinned. `ProjectsEmptyState` is now `.sf-empty` and its parts, the title's ® in `.sf-mark` as in the brand row; its own card, corner, ground and type classes are gone.
+- Load Sample (contract §7): `src/lib/sampleName.ts` (`sampleName`, the first free "Sample: ‹name›", "(2)", …, exact names; `sampleAddedMessage`). The names are read fresh from the driver at the click, every product included, plus clones in flight. A mouse click swallows the rest of its gesture (`swallowRestOfGesture`, as the tile's open does) and a second click while a load is in flight is ignored. The message goes through `src/lib/appAnnouncer.ts` and `AppAnnouncer`, one `aria-live="polite"` region mounted once in `AppShell`, so it is heard after the route change. The Products page's welcome-panel focus request is gone (the page is left).
+- Contrast: Connect AI (inactive) and the back links take the frame's tokens, muted at rest and the text colour on hover (4.84 / 6.82, 12.63 / 14.40; were 2.60 / 3.67 at rest). Retry gains `dark:text-blue-400` (6.72; was 3.38). The code line, the dialog "×" and the release "×" are gray-500 / gray-400. "+ Rib" and "+ Release" are blue-700, blue-800 on hover, in light (6.28 / 7.23; were 2.43 / 4.30), and "+ Release" blue-400 at rest in dark (4.94; was 3.47). `cleanupContrast.test.tsx`.
+- `AppNav`: a keyboard-focused work item partly outside the scrolling zone is scrolled in by the hidden amount rounded up to a whole pixel (Chrome keeps scroll offsets whole: 4.4 moved 4), on `:focus-visible` only; at 853 px Insights now sits 0.6 px inside the zone, from 4.4 px outside (`appNavFocusReveal.test.tsx`). `Modal`: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` its title (`modalDialog.test.tsx`). Structure's colour picker `z-50` → `z-20`, below the sticky navigation row's 30 (`structurePickerStacking.test.tsx`).
+- Release Planning: each column, header and list together, is at most `RELEASE_COLUMN_MAX_HEIGHT`, `calc(100vh - 244px)`, derived beside `CANVAS_TOP` in `framePlace.ts` (the board's top 228 + its `pb-4` 16); the list takes the rest. The lists' `100vh-280px` / `-250px` are gone (`releaseColumnHeight.test.tsx`).
+- `useIsDark()` (`src/hooks/useIsDark.ts`, the `dark` class on `<html>` through `useSyncExternalStore`) is the one theme source for the charts (`BurnUpChart`, `InsightsView`); `useDarkMode` keeps the theme and its button for `AppShell` and no longer returns `isDark` (`chartTheme.test.tsx`).
+- Tests never configure Firebase: `vite.config.ts` blanks the three Firebase keys in `test.env`, and `src/__tests__/setup/networkGuard.ts`, run before every test file, refuses any connection to a Google or Firebase host. With a developer's `.env.local`, `localStoreFold.test.ts` had made a real Firestore write and called production's `teardownAiSession` Cloud Function; it also mocks `lib/firebase` now. Measured: the whole suite with `.env.local` present opens no socket (`networkGuard.test.ts`).
+- The thin scrollbars in `src/index.css` also apply under `[data-thin-scrollbars]`, which `DialogShell`'s overlay (portalled to `body`) carries; `html` and `body` are never matched (`rootScrollbar.test.ts`, `dialogScrollbar.test.tsx`).
+- New tests: `sampleName`, `loadSample`, `welcomePanel.frame`, `cleanupContrast`, `appNavFocusReveal`, `modalDialog`, `structurePickerStacking`, `releaseColumnHeight`, `chartTheme`, `networkGuard`, `dialogScrollbar`, each falsified once.
+
 ## Version 0.57.0 (2026-11-26)
 
 ### Changed

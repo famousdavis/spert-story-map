@@ -16,13 +16,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, AreaChart, Area, ComposedChart, Line,
 } from 'recharts';
-import { useDarkMode } from '../hooks/useDarkMode';
+import { useIsDark } from '../hooks/useIsDark';
 import type { OutletContextValue } from '../types';
 
 
 export default function InsightsView() {
   const { product, updateProduct } = useOutletContext<OutletContextValue>();
-  const { isDark } = useDarkMode();
+  const isDark = useIsDark();
 
   const totalPoints = useMemo(() => getTotalProjectPoints(product), [product]);
   const { core, nonCore } = useMemo(() => getCoreNonCorePoints(product), [product]);

@@ -10,6 +10,7 @@ import AppHeader from './AppHeader';
 import AppNav from './AppNav';
 import AppFooter from './AppFooter';
 import AppSettingsModal from '../settings/AppSettingsModal';
+import AppAnnouncer from './AppAnnouncer';
 import InvitationBanner from '../ui/InvitationBanner';
 import AiTeardownBanner from '../ui/AiTeardownBanner';
 import TermsSignOutBanner from '../ui/TermsSignOutBanner';
@@ -33,6 +34,9 @@ import LocalStorageCaution from '../ui/LocalStorageCaution';
  * `:not(:has(> *))`). A notice that belongs to one page (Products' or a product's) sits below that page's heading row.
  *
  * The Map and Sizing run full bleed (X2) and have no footer (X5); inside a product the navigation row sticks (X3).
+ *
+ * `AppAnnouncer` is the app's own polite live region (v0.58.0): mounted once here, so a message sent just before a
+ * route change (Load Sample's, which opens the Map) is still heard after it.
  */
 export default function AppShell() {
   const { pathname } = useLocation();
@@ -57,6 +61,7 @@ export default function AppShell() {
       </main>
       {!framePlace(pathname).canvas && <AppFooter />}
       <AppSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+      <AppAnnouncer />
     </div>
   );
 }

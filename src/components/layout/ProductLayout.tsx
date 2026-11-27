@@ -111,8 +111,9 @@ export default function ProductLayout() {
 
   // The product's own heading row (contract §7): its name is the page's h1, one line, cut with an ellipsis, the full
   // name in `title`. Saved is status text just left of the toolbar, outside it, at its own 12 px (D10), in the frame's
-  // muted colour (4.84 : 1 on #ffffff, 6.82 on #101828). Connect AI is the toolbar's one button, 36 px (`.sf-btn`),
-  // its two states and colours as before.
+  // muted colour (4.84 : 1 on #ffffff, 6.82 on #101828). Connect AI is the toolbar's one button, 36 px (`.sf-btn`).
+  // Inactive, it is the theme button's rule (v0.58.0): the frame's muted text, the text colour on hover (4.84 / 6.82,
+  // 12.63 / 14.40); it was gray-400 / gray-500, 2.60 / 3.67. Active, unchanged.
   const saved = lastSaved ? (
     <span className="flex-none text-xs whitespace-nowrap text-[color:var(--sf-text-muted)]">
       Saved {formatRelativeTime(lastSaved)}
@@ -124,7 +125,7 @@ export default function ProductLayout() {
       className={`sf-btn px-2.5 rounded-md transition-colors ${
         sessionState.sessionActive
           ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20'
-          : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+          : 'text-[color:var(--sf-text-muted)] hover:text-[color:var(--sf-text)]'
       }`}
     >
       {sessionState.sessionActive && (

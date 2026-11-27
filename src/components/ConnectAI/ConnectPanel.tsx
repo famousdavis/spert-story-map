@@ -109,7 +109,7 @@ export default function ConnectPanel({
           {codeError ? (
             <div className="flex items-center gap-2">
               <span className="text-red-600 dark:text-red-400 text-xs">Couldn’t generate a code.</span>
-              <button onClick={fetchCode} className="text-xs text-blue-600 hover:underline">Retry</button>
+              <button onClick={fetchCode} className="text-xs text-blue-600 hover:underline dark:text-blue-400">Retry</button>
             </div>
           ) : (
             <div className="flex flex-col items-start gap-2">
@@ -132,7 +132,7 @@ export default function ConnectPanel({
               </div>
             </div>
           )}
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {codeLoading ? 'Generating code…' : 'Valid 15 min · refreshes automatically'}
           </p>
         </div>

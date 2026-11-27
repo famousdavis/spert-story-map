@@ -8,6 +8,9 @@
 // rp:{uid}, into rp:local. Over the real storage module and real localStorage (jsdom).
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+// No Firebase in this test, whatever `.env.local` holds (v0.58.0): the fold ends a recorded Connect AI session, and with
+// a real app that was a real Firestore delete and a real call to production's teardownAiSession.
+vi.mock('../lib/firebase', () => ({ db: null, auth: null, functionsInstance: null, isFirebaseAvailable: false }));
 import { foldOwnProducts, foldLocalStore } from '../lib/localStoreFold';
 import { foldCopyId } from '../lib/foldCopyId';
 import * as storage from '../lib/storage';

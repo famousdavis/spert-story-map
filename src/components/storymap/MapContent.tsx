@@ -301,7 +301,7 @@ export default function MapContent({
           style={{ left: hoverGap.x, top: hoverGap.y, width: hoverGap.width, height: GAP_BUTTON_HEIGHT }}
         >
           <button
-            className="w-full h-full bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 text-[10px] rounded px-1 transition-colors dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 dark:hover:text-blue-300"
+            className="w-full h-full bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 text-[10px] rounded px-1 transition-colors dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:text-blue-400 dark:hover:text-blue-300"
             onClick={() => hoverGap.releaseId ? onAddRibToRelease?.(hoverGap.themeId, hoverGap.backboneId, hoverGap.releaseId) : onAddRib?.(hoverGap.themeId, hoverGap.backboneId)}
           >
             + Rib

@@ -26,7 +26,7 @@ interface ProductsBodyProps extends Omit<GridProps, 'dragDisabledReason'> {
   listedCount: number;
   archivedCount: number;
   onCreateNew: ComponentProps<typeof ProjectsEmptyState>['onCreateNew'];
-  onLoadSample: () => void;
+  onLoadSample: ComponentProps<typeof ProjectsEmptyState>['onLoadSample'];
 }
 
 export default function ProductsBody({
