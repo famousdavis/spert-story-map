@@ -18,8 +18,8 @@ import { join, relative, resolve } from 'node:path';
 
 const SRC = resolve(__dirname, '..');
 const FRAME = resolve(SRC, 'styles/spert-frame.css');
-/** The canonical copy's md5 at spert-suite-docs 346d584, stylesheet version "3" (v0.58.0: the Welcome panel, `.sf-empty`). */
-const MD5 = 'b00d0759ec0a0a4d2db6ba10b16678f0';
+/** The canonical copy's md5 at spert-suite-docs be37884, stylesheet version "4" (v0.59.0: the About page, `.sf-about`). */
+const MD5 = '7f8e40a37b008027e06123fe13e1b2f8';
 const IMPORT = '@import "./styles/spert-frame.css";';
 
 /** Every source file under src/ that could import a stylesheet, tests aside. */
@@ -32,12 +32,12 @@ function sources(dir = SRC): string[] {
 }
 
 describe('the vendored frame stylesheet (contract §9.1)', () => {
-  it('is byte-identical to the canonical copy: md5 b00d0759…', () => {
+  it('is byte-identical to the canonical copy: md5 7f8e40a3…', () => {
     expect(createHash('md5').update(readFileSync(FRAME)).digest('hex')).toBe(MD5);
   });
 
-  it('declares stylesheet version "3"', () => {
-    expect(readFileSync(FRAME, 'utf8')).toMatch(/--sf-version:\s*"3";/);
+  it('declares stylesheet version "4"', () => {
+    expect(readFileSync(FRAME, 'utf8')).toMatch(/--sf-version:\s*"4";/);
   });
 
   it('src/index.css imports it exactly once, right after Tailwind, outside every @layer', () => {

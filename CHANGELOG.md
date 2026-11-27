@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.59.0 (2026-11-27)
+
+### Changed
+
+- **One About page across the SPERT® Suite.** About now reads "About SPERT® Story Map" and follows the suite's shared layout: what Story Map is, how it works in six steps, Connect AI, the two guides as listed in the Help Center, your data and storage, and version and license. The "← Back to Products" link is gone (Products is the first item in the navigation row). The storage text no longer says your data never leaves your device: Connect AI's Read Mode sends the open product to the relay while an assistant is connected.
+- **Dialogs keep the keyboard inside.** Opening a dialog moves focus into it; Tab and Shift+Tab stay within it; Escape closes it; focus returns to the button that opened it. The close button is named "Close" for screen readers.
+- **Release Planning's light grey text is readable**: "Add Release", the totals line, "non-core", "Target: …" and an empty column's "Drag items here or click to assign" now meet 4.5:1 in both themes.
+- **The size picker closes when the page scrolls**, instead of floating away from its button.
+- **Theme colour swatches on Structure are named** for screen readers and say which is chosen.
+
 ## Version 0.58.0 (2026-11-26)
 
 ### Changed

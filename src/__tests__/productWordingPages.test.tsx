@@ -87,12 +87,14 @@ describe('R31: what a product is (D12)', () => {
 });
 
 describe('the way home (D4)', () => {
-  it('About: "← Back to Products"; its purpose is product work; the suite keeps its own word (D8, D9)', () => {
+  // v0.59.0: About has no back link (FRAME26 pass 3, D3: Products is the navigation row's first item); its purpose is
+  // still product work, and the suite's name is capitalised and marked, as William approved the words.
+  it('About: no back link; its purpose is product work; the suite keeps its own word (D8, D9, pass 3)', () => {
     render(<MemoryRouter><AboutView /></MemoryRouter>);
-    expect(screen.getByRole('link', { name: '← Back to Products' })).toHaveAttribute('href', '/');
+    expect(screen.queryByRole('link', { name: /← Back/ })).toBeNull();
     const text = squash(document.body.textContent);
     expect(text).toContain('a three-level hierarchy (Theme → Backbone → Rib Item) for organizing product work, with features for:');
-    expect(text).toContain('SPERT Story Map is part of the SPERT® suite of project management tools.');
+    expect(text).toContain('SPERT® Story Map is part of the SPERT® Suite of project management tools.');
   });
 
   it('the changelog page: "← Back to Products", as before (B1)', () => {
