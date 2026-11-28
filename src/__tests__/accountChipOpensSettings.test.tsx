@@ -29,7 +29,7 @@ import AppShell from '../components/layout/AppShell';
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); state.mode = 'local'; });
 
 describe('the signed-in account chip opens the dialog its name says (S1)', () => {
-  it.each(['local', 'cloud'] as const)('%s storage: "Signed in as Ana — %s storage — open Settings" opens "Settings"', async (mode) => {
+  it.each(['local', 'cloud'] as const)('%s storage: the chip named "Signed in as Ana — … storage — open Settings" opens "Settings"', async (mode) => {
     state.mode = mode;
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
     render(<MemoryRouter><Routes><Route element={<AppShell />}><Route path="/" element={<p>Products</p>} /></Route></Routes></MemoryRouter>);
