@@ -7,8 +7,9 @@
 /**
  * N4 (FRAME26, v0.57.0): the storage pill is the frame's account chip, `.sf-chip`, in all three of its states: signed
  * out ("Local only" · "Sign in"), signed in with Local storage, and signed in with Cloud storage. Its two segments are
- * the frame's state (muted) and act (link colour); the accessible names are v0.56.5's, unchanged; every click opens the
- * app's Settings dialog. The avatar keeps #0070f3 with a white initial (4.55 : 1) and is 22 px, to fit the 30 px chip.
+ * the frame's state (muted) and act (link colour); signed in, the accessible name ends "open Settings" (v0.59.1, S1 of
+ * the FRAME26 follow-ups; it said "click to open Cloud Storage settings" before); every click opens the app's Settings
+ * dialog. The avatar keeps #0070f3 with a white initial (4.55 : 1) and is 22 px, to fit the 30 px chip.
  * The colours' contrast is pinned against the vendored tokens in `frameStage0Contrast.test.tsx`.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -48,21 +49,21 @@ describe('the account chip (contract §3, §7)', () => {
     expect(c.el.children).toHaveLength(2);
   });
 
-  it('signed in with Local storage: the avatar and first name, then the lock; named as before', () => {
+  it('signed in with Local storage: the avatar and first name, then the lock; named "… — open Settings"', () => {
     state.user = ANA;
     const c = chip();
-    expect(c.el.getAttribute('aria-label')).toBe('Signed in as Ana — local storage — click to open Cloud Storage settings');
+    expect(c.el.getAttribute('aria-label')).toBe('Signed in as Ana — local storage — open Settings');
     expect(c.state.textContent).toBe('AAna');
     const lock = req(c.act.querySelector('svg'), 'the lock');
     expect(lock.querySelector('rect')).toBeTruthy();
     expect(lock.getAttribute('class')).toBe('text-[color:var(--sf-text-muted)]');
   });
 
-  it('signed in with Cloud storage: the avatar and first name, then the cloud in currentColor; named as before', () => {
+  it('signed in with Cloud storage: the avatar and first name, then the cloud in currentColor; named "… — open Settings"', () => {
     state.user = ANA;
     state.mode = 'cloud';
     const c = chip();
-    expect(c.el.getAttribute('aria-label')).toBe('Signed in as Ana — cloud storage — click to open Cloud Storage settings');
+    expect(c.el.getAttribute('aria-label')).toBe('Signed in as Ana — cloud storage — open Settings');
     const cloud = req(c.act.querySelector('svg path'), 'the cloud');
     expect(cloud.getAttribute('fill')).toBe('currentColor');
     expect(c.act.querySelector('rect')).toBeNull();

@@ -53,7 +53,9 @@ interface StorageStatusPillProps {
  * The frame's account chip (FRAME26, contract §3 and §7, v0.57.0): `.sf-chip`, 30 px tall, its right edge at the
  * column's right edge, last in the brand row. Two segments: the state (`.sf-chip-state`, muted) and the act
  * (`.sf-chip-act`, the link colour). The chip's ground on hover is the frame's `--sf-hover`. Every click, in every
- * state, opens the app's Settings dialog. The accessible names are unchanged from v0.56.5.
+ * state, opens the app's Settings dialog. Signed in, the accessible name ends "open Settings", the dialog's title
+ * (v0.59.1; until then it said "click to open Cloud Storage settings", the dialog's name before v0.58.0). Signed out it
+ * is "Sign in", the act segment's words. `accountChipOpensSettings.test.tsx` holds the name to the dialog it opens.
  */
 export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
   const { user } = useAuth();
@@ -72,9 +74,9 @@ export default function StorageStatusPill({ onClick }: StorageStatusPillProps) {
       data-sf="chip"
       aria-label={
         isCloudSignedIn
-          ? `Signed in as ${firstName} — cloud storage — click to open Cloud Storage settings`
+          ? `Signed in as ${firstName} — cloud storage — open Settings`
           : isSignedInLocal
-            ? `Signed in as ${firstName} — local storage — click to open Cloud Storage settings`
+            ? `Signed in as ${firstName} — local storage — open Settings`
             : 'Sign in'
       }
     >

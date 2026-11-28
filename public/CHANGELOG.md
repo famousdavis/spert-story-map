@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.59.1 (2026-11-28)
+
+### Changed
+
+- **The account chip's screen-reader name now names the dialog it opens.** Signed in, a screen reader heard "… click to open Cloud Storage settings", but the chip opens the Settings dialog. It now hears "Signed in as ‹your first name› — cloud storage — open Settings", or "local storage" when your products are kept in this browser. Signed out, the chip is still named "Sign in".
+
+### Internal
+
+- `StorageStatusPill`: the two signed-in `aria-label`s end "open Settings", the title of `AppSettingsModal`. `accountChip.frame.test.tsx` holds the new names; `accountChipOpensSettings.test.tsx`, new, clicks the chip in `AppShell` by its name and finds the dialog that name ends with. Each falsified once.
+
 ## Version 0.59.0 (2026-11-27)
 
 ### Changed
